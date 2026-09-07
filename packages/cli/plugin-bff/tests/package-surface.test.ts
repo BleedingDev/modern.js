@@ -72,6 +72,12 @@ describe('published package surface', () => {
   });
 
   test('declares the emitted CLI type dependency as an optional peer', () => {
+    const appToolsPackage = JSON.parse(
+      fs.readFileSync(
+        path.resolve(packageRoot, '../../solutions/app-tools/package.json'),
+        'utf8',
+      ),
+    );
     const cliDeclaration = fs.readFileSync(
       path.join(packageRoot, 'dist/types/cli.d.ts'),
       'utf8',
@@ -88,7 +94,7 @@ describe('published package surface', () => {
       dependency: undefined,
       devDependency: 'workspace:*',
       optional: true,
-      peerDependency: 'workspace:^3.8.3',
+      peerDependency: `workspace:^${appToolsPackage.version}`,
     });
   });
 });
