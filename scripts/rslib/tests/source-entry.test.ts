@@ -203,7 +203,7 @@ describe('Rslib bundleless source entries', () => {
     );
 
     expect(entryDeclaration).toContain('identifySourceEntry(): string');
-    expect(entryDeclaration).toContain("from './component'");
+    expect(entryDeclaration).toContain("from './component.js'");
     expect(entryDeclaration).not.toContain('@fixture/component');
     expect(
       fs.readFileSync(

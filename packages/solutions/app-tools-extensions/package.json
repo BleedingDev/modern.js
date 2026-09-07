@@ -128,7 +128,7 @@
   "devDependencies": {
     "@module-federation/runtime-tools": "2.9.0",
     "@modern-js/rslib": "workspace:*",
-    "@rslib/core": "0.23.2",
+    "@rslib/core": "1.0.0",
     "@rsbuild/core": "2.2.0",
     "@scripts/rstest-config": "workspace:*",
     "@types/babel__traverse": "7.28.0",

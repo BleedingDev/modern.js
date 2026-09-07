@@ -192,6 +192,62 @@ The newer upstream source remains present in `HEAD`. The historical transition
 tables below document prior reviews only and do not authorize current growth or
 a future provenance debt reset.
 
+### 2026-09-07 upstream integration through `b6f7840959`
+
+Owner: `bleedingdev`. The release incorporates upstream Modern.js main through
+`b6f7840959947411e6f309d207e5572f907bccc0`, following the existing v3.9.0 merge
+at `ae639d9c1c`. This brings the upstream Rslib 1.0.0 upgrade, its externals
+compatibility changes, the standard creator configuration filename, and the
+Sandpack static template import. The fork keeps its native TS-Go compiler;
+upstream's JavaScript ts-node compiler selection change does not apply to that
+implementation (SRV-20/SRV-21).
+
+This integration does **not** advance the gate's reviewed provenance, alter the
+immutable `eded841256` ownership base, or increase any divergence budget. A
+read-only measurement of the staged integration against the new upstream SHA,
+before release preparation, still found **716 violations** against the existing
+budgets (1,225 governed files / 3,417 hunks / 163,914 changed lines). The untouched
+starting branch had 744 violations using its recorded provenance. These counts
+are audit evidence of unresolved historical debt, not a new allowed snapshot.
+A separately reviewed provenance carry-forward must preserve identity and
+budgets; the ordinary writer must continue to reject uncovered growth.
+
+The following small package edits retain upstream source already accepted in
+`web-infra-dev/modern.js`; their rows record resolution (1), without granting new
+fork behavior or larger budgets. The BFF app-tools peer alignment is separately
+identified as a capped fork correction within the same four-line manifest delta.
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/adapter-rstest/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/cli/builder/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/cli/plugin-bff/package.json` | bleedingdev | Retain upstream Rslib 1.0.0 settings and align the app-tools workspace peer with the integrated Modern.js 3.9.0 baseline; four added-plus-removed PR lines | `upstream-PR` + `keep-[M]` + `capped-patch` |
+| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/cli/plugin-ssg/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/cli/plugin-styled-components/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/runtime/plugin-image/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/runtime/plugin-runtime/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/runtime/render/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/bff-core/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/bff-runtime/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/core/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/create-request/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/plugin-polyfill/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/prod-server/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/server-runtime/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/server/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/server/utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/solutions/app-tools/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/create/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/i18n-utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/plugin/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/runtime-utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/sandpack-react/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/sandpack-react/src/templates/index.ts` | bleedingdev | Retain the reviewed upstream static ESM template import required by the new Rslib build | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Retain the reviewed upstream Rslib 1.0 externals callback and optional library configuration compatibility | `upstream-PR` + `keep-[M]` |
+
 ### 2026-09-02 app-tools deployment-template packaging repair
 
 | Upstream-owned path | Owner | Reason | Disposition |

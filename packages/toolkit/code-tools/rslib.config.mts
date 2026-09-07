@@ -3,7 +3,7 @@ import { defineConfig } from '@rslib/core';
 
 export default defineConfig({
   ...rslibConfig,
-  lib: rslibConfig.lib.map(config =>
+  lib: rslibConfig.lib?.map(config =>
     config.dts
       ? {
           ...config,

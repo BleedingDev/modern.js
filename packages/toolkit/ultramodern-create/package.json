@@ -82,9 +82,9 @@
     "bin"
   ],
   "scripts": {
-    "build": "pnpm clean && rslib build -c rslibconfig.mts",
+    "build": "pnpm clean && rslib build -c rslib.config.mts",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "dev": "rslib build -c rslibconfig.mts -w",
+    "dev": "rslib build -c rslib.config.mts -w",
     "start": "node ./dist/esm-node/index.js",
     "test": "pnpm build && rstest --passWithNoTests",
     "type-check": "tsgo --noEmit -p tsconfig.json"
@@ -99,7 +99,7 @@
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",
-    "@rslib/core": "0.23.2",
+    "@rslib/core": "1.0.0",
     "@scripts/rstest-config": "workspace:*",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
