@@ -4,6 +4,7 @@ import {
   RELEASE_COHORT_PROJECTION_PATH,
   readCreateReleaseCohort,
 } from '../../ultramodern-release-cohort';
+import { createAppEnvDts } from '../../ultramodern-workspace/app-files';
 import {
   createDevelopmentOverlay,
   createTopology,
@@ -628,7 +629,16 @@ function migrateStrictEffect(
       : undefined;
 
   const currentApps = workspaceAppsFromToolingConfig(current);
+  const allCurrentApps = allWorkspaceAppsFromToolingConfig(current);
   const artifactOwnership = preserveConsumerWorkspaceArtifacts(io, [
+    ...allCurrentApps.map(app => ({
+      relativePath: `${app.directory}/src/modern-app-env.d.ts`,
+      content: createAppEnvDts(
+        app,
+        allCurrentApps.filter(remote => remote.kind !== 'shell'),
+        current.workspace.packageScope,
+      ),
+    })),
     ...migratedWorkspaceScriptArtifacts({
       shellOnly: false,
       hasBackendSurface: true,
