@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { semver } from '@modern-js/utils';
 import {
   ULTRAMODERN_PACKAGE_PINS,
   ULTRAMODERN_WORKSPACE_POLICY,
@@ -8,6 +9,16 @@ import type { MigrationIo } from './io';
 
 const { toolchain } = ULTRAMODERN_WORKSPACE_POLICY;
 const retiredRootToolingDependencies = ['@typescript/typescript6'] as const;
+
+function migrationPnpmVersion(value: unknown) {
+  const baseline = toolchain.packageManager.version;
+  return typeof value === 'string' &&
+    semver.valid(value) &&
+    semver.major(value) === semver.major(baseline) &&
+    semver.gte(value, baseline)
+    ? value
+    : baseline;
+}
 
 function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -34,7 +45,7 @@ export function updateUltramodernConfigToolchain(config: Record<string, any>) {
     'workspace.packageManager',
   );
   packageManager.name = toolchain.packageManager.name;
-  packageManager.version = toolchain.packageManager.version;
+  packageManager.version = migrationPnpmVersion(packageManager.version);
 
   const node = ensureRecord(workspace, 'node', 'workspace.node');
   node.version = toolchain.node.version;
@@ -42,7 +53,11 @@ export function updateUltramodernConfigToolchain(config: Record<string, any>) {
 }
 
 export function updateRootPackageToolchain(packageJson: Record<string, any>) {
-  packageJson.packageManager = `${toolchain.packageManager.name}@${toolchain.packageManager.version}`;
+  const currentVersion =
+    typeof packageJson.packageManager === 'string'
+      ? packageJson.packageManager.match(/^pnpm@([^+]+)(?:\+.*)?$/u)?.[1]
+      : undefined;
+  packageJson.packageManager = `${toolchain.packageManager.name}@${migrationPnpmVersion(currentVersion)}`;
 
   const engines = ensureRecord(packageJson, 'engines', 'package.json engines');
   engines.node = toolchain.node.engineRange;
@@ -64,7 +79,7 @@ export function updateRootPackageToolchain(packageJson: Record<string, any>) {
     ULTRAMODERN_PACKAGE_PINS.rootDevDependencies.miniflare;
 }
 
-function updateMiseTools(content: string) {
+function updateMiseTools(content: string, pnpmVersion: string) {
   const lines = content.replace(/\r\n/gu, '\n').split('\n');
   if (lines.at(-1) === '') {
     lines.pop();
@@ -109,7 +124,7 @@ function updateMiseTools(content: string) {
   };
 
   upsertTool('node', toolchain.node.version);
-  upsertTool('pnpm', toolchain.packageManager.version);
+  upsertTool('pnpm', pnpmVersion);
 
   return `${lines.join('\n')}\n`;
 }
@@ -119,7 +134,13 @@ export function updateGeneratedToolchainFiles(io: MigrationIo) {
   const miseContent = fs.existsSync(misePath)
     ? fs.readFileSync(misePath, 'utf-8')
     : '';
-  io.write(misePath, updateMiseTools(miseContent));
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(io.workspaceRoot, 'package.json'), 'utf8'),
+  );
+  const pnpmVersion = migrationPnpmVersion(
+    packageJson.packageManager?.match(/^pnpm@([^+]+)(?:\+.*)?$/u)?.[1],
+  );
+  io.write(misePath, updateMiseTools(miseContent, pnpmVersion));
 
   const workflowPath = path.join(
     io.workspaceRoot,

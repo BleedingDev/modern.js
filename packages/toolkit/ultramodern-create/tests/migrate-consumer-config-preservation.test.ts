@@ -833,3 +833,123 @@ test('migrate preserves consumer Drizzle versions without materializing an unrel
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('migration preserves authored tooling, deployment topology, and federation composition', async () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-consumer-artifacts-'),
+  );
+  const workspaceRoot = path.join(tempRoot, 'workspace');
+  try {
+    generateUltramodernWorkspace({
+      targetDir: workspaceRoot,
+      packageName: 'consumer-artifacts',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource: { strategy: 'workspace' },
+    });
+    addUltramodernVertical({
+      workspaceRoot,
+      name: 'orders',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource: { strategy: 'workspace' },
+    });
+    const authoredFiles = {
+      'scripts/validate-ultramodern-workspace.mts':
+        "import { Effect } from 'effect';\nEffect.runSync(Effect.log('consumer authorization and workspace checks'));\n",
+      'scripts/setup-agent-reference-repos.mjs':
+        "console.log('consumer reference policy');\n",
+      'scripts/materialize-zerops-runtime.mjs':
+        "console.log('consumer worker deployment');\n",
+      'zerops.yaml':
+        'zerops:\n  - setup: consumer-worker\n    run:\n      start: node worker.mjs\n',
+    };
+    fs.rmSync(
+      path.join(workspaceRoot, 'scripts/setup-agent-reference-repos.mts'),
+    );
+    for (const [relativePath, source] of Object.entries(authoredFiles)) {
+      fs.writeFileSync(path.join(workspaceRoot, relativePath), source);
+    }
+    const rootPackage = readJson(workspaceRoot, 'package.json');
+    rootPackage.packageManager = 'pnpm@11.25.0';
+    rootPackage.scripts['agents:refs:install'] =
+      'node ./scripts/setup-agent-reference-repos.mjs';
+    writeJson(workspaceRoot, 'package.json', rootPackage);
+    const compact = readJson(workspaceRoot, '.modernjs/ultramodern.json');
+    compact.workspace.packageManager.version = '11.25.0';
+    writeJson(workspaceRoot, '.modernjs/ultramodern.json', compact);
+    const topology = readJson(
+      workspaceRoot,
+      'topology/reference-topology.json',
+    );
+    const sharedPackage = {
+      id: 'core-runtime',
+      package: '@consumer-artifacts/core-runtime',
+      path: 'packages/core-runtime',
+    };
+    topology.sharedPackages.unshift(sharedPackage);
+    topology.validation.commands.push('pnpm authorization:check');
+    delete topology.verticals[0].api.domainOperations;
+    writeJson(workspaceRoot, 'topology/reference-topology.json', topology);
+    const mfPath = path.join(
+      workspaceRoot,
+      'verticals/orders/module-federation.config.ts',
+    );
+    const customMf = `${fs.readFileSync(mfPath, 'utf8')}\nexport const consumerOwnership = true;\n`;
+    fs.writeFileSync(mfPath, customMf);
+    const fragmentsPath = path.join(
+      workspaceRoot,
+      'verticals/orders/src/routes/[lang]/_mf',
+    );
+    fs.rmSync(fragmentsPath, { recursive: true, force: true });
+
+    assert.equal(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--skip-install'],
+        workspaceRoot,
+      ),
+      0,
+    );
+    for (const [relativePath, source] of Object.entries(authoredFiles)) {
+      assert.equal(
+        fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf8'),
+        source,
+        relativePath,
+      );
+    }
+    assert.equal(
+      fs.existsSync(
+        path.join(workspaceRoot, 'scripts/setup-agent-reference-repos.mts'),
+      ),
+      false,
+    );
+    const migratedRoot = readJson(workspaceRoot, 'package.json');
+    assert.equal(
+      migratedRoot.scripts['agents:refs:install'],
+      rootPackage.scripts['agents:refs:install'],
+    );
+    assert.equal(migratedRoot.packageManager, 'pnpm@11.25.0');
+    assert.equal(
+      readJson(workspaceRoot, '.modernjs/ultramodern.json').workspace
+        .packageManager.version,
+      '11.25.0',
+    );
+    assert.match(
+      fs.readFileSync(path.join(workspaceRoot, '.mise.toml'), 'utf8'),
+      /pnpm = "11\.25\.0"/u,
+    );
+    const migratedTopology = readJson(
+      workspaceRoot,
+      'topology/reference-topology.json',
+    );
+    assert.deepEqual(migratedTopology.sharedPackages[0], sharedPackage);
+    assert.ok(
+      migratedTopology.validation.commands.includes('pnpm authorization:check'),
+    );
+    assert.equal(migratedTopology.verticals[0].api.domainOperations, undefined);
+    assert.equal(fs.readFileSync(mfPath, 'utf8'), customMf);
+    assert.equal(fs.existsSync(fragmentsPath), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

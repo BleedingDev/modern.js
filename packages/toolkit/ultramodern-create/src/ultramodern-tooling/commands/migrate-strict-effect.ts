@@ -15,8 +15,10 @@ import { createAdditionalShellConfigEntry } from '../../ultramodern-workspace/sh
 import type { WorkspaceApp } from '../../ultramodern-workspace/types';
 import {
   createWorkspaceValidationScript,
+  createZeropsRuntimeMaterializationScript,
   migratedWorkspaceScriptArtifacts,
 } from '../../ultramodern-workspace/workspace-scripts';
+import { createZeropsYaml } from '../../ultramodern-workspace/zerops';
 import {
   additionalShellsFromToolingConfig,
   allWorkspaceAppsFromToolingConfig,
@@ -75,6 +77,7 @@ import {
   updateGeneratedToolchainFiles,
   updateRootPackageToolchain,
 } from './migrate-strict-effect/toolchain-pins';
+import { preserveConsumerWorkspaceArtifacts } from './migrate-strict-effect/workspace-artifact-ownership';
 import { hasFlag } from './options';
 
 const retiredMetadataPaths = [
@@ -169,16 +172,35 @@ function synchronizeMigrationDeliveryUnitMetadata(
     createTopology(scope, synchronizedRemotes, synchronizedPrimaryShell),
     'Generated reference topology',
   );
-  for (const key of [
-    'schemaVersion',
-    'id',
-    'description',
-    'preset',
-    'sharedPackages',
-    'validation',
-  ]) {
-    topology[key] = canonicalTopology[key];
+  for (const key of ['schemaVersion', 'id', 'description', 'preset']) {
+    if (key === 'id' || key === 'description') {
+      topology[key] ??= canonicalTopology[key];
+    } else {
+      topology[key] = canonicalTopology[key];
+    }
   }
+  const existingSharedPackages = Array.isArray(topology.sharedPackages)
+    ? topology.sharedPackages
+    : [];
+  topology.sharedPackages = [
+    ...existingSharedPackages,
+    ...canonicalTopology.sharedPackages.filter(
+      (candidate: Record<string, unknown>) =>
+        !existingSharedPackages.some(
+          (existing: Record<string, unknown>) => existing.id === candidate.id,
+        ),
+    ),
+  ];
+  topology.validation = {
+    ...canonicalTopology.validation,
+    ...topology.validation,
+    commands: [
+      ...new Set([
+        ...(topology.validation?.commands ?? []),
+        ...canonicalTopology.validation.commands,
+      ]),
+    ],
+  };
   const canonicalTopologyApps = new Map<string, Record<string, unknown>>(
     [canonicalTopology.shell, ...(canonicalTopology.verticals ?? [])].map(
       (entry: Record<string, unknown>) => [String(entry.id), entry],
@@ -201,7 +223,29 @@ function synchronizeMigrationDeliveryUnitMetadata(
           'ownership',
         ]) {
           if (Object.hasOwn(canonicalEntry, key)) {
-            entry[key] = canonicalEntry[key];
+            const canonicalValue = canonicalEntry[key];
+            if (
+              key === 'api' &&
+              entry.api &&
+              canonicalValue &&
+              typeof canonicalValue === 'object'
+            ) {
+              const nextApi = { ...entry.api, ...canonicalValue };
+              // Demo domain operations are not evidence that a customized API
+              // implements the generated sample business endpoints.
+              if (!Object.hasOwn(entry.api, 'domainOperations'))
+                delete nextApi.domainOperations;
+              entry.api = nextApi;
+            } else if (
+              key === 'cloudflare' &&
+              entry.cloudflare &&
+              canonicalValue &&
+              typeof canonicalValue === 'object'
+            ) {
+              entry.cloudflare = { ...canonicalValue, ...entry.cloudflare };
+            } else {
+              entry[key] = canonicalValue;
+            }
           } else {
             delete entry[key];
           }
@@ -247,6 +291,10 @@ function synchronizeMigrationCompactPolicy(
   );
 
   for (const key of compactPolicyKeys) {
+    if (key === 'workspace') {
+      canonical.workspace.packageManager.version =
+        raw.workspace.packageManager.version;
+    }
     raw[key] = canonical[key];
   }
   writeJsonFile(
@@ -579,6 +627,36 @@ function migrateStrictEffect(
       ? readCreateReleaseCohort()
       : undefined;
 
+  const currentApps = workspaceAppsFromToolingConfig(current);
+  const artifactOwnership = preserveConsumerWorkspaceArtifacts(io, [
+    ...migratedWorkspaceScriptArtifacts({
+      shellOnly: false,
+      hasBackendSurface: true,
+    }),
+    {
+      relativePath: 'scripts/validate-ultramodern-workspace.mts',
+      legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
+      generatedDataBinding: 'workspaceValidationContract',
+      content: createWorkspaceValidationScript(
+        current.workspace.packageScope,
+        current.features.tailwind,
+        currentApps.filter(app => app.kind !== 'shell'),
+        undefined,
+        additionalShellsFromToolingConfig(current),
+        currentApps.find(app => app.kind === 'shell'),
+      ),
+    },
+    {
+      relativePath: 'zerops.yaml',
+      content: `${createZeropsYaml(current.workspace.packageScope, allWorkspaceAppsFromToolingConfig(current))}\n`,
+    },
+    {
+      relativePath: 'scripts/materialize-zerops-runtime.mjs',
+      content: createZeropsRuntimeMaterializationScript(),
+    },
+  ]);
+  io = artifactOwnership.io;
+
   // Establish both metadata shapes in memory before the first write. Invalid
   // structural input must not leave a partially cleaned workspace behind.
   reconcileCompactPackageSourceMetadata(raw.packageSource, packageSource);
@@ -759,7 +837,7 @@ function migrateStrictEffect(
       updateRootPackageToolchain(packageJson);
     }
 
-    updateModernDependencies(packageJson, packageSource);
+    updateModernDependencies(packageJson, packageSource, releaseCohort);
     const ownsGeneratedScripts =
       relativePackageFile === 'package.json' ||
       allMigratedApps.some(
@@ -786,6 +864,7 @@ function migrateStrictEffect(
       );
     }
     updateGeneratedPackageScripts(packageJson, {
+      preservedArtifacts: artifactOwnership.preservedPaths,
       relativePackageFile,
       apps: allMigratedApps,
       shellOnly,

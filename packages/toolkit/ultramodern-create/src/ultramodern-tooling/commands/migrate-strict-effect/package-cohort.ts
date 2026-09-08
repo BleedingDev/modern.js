@@ -5,6 +5,7 @@ import {
   ULTRAMODERN_SINGLE_APP_MODERN_PACKAGES,
   ULTRAMODERN_WORKSPACE_MODERN_PACKAGES,
 } from '../../../ultramodern-package-source';
+import type { UltramodernReleaseCohort } from '../../../ultramodern-release-cohort';
 import { ULTRAMODERN_PACKAGE_PINS } from '../../../ultramodern-workspace/policy';
 import type { WorkspaceApp } from '../../../ultramodern-workspace/types';
 import {
@@ -56,6 +57,7 @@ function updateDeclaredDependencies(
 export function updateModernDependencies(
   packageJson: Record<string, any>,
   packageSource: ResolvedUltramodernPackageSource,
+  releaseCohort?: Pick<UltramodernReleaseCohort, 'packages'>,
 ) {
   let changed = false;
   for (const section of ['dependencies', 'devDependencies']) {
@@ -72,12 +74,22 @@ export function updateModernDependencies(
   return (
     updateDeclaredDependencies(
       packageJson,
-      new Map(
-        [...modernPackageNames].map(packageName => [
-          packageName,
-          modernPackageSpecifier(packageName, packageSource),
+      new Map([
+        ...[...modernPackageNames].map(
+          packageName =>
+            [
+              packageName,
+              modernPackageSpecifier(packageName, packageSource),
+            ] as const,
+        ),
+        ...(releaseCohort?.packages ?? []).flatMap(item => [
+          [
+            item.sourceName,
+            modernPackageSpecifier(item.sourceName, packageSource),
+          ] as const,
+          [item.targetName, item.version] as const,
         ]),
-      ),
+      ]),
     ) || changed
   );
 }
@@ -398,7 +410,10 @@ function mergeGeneratedScript(
 // Rewrite any script references to a workspace-owned .mjs script that migrate
 // renamed to .mts, so no package.json script points at a deleted file.
 
-function rewriteMigratedScriptReferences(scripts: Record<string, any>) {
+function rewriteMigratedScriptReferences(
+  scripts: Record<string, any>,
+  preservedArtifacts?: ReadonlySet<string>,
+) {
   let changed = false;
   const pattern = new RegExp(
     `(scripts/(?:${migratedWorkspaceScriptBasenames.join('|')}))\\.mjs`,
@@ -408,7 +423,9 @@ function rewriteMigratedScriptReferences(scripts: Record<string, any>) {
     if (typeof value !== 'string') {
       continue;
     }
-    const next = value.replace(pattern, '$1.mts');
+    const next = value.replace(pattern, (original, basename) =>
+      preservedArtifacts?.has(`${basename}.mjs`) ? original : `${basename}.mts`,
+    );
     if (next !== value) {
       scripts[name] = next;
       changed = true;
@@ -425,6 +442,7 @@ export function updateGeneratedPackageScripts(
     shellOnly?: boolean;
     canRetireLegacyOxfmtCliExclusion?: boolean;
     onPreserveScript?: (scriptName: string) => void;
+    preservedArtifacts?: ReadonlySet<string>;
   } = {},
 ) {
   const scripts = packageJson.scripts;
@@ -440,7 +458,7 @@ export function updateGeneratedPackageScripts(
   );
   const isRootPackage = options.relativePackageFile === 'package.json';
 
-  if (rewriteMigratedScriptReferences(scripts)) {
+  if (rewriteMigratedScriptReferences(scripts, options.preservedArtifacts)) {
     changed = true;
   }
 

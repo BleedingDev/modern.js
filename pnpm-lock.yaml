@@ -2854,6 +2854,9 @@ importers:
 
   packages/toolkit/ultramodern-create:
     dependencies:
+      '@babel/parser':
+        specifier: ^8.0.4
+        version: 8.0.4
       '@modern-js/codesmith':
         specifier: 2.6.9
         version: 2.6.9(supports-color@8.1.1)
