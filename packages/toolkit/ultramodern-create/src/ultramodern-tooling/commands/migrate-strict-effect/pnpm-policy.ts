@@ -331,9 +331,7 @@ function reconcilePatchedDependencies(
   );
   const stale = new Map(policy.stale.map(patch => [patchKey(patch), patch]));
   const ownedPackageNames = new Set(
-    [...policy.required, ...policy.conditional, ...policy.stale].map(
-      patch => patch.packageName,
-    ),
+    expectedPatches.map(patch => patch.packageName),
   );
   const patchedDependencies = ensureMap(document, 'patchedDependencies');
 
@@ -349,23 +347,24 @@ function reconcilePatchedDependencies(
       continue;
     }
 
+    const conditionalPatch = policy.conditional.find(
+      patch => patchKey(patch) === selector,
+    );
+    if (
+      conditionalPatch &&
+      !includeDrizzleOrmPatch &&
+      patchPath === conditionalPatch.path
+    ) {
+      delete patchedDependencies[selector];
+      continue;
+    }
+
     const parts = packageVersionParts(selector);
     if (
       parts &&
       ownedPackageNames.has(parts.packageName) &&
       !expected.has(selector)
     ) {
-      const conditionalPatch = policy.conditional.find(
-        patch => patchKey(patch) === selector,
-      );
-      if (
-        conditionalPatch &&
-        !includeDrizzleOrmPatch &&
-        patchPath === conditionalPatch.path
-      ) {
-        delete patchedDependencies[selector];
-        continue;
-      }
       throw new Error(
         `Framework-owned patch selector ${selector} has unknown provenance.`,
       );

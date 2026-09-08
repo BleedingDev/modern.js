@@ -777,6 +777,28 @@ test('migrate preserves consumer Drizzle versions without materializing an unrel
     writeJson(workspaceRoot, ordersPackagePath, ordersPackage);
 
     const workspacePolicyPath = path.join(workspaceRoot, 'pnpm-workspace.yaml');
+    // Historical framework patches do not establish ownership of every later
+    // consumer patch for the same package (OntOS uses both of these repairs).
+    const consumerPatches = {
+      'effect@4.0.0-rc.112': 'patches/consumer-effect-declarations.patch',
+      'drizzle-orm@0.45.2': 'patches/consumer-drizzle-declarations.patch',
+    };
+    const policySource = fs.readFileSync(workspacePolicyPath, 'utf8');
+    fs.writeFileSync(
+      workspacePolicyPath,
+      policySource.replace(
+        'patchedDependencies:\n',
+        `patchedDependencies:\n${Object.entries(consumerPatches)
+          .map(([selector, patchPath]) => `  '${selector}': ${patchPath}\n`)
+          .join('')}`,
+      ),
+    );
+    for (const patchPath of Object.values(consumerPatches)) {
+      fs.writeFileSync(
+        path.join(workspaceRoot, patchPath),
+        'consumer repair\n',
+      );
+    }
     const beforePolicy = fs.readFileSync(workspacePolicyPath);
     const drizzlePatchPath = path.join(
       workspaceRoot,
@@ -800,6 +822,12 @@ test('migrate preserves consumer Drizzle versions without materializing an unrel
       '0.31.10',
     );
     assert.deepEqual(fs.readFileSync(workspacePolicyPath), beforePolicy);
+    for (const patchPath of Object.values(consumerPatches)) {
+      assert.equal(
+        fs.readFileSync(path.join(workspaceRoot, patchPath), 'utf8'),
+        'consumer repair\n',
+      );
+    }
     assert.equal(fs.existsSync(drizzlePatchPath), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

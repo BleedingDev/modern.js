@@ -884,7 +884,7 @@ jobs:
       release_bundle_artifact: bleedingdev-release-bundle-${{ needs.prepare-release.outputs.producer_artifact_identity }}
       # Must stay identical to the published tractor-downstream pin below;
       # publish-security.test.js compares the two.
-      tractor_ref: 252bbdfeeb5906524cb75c1210b214f7460c56da
+      tractor_ref: 0ec478a4d02b172389782edb0a612838b464e066
 
   # Sidecars are NOT cohort members: they keep their own stable versions and
   # their own scope, and they are published from this dedicated job strictly
@@ -1446,7 +1446,7 @@ jobs:
       release_bundle_artifact: bleedingdev-release-bundle-${{ needs.prepare-release.outputs.producer_artifact_identity }}
       wait_for_registry_cohort: true
       # Advance this reviewed immutable baseline after every accepted Tractor update.
-      tractor_ref: 252bbdfeeb5906524cb75c1210b214f7460c56da
+      tractor_ref: 0ec478a4d02b172389782edb0a612838b464e066
 
   record-publish-outcome:
     name: Record the authenticated publish outcome
