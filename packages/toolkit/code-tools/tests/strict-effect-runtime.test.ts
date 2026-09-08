@@ -83,6 +83,20 @@ defineEffectBff({api: fixtureApi, layer: fixtureLayer});`,
     expect(violation(source)).toBeDefined();
   });
 
+  test('classifies parser syntax and binder collision diagnostics as invalid source', () => {
+    expect(violation('export const invalid = ;')).toBeDefined();
+    // TypeScript parsing permits this import/value collision; scope crawling
+    // reports it through Babel's Hub, not BABEL_PARSER_SYNTAX_ERROR.
+    const duplicate = `import { assembleEffectBffRuntime } from '@fixture/shared-contracts/server/effect-bff-runtime';
+import { HttpApiBuilder, Layer } from '@modern-js/plugin-bff/effect-edge';
+import { Layer as GovernedReadLayer } from 'effect';
+import { fixtureApi, governedHttpApi } from '../shared/api.ts';
+const group = HttpApiBuilder.group(governedHttpApi, 'fixture', (handlers) => handlers.handle('reachable', () => undefined));
+const GovernedReadLayer = {}; const handlers = Layer.mergeAll(group.pipe(GovernedReadLayer.provide(Layer.empty)));
+export default assembleEffectBffRuntime({ api: fixtureApi, handlers: handlers });`;
+    expect(violation(duplicate)).toBeDefined();
+  });
+
   test('accepts native RPC composition and rejects transport or handler substitution', () => {
     const source = `import { defineEffectBff, HttpApi, Layer } from '@modern-js/plugin-bff/effect-edge';
 import { fixtureRpcGroup } from '../shared/rpc.ts';

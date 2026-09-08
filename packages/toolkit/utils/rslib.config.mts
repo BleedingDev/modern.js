@@ -1,5 +1,6 @@
 import { rslibConfig } from '@modern-js/rslib';
 import { defineConfig, type RslibConfig, type Rspack } from '@rslib/core';
+import { publicDeclarationsPlugin } from '../../../scripts/prebundle/ultramodern/public-declarations.mjs';
 
 const dependencies = [
   // zero dependency
@@ -159,5 +160,6 @@ const lib: RslibConfig['lib'] = rslibConfig.lib?.map(config => {
 
 export default defineConfig({
   ...rslibConfig,
+  plugins: [...(rslibConfig.plugins ?? []), publicDeclarationsPlugin('utils')],
   lib,
 });
