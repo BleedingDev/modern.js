@@ -5,5 +5,8 @@ import { publicDeclarationsPlugin } from '../../../scripts/prebundle/ultramodern
 
 export default defineConfig({
   ...rslibConfig,
-  plugins: [...(rslibConfig.plugins ?? []), publicDeclarationsPlugin('builder')],
+  plugins: [
+    ...(rslibConfig.plugins ?? []),
+    publicDeclarationsPlugin('builder'),
+  ],
 });

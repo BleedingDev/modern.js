@@ -32,6 +32,7 @@
     "test:watch": "rstest watch"
   },
   "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@modern-js/utils": "workspace:*",
     "@rsbuild/core": "2.2.3",
     "@rsbuild/plugin-assets-retry": "2.0.2",

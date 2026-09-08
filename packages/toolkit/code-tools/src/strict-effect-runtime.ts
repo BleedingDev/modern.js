@@ -37,7 +37,8 @@ export type EffectApiImportResolver = (
 export function createEffectApiImportResolver(
   filename: string,
 ): EffectApiImportResolver {
-  const owner = path.resolve(path.dirname(filename), '..');
+  const directory = fs.realpathSync(path.dirname(filename));
+  const owner = fs.realpathSync(path.resolve(directory, '..'));
   const resolve =
     (from: string): EffectApiImportResolver =>
     specifier => {
@@ -48,7 +49,7 @@ export function createEffectApiImportResolver(
         try {
           const real = fs.realpathSync(candidate);
           if (
-            !real.startsWith(`${fs.realpathSync(owner)}${path.sep}`) ||
+            !real.startsWith(`${owner}${path.sep}`) ||
             fs.statSync(real).size > 1_000_000
           )
             return undefined;
@@ -63,7 +64,7 @@ export function createEffectApiImportResolver(
       }
       return undefined;
     };
-  return resolve(filename);
+  return resolve(path.join(directory, path.basename(filename)));
 }
 
 type ApiModule = EffectApiSource & { file: t.File };

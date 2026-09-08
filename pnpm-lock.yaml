@@ -973,6 +973,9 @@ importers:
 
   packages/cli/builder:
     dependencies:
+      '@jridgewell/trace-mapping':
+        specifier: ^0.3.31
+        version: 0.3.31
       '@modern-js/utils':
         specifier: workspace:*
         version: link:../../toolkit/utils
@@ -2594,13 +2597,13 @@ importers:
   packages/toolkit/code-tools:
     dependencies:
       '@babel/parser':
-        specifier: 8.0.4
+        specifier: ^8.0.4
         version: 8.0.4
       '@babel/traverse':
-        specifier: 8.0.4
+        specifier: ^8.0.4
         version: 8.0.4
       '@babel/types':
-        specifier: 8.0.4
+        specifier: ^8.0.4
         version: 8.0.4
       oxlint:
         specifier: 1.81.0
