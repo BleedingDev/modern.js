@@ -913,6 +913,19 @@ export async function validateGeneratedPnpmLockReleaseAgePolicy(
     lockfilePath,
   );
   const closure = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
+  const firstPartySourceNames = new Set(
+    releaseCohort?.packages.map(item => item.sourceName) ?? [],
+  );
+  for (const tarball of closure.tarballs) {
+    if (
+      firstPartyTargetNames.has(tarball.packageName) ||
+      firstPartySourceNames.has(tarball.packageName)
+    ) {
+      throw new Error(
+        `First-party lock candidate ${tarball.packageName} must resolve through the authenticated release cohort, not a tarball URL.`,
+      );
+    }
+  }
   if (closure.unresolved.length > 0) {
     const unresolved = closure.unresolved
       .slice(0, 20)

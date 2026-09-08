@@ -800,6 +800,178 @@ test('matches the production audit closure across peer-variant snapshots', () =>
   );
 });
 
+test('audits registry dependencies and peers reachable through integrity-pinned HTTPS tarballs', () => {
+  const url = `https://pkg.pr.new/example/tool@${'a'.repeat(40)}`;
+  const key = `consumer-tool@${url}`;
+  const context = `(patch_hash=${'b'.repeat(64)})(peer@2.0.0(nested@3.0.0))`;
+  const lockfile = lockfileWithImporter('consumer-tool', `${url}${context}`, {
+    specifier: url,
+    packages: {
+      [key]: { version: '0.1.0', resolution: { integrity, tarball: url } },
+      'transitive@1.0.0': { resolution: { integrity } },
+      'peer@2.0.0': { resolution: { integrity } },
+      'nested@3.0.0': { resolution: { integrity } },
+    },
+    snapshots: {
+      [`${key}${context}`]: { dependencies: { transitive: '1.0.0' } },
+      'transitive@1.0.0': {},
+      'peer@2.0.0(nested@3.0.0)': {},
+      'nested@3.0.0': {},
+    },
+  });
+  const migration = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
+  const production = buildDependencyClosure(lockfile);
+  assert.deepEqual(migration.unresolved, []);
+  assert.deepEqual(production.unresolved, []);
+  assert.deepEqual(migration.candidates.map(item => item.packageName).sort(), [
+    'nested',
+    'peer',
+    'transitive',
+  ]);
+  assert.deepEqual(production.closure.map(item => item.name).sort(), [
+    'nested',
+    'peer',
+    'transitive',
+  ]);
+  assert.deepEqual(migration.tarballs, [
+    {
+      packageName: 'consumer-tool',
+      version: '0.1.0',
+      url,
+      integrity,
+      path: ['importer:.', key],
+    },
+  ]);
+  assert.deepEqual(
+    production.tarballs,
+    migration.tarballs.map(({ packageName, ...item }) => ({
+      name: packageName,
+      ...item,
+    })),
+  );
+
+  const variants: Array<(lock: any) => void> = [
+    lock => {
+      delete lock.packages[key].resolution.integrity;
+    },
+    lock => {
+      lock.packages[key].resolution.tarball = `${url}changed`;
+    },
+    lock => {
+      delete lock.packages[key].version;
+    },
+    lock => {
+      delete lock.packages[key];
+    },
+    lock => {
+      delete lock.snapshots[`${key}${context}`];
+    },
+    lock => {
+      delete lock.snapshots['peer@2.0.0(nested@3.0.0)'];
+    },
+    lock => {
+      lock.snapshots[`${key}${context}`].dependencies.transitive = 'latest';
+    },
+  ];
+  for (const mutate of variants) {
+    const invalid = structuredClone(lockfile);
+    mutate(invalid);
+    for (const discover of [
+      discoverReachablePnpmLockReleaseAgeClosure,
+      buildDependencyClosure,
+    ]) {
+      assert.throws(() => {
+        const result = discover(invalid);
+        if (result.unresolved.length) throw new Error('unresolved closure');
+      });
+    }
+  }
+});
+
+test('URL package identities remain distinct from each other and from registry versions', () => {
+  const urls = ['a', 'b'].map(
+    commit => `https://example.test/tool@${commit.repeat(40)}.tgz`,
+  );
+  const lockfile = lockfileWithImporter('parent', 'parent@1.0.0', {
+    packages: {
+      'parent@1.0.0': { resolution: { integrity } },
+      'tool@0.1.0': { resolution: { integrity } },
+      ...Object.fromEntries(
+        urls.map(url => [
+          `tool@${url}`,
+          { version: '0.1.0', resolution: { integrity, tarball: url } },
+        ]),
+      ),
+    },
+    snapshots: {
+      'parent@1.0.0': {
+        dependencies: {
+          first: `tool@${urls[0]}`,
+          second: `tool@${urls[1]}`,
+          registry: 'tool@0.1.0',
+        },
+      },
+      'tool@0.1.0': {},
+      ...Object.fromEntries(urls.map(url => [`tool@${url}`, {}])),
+    },
+  });
+  const migration = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
+  const production = buildDependencyClosure(lockfile);
+  assert.deepEqual(migration.unresolved, []);
+  assert.deepEqual(production.unresolved, []);
+  assert.deepEqual(migration.tarballs.map(item => item.url).sort(), urls);
+  assert.deepEqual(production.tarballs.map(item => item.url).sort(), urls);
+  assert.deepEqual(migration.candidates.map(item => item.packageName).sort(), [
+    'parent',
+    'tool',
+  ]);
+});
+
+test('tarball roots do not exempt immature registry children or replace authenticated cohort members', async () => {
+  const url = `https://example.test/tool@${'a'.repeat(40)}.tgz`;
+  for (const name of [
+    'consumer-tool',
+    '@bleedingdev/modern-js-create',
+    '@modern-js/create',
+  ]) {
+    const key = `${name}@${url}`;
+    const root = createWorkspace(
+      lockfileWithImporter(name, url, {
+        packages: {
+          [key]: { version: '0.1.0', resolution: { integrity, tarball: url } },
+          'transitive@1.0.0': { resolution: { integrity } },
+        },
+        snapshots: {
+          [key]: { dependencies: { transitive: '1.0.0' } },
+          'transitive@1.0.0': {},
+        },
+      }),
+    );
+    try {
+      await assert.rejects(
+        validate(root, {
+          transitive: packument('1.0.0', '2026-07-10T11:00:00.000Z'),
+        }),
+        name === 'consumer-tool'
+          ? /immature package/u
+          : /authenticated release cohort/u,
+      );
+      if (name === 'consumer-tool') {
+        assert.deepEqual(
+          (
+            await validate(root, {
+              transitive: packument('1.0.0', '2026-07-01T11:00:00.000Z'),
+            })
+          ).reviewCandidates,
+          [],
+        );
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test('accepts pnpm 11.17 base package records and nested peer snapshot locators', () => {
   const root = '@bleedingdev/modern-js-plugin-tanstack@3.5.0-ultramodern.77';
   const nestedPeer = 'nested-peer@2.0.0';
@@ -1094,6 +1266,10 @@ test('reports malformed reachable descriptors and peer locators as unresolved', 
     '1.0.0-',
     '1.0.0-..',
     '1.0.0+..',
+    'http://example.test/tool.tgz',
+    'https://example.test/tool.tgz#mutable',
+    'https://user:password@example.test/tool.tgz',
+    'https://example.test/tool name.tgz',
   ];
   for (const version of malformedDescriptorValues) {
     const lockfile = lockfileWithImporter('malformed', 'malformed@1.0.0');

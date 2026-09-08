@@ -632,7 +632,10 @@ function migrateStrictEffect(
     ...migratedWorkspaceScriptArtifacts({
       shellOnly: false,
       hasBackendSurface: true,
-    }),
+    }).filter(
+      artifact =>
+        artifact.relativePath !== 'scripts/validate-ultramodern-workspace.mts',
+    ),
     {
       relativePath: 'scripts/validate-ultramodern-workspace.mts',
       legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
