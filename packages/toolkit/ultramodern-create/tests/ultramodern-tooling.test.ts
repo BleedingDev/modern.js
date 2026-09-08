@@ -2135,11 +2135,11 @@ declare module '*.css' {}
       );
     assert.equal(
       migratedIdentityTopology.description,
-      'Generated UltraModern SuperApp shell that can grow by adding full-stack verticals.',
+      'Stale generated workspace description.',
     );
     assert.equal(
       migratedIdentityTopology.sharedPackages[0].description,
-      'Generated route, ownership, and topology contracts.',
+      'Stale generated shared package description.',
     );
     assert.equal(
       migratedIdentityTopology.shell.moduleFederation.remotes[0].alias,

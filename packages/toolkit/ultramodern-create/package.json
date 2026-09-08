@@ -90,6 +90,7 @@
     "type-check": "tsgo --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@babel/parser": "^8.0.4",
     "@modern-js/codesmith": "2.6.9",
     "@modern-js/i18n-utils": "workspace:*",
     "@modern-js/utils": "workspace:*",

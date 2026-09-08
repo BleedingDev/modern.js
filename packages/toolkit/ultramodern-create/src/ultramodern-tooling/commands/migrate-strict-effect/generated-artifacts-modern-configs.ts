@@ -258,6 +258,11 @@ export function updateGeneratedModernConfigs(
       generatedModuleFederationConfig,
       createGeneratedModuleFederationConfig(!enableBridgeRouter),
     ];
+    const ownsUiComposition =
+      !fs.existsSync(moduleFederationConfigPath) ||
+      recognizedModuleFederationConfigs.includes(
+        fs.readFileSync(moduleFederationConfigPath, 'utf8'),
+      );
     if (appEmitsBrowserUi(app)) {
       // Existing configs are never regenerated wholesale without byte-exact
       // current ownership proof. The later bridge pass performs its one safe,
@@ -297,6 +302,12 @@ export function updateGeneratedModernConfigs(
       ]);
     }
 
+    if (!ownsUiComposition) {
+      io.log(
+        `${app.directory} preserves its consumer-owned federation composition instead of regenerating routes from unproven metadata.`,
+      );
+      continue;
+    }
     if (app.kind === 'shell') {
       // Each shell renders only the UI-emitting remotes named by its own
       // verticalRefs (G28 + G2a) — never the whole workspace remote set.
