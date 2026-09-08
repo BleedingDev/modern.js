@@ -1,19 +1,20 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 // Native Node imports deliberately bypass Rstest's source aliases and transforms.
-const { compatibleRequire } = await import('../../../dist/esm-node/index.mjs');
+const { compatibleRequire } = await import(
+  '../../../../utils/dist/esm-node/index.mjs'
+);
 const require = createRequire(import.meta.url);
 const {
   compatibleRequire: compatibleRequireCJS,
-} = require('../../../dist/cjs/index.js');
-const directory = mkdtempSync(
-  join(dirname(fileURLToPath(import.meta.url)), '.interop-'),
-);
+} = require('../../../../utils/dist/cjs/index.js');
+const directory = mkdtempSync(join(tmpdir(), 'modern-utils-interop-'));
 after(() => rmSync(directory, { recursive: true, force: true }));
 const fixture = (name, source) => {
   const path = join(directory, name);

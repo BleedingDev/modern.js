@@ -4,10 +4,10 @@ import { join } from 'node:path';
 // Requires the package's release build, like compiledYamlExports.test.ts.
 // Source/CJS tests cannot reproduce Node's native import(CJS) namespace shape.
 test('release-built ESM utils normalize server plugin exports', () => {
-  const cwd = join(__dirname, '..');
+  const cwd = join(__dirname, '../../utils');
   const output = execFileSync(
     process.execPath,
-    ['--test', 'tests/fixtures/compat-require-built/run.mjs'],
+    ['--test', join(__dirname, 'fixtures/compat-require-built/run.mjs')],
     {
       cwd,
       env: { ...process.env, NODE_ENV: 'production' },

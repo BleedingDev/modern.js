@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 test('CLI route declarations resolve React in a Node-only types environment', () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'modern-cli-react-types-'));
   const declarations = fileURLToPath(
-    new URL('../cli/index.d.ts', import.meta.url),
+    new URL('../../types/cli/index.d.ts', import.meta.url),
   );
   const compiler = path.join(
     path.dirname(require.resolve('typescript/package.json')),
