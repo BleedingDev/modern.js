@@ -179,6 +179,22 @@ function assertYamlDistributionIntegrity(runImpl = run) {
   );
 }
 
+function isHttpsTarballLocator(value) {
+  if (
+    !value.startsWith('https://') ||
+    /[\s()]/u.test(value) ||
+    !URL.canParse(value)
+  )
+    return false;
+  const url = new URL(value);
+  return (
+    url.href === value &&
+    url.username === '' &&
+    url.password === '' &&
+    url.hash === ''
+  );
+}
+
 function splitPeerContext(locator) {
   const peerStart = locator.indexOf('(');
   if (peerStart === -1) {
@@ -226,7 +242,7 @@ function splitPeerContext(locator) {
       continue;
     }
     const peer = parsePackageKey(segment);
-    if (!peer) {
+    if (!peer || isHttpsTarballLocator(peer.version)) {
       return { unresolved: locator };
     }
     peers.push(peer);
@@ -236,7 +252,9 @@ function splitPeerContext(locator) {
 
 function parseFullPackageLocator(rawLocator) {
   const locator = rawLocator.replace(/^\//u, '');
-  const separator = locator.lastIndexOf('@');
+  const tarballSeparator = locator.indexOf('@https://');
+  const separator =
+    tarballSeparator > 0 ? tarballSeparator : locator.lastIndexOf('@');
   if (separator <= 0) {
     return undefined;
   }
@@ -244,7 +262,7 @@ function parseFullPackageLocator(rawLocator) {
   const version = locator.slice(separator + 1);
   if (
     !exactPackageNamePattern.test(name) ||
-    !exactVersionPattern.test(version)
+    (!exactVersionPattern.test(version) && !isHttpsTarballLocator(version))
   ) {
     return undefined;
   }
@@ -294,6 +312,12 @@ function dependencyIdentity(dependencyName, rawValue) {
     return { unresolved: value };
   }
   const { base, peers } = peerContext;
+  if (
+    isHttpsTarballLocator(base) &&
+    exactPackageNamePattern.test(dependencyName)
+  ) {
+    return { name: dependencyName, version: base, peers };
+  }
   const full = parseFullPackageLocator(base);
   if (full) {
     return { ...full, peers };
@@ -487,6 +511,7 @@ function buildDependencyClosure(lock) {
     }
   }
 
+  const tarballs = [];
   const closure = [...shortestIdentityPaths.entries()]
     .map(([key, packagePath]) => {
       const metadata = metadataByIdentity.get(key);
@@ -496,6 +521,27 @@ function buildDependencyClosure(lock) {
           packagePath,
           'missing exact SHA-512 lock integrity',
         );
+        return undefined;
+      }
+      if (isHttpsTarballLocator(metadata.version)) {
+        let version;
+        for (const record of packageRecordsByIdentity.get(key) ?? []) {
+          assertCondition(
+            record?.resolution?.tarball === metadata.version &&
+              typeof record.version === 'string' &&
+              exactVersionPattern.test(record.version) &&
+              (version === undefined || version === record.version),
+            `pnpm lockfile package ${key} has uncertain tarball identity.`,
+          );
+          version = record.version;
+        }
+        tarballs.push({
+          name: metadata.name,
+          version,
+          url: metadata.version,
+          integrity: metadata.integrity,
+          path: packagePath,
+        });
         return undefined;
       }
       return { ...metadata, path: packagePath };
@@ -510,6 +556,7 @@ function buildDependencyClosure(lock) {
   );
   return {
     closure,
+    tarballs,
     importerCount: Object.keys(lock.importers).length,
     lockfileVersion: String(lock.lockfileVersion),
     unresolved,
@@ -1071,6 +1118,15 @@ async function auditReleaseAgePolicy({
   const lockPath = path.join(projectDir, 'pnpm-lock.yaml');
   const nativeLock = readNativeLock(lockPath, { parseYamlImpl });
   const closureResult = buildDependencyClosure(nativeLock.lock);
+  const cohortNames = new Set(
+    release.packages.flatMap(item => [item.targetName, item.sourceName]),
+  );
+  for (const tarball of closureResult.tarballs) {
+    assertCondition(
+      !cohortNames.has(tarball.name),
+      `First-party lock candidate ${tarball.name} must resolve through the authenticated release cohort, not a tarball URL.`,
+    );
+  }
   if (closureResult.unresolved.length > 0) {
     throw new Error(
       `Dependency closure has unresolved candidates:\n${formatUnresolvedCandidates(
@@ -1147,6 +1203,7 @@ async function auditReleaseAgePolicy({
   const digests = {
     lockSha256: nativeLock.sha256,
     closureSha256: sha256(canonicalJson(closureResult.closure)),
+    tarballsSha256: sha256(canonicalJson(closureResult.tarballs)),
     registryMetadataSha256: sha256(canonicalJson(metadataIdentity)),
     exceptionPolicySha256: sha256(canonicalJson(policy)),
     releaseManifestSha256: release.manifestSha256,
@@ -1154,6 +1211,7 @@ async function auditReleaseAgePolicy({
 
   return {
     approvals,
+    tarballs: closureResult.tarballs,
     closureCount: closureResult.closure.length,
     closureIdentities: closureResult.closure.map(({ name, version }) => ({
       name,

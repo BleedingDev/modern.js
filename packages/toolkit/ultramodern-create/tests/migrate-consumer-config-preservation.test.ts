@@ -104,6 +104,41 @@ function addLegacyGeneratedDefaults(source: string) {
 ${withLegacySsr.slice(optionsEndIndex)}`;
 }
 
+test('migration refreshes canonical validator data without classifying it as a tooling wrapper', async () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-validator-refresh-'),
+  );
+  const workspaceRoot = path.join(tempRoot, 'workspace');
+  try {
+    generateUltramodernWorkspace({
+      targetDir: workspaceRoot,
+      packageName: 'workspace',
+      modernVersion: '3.2.1',
+      packageSource: { strategy: 'workspace' },
+    });
+    const validatorPath = path.join(
+      workspaceRoot,
+      'scripts/validate-ultramodern-workspace.mts',
+    );
+    const source = fs.readFileSync(validatorPath, 'utf8');
+    const stale = source.replace('schemaVersion: 2', 'schemaVersion: -123');
+    assert.notEqual(stale, source);
+    fs.writeFileSync(validatorPath, stale);
+    assert.equal(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--skip-install'],
+        workspaceRoot,
+      ),
+      0,
+    );
+    const migrated = fs.readFileSync(validatorPath, 'utf8');
+    assert.doesNotMatch(migrated, /schemaVersion: -123/u);
+    assert.match(migrated, /const workspaceValidationContract =/u);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('migrate converges the published .15 generated Tailwind config to native defaults', async () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-migrate-generated-config-'),

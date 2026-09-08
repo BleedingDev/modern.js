@@ -21,6 +21,13 @@ export type PnpmLockReleaseAgeCandidate = {
 
 export type PnpmLockReleaseAgeClosure = {
   candidates: PnpmLockReleaseAgeCandidate[];
+  tarballs: Array<{
+    packageName: string;
+    version: string;
+    url: string;
+    integrity: string;
+    path: string[];
+  }>;
   unresolved: Array<{
     package?: string;
     path: string[];
@@ -39,6 +46,22 @@ const integrityPattern = /^sha512-[A-Za-z0-9+/]+={0,2}$/u;
 
 function isExactSemver(version: string) {
   return semver.valid(version) === version;
+}
+
+function isHttpsTarballLocator(value: string) {
+  if (
+    !value.startsWith('https://') ||
+    /[\s()]/u.test(value) ||
+    !URL.canParse(value)
+  )
+    return false;
+  const url = new URL(value);
+  return (
+    url.href === value &&
+    url.username === '' &&
+    url.password === '' &&
+    url.hash === ''
+  );
 }
 
 export function isYamlRecord(value: unknown): value is PnpmWorkspaceYaml {
@@ -114,7 +137,7 @@ function splitPeerContext(
       continue;
     }
     const peer = parsePackageKey(segment);
-    if (!peer) {
+    if (!peer || isHttpsTarballLocator(peer.version)) {
       return { unresolved: locator };
     }
     peers.push(peer);
@@ -124,13 +147,18 @@ function splitPeerContext(
 
 function parsePackageLocator(rawLocator: string): PnpmLockIdentity | undefined {
   const locator = rawLocator.replace(/^\//u, '');
-  const separator = locator.lastIndexOf('@');
+  const tarballSeparator = locator.indexOf('@https://');
+  const separator =
+    tarballSeparator > 0 ? tarballSeparator : locator.lastIndexOf('@');
   if (separator <= 0) {
     return undefined;
   }
   const packageName = locator.slice(0, separator);
   const version = locator.slice(separator + 1);
-  if (!exactPackageNamePattern.test(packageName) || !isExactSemver(version)) {
+  if (
+    !exactPackageNamePattern.test(packageName) ||
+    (!isExactSemver(version) && !isHttpsTarballLocator(version))
+  ) {
     return undefined;
   }
   return { packageName, version, peers: [] };
@@ -199,6 +227,12 @@ function dependencyIdentity(
     return peerContext;
   }
   const { base, peers } = peerContext;
+  if (
+    isHttpsTarballLocator(base) &&
+    exactPackageNamePattern.test(dependencyName)
+  ) {
+    return { packageName: dependencyName, version: base, peers };
+  }
   const full = parsePackageLocator(base);
   if (full) {
     return { ...full, peers };
@@ -391,12 +425,12 @@ export function discoverReachablePnpmLockReleaseAgeClosure(
     }
   }
 
+  const tarballs: PnpmLockReleaseAgeClosure['tarballs'] = [];
   const candidates = [...shortestIdentityPaths.entries()]
     .map(([key, path]) => {
-      const [packageName, version] = [
-        key.slice(0, key.lastIndexOf('@')),
-        key.slice(key.lastIndexOf('@') + 1),
-      ];
+      const { packageName, version } = nodes.get(
+        nodeIdsByIdentity.get(key)![0],
+      )!.identity;
       const packageRecordsForIdentity = packageRecordsByIdentity.get(key);
       if (!packageRecordsForIdentity?.length) {
         recordUnresolved(
@@ -407,6 +441,7 @@ export function discoverReachablePnpmLockReleaseAgeClosure(
         return undefined;
       }
       let integrity: string | undefined;
+      let tarballVersion: string | undefined;
       for (const [packageKey, packageRecord] of packageRecordsForIdentity) {
         const resolution = requiredYamlRecord(
           requiredYamlRecord(
@@ -429,6 +464,36 @@ export function discoverReachablePnpmLockReleaseAgeClosure(
           );
         }
         integrity = resolution.integrity;
+        if (isHttpsTarballLocator(version)) {
+          const metadata = requiredYamlRecord(
+            packageRecord,
+            `pnpm lockfile package ${packageKey}`,
+          );
+          if (
+            resolution.tarball !== version ||
+            typeof metadata.version !== 'string' ||
+            !isExactSemver(metadata.version) ||
+            (tarballVersion !== undefined &&
+              tarballVersion !== metadata.version)
+          ) {
+            throw new Error(
+              `pnpm lockfile package ${packageKey} has uncertain tarball identity.`,
+            );
+          }
+          tarballVersion = metadata.version;
+        }
+      }
+      if (tarballVersion !== undefined) {
+        // URL-keyed packages are not npm releases. Keep their integrity-bound
+        // identity as evidence while auditing all reachable registry children.
+        tarballs.push({
+          packageName,
+          version: tarballVersion,
+          url: version,
+          integrity: integrity as string,
+          path,
+        });
+        return undefined;
       }
       return {
         packageName,
@@ -447,7 +512,7 @@ export function discoverReachablePnpmLockReleaseAgeClosure(
   unresolved.sort((left, right) =>
     JSON.stringify(left).localeCompare(JSON.stringify(right)),
   );
-  return { candidates, unresolved };
+  return { candidates, tarballs, unresolved };
 }
 
 export function parsePnpmWorkspaceYaml(
