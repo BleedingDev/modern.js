@@ -136,7 +136,7 @@ describe('BFF compiler global variables', () => {
       await compileApi();
 
       const compiledEntry = path.join(distDirectory, 'api/index.js');
-      await fs.remove(esmDependencyDirectory);
+      await fs.remove(packageDirectory);
       const runtime = require(compiledEntry) as {
         default: () => string;
       };

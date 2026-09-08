@@ -113,6 +113,7 @@ for (const format of ['cjs', 'esm', 'esm-node']) {
       `,
       );
       const noCompiler = {
+        GITHUB_ACTIONS: 'true',
         NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(path.join(root, 'forbid-compiler.mjs')).href}`,
       };
       const cli = pathToFileURL(
@@ -228,6 +229,7 @@ for (const format of ['cjs', 'esm', 'esm-node']) {
       `,
         );
         const failed = invoke([valid[0]], {
+          ...noCompiler,
           NODE_OPTIONS: `${noCompiler.NODE_OPTIONS} --import=${pathToFileURL(path.join(root, 'fail-parser.mjs')).href}`,
         });
         assert.equal(failed.status, 1, failed.output);
