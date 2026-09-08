@@ -12,7 +12,7 @@
     "@modern-js/plugin-i18n": "workspace:*",
     "@modern-js/runtime": "workspace:*",
     "effect": "4.0.0-rc.112",
-    "i18next": "26.3.6",
+    "i18next": "26.4.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

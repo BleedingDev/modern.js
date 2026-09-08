@@ -66,9 +66,9 @@
     "@rslib/core": "1.0.0",
     "@scripts/rstest-config": "workspace:*",
     "@types/merge-deep": "^3.0.3",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.1",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "lint-staged": "~17.0.8"
+    "lint-staged": "~17.5.0"
   },
   "sideEffects": [],
   "engines": {

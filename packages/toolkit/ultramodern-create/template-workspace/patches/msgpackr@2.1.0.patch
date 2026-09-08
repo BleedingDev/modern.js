@@ -1,8 +1,9 @@
 diff --git a/unpack.js b/unpack.js
-index 2a66b62..2503656 100644
+index 2e8fc87..75305e1 100644
 --- a/unpack.js
 +++ b/unpack.js
-@@ -491,24 +491,7 @@ function read() {
+@@ -491,25 +491,8 @@ export function read() {
+ 		}
  	}
  }
 -const validName = /^[a-zA-Z_$][a-zA-Z\d_$]*$/;

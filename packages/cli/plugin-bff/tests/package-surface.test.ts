@@ -67,7 +67,7 @@ describe('published package surface', () => {
       builderDependency: undefined,
       builderDevDependency: 'workspace:*',
       esbuildDependency: undefined,
-      esbuildDevDependency: '^0.28.1',
+      esbuildDevDependency: '^0.28.2',
     });
   });
 

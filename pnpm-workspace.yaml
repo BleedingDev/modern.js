@@ -67,19 +67,18 @@ patchedDependencies:
   '@module-federation/runtime-core@2.9.0': patches/@module-federation__runtime-core@2.9.0.patch
   # Repair bridge-react's declaration specifiers for portable TS resolution.
   '@module-federation/bridge-react@2.9.0': patches/@module-federation__bridge-react@2.9.0.patch
-  # 1.171.27 dist ssr declarations index a property MakeRouteMatch does not
-  # have; fails skipLibCheck:false consumers (generated workspaces enforce it).
-  '@tanstack/router-core@1.171.27': patches/@tanstack__router-core@1.171.27.patch
   # Remove msgpackr's dynamic Function optimization from browser/edge ESM.
   # Its ordinary decoder is functionally equivalent and CSP/Worker-safe.
-  'msgpackr@2.0.6': patches/msgpackr@2.0.6.patch
+  'msgpackr@2.1.0': patches/msgpackr@2.1.0.patch
   # Disable Zod's Function-constructor capability probe in CSP/Worker bundles.
-  'zod@4.4.3': patches/zod@4.4.3.patch
+  'zod@4.5.4': patches/zod@4.5.4.patch
   # Keep source-workspace installs hardened before the independently published
   # image sidecars exist; release staging redirects the shipped image package.
   'image-size@2.0.2': patches/image-size@2.0.2.patch
 overrides:
   micromatch: ^4.0.8
+  # Effect resolves msgpackr through a caret; pin it to the patched release.
+  msgpackr: 2.1.0
   'js-yaml@>=3.0.0 <3.15.1': 3.15.1
   'js-yaml@>=4.0.0 <5.0.0': 4.3.1
   '@remix-run/router': '>=1.23.3'
@@ -145,94 +144,3 @@ allowedDeprecatedVersions:
 minimumReleaseAgeExclude:
   - '@typescript/native-preview'
   - '@typescript/native-preview-*'
-  # Exact, integrity-reviewed stable 2.2.0 closure. The corresponding
-  # generated-workspace approvals expire at 2026-08-27T02:46:55.656Z;
-  # remove these static root exclusions under modernjs-lo5p.5 after expiry.
-  - '@rsbuild/core@2.2.0'
-  - '@rspack/binding-darwin-arm64@2.2.0'
-  - '@rspack/binding-darwin-x64@2.2.0'
-  - '@rspack/binding-linux-arm64-gnu@2.2.0'
-  - '@rspack/binding-linux-arm64-musl@2.2.0'
-  - '@rspack/binding-linux-ppc64-gnu@2.2.0'
-  - '@rspack/binding-linux-riscv64-gnu@2.2.0'
-  - '@rspack/binding-linux-riscv64-musl@2.2.0'
-  - '@rspack/binding-linux-s390x-gnu@2.2.0'
-  - '@rspack/binding-linux-x64-gnu@2.2.0'
-  - '@rspack/binding-linux-x64-musl@2.2.0'
-  - '@rspack/binding-wasm32-wasi@2.2.0'
-  - '@rspack/binding-win32-arm64-msvc@2.2.0'
-  - '@rspack/binding-win32-ia32-msvc@2.2.0'
-  - '@rspack/binding-win32-x64-msvc@2.2.0'
-  - '@rspack/binding@2.2.0'
-  - '@rspack/core@2.2.0'
-  - pure-rand@8.4.1
-  - ts-checker-rspack-plugin@1.5.1
-  - '@types/react@19.2.18'
-  - '@types/node@26.2.0'
-  - i18next@26.3.6
-  - react-i18next@17.0.9
-  - typescript@7.0.2
-  - '@tanstack/history@1.162.1'
-  - '@jsonjoy.com/fs-core@4.64.0'
-  - '@jsonjoy.com/fs-fsa@4.64.0'
-  - '@jsonjoy.com/fs-node-builtins@4.64.0'
-  - '@jsonjoy.com/fs-node-to-fsa@4.64.0'
-  - '@jsonjoy.com/fs-node-utils@4.64.0'
-  - '@jsonjoy.com/fs-node@4.64.0'
-  - '@jsonjoy.com/fs-print@4.64.0'
-  - '@jsonjoy.com/fs-snapshot@4.64.0'
-  - memfs@4.64.0
-  - '@img/sharp-darwin-arm64@0.35.3'
-  - '@img/sharp-darwin-x64@0.35.3'
-  - '@img/sharp-freebsd-wasm32@0.35.3'
-  - '@img/sharp-linux-arm64@0.35.3'
-  - '@img/sharp-linux-arm@0.35.3'
-  - '@img/sharp-linux-ppc64@0.35.3'
-  - '@img/sharp-linux-riscv64@0.35.3'
-  - '@img/sharp-linux-s390x@0.35.3'
-  - '@img/sharp-linux-x64@0.35.3'
-  - '@img/sharp-linuxmusl-arm64@0.35.3'
-  - '@img/sharp-linuxmusl-x64@0.35.3'
-  - '@img/sharp-wasm32@0.35.3'
-  - '@img/sharp-webcontainers-wasm32@0.35.3'
-  - '@img/sharp-win32-arm64@0.35.3'
-  - '@img/sharp-win32-ia32@0.35.3'
-  - '@img/sharp-win32-x64@0.35.3'
-  - '@img/sharp-libvips-darwin-arm64@1.3.1'
-  - '@img/sharp-libvips-darwin-x64@1.3.1'
-  - '@img/sharp-libvips-linux-arm64@1.3.1'
-  - '@img/sharp-libvips-linux-arm@1.3.1'
-  - '@img/sharp-libvips-linux-ppc64@1.3.1'
-  - '@img/sharp-libvips-linux-riscv64@1.3.1'
-  - '@img/sharp-libvips-linux-s390x@1.3.1'
-  - '@img/sharp-libvips-linux-x64@1.3.1'
-  - '@img/sharp-libvips-linuxmusl-arm64@1.3.1'
-  - '@img/sharp-libvips-linuxmusl-x64@1.3.1'
-  - sharp@0.35.3
-  - '@opentelemetry/semantic-conventions@1.42.0 || 1.43.0'
-  - '@typescript/typescript-aix-ppc64@7.0.2'
-  - '@typescript/typescript-darwin-arm64@7.0.2'
-  - '@typescript/typescript-darwin-x64@7.0.2'
-  - '@typescript/typescript-freebsd-arm64@7.0.2'
-  - '@typescript/typescript-freebsd-x64@7.0.2'
-  - '@typescript/typescript-linux-arm64@7.0.2'
-  - '@typescript/typescript-linux-arm@7.0.2'
-  - '@typescript/typescript-linux-loong64@7.0.2'
-  - '@typescript/typescript-linux-mips64el@7.0.2'
-  - '@typescript/typescript-linux-ppc64@7.0.2'
-  - '@typescript/typescript-linux-riscv64@7.0.2'
-  - '@typescript/typescript-linux-s390x@7.0.2'
-  - '@typescript/typescript-linux-x64@7.0.2'
-  - '@typescript/typescript-netbsd-arm64@7.0.2'
-  - '@typescript/typescript-netbsd-x64@7.0.2'
-  - '@typescript/typescript-openbsd-arm64@7.0.2'
-  - '@typescript/typescript-openbsd-x64@7.0.2'
-  - '@typescript/typescript-sunos-x64@7.0.2'
-  - '@typescript/typescript-win32-arm64@7.0.2'
-  - '@typescript/typescript-win32-x64@7.0.2'
-  - zephyr-agent@1.2.1
-  - zephyr-edge-contract@1.2.1
-  - zephyr-modernjs-plugin@1.2.1
-  - zephyr-rspack-plugin@1.2.1
-  - zephyr-xpack-internal@1.2.1
-  - '@rsbuild/plugin-styled-components@1.7.0'

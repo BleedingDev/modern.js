@@ -459,15 +459,6 @@ const requiredPatchPolicies: readonly UltramodernPatchPolicy[] = [
     path: `patches/@module-federation__runtime-core@${MODULE_FEDERATION_VERSION}.patch`,
   },
   {
-    // router-core 1.171.27 still ships `MakeRouteMatch['__beforeLoadContext']`
-    // in dist ssr type declarations; the property does not exist on the type,
-    // so workspace builds fail under skipLibCheck:false (which generated
-    // workspaces enforce). Patch until an upstream release fixes the d.ts.
-    packageName: '@tanstack/router-core',
-    version: TANSTACK_ROUTER_CORE_VERSION,
-    path: `patches/@tanstack__router-core@${TANSTACK_ROUTER_CORE_VERSION}.patch`,
-  },
-  {
     // msgpackr's record decoder dynamically constructs optimized readers.
     // Edge runtimes use the equivalent CSP-safe ordinary decoder instead.
     packageName: 'msgpackr',
@@ -492,6 +483,26 @@ const conditionalPatchPolicies: readonly UltramodernPatchPolicy[] = [
 ];
 
 const stalePatchPolicies: readonly UltramodernStalePatchPolicy[] = [
+  {
+    // router-core 1.171.28 dropped the phantom `__beforeLoadContext` index
+    // from its ssr declarations, so the strict-lib-check repair is retired.
+    packageName: '@tanstack/router-core',
+    version: '1.171.27',
+    path: 'patches/@tanstack__router-core@1.171.27.patch',
+    sha256: 'd0e147ec82083771b70989d2a1da6aa47f342ae42071af86c4247649f6a5b9e9',
+  },
+  {
+    packageName: 'msgpackr',
+    version: '2.0.6',
+    path: 'patches/msgpackr@2.0.6.patch',
+    sha256: 'ea06f707e02e6b95d68e199347ada7bd640764e2653bfdd77664592390fac811',
+  },
+  {
+    packageName: 'zod',
+    version: '4.4.3',
+    path: 'patches/zod@4.4.3.patch',
+    sha256: '2ae01a829b3f4082e46f1ccb4cbcffdea0db8664c2544b3566cb507e2c471c77',
+  },
   {
     packageName: '@module-federation/bridge-react',
     version: '2.8.2',

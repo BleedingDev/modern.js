@@ -90,7 +90,6 @@ test('generated workspace renders the pins from versions.ts', () => {
       [`@module-federation/dts-plugin@${MODULE_FEDERATION_VERSION}`]: `patches/@module-federation__dts-plugin@${MODULE_FEDERATION_VERSION}.patch`,
       [`@module-federation/modern-js-v3@${MODULE_FEDERATION_VERSION}`]: `patches/@module-federation__modern-js-v3@${MODULE_FEDERATION_VERSION}.patch`,
       [`@module-federation/runtime-core@${MODULE_FEDERATION_VERSION}`]: `patches/@module-federation__runtime-core@${MODULE_FEDERATION_VERSION}.patch`,
-      [`@tanstack/router-core@${TANSTACK_ROUTER_CORE_VERSION}`]: `patches/@tanstack__router-core@${TANSTACK_ROUTER_CORE_VERSION}.patch`,
       [`msgpackr@${MSGPACKR_VERSION}`]: `patches/msgpackr@${MSGPACKR_VERSION}.patch`,
       [`zod@${ZOD_VERSION}`]: `patches/zod@${ZOD_VERSION}.patch`,
     });

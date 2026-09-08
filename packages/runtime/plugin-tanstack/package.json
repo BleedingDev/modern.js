@@ -103,8 +103,8 @@
     "@modern-js/types": "workspace:*",
     "@modern-js/utils": "workspace:*",
     "@swc/helpers": "^0.5.23",
-    "@tanstack/react-router": "1.170.32",
-    "@tanstack/router-core": "1.171.27"
+    "@tanstack/react-router": "1.170.33",
+    "@tanstack/router-core": "1.171.28"
   },
   "peerDependencies": {
     "@modern-js/app-tools": "workspace:^3.9.0",
@@ -124,12 +124,12 @@
     "@modern-js/runtime": "workspace:*",
     "@rslib/core": "1.0.0",
     "@scripts/rstest-config": "workspace:*",
-    "@tanstack/history": "1.162.1",
-    "@testing-library/react": "^16.3.2",
+    "@tanstack/history": "1.162.2",
+    "@testing-library/react": "^16.3.3",
     "@tsconfig/strictest": "2.0.8",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react-dom": "^19.2.7",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

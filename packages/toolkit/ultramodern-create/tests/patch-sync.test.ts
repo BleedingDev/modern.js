@@ -10,7 +10,6 @@ import {
   DRIZZLE_ORM_VERSION,
   MODULE_FEDERATION_VERSION,
   MSGPACKR_VERSION,
-  TANSTACK_ROUTER_CORE_VERSION,
   TYPES_NODE_VERSION,
   ZOD_VERSION,
 } from '../src/ultramodern-workspace/versions';
@@ -228,154 +227,6 @@ function assertRuntimeCorePatchIsLoadBearing(): void {
       stdio: 'pipe',
     });
     compileRuntimeCoreProof(temporaryDir);
-  } finally {
-    fs.rmSync(temporaryDir, { recursive: true, force: true });
-  }
-}
-
-function compileTanstackSsrProof(temporaryDir: string): void {
-  const proofPath = path.join(temporaryDir, 'router-core-ssr-proof.ts');
-  fs.writeFileSync(
-    proofPath,
-    [
-      "import type { DehydratedMatch } from '@tanstack/router-core/ssr/client';",
-      "export type BeforeLoadContextProof = DehydratedMatch['b'];",
-    ].join('\n'),
-  );
-  execFileSync(
-    path.join(
-      repoRoot,
-      `node_modules/.bin/${process.platform === 'win32' ? 'tsgo.cmd' : 'tsgo'}`,
-    ),
-    [
-      '--noEmit',
-      '--strict',
-      '--skipLibCheck',
-      'false',
-      '--module',
-      'ESNext',
-      '--moduleResolution',
-      'Bundler',
-      '--target',
-      'ES2022',
-      '--lib',
-      'ES2022,DOM,DOM.Iterable,ESNext.Disposable',
-      '--types',
-      'node',
-      proofPath,
-    ],
-    { cwd: temporaryDir, stdio: 'pipe' },
-  );
-}
-
-function assertTanstackRouterCorePatchIsLoadBearing(): void {
-  const patchFile = SHARED_ULTRAMODERN_WORKSPACE_PATCH_FILES.find(file =>
-    file.startsWith('@tanstack__router-core@'),
-  );
-  assert.ok(patchFile, 'router-core patch must be in the shared patch list');
-  const patchPath = path.join(repoPatchDir, patchFile);
-  const storeEntry = fs
-    .readdirSync(pnpmModulesDir)
-    .find(entry =>
-      entry.startsWith(
-        `@tanstack+router-core@${TANSTACK_ROUTER_CORE_VERSION}_patch_hash=`,
-      ),
-    );
-  assert.ok(
-    storeEntry,
-    `patched @tanstack/router-core@${TANSTACK_ROUTER_CORE_VERSION} must be installed for patch validation`,
-  );
-  const storeModulesDir = path.join(pnpmModulesDir, storeEntry, 'node_modules');
-  const installedPackageDir = path.join(
-    storeModulesDir,
-    '@tanstack/router-core',
-  );
-  const temporaryDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'modern-js-router-core-patch-'),
-  );
-
-  try {
-    const temporaryPackageDir = path.join(
-      temporaryDir,
-      'node_modules/@tanstack/router-core',
-    );
-    fs.mkdirSync(path.dirname(temporaryPackageDir), { recursive: true });
-    fs.cpSync(installedPackageDir, temporaryPackageDir, { recursive: true });
-    const routerCorePackageJson = JSON.parse(
-      fs.readFileSync(path.join(installedPackageDir, 'package.json'), 'utf8'),
-    ) as { dependencies?: Record<string, string> };
-    for (const dependencyName of Object.keys(
-      routerCorePackageJson.dependencies ?? {},
-    )) {
-      const temporaryDependencyPath = path.join(
-        temporaryDir,
-        'node_modules',
-        dependencyName,
-      );
-      fs.mkdirSync(path.dirname(temporaryDependencyPath), { recursive: true });
-      fs.symlinkSync(
-        fs.realpathSync(path.join(storeModulesDir, dependencyName)),
-        temporaryDependencyPath,
-        process.platform === 'win32' ? 'junction' : 'dir',
-      );
-    }
-
-    // The dist declarations reference node builtins, so strict lib checks
-    // need @types/node resolvable from the proof workspace.
-    const typesNodeVersion = TYPES_NODE_VERSION.replace(/^\^/, '');
-    const typesNodeStoreEntry = fs
-      .readdirSync(pnpmModulesDir)
-      .find(entry => entry.startsWith(`@types+node@${typesNodeVersion}`));
-    assert.ok(
-      typesNodeStoreEntry,
-      `@types/node@${typesNodeVersion} must be installed for router-core patch validation`,
-    );
-    const typesNodeModulesDir = path.join(
-      pnpmModulesDir,
-      typesNodeStoreEntry,
-      'node_modules',
-    );
-    for (const dependencyName of ['@types/node', 'undici-types']) {
-      const temporaryDependencyPath = path.join(
-        temporaryDir,
-        'node_modules',
-        dependencyName,
-      );
-      fs.mkdirSync(path.dirname(temporaryDependencyPath), { recursive: true });
-      fs.symlinkSync(
-        fs.realpathSync(path.join(typesNodeModulesDir, dependencyName)),
-        temporaryDependencyPath,
-        process.platform === 'win32' ? 'junction' : 'dir',
-      );
-    }
-
-    // The installed package must already carry the canonical patch.
-    execFileSync('git', ['apply', '--reverse', '--check', patchPath], {
-      cwd: temporaryPackageDir,
-      stdio: 'pipe',
-    });
-    execFileSync('git', ['apply', '--reverse', patchPath], {
-      cwd: temporaryPackageDir,
-      stdio: 'pipe',
-    });
-
-    // Unpatched 1.171.27 declarations must still fail under
-    // skipLibCheck:false; when an upstream release fixes them, this forces a
-    // conscious retirement of the patch instead of a silent stale copy.
-    assert.throws(
-      () => compileTanstackSsrProof(temporaryDir),
-      'unpatched @tanstack/router-core ssr declarations should fail strict lib checks; retire the patch if upstream fixed them',
-    );
-
-    execFileSync('git', ['apply', '--check', patchPath], {
-      cwd: temporaryPackageDir,
-      stdio: 'pipe',
-    });
-    execFileSync('git', ['apply', patchPath], {
-      cwd: temporaryPackageDir,
-      stdio: 'pipe',
-    });
-    compileTanstackSsrProof(temporaryDir);
   } finally {
     fs.rmSync(temporaryDir, { recursive: true, force: true });
   }
@@ -1013,7 +864,7 @@ test('msgpackr patch only removes the dynamic record-reader optimizer', () => {
     patchSource,
   );
   assert.deepEqual(patchSource.match(/^@@ .*$/gmu), [
-    '@@ -491,24 +491,7 @@ function read() {',
+    '@@ -491,25 +491,8 @@ export function read() {',
   ]);
   assert.equal(
     patchSource
@@ -1045,8 +896,8 @@ test('zod patch disables its runtime evaluator probe in both module formats', ()
     patchSource,
   );
   assert.deepEqual(patchSource.match(/^@@ .*$/gmu), [
-    '@@ -201,22 +201,6 @@ function isObject(data) {',
-    '@@ -143,22 +143,6 @@ export function isObject(data) {',
+    '@@ -213,22 +213,7 @@ function isObject(data) {',
+    '@@ -146,22 +146,7 @@ export function isObject(data) {',
   ]);
   assert.match(patchSource, /^-\s*const F = Function;$/mu);
   assert.match(patchSource, /^-\s*new F\(""\);$/mu);
@@ -1069,10 +920,6 @@ for (const packageName of [
     assertPatchReversesAndReapplies(packageName);
   });
 }
-
-test('TanStack router-core declaration patch is applied and load-bearing', () => {
-  assertTanstackRouterCorePatchIsLoadBearing();
-});
 
 test('Module Federation runtime-core declaration patch is applied and load-bearing', () => {
   assertRuntimeCorePatchIsLoadBearing();

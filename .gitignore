@@ -77,3 +77,6 @@ dist-ssg
 !packages/toolkit/ultramodern-create/template-workspace/.agents/
 !packages/toolkit/ultramodern-create/template-workspace/.agents/**
 .specify/
+
+# swc transform cache emitted by test runs
+.swc/

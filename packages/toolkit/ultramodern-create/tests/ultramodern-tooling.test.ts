@@ -46,7 +46,6 @@ import {
   NODE_VERSION,
   OXFMT_VERSION,
   PNPM_VERSION,
-  TANSTACK_ROUTER_CORE_VERSION,
   TYPESCRIPT_NATIVE_PREVIEW_VERSION,
   TYPESCRIPT_VERSION,
   ZOD_VERSION,
@@ -825,11 +824,6 @@ test('migrate materializes required shared declaration patches', async () => {
   );
   const workspacePath = path.join(workspaceDir, 'pnpm-workspace.yaml');
   const patchCases = [
-    {
-      label: 'router-core',
-      relativePatchPath: `patches/@tanstack__router-core@${TANSTACK_ROUTER_CORE_VERSION}.patch`,
-      selector: `@tanstack/router-core@${TANSTACK_ROUTER_CORE_VERSION}`,
-    },
     {
       label: 'runtime-core',
       relativePatchPath: `patches/@module-federation__runtime-core@${MODULE_FEDERATION_VERSION}.patch`,
@@ -3667,13 +3661,13 @@ test('UltraModern migrate rejects duplicate pnpm mappings without writes', async
 
   try {
     const pnpmWorkspaceFile = path.join(workspaceDir, 'pnpm-workspace.yaml');
-    const unquotedLine = `  @tanstack/router-core@${TANSTACK_ROUTER_CORE_VERSION}: patches/@tanstack__router-core@${TANSTACK_ROUTER_CORE_VERSION}.patch`;
+    const unquotedLine = `  @module-federation/runtime-core@${MODULE_FEDERATION_VERSION}: patches/@module-federation__runtime-core@${MODULE_FEDERATION_VERSION}.patch`;
     fs.writeFileSync(
       pnpmWorkspaceFile,
       fs
         .readFileSync(pnpmWorkspaceFile, 'utf-8')
         .replace(
-          `  '@tanstack/router-core@${TANSTACK_ROUTER_CORE_VERSION}': patches/@tanstack__router-core@${TANSTACK_ROUTER_CORE_VERSION}.patch`,
+          `  '@module-federation/runtime-core@${MODULE_FEDERATION_VERSION}': patches/@module-federation__runtime-core@${MODULE_FEDERATION_VERSION}.patch`,
           `${unquotedLine}\n${unquotedLine}`,
         ),
       'utf-8',

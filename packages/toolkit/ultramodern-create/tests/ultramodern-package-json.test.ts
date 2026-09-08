@@ -48,8 +48,8 @@ const installAppDependencies = {
   '@module-federation/bridge-react': '2.9.0',
   '@module-federation/modern-js-v3': '2.9.0',
   '@module-federation/runtime': '2.9.0',
-  '@tanstack/react-router': '1.170.32',
-  i18next: '26.3.6',
+  '@tanstack/react-router': '1.170.33',
+  i18next: '26.4.2',
   'node-fetch': '^3.3.2',
   '@tractor-store/shared-contracts': 'workspace:*',
   '@tractor-store/shared-design-tokens': 'workspace:*',
@@ -146,8 +146,8 @@ test('workspace package source uses workspace versions for generated framework d
     '@module-federation/bridge-react': '2.9.0',
     '@module-federation/modern-js-v3': '2.9.0',
     '@module-federation/runtime': '2.9.0',
-    '@tanstack/react-router': '1.170.32',
-    i18next: '26.3.6',
+    '@tanstack/react-router': '1.170.33',
+    i18next: '26.4.2',
     'node-fetch': '^3.3.2',
     '@tractor-store/shared-contracts': 'workspace:*',
     '@tractor-store/shared-design-tokens': 'workspace:*',
@@ -222,7 +222,7 @@ test('root package json pins workspace package versions and bridge workspace glo
     'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .',
   );
   assert.deepEqual(rootPackageJson.devDependencies, {
-    '@effect/tsgo': '0.37.0',
+    '@effect/tsgo': '0.41.0',
     '@modern-js/code-tools': packageVersion,
     '@modern-js/ultramodern-create': packageVersion,
     '@modern-js/plugin-bff': packageVersion,
@@ -231,11 +231,11 @@ test('root package json pins workspace package versions and bridge workspace glo
     'cross-env': '10.1.0',
     lefthook: '^2.1.10',
     miniflare: MINIFLARE_VERSION,
-    oxlint: '1.80.0',
-    oxfmt: '0.65.0',
-    ultracite: '7.10.6',
+    oxlint: '1.81.0',
+    oxfmt: '0.66.0',
+    ultracite: '7.11.0',
     wrangler: '4.116.0',
-    'zephyr-agent': '1.2.1',
+    'zephyr-agent': '1.2.4',
   });
 });
 
