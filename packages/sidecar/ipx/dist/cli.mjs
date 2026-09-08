@@ -13,7 +13,7 @@ import 'ofetch';
 import 'pathe';
 
 const name = "ipx";
-const version = "3.2.0";
+const version = "3.2.1";
 const description = "High performance, secure and easy-to-use image optimizer.";
 
 const serve = defineCommand({

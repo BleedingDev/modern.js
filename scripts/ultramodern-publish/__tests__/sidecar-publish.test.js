@@ -607,3 +607,32 @@ test('the repository sidecar roots stay aligned with the shipped image aliases',
     sidecars,
   );
 });
+
+test('the repository IPX version and CLI banners track its updated Sharp floor', async () => {
+  const { collectSidecarPackages, rewriteSidecarConsumerAliases } =
+    await importSidecars();
+  const sidecars = collectSidecarPackages(repoRoot);
+  const ipx = JSON.parse(
+    fs.readFileSync(
+      path.join(repoRoot, 'packages/sidecar/ipx/package.json'),
+      'utf8',
+    ),
+  );
+  const image = JSON.parse(
+    fs.readFileSync(
+      path.join(repoRoot, 'packages/runtime/plugin-image/package.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(ipx.version, '3.2.1');
+  assert.equal(ipx.dependencies.sharp, image.dependencies.sharp);
+  for (const file of ['cli.mjs', 'cli.cjs']) {
+    const source = fs.readFileSync(
+      path.join(repoRoot, 'packages/sidecar/ipx/dist', file),
+      'utf8',
+    );
+    assert.ok(source.includes(`const version = "${ipx.version}";`));
+  }
+  rewriteSidecarConsumerAliases(image, sidecars);
+  assert.equal(image.dependencies.ipx, `npm:${ipx.name}@${ipx.version}`);
+});

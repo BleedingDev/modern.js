@@ -4,7 +4,7 @@ A minimal, distributable sidecar fork of [`ipx`](https://github.com/unjs/ipx) �
 performance, secure and easy-to-use image optimizer" — by Pooya Parsa and the UnJS
 contributors, MIT licensed. The upstream `LICENSE` is preserved verbatim next to this file.
 
-Forked from **`ipx@3.1.1`**. Published as **`@bleedingdev/ipx@3.2.0`**.
+Forked from **`ipx@3.1.1`**. Published as **`@bleedingdev/ipx@3.2.1`**.
 
 The `dist/` tree here is the upstream published build, vendored byte-for-byte except for the
 hunks listed below. Upstream ships no TypeScript sources in the npm tarball, so this fork
@@ -13,7 +13,7 @@ against `ipx@3.1.1` small enough to re-audit by eye on every upstream bump.
 
 ## Why this fork exists
 
-`@modern-js/image` depends on `sharp@^0.35.3`, but `ipx@3.1.1` declares `"sharp": "^0.34.3"`
+`@modern-js/image` depends on `sharp@^0.35.4`, but `ipx@3.1.1` declares `"sharp": "^0.34.3"`
 as a **plain dependency**. A `0.x` caret does not admit `0.35.x`
 (`semver.satisfies("0.35.3", "^0.34.3") === false`), so every consumer of the published
 `@modern-js/image` also installs a second, older `sharp` — currently `sharp@0.34.5` — behind
@@ -22,7 +22,7 @@ IPX. Plain dependencies cannot be redirected from a consumer's manifest: `pnpm.o
 package. Forking the dependency and aliasing it in `@modern-js/image` is the only distributable
 fix.
 
-The version is a **stable** `3.2.0` on purpose. Both `@rsbuild-image/core` and
+The version is a **stable** `3.2.1` on purpose. Both `@rsbuild-image/core` and
 `@rsbuild-image/react` declare the peer range `"ipx": ">=3.0.3"`, and npm evaluates non-wildcard
 peer ranges with a loose-only `semver.satisfies` that **excludes prereleases**. A prerelease
 version such as `3.2.0-ultramodern.1` would pass pnpm but fail strict npm and yarn-classic
@@ -30,7 +30,7 @@ consumers.
 
 ## Fork delta vs `ipx@3.1.1`
 
-### 1. `sharp` dependency range: `^0.34.3` → `^0.35.3` (`package.json`)
+### 1. `sharp` dependency range: `^0.34.3` → `^0.35.4` (`package.json`)
 
 Aligns IPX with the `sharp` version `@modern-js/image` already declares, so a single, current
 `sharp` is installed for the whole image pipeline.
@@ -69,7 +69,7 @@ Behaviour notes:
 - `flat`/`jagged` map to `m1`/`m2`, whose valid range widens to `0`–`1000000` (Sharp 0.34's
   deprecated path capped them at `10000`).
 
-### 3. CLI banner version string `3.1.1` → `3.2.0` (`dist/cli.mjs`, `dist/cli.cjs`)
+### 3. CLI banner version string `3.1.1` → `3.2.1` (`dist/cli.mjs`, `dist/cli.cjs`)
 
 Cosmetic and non-functional: the version is inlined into the published CLI at build time, so
 without this hunk `ipx --version` would disagree with this package's manifest. The bin name
@@ -107,6 +107,9 @@ node packages/sidecar/ipx/scripts/verify-sharpen.mjs [imageDir]
 Running the same script against the unpatched `ipx@3.1.1` dist on `sharp@0.35.3` fails both
 differentiation assertions — every `sharpen` variant returns the identical mild-sharpen buffer —
 which is exactly the silent regression this fork removes.
+
+Version 3.2.1 advances the Sharp dependency floor to 0.35.4. It uses a new
+stable version because the package manifest changes the immutable npm tarball.
 
 ## Maintenance
 

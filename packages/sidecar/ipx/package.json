@@ -1,7 +1,7 @@
 {
   "name": "@bleedingdev/ipx",
-  "version": "3.2.0",
-  "description": "UltraModern sidecar fork of ipx: high performance, secure and easy-to-use image optimizer, built against sharp ^0.35.3.",
+  "version": "3.2.1",
+  "description": "UltraModern sidecar fork of ipx: high performance, secure and easy-to-use image optimizer, built against sharp ^0.35.4.",
   "license": "MIT",
   "repository": {
     "type": "git",

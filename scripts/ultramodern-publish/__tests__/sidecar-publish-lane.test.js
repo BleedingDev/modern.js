@@ -874,7 +874,7 @@ test('the CLI reads the staged lane from the release bundle and fails closed on 
         item.name === '@bleedingdev/ipx'
           ? {
               ...item,
-              packageJson: { ...item.packageJson, version: '3.2.1' },
+              packageJson: { ...item.packageJson, version: '999.0.0' },
             }
           : item,
       ),
@@ -885,7 +885,7 @@ test('the CLI reads the staged lane from the release bundle and fails closed on 
       readStagedSidecars(releaseDir, {
         verifyRelease: () => tampered,
       }),
-    /Accepted sidecar @bleedingdev\/ipx@3\.2\.0 contains @bleedingdev\/ipx@3\.2\.1/u,
+    /Accepted sidecar @bleedingdev\/ipx@[\d.]+ contains @bleedingdev\/ipx@999\.0\.0/u,
   );
 
   assert.throws(
@@ -1040,7 +1040,7 @@ test('a rerun converges when an exact sidecar version is still indexing at the i
         return ipxReads === 1
           ? {
               name,
-              'dist-tags': { latest: '3.2.0' },
+              'dist-tags': { latest: stagedIpxPackage.version },
               versions: {},
             }
           : {
@@ -1063,7 +1063,9 @@ test('a rerun converges when an exact sidecar version is still indexing at the i
     },
   );
 
-  assert.deepEqual(result.reused, ['@bleedingdev/ipx@3.2.0']);
+  assert.deepEqual(result.reused, [
+    `@bleedingdev/ipx@${stagedIpxPackage.version}`,
+  ]);
   assert.equal(result.published.length, 2);
   assert.equal(ipxReads, 2);
   assert.equal(
