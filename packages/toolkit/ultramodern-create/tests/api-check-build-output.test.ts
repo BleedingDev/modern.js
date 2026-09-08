@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { linkBuiltCodeTools } from './helpers/built-code-tools';
 
 const require = createRequire(import.meta.url);
 const checker = path.resolve(
@@ -46,13 +47,7 @@ test('API checker excludes only registered app Cloudflare output, not authored l
       path.join(typescriptScope, 'native'),
       'dir',
     );
-    const scopeDirectory = path.join(root, 'node_modules/@modern-js');
-    fs.mkdirSync(scopeDirectory, { recursive: true });
-    fs.symlinkSync(
-      path.resolve(__dirname, '../../code-tools'),
-      path.join(scopeDirectory, 'code-tools'),
-      'dir',
-    );
+    linkBuiltCodeTools(path.join(root, 'node_modules'));
     write(
       root,
       '.modernjs/ultramodern.json',

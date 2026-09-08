@@ -1,8 +1,13 @@
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import {
   isAsExpression,
   isCallExpression,
+  isExportDeclaration,
   isIdentifier,
   isImportDeclaration,
+  isNamedExports,
   isNamedImports,
   isNumericLiteral,
   isObjectLiteralExpression,
@@ -334,15 +339,139 @@ const importsExactBindings = (
   return expectedBindings.every(name => names.has(name));
 };
 
+const baselineBindings = [
+  'MicroVerticalBuildMarkerSchema',
+  'MicroVerticalReadinessSchema',
+  'createMicroVerticalOperationContext',
+] as const;
+
 const importsSharedBaselinePrimitives = (
   sourceFile: SourceFile,
   expectedPackage: string,
 ): boolean =>
-  importsExactBindings(sourceFile, expectedPackage, [
-    'MicroVerticalBuildMarkerSchema',
-    'MicroVerticalReadinessSchema',
-    'createMicroVerticalOperationContext',
-  ]);
+  [expectedPackage, `${expectedPackage}/microvertical-api-baseline`].some(
+    specifier => importsExactBindings(sourceFile, specifier, baselineBindings),
+  );
+
+/** Resolve only the owner's two public baseline surfaces, never arbitrary subpaths. */
+const baselinePublicIdentityIsExact = (
+  sourceFile: SourceFile,
+  expectation: MicroVerticalApiBaselineExpectation,
+  parse: (filePath: string) => SourceFile | undefined,
+): boolean => {
+  try {
+    const owner = fs.realpathSync(expectation.sharedContractsDirectory);
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(owner, 'package.json'), 'utf8'),
+    );
+    if (manifest.name !== expectation.sharedContractsPackage) return false;
+    const exports =
+      typeof manifest.exports === 'string'
+        ? { '.': manifest.exports }
+        : manifest.exports;
+    const specifier = [
+      expectation.sharedContractsPackage,
+      `${expectation.sharedContractsPackage}/microvertical-api-baseline`,
+    ].find(candidate =>
+      importsExactBindings(sourceFile, candidate, baselineBindings),
+    );
+    if (specifier === undefined) return false;
+    const subpath =
+      specifier === expectation.sharedContractsPackage
+        ? '.'
+        : './microvertical-api-baseline';
+    const target =
+      subpath === '.'
+        ? './src/index.ts'
+        : './src/microvertical-api-baseline.ts';
+    if (
+      exports?.[subpath] !== target ||
+      fs.realpathSync(createRequire(sourceFile.fileName).resolve(specifier)) !==
+        path.join(owner, target)
+    )
+      return false;
+    const rootPath = path.join(owner, 'src/index.ts');
+    const baselinePath = path.join(owner, 'src/microvertical-api-baseline.ts');
+    const publicFile = parse(path.join(owner, target));
+    if (publicFile === undefined) return false;
+    const exportedOwner = (
+      file: SourceFile,
+      name: string,
+    ): SourceFile | undefined => {
+      const filePath = path.resolve(file.fileName);
+      if (
+        ![rootPath, baselinePath].includes(filePath) ||
+        fs.realpathSync(filePath) !== filePath
+      )
+        return undefined;
+      if (exportedConst(file, name) !== undefined) return file;
+      // The legacy root may re-export the dedicated owner file. No foreign or
+      // multi-hop barrels, renamed exports, type-only exports, or decoys qualify.
+      if (filePath !== rootPath) return undefined;
+      const exports = file.statements
+        .filter(isExportDeclaration)
+        .filter(statement => !statement.isTypeOnly);
+      const explicit = exports.filter(statement =>
+        statement.exportClause !== undefined &&
+        isNamedExports(statement.exportClause) &&
+        statement.exportClause.elements.some(
+          element => !element.isTypeOnly && element.name.text === name,
+        ),
+      );
+      const candidates = explicit.length > 0
+        ? explicit
+        : exports.filter(statement => statement.exportClause === undefined);
+      // Explicit exports override stars; multiple unrelated stars can be ambiguous.
+      if (candidates.some(statement =>
+        stringLiteral(statement.moduleSpecifier) !== './microvertical-api-baseline.ts',
+      )) return undefined;
+      for (const statement of candidates) {
+        if (
+          statement.exportClause !== undefined &&
+          (!isNamedExports(statement.exportClause) ||
+            !statement.exportClause.elements.some(
+              element =>
+                !element.isTypeOnly &&
+                element.propertyName === undefined &&
+                element.name.text === name,
+            ))
+        )
+          continue;
+        const baseline = parse(baselinePath);
+        if (
+          baseline !== undefined &&
+          exportedConst(baseline, name) !== undefined &&
+          fs.realpathSync(baselinePath) === baselinePath
+        )
+          return baseline;
+      }
+      return undefined;
+    };
+    const owners = baselineBindings.map(name =>
+      exportedOwner(publicFile, name),
+    );
+    const baseline = owners[0];
+    return (
+      baseline !== undefined &&
+      owners.every(file => file?.fileName === baseline.fileName) &&
+      ['effect', expectation.effectClientPackage].some(specifier =>
+        importsExactBindings(baseline, specifier, ['Schema']),
+      ) &&
+      baselineBindings
+        .slice(0, 2)
+        .every(
+          name =>
+            exactCall(
+              exportedConst(baseline, name)?.initializer,
+              ['Schema', 'Struct'],
+              1,
+            ) !== undefined,
+        )
+    );
+  } catch {
+    return false;
+  }
+};
 
 const singleAddedArgument = (
   expression: Expression | undefined,
@@ -736,7 +865,14 @@ const parseAndValidate = (
 ): string | undefined => {
   const compiler = new TypeScriptApi();
   try {
-    const snapshot = compiler.updateSnapshot({ openFiles: [filePath] });
+    const ownerFiles = ['index.ts', 'microvertical-api-baseline.ts']
+      .map(name =>
+        path.resolve(expectation.sharedContractsDirectory, 'src', name),
+      )
+      .filter(file => fs.existsSync(file));
+    const snapshot = compiler.updateSnapshot({
+      openFiles: [filePath, ...ownerFiles],
+    });
     const project = snapshot.getDefaultProjectForFile(filePath);
     const sourceFile = project?.program.getSourceFile(filePath);
     if (
@@ -745,6 +881,20 @@ const parseAndValidate = (
       (project?.program.getBindDiagnostics(filePath).length ?? 1) > 0
     ) {
       return 'MicroVertical root contract must be valid TypeScript syntax';
+    }
+    if (
+      !baselinePublicIdentityIsExact(sourceFile, expectation, ownerFile => {
+        const ownerProject = snapshot.getDefaultProjectForFile(ownerFile);
+        if (
+          !ownerProject ||
+          ownerProject.program.getSyntacticDiagnostics(ownerFile).length > 0 ||
+          ownerProject.program.getBindDiagnostics(ownerFile).length > 0
+        )
+          return undefined;
+        return ownerProject.program.getSourceFile(ownerFile);
+      })
+    ) {
+      return 'MicroVertical baseline imports must resolve the exact shared owner public export and schema identity';
     }
     return validateParsedContract(sourceFile, stem, expectation);
   } finally {
@@ -760,6 +910,7 @@ export interface MicroVerticalApiBaselineExpectation {
   readonly ownerId: string;
   readonly readinessPath: string;
   readonly sharedContractsPackage: string;
+  readonly sharedContractsDirectory: string;
 }
 
 export interface MicroVerticalTopologyEntry {

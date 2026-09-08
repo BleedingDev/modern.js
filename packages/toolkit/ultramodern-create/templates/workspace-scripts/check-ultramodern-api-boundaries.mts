@@ -623,6 +623,10 @@ function assertApiSurface(appPath, app) {
         ownerId: app?.id ?? path.posix.basename(appPath),
         readinessPath: `${basePath}/readiness`,
         sharedContractsPackage: sharedPackage.name,
+        sharedContractsDirectory: path.resolve(
+          workspaceRoot,
+          'packages/shared-contracts',
+        ),
       },
     );
     assert(

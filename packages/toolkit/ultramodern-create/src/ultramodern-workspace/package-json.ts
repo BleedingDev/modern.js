@@ -339,6 +339,7 @@ export function createSharedPackage(
   if (id === 'shared-contracts') {
     packageJson.exports = {
       '.': './src/index.ts',
+      './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
       './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
     };
     packageJson.dependencies = {
@@ -360,5 +361,5 @@ export function createSharedPackage(
 }
 
 export function createSharedContractsIndex(): string {
-  return `${readFileTemplate('packages/microvertical-api-baseline.ts')}\n${readFileTemplate('packages/shared-contracts-index.ts')}`;
+  return readFileTemplate('packages/shared-contracts-index.ts');
 }

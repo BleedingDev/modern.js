@@ -1081,8 +1081,13 @@ async function validateApp(app, publicUrl) {
   const noFrontendExposes = exposes === undefined ||
     (Array.isArray(exposes) ? exposes.length === 0 :
       exposes !== null && typeof exposes === 'object' && Object.keys(exposes).length === 0);
-  // An API readiness contract without frontend exposes need not invent UI routes.
-  const apiOnlyRoutes = noFrontendExposes && isProofRoute(routes.apiReadiness);
+  // REST readiness or an explicitly exercised RPC contract needs no invented UI routes.
+  const rpcSmokeCheck = (app.deploy?.cloudflare?.jsonSmokeChecks ?? []).find(
+    check => check.route === routes.rpc && String(check.method ?? 'GET').toUpperCase() === 'POST',
+  );
+  const apiOnlyRoutes = noFrontendExposes && (
+    isProofRoute(routes.apiReadiness) || (isProofRoute(routes.rpc) && rpcSmokeCheck)
+  );
   for (const field of ['ssr', 'locale']) {
     if (Object.hasOwn(routes, field)) {
       assert(isProofRoute(routes[field]), `${app.id} declared ${field} route must be a root-relative path`);
@@ -1092,13 +1097,7 @@ async function validateApp(app, publicUrl) {
   }
 
   if (routes.rpc) {
-    const rpcSmokeCheck = (
-      app.deploy?.cloudflare?.jsonSmokeChecks ?? []
-    ).find(
-      check =>
-        check.route === routes.rpc &&
-        String(check.method ?? 'GET').toUpperCase() === 'POST',
-    );
+    assert(isProofRoute(routes.rpc), `${app.id} declared RPC route must be a root-relative path`);
     assert(
       rpcSmokeCheck,
       `${app.id} RPC route ${routes.rpc} requires a POST JSON smoke check`,

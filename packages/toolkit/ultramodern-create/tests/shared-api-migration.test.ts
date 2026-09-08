@@ -10,6 +10,7 @@ import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
+import { linkBuiltCodeTools } from './helpers/built-code-tools';
 
 const source = {
   strategy: 'workspace' as const,
@@ -50,8 +51,8 @@ test('shared API infrastructure is additive, byte-stable, and preserves consumer
   );
   migrate();
   const index = read(root, `${shared}/src/index.ts`);
-  expect(index.startsWith(business)).toBe(true);
-  expect(index).toContain("export * from './microvertical-api-baseline.ts';");
+  expect(index).toBe(business);
+  expect(index).not.toContain('microvertical-api-baseline');
   expect(read(root, 'verticals/catalog/api/index.ts')).toBe(handler);
   expect(read(root, `${shared}/src/effect-bff-runtime.ts`)).toContain(
     'defineEffectBff({ api, layer })',
@@ -63,6 +64,7 @@ test('shared API infrastructure is additive, byte-stable, and preserves consumer
     exports: {
       '.': './src/index.ts',
       './business': './src/business.ts',
+      './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
       './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
     },
     dependencies: {
@@ -118,6 +120,37 @@ test('ambiguous consumer root exports fail closed before any infrastructure writ
   expect(fs.existsSync(path.join(root, shared, 'src'))).toBe(false);
 });
 
+test.each([
+  './microvertical-api-baseline',
+  './server/effect-bff-runtime',
+])('conflicting consumer %s export fails transactionally', subpath => {
+  const manifest = JSON.stringify({
+    name: '@warehouse/shared-contracts',
+    exports: { '.': './src/index.ts', [subpath]: './src/business.ts' },
+  });
+  write(root, `${shared}/package.json`, manifest);
+  write(root, `${shared}/src/index.ts`, 'export const business = true;\r\n');
+  expect(migrate).toThrow('consumer exports were not overwritten');
+  expect(read(root, `${shared}/package.json`)).toBe(manifest);
+  expect(read(root, `${shared}/src/index.ts`)).toBe(
+    'export const business = true;\r\n',
+  );
+  expect(
+    fs.existsSync(path.join(root, shared, 'src/microvertical-api-baseline.ts')),
+  ).toBe(false);
+});
+
+test.each([
+  '',
+  '\n',
+  '\r\n',
+])('migration retains root index bytes with terminator %j', terminator => {
+  const index = `export const consumer =  "preserved";${terminator}`;
+  write(root, `${shared}/src/index.ts`, index);
+  migrate();
+  expect(read(root, `${shared}/src/index.ts`)).toBe(index);
+});
+
 test('owning migration restores missing shared infrastructure without regenerating business API source', async () => {
   const workspace = path.join(root, 'workspace');
   generateUltramodernWorkspace({
@@ -156,9 +189,7 @@ test('owning migration restores missing shared infrastructure without regenerati
   expect(
     handlers.map(file => read(workspace, `verticals/catalog/${file}`)),
   ).toEqual(before);
-  expect(read(workspace, `${shared}/src/index.ts`).startsWith(business)).toBe(
-    true,
-  );
+  expect(read(workspace, `${shared}/src/index.ts`)).toBe(business);
   expect(read(workspace, `${shared}/src/effect-bff-runtime.ts`)).toContain(
     'defineEffectBff',
   );
@@ -171,13 +202,13 @@ test('owning migration restores missing shared infrastructure without regenerati
       '@typescript/native',
       path.dirname(require.resolve('typescript/package.json')),
     ],
-    ['@modern-js/code-tools', path.resolve(__dirname, '../../code-tools')],
     ['@warehouse/shared-contracts', path.join(workspace, shared)],
   ]) {
     const destination = path.join(workspace, 'node_modules', name);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.symlinkSync(target, destination, 'dir');
   }
+  linkBuiltCodeTools(path.join(workspace, 'node_modules'));
   const checked = spawnSync(
     process.execPath,
     ['scripts/check-ultramodern-api-boundaries.mts'],

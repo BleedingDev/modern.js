@@ -9,7 +9,7 @@ let helperDirectory: string;
 let microVerticalApiBaselineViolation: (
   stem: string,
   file: string,
-  options: typeof expectation,
+  options: typeof expectation & { sharedContractsDirectory: string },
 ) => string | undefined;
 
 beforeAll(() => {
@@ -55,18 +55,48 @@ const expectation = {
   sharedContractsPackage: '@warehouse/shared-contracts',
 };
 const source = createSharedApi(service, { scope: 'warehouse' });
-const validate = (content: string) => {
+const validate = (content: string, customize?: (owner: string) => void) => {
   const directory = fs.mkdtempSync(
     path.join(os.tmpdir(), 'shared-api-baseline-'),
   );
   try {
     const file = path.join(directory, 'api.ts');
     fs.writeFileSync(file, content);
-    return microVerticalApiBaselineViolation(
-      'warehouse-items',
-      file,
-      expectation,
+    const owner = path.join(directory, 'packages/shared-contracts');
+    fs.mkdirSync(path.join(owner, 'src'), { recursive: true });
+    fs.writeFileSync(
+      path.join(owner, 'package.json'),
+      JSON.stringify({
+        name: expectation.sharedContractsPackage,
+        exports: {
+          '.': './src/index.ts',
+          './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
+        },
+      }),
     );
+    fs.writeFileSync(
+      path.join(owner, 'src/index.ts'),
+      'export const business = true;\n',
+    );
+    fs.copyFileSync(
+      path.resolve(
+        __dirname,
+        '../templates/packages/microvertical-api-baseline.ts',
+      ),
+      path.join(owner, 'src/microvertical-api-baseline.ts'),
+    );
+    const publicPackage = path.join(
+      directory,
+      'node_modules',
+      expectation.sharedContractsPackage,
+    );
+    fs.mkdirSync(path.dirname(publicPackage), { recursive: true });
+    fs.symlinkSync(owner, publicPackage, 'dir');
+    customize?.(owner);
+    return microVerticalApiBaselineViolation('warehouse-items', file, {
+      ...expectation,
+      sharedContractsDirectory: owner,
+    });
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -76,7 +106,107 @@ describe('native shared API baseline AST', () => {
   test('accepts scoped readiness foundation with independent owner and prefix', () => {
     expect(validate(source)).toBeUndefined();
   });
+  test('accepts legacy root only when the exact owner exports its baseline', () => {
+    const legacy = source.replaceAll(
+      '/shared-contracts/microvertical-api-baseline',
+      '/shared-contracts',
+    );
+    expect(validate(legacy)).toBeDefined();
+    expect(
+      validate(legacy, owner => {
+        fs.writeFileSync(
+          path.join(owner, 'src/index.ts'),
+          "export * from './microvertical-api-baseline.ts';\n",
+        );
+      }),
+    ).toBeUndefined();
+    expect(
+      validate(legacy, owner => {
+        fs.copyFileSync(
+          path.join(owner, 'src/microvertical-api-baseline.ts'),
+          path.join(owner, 'src/index.ts'),
+        );
+      }),
+    ).toBeUndefined();
+  });
+  test('rejects an explicit impersonated schema overriding a genuine root star export', () => {
+    const legacy = source.replaceAll(
+      '/shared-contracts/microvertical-api-baseline',
+      '/shared-contracts',
+    );
+    expect(
+      validate(legacy, owner => {
+        fs.writeFileSync(
+          path.join(owner, 'src/index.ts'),
+          [
+            "export * from './microvertical-api-baseline.ts';",
+            'const fake = {};',
+            'export { fake as MicroVerticalBuildMarkerSchema };',
+          ].join('\n'),
+        );
+      }),
+    ).toBeDefined();
+  });
   test.each([
+    './src/impersonated.ts',
+    './src/index.ts',
+  ])('rejects remapped dedicated baseline export %s', target => {
+    expect(
+      validate(source, owner => {
+        fs.copyFileSync(
+          path.join(owner, 'src/microvertical-api-baseline.ts'),
+          path.join(owner, 'src/impersonated.ts'),
+        );
+        fs.writeFileSync(
+          path.join(owner, 'package.json'),
+          JSON.stringify({
+            name: expectation.sharedContractsPackage,
+            exports: { './microvertical-api-baseline': target },
+          }),
+        );
+      }),
+    ).toBeDefined();
+  });
+  test('rejects a same-named installed package impersonating the expected owner', () => {
+    expect(
+      validate(source, owner => {
+        const root = path.resolve(owner, '../..');
+        const impersonator = path.join(root, 'impersonator');
+        fs.cpSync(owner, impersonator, { recursive: true });
+        const link = path.join(
+          root,
+          'node_modules',
+          expectation.sharedContractsPackage,
+        );
+        fs.unlinkSync(link);
+        fs.symlinkSync(impersonator, link, 'dir');
+      }),
+    ).toBeDefined();
+  });
+  test('rejects missing public primitives and foreign package identity', () => {
+    expect(
+      validate(source, owner => {
+        fs.writeFileSync(
+          path.join(owner, 'src/microvertical-api-baseline.ts'),
+          'export const unrelated = true;',
+        );
+      }),
+    ).toBeDefined();
+    expect(
+      validate(source, owner => {
+        const manifestPath = path.join(owner, 'package.json');
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        manifest.name = '@foreign/shared-contracts';
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+      }),
+    ).toBeDefined();
+  });
+  test.each([
+    [
+      'arbitrary package subpath',
+      '/shared-contracts/microvertical-api-baseline',
+      '/shared-contracts/impersonated',
+    ],
     ['fake primitive import', '  HttpApi,', '  fake as HttpApi,'],
     [
       'foreign shared scope',

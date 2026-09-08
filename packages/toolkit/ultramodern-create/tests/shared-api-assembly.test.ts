@@ -45,7 +45,9 @@ describe('scope-aware native API scaffolding', () => {
   });
   test('shared API baseline retains owner metadata and custom prefixes', () => {
     const source = createSharedApi(service, { scope: 'warehouse' });
-    expect(source).toContain("from '@warehouse/shared-contracts'");
+    expect(source).toContain(
+      "from '@warehouse/shared-contracts/microvertical-api-baseline'",
+    );
     expect(source).toContain('= MicroVerticalReadinessSchema');
     expect(source).toContain('= MicroVerticalBuildMarkerSchema');
     expect(source).toContain('.addHttpApi(warehouseItemsFoundationApi)');
@@ -63,15 +65,20 @@ describe('scope-aware native API scaffolding', () => {
       { strategy: 'install', modernPackageVersion: '3.9.0' },
     );
     expect(manifest).toMatchObject({
-      exports: { './server/effect-bff-runtime': './src/effect-bff-runtime.ts' },
+      exports: {
+        './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
+        './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
+      },
       dependencies: {
         '@modern-js/plugin-bff': '3.9.0',
         effect: '4.0.0-rc.112',
       },
     });
-    expect(createSharedContractsIndex()).toContain(
-      'export const MicroVerticalReadinessSchema',
+    expect(createSharedContractsIndex()).not.toContain(
+      'MicroVerticalReadinessSchema',
     );
+    expect(createSharedContractsIndex()).not.toContain("from 'effect'");
+    expect(createSharedContractsIndex()).not.toContain('export *');
     expect(createSharedContractsIndex()).not.toContain('defineEffectBff');
   });
   test('migration emits the owning AST helper rather than a consumer customization', () => {

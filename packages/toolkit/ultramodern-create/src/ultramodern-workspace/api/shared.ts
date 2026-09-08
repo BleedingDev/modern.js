@@ -293,8 +293,9 @@ export function createSharedApi(
   options?: { readonly scope: string },
 ): string {
   const imports = options
-    ? `import { MicroVerticalBuildMarkerSchema, MicroVerticalReadinessSchema, createMicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}';
-import type { MicroVerticalBuildMarker, MicroVerticalReadiness, MicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}';`
+    ? `import { MicroVerticalBuildMarkerSchema, MicroVerticalReadinessSchema, createMicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}/microvertical-api-baseline';
+import type { MicroVerticalBuildMarker, MicroVerticalReadiness, MicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}/microvertical-api-baseline';
+`
     : '';
   return `${createSharedApiImports()}
 ${imports}

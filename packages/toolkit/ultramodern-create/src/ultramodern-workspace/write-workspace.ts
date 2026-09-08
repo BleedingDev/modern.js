@@ -116,6 +116,11 @@ function writeSharedPackages(
   );
   writeFile(
     targetDir,
+    'packages/shared-contracts/src/microvertical-api-baseline.ts',
+    readFileTemplate('packages/microvertical-api-baseline.ts'),
+  );
+  writeFile(
+    targetDir,
     'packages/shared-contracts/src/effect-bff-runtime.ts',
     readFileTemplate('packages/effect-bff-runtime.ts'),
   );

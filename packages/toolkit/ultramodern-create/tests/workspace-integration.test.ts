@@ -18,6 +18,7 @@ import {
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
 import { createWorkspaceRootPackageScripts } from '../src/ultramodern-workspace/workspace-script-plan';
+import { linkBuiltCodeTools } from './helpers/built-code-tools';
 import { snapshotWorkspace } from './helpers/workspace-kit';
 
 const packageRoot = path.resolve(__dirname, '..');
@@ -192,10 +193,24 @@ function runGeneratedWorkspaceCheck(workspaceDir: string) {
 function runGeneratedApiCheck(workspaceDir: string) {
   // These fixtures deliberately skip install. Supply the real parser/tooling,
   // never mock the validator or write through a shared node_modules symlink.
+  const sharedContracts = path.join(workspaceDir, 'packages/shared-contracts');
+  const sharedName = readJson(
+    workspaceDir,
+    'packages/shared-contracts/package.json',
+  ).name;
+  const workspaceModules = path.join(workspaceDir, 'node_modules');
+  if (fs.existsSync(workspaceModules)) {
+    assert.equal(fs.lstatSync(workspaceModules).isSymbolicLink(), false);
+  }
+  const sharedLink = path.join(workspaceModules, sharedName);
+  if (!fs.existsSync(sharedLink)) {
+    fs.mkdirSync(path.dirname(sharedLink), { recursive: true });
+    fs.symlinkSync(sharedContracts, sharedLink, 'dir');
+  }
   const modules = path.join(workspaceDir, 'scripts/node_modules');
+  linkBuiltCodeTools(modules);
   for (const [name, target] of Object.entries({
-    '@modern-js/code-tools': path.resolve(packageRoot, '../code-tools'),
-    typescript: path.dirname(
+    '@typescript/native': path.dirname(
       createRequire(import.meta.url).resolve('typescript/package.json'),
     ),
   })) {

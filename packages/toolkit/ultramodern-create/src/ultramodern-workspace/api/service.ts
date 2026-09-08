@@ -195,12 +195,11 @@ ${
 ${
   options
     ? `const apiHandlersLive = Layer.mergeAll(${groupName}Layer, ${groupName}ReadinessLayer);
-export const make${apiExport[0].toUpperCase()}${apiExport.slice(1)}Runtime = () => {
-  return assembleEffectBffRuntime({
+export const make${apiExport[0].toUpperCase()}${apiExport.slice(1)}Runtime = () =>
+  assembleEffectBffRuntime({
     api: ${apiExport},
     handlers: apiHandlersLive,
-  });
-};`
+  });`
     : `export const make${apiExport[0].toUpperCase()}${apiExport.slice(1)}Runtime = () => {
   const layer = HttpApiBuilder.layer(${apiExport}).pipe(
     Layer.provide(${groupName}Layer),

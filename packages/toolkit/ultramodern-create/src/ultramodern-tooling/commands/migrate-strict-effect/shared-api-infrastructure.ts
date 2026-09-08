@@ -9,7 +9,6 @@ import type { ResolvedPackageSource } from '../../../ultramodern-workspace/types
 import { type MigrationIo, readJsonFile, writeJsonFile } from './io';
 
 const directory = 'packages/shared-contracts';
-const baselineExport = "export * from './microvertical-api-baseline.ts';";
 
 function record(value: unknown, label: string): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -68,6 +67,15 @@ export function ensureSharedApiInfrastructure(
         'before adding shared API infrastructure; consumer exports were not overwritten.',
     );
   }
+  for (const [subpath, target] of Object.entries(
+    record(defaults.exports, 'Shared contract exports'),
+  )) {
+    if (exports[subpath] !== undefined && exports[subpath] !== target) {
+      throw new Error(
+        `${directory}/package.json ${subpath} must expose ${String(target)}; consumer exports were not overwritten.`,
+      );
+    }
+  }
   const dependencies = record(
     manifest.dependencies ?? {},
     `${directory}/package.json dependencies`,
@@ -101,17 +109,11 @@ export function ensureSharedApiInfrastructure(
     `${JSON.stringify(createSharedPackageTsConfig(directory), null, 2)}\n`,
   );
 
-  const indexPath = path.join(io.workspaceRoot, directory, 'src/index.ts');
-  const index = fs.existsSync(indexPath)
-    ? fs.readFileSync(indexPath, 'utf8')
-    : readFileTemplate('packages/shared-contracts-index.ts');
-  if (!index.endsWith(`\n${baselineExport}\n`)) {
-    // Star exports fill absent names without replacing existing explicit exports.
-    // Use write, not writeGenerated, to retain every byte of consumer source.
-    io.write(
-      indexPath,
-      `${index}${index.endsWith('\n') ? '' : '\n'}\n${baselineExport}\n`,
-    );
-  }
+  // A new public subpath must not expand the consumer root barrel's module graph.
+  // Even its formatting is consumer-owned; only create an index when absent.
+  writeMissing(
+    'src/index.ts',
+    readFileTemplate('packages/shared-contracts-index.ts'),
+  );
   writeJsonFile(io, manifestPath, manifest);
 }

@@ -281,13 +281,16 @@ jobs:
           # and plugin-bff type fixtures resolve @modern-js/runtime and
           # @modern-js/create-request through their exports maps, which point at
           # dist/types. The create CLI fixture also loads plugin-i18n and
-          # plugin-tanstack from their built public entries. A clean checkout
-          # has none of it, so build every tested package and dependency
+          # plugin-tanstack from their built public entries. Generated API checks
+          # also import code-tools/strict-effect-runtime; its ESM, CJS and type
+          # entries must be built, not substituted with source-only fixture stubs.
+          # A clean checkout has none of it, so build every tested package and dependency
           # closure before tests. One invocation with every closure so nx plans
           # a single graph; each closure still completes before its first
           # consumer below.
           mise exec -- pnpm \
             --filter "@modern-js/ultramodern-create^..." \
+            --filter "@modern-js/code-tools..." \
             --filter "@modern-js/app-tools..." \
             --filter "@modern-js/image..." \
             --filter "@modern-js/runtime..." \
