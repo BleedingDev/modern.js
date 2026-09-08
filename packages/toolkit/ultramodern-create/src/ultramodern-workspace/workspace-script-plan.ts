@@ -294,7 +294,7 @@ export function createWorkspaceRootScriptPlan(
     contractCheck: rootToolingWrapperCommand('validate'),
     typecheck:
       options.typecheck ??
-      `${rootToolingWrapperCommand('typecheck')} --project tsconfig.json`,
+      `${rootToolingWrapperCommand('typecheck')} --build tsconfig.json`,
     // `check` is a static source/build gate. Runtime acceptance invokes the
     // read-only Node proof only after built servers are running.
     check: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm skills:check && pnpm i18n:boundaries && pnpm api:check && pnpm contract:check && pnpm performance:readiness${bridgeCheck}`,

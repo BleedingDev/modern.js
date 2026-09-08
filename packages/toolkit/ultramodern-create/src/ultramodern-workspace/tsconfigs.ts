@@ -7,6 +7,7 @@ export function createTsConfigBase(): JsonValue {
   return {
     compilerOptions: {
       target: 'ESNext',
+      types: ['node'],
       lib: ['ESNext', 'DOM', 'DOM.Iterable'],
       module: 'preserve',
       moduleResolution: 'Bundler',

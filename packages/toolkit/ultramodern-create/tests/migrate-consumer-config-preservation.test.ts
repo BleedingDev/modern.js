@@ -405,10 +405,10 @@ const cloudflareDeployEnabled =`,
     );
     const migratedBaseTsConfig = readJson(workspaceRoot, 'tsconfig.base.json');
     assert.deepEqual(migratedBaseTsConfig.references, baseTsConfig.references);
-    assert.deepEqual(
-      migratedBaseTsConfig.compilerOptions.types,
-      baseTsConfig.compilerOptions.types,
-    );
+    assert.deepEqual(migratedBaseTsConfig.compilerOptions.types, [
+      'node',
+      ...baseTsConfig.compilerOptions.types,
+    ]);
     assert.deepEqual(
       migratedBaseTsConfig.compilerOptions.plugins.find(
         (plugin: Record<string, unknown>) =>

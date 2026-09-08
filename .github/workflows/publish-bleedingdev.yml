@@ -289,7 +289,7 @@ jobs:
           # a single graph; each closure still completes before its first
           # consumer below.
           mise exec -- pnpm \
-            --filter "@modern-js/ultramodern-create^..." \
+            --filter "@modern-js/ultramodern-create..." \
             --filter "@modern-js/code-tools..." \
             --filter "@modern-js/app-tools..." \
             --filter "@modern-js/image..." \

@@ -355,6 +355,7 @@ export const ULTRAMODERN_PACKAGE_PINS = {
   rootDevDependencies: {
     '@effect/tsgo': EFFECT_TSGO_VERSION,
     '@typescript/native': `npm:typescript@${TYPESCRIPT_VERSION}`,
+    '@types/node': TYPES_NODE_VERSION,
     'cross-env': CROSS_ENV_VERSION,
     lefthook: LEFTHOOK_VERSION,
     miniflare: MINIFLARE_VERSION,
