@@ -188,6 +188,8 @@ export default plugin.rules ? plugin : plugin.default;
         ...resolvedTargets,
         '--config',
         configPath,
+        '--format',
+        'default',
         '--quiet',
       ],
       {

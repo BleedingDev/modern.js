@@ -15,6 +15,70 @@ const writeFile = async (filename: string, source: string) => {
 };
 
 describe('Effect source loading', () => {
+  test.each([
+    'cjs',
+    'esm',
+  ] as const)('keeps installed Effect schema identity across bundled workspace source in %s', async format => {
+    const appDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'modern-bff-effect-identity-'),
+    );
+    try {
+      const contractsDir = path.join(appDir, 'contracts');
+      const entryPath = path.join(
+        appDir,
+        format === 'cjs' ? 'entry.cts' : 'entry.mts',
+      );
+      const fixtureRequire = createRequire(import.meta.url);
+      await writeFile(
+        path.join(contractsDir, 'package.json'),
+        JSON.stringify({
+          name: '@fixture/contracts',
+          type: 'module',
+          exports: './index.ts',
+        }),
+      );
+      await writeFile(
+        path.join(contractsDir, 'index.ts'),
+        `import { Schema } from 'effect';
+export const markerSchema = Schema.Struct({
+  appId: Schema.String.pipe(Schema.brand('AppId'), Schema.decodeTo(Schema.String)),
+});
+export const schemaIdentity = Schema.String;`,
+      );
+      await fs.promises.mkdir(path.join(appDir, 'node_modules/@fixture'), {
+        recursive: true,
+      });
+      await fs.promises.symlink(
+        contractsDir,
+        path.join(appDir, 'node_modules/@fixture/contracts'),
+        'dir',
+      );
+      await fs.promises.symlink(
+        path.dirname(fixtureRequire.resolve('effect/package.json')),
+        path.join(appDir, 'node_modules/effect'),
+        'dir',
+      );
+      await writeFile(
+        entryPath,
+        `export { markerSchema, schemaIdentity } from '@fixture/contracts';`,
+      );
+      await bundleEffectEntryForNode({ appDir, entryPath, format });
+      const result = (await loadEffectBuiltModule(entryPath)) as {
+        schemaIdentity: unknown;
+        markerSchema: unknown;
+      };
+      const { Schema } = createRequire(entryPath)('effect');
+      expect(result.schemaIdentity).toBe(Schema.String);
+      expect(
+        Schema.encodeSync(Schema.toCodecJson(result.markerSchema))({
+          appId: 'catalog',
+        }),
+      ).toEqual({ appId: 'catalog' });
+    } finally {
+      await fs.promises.rm(appDir, { recursive: true, force: true });
+    }
+  });
+
   test('loads built CommonJS and ESM artifacts through their native module boundaries', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-bff-effect-built-'),
@@ -143,8 +207,10 @@ describe('Effect source loading', () => {
       };
 
       expect(loaded.moduleGlobals).toEqual({
-        directory: workspacePackageDir,
-        filename: path.join(workspacePackageDir, 'index.js'),
+        directory: await fs.promises.realpath(workspacePackageDir),
+        filename: await fs.promises.realpath(
+          path.join(workspacePackageDir, 'index.js'),
+        ),
       });
     } finally {
       await fs.promises.rm(fixtureDir, { recursive: true, force: true });

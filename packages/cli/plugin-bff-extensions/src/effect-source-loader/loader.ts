@@ -125,12 +125,8 @@ function isBareSpecifier(specifier: string) {
  * generated entry is relocatable and directly executable by Node 26.7.
  */
 function externalizeInstalledDependencies(options: {
-  format: 'cjs' | 'esm';
   runtimeResolveDir: string;
 }): Plugin {
-  const runtimeRequire = createRequire(
-    path.join(options.runtimeResolveDir, '__modern_effect_entry.cjs'),
-  );
   return {
     name: 'modern-js-effect-installed-dependencies',
     setup(buildApi) {
@@ -176,24 +172,8 @@ function externalizeInstalledDependencies(options: {
             resolveDir: options.runtimeResolveDir,
           });
           if (runtimeResolution.errors.length === 0 && runtimeResolution.path) {
-            if (options.format === 'cjs') {
-              let requiredPath: string;
-              try {
-                requiredPath = runtimeRequire.resolve(args.path);
-              } catch {
-                requiredPath = runtimeResolution.path;
-              }
-              if (await isEsmOnlyFile(requiredPath)) {
-                return {
-                  namespace: resolution.namespace,
-                  path: resolution.path,
-                  pluginData: resolution.pluginData,
-                  sideEffects: resolution.sideEffects,
-                  suffix: resolution.suffix,
-                  warnings: resolution.warnings,
-                };
-              }
-            }
+            // Node 26 loads installed ESM from CommonJS natively. Rebundling
+            // it here would split dependency identity from the BFF runtime.
             return { external: true, path: args.path };
           }
         }
@@ -227,7 +207,6 @@ export async function bundleEffectEntryForNode(options: {
     platform: 'node',
     plugins: [
       externalizeInstalledDependencies({
-        format: options.format,
         runtimeResolveDir: options.appDir,
       }),
       preserveSourceModuleSemantics(),
@@ -365,7 +344,6 @@ export async function loadEffectSourceModule(
     platform: 'node',
     plugins: [
       externalizeInstalledDependencies({
-        format: 'esm',
         runtimeResolveDir: appDir,
       }),
       preserveSourceModuleSemantics(),
