@@ -283,7 +283,7 @@ test('release acceptance runner exposes distinct execution and receipt verificat
   );
 });
 
-test('release acceptance defaults to the exact reviewed third-party policy', async () => {
+test('release acceptance defaults to no obsolete third-party release-age exceptions', async () => {
   const [
     { defaultReleaseAgePolicyPath, parseArgs },
     { validateExceptionPolicy },
@@ -311,106 +311,17 @@ test('release acceptance defaults to the exact reviewed third-party policy', asy
   const policy = JSON.parse(
     fs.readFileSync(defaultReleaseAgePolicyPath, 'utf8'),
   );
-  const browserDataReview = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        'scripts/ultramodern-publish/release-age-review-2026-08-25.json',
-      ),
-      'utf8',
-    ),
-  );
-  const stableRsbuildRspackReview = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        'packages/toolkit/ultramodern-create/release-age-review-2026-08-26-rsbuild-rspack-2.2.0.json',
-      ),
-      'utf8',
-    ),
-  );
-  const retainedBrowserDataReview = browserDataReview.packages.filter(
-    record =>
-      `${record.packageName}@${record.version}` === 'caniuse-lite@1.0.30001810',
-  );
-  assert.equal(retainedBrowserDataReview.length, 1);
   const validated = validateExceptionPolicy(
     policy,
-    new Date(stableRsbuildRspackReview.reviewedAt),
+    new Date('2026-09-08T00:00:00.000Z'),
   );
-  const reviewedRegistry = new Map([
-    ...retainedBrowserDataReview.map(record => [
-      `${record.packageName}@${record.version}`,
-      {
-        allowedExpiryDates: new Set([record.maturesAt]),
-        evidence: {
-          sha256:
-            'b8f9c9e91c424bb9ea2900fb613d2c3e383e4f9efaf51868b96e9e8e83ac0c82',
-          uri: 'https://github.com/BleedingDev/ultramodern.js/commit/625c94e446ae5b8f91624563c6848f2cc6c934cf',
-        },
-        record,
-        review: browserDataReview,
-      },
-    ]),
-    ...stableRsbuildRspackReview.registryRecords.map(record => [
-      `${record.packageName}@${record.version}`,
-      {
-        allowedExpiryDates: new Set([stableRsbuildRspackReview.expiresAt]),
-        evidence: {
-          sha256:
-            'fe2b9cbf8027a6241d6cad9fc2bfd1efbc1517af95cbddde5bf5167fb0ae6b38',
-          uri: 'https://github.com/BleedingDev/ultramodern.js/commit/986768d419f032f98d0cdcfd0893538b94ef1ea5',
-        },
-        record,
-        review: stableRsbuildRspackReview,
-      },
-    ]),
-  ]);
-  const allowedExpiryDates = new Set([
-    ...retainedBrowserDataReview.map(record => record.maturesAt),
-    stableRsbuildRspackReview.expiresAt,
-  ]);
-  const observedExpiryDates = new Set();
-
   assert.equal(options.releaseAgePolicyPath, defaultReleaseAgePolicyPath);
-  assert.equal(validated.entries.length, 18);
+  assert.deepEqual(validated.entries, []);
   assert.deepEqual(
     policy.entries,
     validated.entries,
     'policy must be canonical',
   );
-  for (const entry of validated.entries) {
-    const reviewed = reviewedRegistry.get(`${entry.package}@${entry.version}`);
-    assert.ok(reviewed, `missing review record for ${entry.package}`);
-    assert.equal(reviewed.record.dist.integrity, entry.integrity);
-    if (reviewed.record.maturityAtReview) {
-      assert.equal(reviewed.record.maturityAtReview.state, 'immature');
-    } else {
-      assert.ok(
-        new Date(reviewed.record.publishedAt) <
-          new Date(reviewed.review.reviewedAt),
-        `review must follow publication for ${entry.package}`,
-      );
-      assert.ok(
-        new Date(reviewed.review.reviewedAt) <
-          new Date(reviewed.record.maturesAt),
-        `reviewed browser data must still be immature for ${entry.package}`,
-      );
-    }
-    assert.equal(entry.approvedBy, reviewed.review.reviewer);
-    assert.equal(entry.reviewedAt, reviewed.review.reviewedAt);
-    assert.deepEqual(entry.evidence, reviewed.evidence);
-    assert.ok(
-      reviewed.allowedExpiryDates.has(entry.expiresAt),
-      `unexpected expiry for ${entry.package}`,
-    );
-    assert.ok(
-      new Date(entry.expiresAt) > new Date(reviewed.review.reviewedAt),
-      `expiry must follow review for ${entry.package}`,
-    );
-    observedExpiryDates.add(entry.expiresAt);
-  }
-  assert.deepEqual(observedExpiryDates, allowedExpiryDates);
 });
 
 test('release acceptance runner preserves the accepted producer identity on a publish retry', async () => {

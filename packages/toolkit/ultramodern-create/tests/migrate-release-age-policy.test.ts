@@ -18,7 +18,9 @@ import {
 import { discoverReachablePnpmLockReleaseAgeClosure } from '../src/ultramodern-tooling/commands/migrate-strict-effect/pnpm-yaml';
 import {
   renderMinimumReleaseAgeExclude,
+  resolveReleaseAgeApprovals,
   ULTRAMODERN_WORKSPACE_POLICY,
+  type UltramodernReleaseAgeApproval,
   validateReleaseAgeApprovals,
 } from '../src/ultramodern-workspace/policy';
 
@@ -52,6 +54,32 @@ const releaseCohort = parseUltramodernReleaseCohort({
   },
 });
 
+// Independent fixture: validation tests must not depend on live exceptions.
+const testApproval: UltramodernReleaseAgeApproval = {
+  packageName: 'reviewed-package',
+  version: '1.0.0',
+  reason: 'Fixture for exact release-age validation',
+  reviewer: 'Test reviewer',
+  reviewedAt: '2026-07-10T11:30:00.000Z',
+  expiresAt: '2026-07-11T11:00:00.000Z',
+  evidence: {
+    uri: `https://github.com/example/review/commit/${'a'.repeat(40)}`,
+    sha256: 'b'.repeat(64),
+    sha256Subject: 'git-commit-payload',
+  },
+  registry: {
+    publishedAt: '2026-07-10T11:00:00.000Z',
+    dist: {
+      integrity: `sha512-${Buffer.from('reviewed-artifact').toString('base64')}`,
+    },
+  },
+};
+
+test('retires all current third-party release-age approvals', () => {
+  assert.deepEqual(ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals, []);
+  assert.deepEqual(renderMinimumReleaseAgeExclude({ now }), []);
+});
+
 test('does not treat Module Federation registry evidence as a release-age approval', () => {
   const moduleFederation =
     ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.registryEvidence
@@ -78,8 +106,7 @@ test('does not treat Module Federation registry evidence as a release-age approv
 });
 
 test('rejects review evidence created before a dependency was published', () => {
-  const existing = ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals[0];
-  assert.ok(existing);
+  const existing = testApproval;
 
   assert.throws(
     () =>
@@ -160,7 +187,7 @@ test('migrates the exact authenticated August 10 release-age list idempotently',
     path.join(os.tmpdir(), 'um-stale-release-age-'),
   );
   const workspaceFile = path.join(workspaceRoot, 'pnpm-workspace.yaml');
-  const migrationNow = new Date('2026-08-26T12:00:00.000Z');
+  const migrationNow = new Date('2026-09-08T00:00:00.000Z');
 
   try {
     fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{}\n');
@@ -315,10 +342,11 @@ test('retires the expired browser data cohort while preserving review evidence',
   }
 });
 
-test('migrates the exact authenticated August 24 and 25 selectors atomically', () => {
+test('migrates the exact authenticated August 24 through 26 selectors atomically', () => {
   const reviewedSelectors = [
     '../release-age-review-2026-08-24.json',
     '../release-age-review-2026-08-25.json',
+    '../release-age-review-2026-08-26-rsbuild-rspack-2.2.0.json',
   ].flatMap(reviewPath => {
     const review = JSON.parse(
       fs.readFileSync(new URL(reviewPath, import.meta.url), 'utf8'),
@@ -340,13 +368,30 @@ test('migrates the exact authenticated August 24 and 25 selectors atomically', (
       'caniuse-lite@1.0.30001810',
       'electron-to-chromium@1.5.413',
       'electron-to-chromium@1.5.414',
+      '@rsbuild/core@2.2.0',
+      '@rspack/binding-darwin-arm64@2.2.0',
+      '@rspack/binding-darwin-x64@2.2.0',
+      '@rspack/binding-linux-arm64-gnu@2.2.0',
+      '@rspack/binding-linux-arm64-musl@2.2.0',
+      '@rspack/binding-linux-ppc64-gnu@2.2.0',
+      '@rspack/binding-linux-riscv64-gnu@2.2.0',
+      '@rspack/binding-linux-riscv64-musl@2.2.0',
+      '@rspack/binding-linux-s390x-gnu@2.2.0',
+      '@rspack/binding-linux-x64-gnu@2.2.0',
+      '@rspack/binding-linux-x64-musl@2.2.0',
+      '@rspack/binding-wasm32-wasi@2.2.0',
+      '@rspack/binding-win32-arm64-msvc@2.2.0',
+      '@rspack/binding-win32-ia32-msvc@2.2.0',
+      '@rspack/binding-win32-x64-msvc@2.2.0',
+      '@rspack/binding@2.2.0',
+      '@rspack/core@2.2.0',
     ].sort(),
   );
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-stale-reviewed-release-age-'),
   );
   const workspaceFile = path.join(workspaceRoot, 'pnpm-workspace.yaml');
-  const migrationNow = new Date('2026-08-26T12:00:00.000Z');
+  const migrationNow = new Date('2026-09-08T00:00:00.000Z');
 
   try {
     fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{}\n');
@@ -393,94 +438,31 @@ test('migrates the exact authenticated August 24 and 25 selectors atomically', (
     );
     assert.deepEqual(fs.readFileSync(workspaceFile), canonicalPolicy);
 
-    const unreviewedSelector = 'electron-to-chromium@1.5.415';
-    fs.writeFileSync(
-      workspaceFile,
-      yaml.dump({ minimumReleaseAgeExclude: [unreviewedSelector] }),
-    );
-    const unreviewedPolicy = fs.readFileSync(workspaceFile);
-    assert.throws(
-      () =>
-        updateGeneratedPnpmWorkspacePolicy(
-          createMigrationIo(workspaceRoot, false),
-          packageSource,
-          { now: migrationNow, releaseCohort },
+    for (const unreviewedSelector of [
+      'electron-to-chromium@1.5.415',
+      '@rspack/core@2.2.1',
+    ]) {
+      fs.writeFileSync(
+        workspaceFile,
+        yaml.dump({ minimumReleaseAgeExclude: [unreviewedSelector] }),
+      );
+      const unreviewedPolicy = fs.readFileSync(workspaceFile);
+      assert.throws(
+        () =>
+          updateGeneratedPnpmWorkspacePolicy(
+            createMigrationIo(workspaceRoot, false),
+            packageSource,
+            { now: migrationNow, releaseCohort },
+          ),
+        new RegExp(
+          `Unapproved release-age exclusion "${unreviewedSelector.replaceAll('.', '\\.')}"`,
+          'u',
         ),
-      /Unapproved release-age exclusion "electron-to-chromium@1\.5\.415"/u,
-    );
-    assert.deepEqual(fs.readFileSync(workspaceFile), unreviewedPolicy);
+      );
+      assert.deepEqual(fs.readFileSync(workspaceFile), unreviewedPolicy);
+    }
   } finally {
     fs.rmSync(workspaceRoot, { force: true, recursive: true });
-  }
-});
-
-test('temporarily approves the exact stable Rsbuild and Rspack cohort', () => {
-  const evidence = {
-    uri: 'https://github.com/BleedingDev/ultramodern.js/commit/986768d419f032f98d0cdcfd0893538b94ef1ea5',
-    sha256: 'fe2b9cbf8027a6241d6cad9fc2bfd1efbc1517af95cbddde5bf5167fb0ae6b38',
-    sha256Subject: 'git-commit-payload',
-  } as const;
-  const review = JSON.parse(
-    fs.readFileSync(
-      new URL(
-        '../release-age-review-2026-08-26-rsbuild-rspack-2.2.0.json',
-        import.meta.url,
-      ),
-      'utf8',
-    ),
-  ) as {
-    expiresAt: string;
-    registryRecords: Array<{
-      packageName: string;
-      version: string;
-      publishedAt: string;
-      dist: { integrity: string };
-    }>;
-    reviewedAt: string;
-    reviewer: string;
-  };
-  const cohortApprovals =
-    ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals.filter(
-      approval => approval.evidence.uri === evidence.uri,
-    );
-  const approvalBySelector = new Map(
-    cohortApprovals.map(approval => [
-      packageKey(approval.packageName, approval.version),
-      approval,
-    ]),
-  );
-
-  assert.equal(review.registryRecords.length, 17);
-  assert.equal(cohortApprovals.length, 17);
-  assert.deepEqual(
-    [...approvalBySelector.keys()].sort(),
-    review.registryRecords
-      .map(record => packageKey(record.packageName, record.version))
-      .sort(),
-  );
-  for (const record of review.registryRecords) {
-    const selector = packageKey(record.packageName, record.version);
-    const approval = approvalBySelector.get(selector);
-    assert.ok(approval, `${selector} must have exact review approval`);
-    assert.equal(approval.reviewer, review.reviewer);
-    assert.equal(approval.reviewedAt, review.reviewedAt);
-    assert.equal(approval.expiresAt, review.expiresAt);
-    assert.deepEqual(approval.registry, {
-      publishedAt: record.publishedAt,
-      dist: { integrity: record.dist.integrity },
-    });
-    assert.deepEqual(approval.evidence, evidence);
-  }
-
-  const active = new Set(
-    renderMinimumReleaseAgeExclude({ now: new Date(review.reviewedAt) }),
-  );
-  const expired = new Set(
-    renderMinimumReleaseAgeExclude({ now: new Date(review.expiresAt) }),
-  );
-  for (const selector of approvalBySelector.keys()) {
-    assert.equal(active.has(selector), true);
-    assert.equal(expired.has(selector), false);
   }
 });
 
@@ -647,34 +629,26 @@ test('ignores unreachable lockfile entries when validating the release-age closu
   }
 });
 
-test('rejects a reachable immature dependency without an exact reviewed integrity', async () => {
-  const approval = ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals[0];
-  const target = packageKey(approval.packageName, approval.version);
-  const workspaceRoot = createWorkspace(
-    lockfileWithImporter(approval.packageName, target, {
-      packages: {
-        [target]: { resolution: { integrity } },
-      },
+test('rejects an immature dependency with a mismatched reviewed integrity', () => {
+  assert.doesNotThrow(() =>
+    resolveReleaseAgeApprovals([testApproval], {
+      approvals: [testApproval],
+      now,
     }),
   );
-
-  try {
-    await assert.rejects(
-      () =>
-        validate(workspaceRoot, {
-          [approval.packageName]: packument(
-            approval.version,
-            '2026-07-10T11:00:00.000Z',
-          ),
-        }),
-      new RegExp(
-        `Release-age approval ${target} does not match lock integrity`,
-        'u',
+  assert.throws(
+    () =>
+      resolveReleaseAgeApprovals(
+        [
+          {
+            ...testApproval,
+            registry: { ...testApproval.registry, dist: { integrity } },
+          },
+        ],
+        { approvals: [testApproval], now },
       ),
-    );
-  } finally {
-    fs.rmSync(workspaceRoot, { recursive: true, force: true });
-  }
+    /Release-age approval reviewed-package@1\.0\.0 does not match lock integrity/u,
+  );
 });
 
 test('rejects a reachable immature dependency without an approval', async () => {
@@ -716,8 +690,8 @@ test('accepts a reachable mature dependency without an approval', async () => {
   }
 });
 
-test('traverses reachable snapshot dependencies before resolving approvals', async () => {
-  const approval = ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals[0];
+test('rejects an unapproved immature dependency reached through a snapshot', async () => {
+  const approval = testApproval;
   const target = '@bleedingdev/modern-js-create@3.5.0-ultramodern.1';
   const approvedTarget = packageKey(approval.packageName, approval.version);
   const workspaceRoot = createWorkspace(
@@ -748,7 +722,7 @@ test('traverses reachable snapshot dependencies before resolving approvals', asy
           ),
         }),
       new RegExp(
-        `Release-age approval ${approvedTarget} does not match lock integrity`,
+        `immature package\\(s\\) without an exact, unexpired approval:[\\s\\S]*${approvedTarget.replaceAll('.', '\\.')}`,
         'u',
       ),
     );

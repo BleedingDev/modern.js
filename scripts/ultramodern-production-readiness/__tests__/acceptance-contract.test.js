@@ -1357,6 +1357,20 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
       workspace.minimumReleaseAgeExclude,
     );
 
+    // A mature closure must still reject an approval for a removed version.
+    fs.writeFileSync(
+      policyPath,
+      JSON.stringify({
+        ...policy,
+        entries: [{ ...policy.entries[0], version: '0.36.1' }],
+      }),
+    );
+    await assert.rejects(
+      auditAt(new Date('2026-09-10T01:00:00.000Z')),
+      /stale or unmatched approval/u,
+    );
+    fs.writeFileSync(policyPath, JSON.stringify(policy));
+
     registry = new Map([
       [external.name, { ...external, publishedAt: '2026-09-10T00:30:00.000Z' }],
       [firstParty.name, firstParty],

@@ -115,6 +115,28 @@ const reviewedAugust24And25StaleReleaseAgeEntries = [
   'electron-to-chromium@1.5.414',
 ] as const;
 
+// Recognition-only selectors authenticated by the August 26 review artifact.
+// Retire these exact historical approvals without accepting neighboring versions.
+const reviewedAugust26StaleReleaseAgeEntries = [
+  '@rsbuild/core@2.2.0',
+  '@rspack/binding-darwin-arm64@2.2.0',
+  '@rspack/binding-darwin-x64@2.2.0',
+  '@rspack/binding-linux-arm64-gnu@2.2.0',
+  '@rspack/binding-linux-arm64-musl@2.2.0',
+  '@rspack/binding-linux-ppc64-gnu@2.2.0',
+  '@rspack/binding-linux-riscv64-gnu@2.2.0',
+  '@rspack/binding-linux-riscv64-musl@2.2.0',
+  '@rspack/binding-linux-s390x-gnu@2.2.0',
+  '@rspack/binding-linux-x64-gnu@2.2.0',
+  '@rspack/binding-linux-x64-musl@2.2.0',
+  '@rspack/binding-wasm32-wasi@2.2.0',
+  '@rspack/binding-win32-arm64-msvc@2.2.0',
+  '@rspack/binding-win32-ia32-msvc@2.2.0',
+  '@rspack/binding-win32-x64-msvc@2.2.0',
+  '@rspack/binding@2.2.0',
+  '@rspack/core@2.2.0',
+] as const;
+
 const knownStaleReleaseAgeEntries = new Set([
   '@effect/opentelemetry@4.0.0-beta.92',
   '@effect/opentelemetry@4.0.0-beta.94',
@@ -143,6 +165,7 @@ const knownStaleReleaseAgeEntries = new Set([
   ...staleOxcBindingTargets.map(target => `@oxlint/binding-${target}@1.79.0`),
   ...reviewedAugust10StaleReleaseAgeEntries,
   ...reviewedAugust24And25StaleReleaseAgeEntries,
+  ...reviewedAugust26StaleReleaseAgeEntries,
   ...ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals
     .filter(approval => approval.packageName.startsWith('@module-federation/'))
     .map(approval => `${approval.packageName}@2.6.0`),

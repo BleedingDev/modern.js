@@ -309,66 +309,6 @@ export type UltramodernStalePatchPolicy = UltramodernPatchPolicy & {
   acceptedLegacySha256?: readonly string[];
 };
 
-const releaseAgeReasons = {
-  cloudflare:
-    'Reviewed Cloudflare runtime cohort required by generated Worker tooling before pnpm minimum release age elapsed.',
-  framework:
-    'Reviewed Modern.js framework and fresh generated dependency closure required by workspaces before pnpm minimum release age elapsed.',
-  typescript:
-    'Reviewed TypeScript compiler and platform cohort required by generated TypeScript 7 workspaces before pnpm minimum release age elapsed.',
-} as const;
-
-type ReleaseAgeReviewEvidence = {
-  reviewer: string;
-  reviewedAt: string;
-  expiresAt: string;
-  uri: string;
-  sha256: string;
-};
-
-const releaseAgeReviewEvidence = {
-  rsbuildRspack20260826: {
-    reviewer: 'Petr Glaser <syreanis+1@gmail.com>',
-    reviewedAt: '2026-08-26T10:06:26.000Z',
-    expiresAt: '2026-08-27T02:46:55.656Z',
-    uri: 'https://github.com/BleedingDev/ultramodern.js/commit/986768d419f032f98d0cdcfd0893538b94ef1ea5',
-    sha256: 'fe2b9cbf8027a6241d6cad9fc2bfd1efbc1517af95cbddde5bf5167fb0ae6b38',
-  },
-} as const satisfies Record<string, ReleaseAgeReviewEvidence>;
-
-type ReleaseAgeApprovalSeed = {
-  packageName: string;
-  version: string;
-  reason: string;
-  publishedAt: string;
-  integrity: string;
-  review: ReleaseAgeReviewEvidence;
-};
-
-function createReleaseAgeApproval(
-  seed: ReleaseAgeApprovalSeed,
-): UltramodernReleaseAgeApproval {
-  return {
-    packageName: seed.packageName,
-    version: seed.version,
-    reason: seed.reason,
-    reviewer: seed.review.reviewer,
-    reviewedAt: seed.review.reviewedAt,
-    evidence: {
-      uri: seed.review.uri,
-      sha256: seed.review.sha256,
-      sha256Subject: 'git-commit-payload',
-    },
-    registry: {
-      publishedAt: seed.publishedAt,
-      dist: {
-        integrity: seed.integrity,
-      },
-    },
-    expiresAt: seed.review.expiresAt,
-  };
-}
-
 export const ULTRAMODERN_PACKAGE_PINS = {
   appDependencies: {
     // Generated apps never install react-router — TanStack Router is the
@@ -737,132 +677,13 @@ const moduleFederationNodeRegistryRelease = {
   },
 } as const;
 
-const rsbuildRspackRegistryReleases = [
-  [
-    '@rsbuild/core',
-    '2.2.0',
-    '2026-08-26T02:46:55.656Z',
-    'sha512-UnBBfxWIDKVdLz2BUBq7hFBatwLclJ4moFhlDFg+pFBPPJ1g34MmCbGUC0c9Mo1DhPGdYJG69qMIldh5MvC74w==',
-  ],
-  [
-    '@rspack/core',
-    '2.2.0',
-    '2026-08-26T02:17:40.412Z',
-    'sha512-3W7oX0BAHbK4VlknH3lfyfRvupzxdZtyEa+DfKmdjzmIAcqYtHnFd0nLqp5dzitDPyDI1TIKkDhpB0AZJn0pVg==',
-  ],
-  [
-    '@rspack/binding',
-    '2.2.0',
-    '2026-08-26T02:15:34.205Z',
-    'sha512-nxZzJqqB0EmEKp6qjzFNkBb/SgGt0k0DSENrLvAJgvVvrm3waVsubD0cfxtPlZY/rd5SzadzxWGEHRyFcds5nA==',
-  ],
-  [
-    '@rspack/binding-darwin-arm64',
-    '2.2.0',
-    '2026-08-26T02:10:44.109Z',
-    'sha512-KAVVT7hp3NBjtc/RY2UtOjzzc8i+s4pIhW1p52UV+Aev6ywQCu3dXwkHTonpPvJO3hqLXc4zIMH5l4HbMqBm4g==',
-  ],
-  [
-    '@rspack/binding-darwin-x64',
-    '2.2.0',
-    '2026-08-26T02:10:51.901Z',
-    'sha512-rzyJCX99aFwl540trsVMNZOgK4+IFm2d5+YeP+RdNo9Uprxloz8vHz0J4dYtaq6MRiCAyM60dAwEa3wJMwqWAQ==',
-  ],
-  [
-    '@rspack/binding-linux-arm64-gnu',
-    '2.2.0',
-    '2026-08-26T02:16:09.113Z',
-    'sha512-0t8QOiOMcBV7RvPSsTJ5DQ4QCK6FIyUZy77qbxnS6asGTOXPZZn7V5cL26IxEv/wuHdQ6tQOXheau1fi+gGyBQ==',
-  ],
-  [
-    '@rspack/binding-linux-arm64-musl',
-    '2.2.0',
-    '2026-08-26T02:11:06.138Z',
-    'sha512-BAvCukqcuHxUdE294ITCohvhVkEklW8RbkKkR36Uo0WyIiMPGrnvPjARPn0/4Q4xMAz7lUmC60sZrvJHlAOKMw==',
-  ],
-  [
-    '@rspack/binding-linux-ppc64-gnu',
-    '2.2.0',
-    '2026-08-26T02:11:12.739Z',
-    'sha512-nCHqZLv/E8nm2ccGkb00F5DQtXxzGy3W3X73ArA+N0+zXJUnzRcSRSwr7AE8pVgP/FYfX4yMFgUXy0g0YxYGRA==',
-  ],
-  [
-    '@rspack/binding-linux-riscv64-gnu',
-    '2.2.0',
-    '2026-08-26T02:11:19.331Z',
-    'sha512-CA3WEqKFDI6FAZTnCho2n9pmdPWZYAW/S8mqgxd0cx2Jix43at3VyLxhCC7ED5A9WBSFn/AdHaIbVtgoQHVhWA==',
-  ],
-  [
-    '@rspack/binding-linux-riscv64-musl',
-    '2.2.0',
-    '2026-08-26T02:11:26.587Z',
-    'sha512-kHB960oClkoPRPZ6sdkhRvqbdRIlbpIMYd/Tbxfmn3DWQahiCk1pkUFJbOtFq3EgESxZISV4THl442W2Y57HvQ==',
-  ],
-  [
-    '@rspack/binding-linux-s390x-gnu',
-    '2.2.0',
-    '2026-08-26T02:11:34.448Z',
-    'sha512-lVBdiffVo1jq0P0jT36jNou2suLB4ueQI4aWUs+HM+h67YPBtVKWu/mo5Wh59+8nowgcZmYaFM5hdH69963I9w==',
-  ],
-  [
-    '@rspack/binding-linux-x64-gnu',
-    '2.2.0',
-    '2026-08-26T02:13:49.303Z',
-    'sha512-M49UaWspE0YJ3268DsquD8idEQTfjBDMvO/I8qccV/Z5T+Q98FJ+kIs5liUaTWb48OIbDEK+8ZKx5QzLbfVN6g==',
-  ],
-  [
-    '@rspack/binding-linux-x64-musl',
-    '2.2.0',
-    '2026-08-26T02:21:58.999Z',
-    'sha512-YYbs0wmey+5blhEQDE4Dax3TwJtqfGwe2QBm3OLphlBHo/fcZVvimzKkMV0/pVrZTLy2z5ZAwNhGMY64bNr77w==',
-  ],
-  [
-    '@rspack/binding-wasm32-wasi',
-    '2.2.0',
-    '2026-08-26T02:11:53.777Z',
-    'sha512-rerLPTN/HD4EvLNWs3O2N+Eb37eGvLRIP3dXXc3n+UzTebOepAsahNn44vXeRBsE4m/pHkpDJjwgWTytgQ2gBw==',
-  ],
-  [
-    '@rspack/binding-win32-arm64-msvc',
-    '2.2.0',
-    '2026-08-26T02:11:59.878Z',
-    'sha512-JUAmnbOQYGTRyX28vls/MOMonZWcmcCi5YtEq6YMc8Xqh3Qx0HUwaLM/I1xr/N9BX3b8CV0dQDOpNuBc2ei+CA==',
-  ],
-  [
-    '@rspack/binding-win32-ia32-msvc',
-    '2.2.0',
-    '2026-08-26T02:12:06.484Z',
-    'sha512-wOmQRUaOG0eWH/fnfslA9yK9xKfaq9X+3Xa1TdTJnTqlo0ARJYs6A+Lzjbs7cxdY/o1f12Xe00BG3nQozReUOg==',
-  ],
-  [
-    '@rspack/binding-win32-x64-msvc',
-    '2.2.0',
-    '2026-08-26T02:12:13.441Z',
-    'sha512-v6/3bFr9+i7hRpgulL9b5qCvZL0VgR4vQGQNqOWezUzZmPUj9LYpvB0L9xZIVwDQ2ug/xBiA58bfg5IbESgoyw==',
-  ],
-] as const satisfies readonly (readonly [
-  packageName: string,
-  version: string,
-  publishedAt: string,
-  integrity: string,
-])[];
-
 const releaseAgeApprovals: readonly UltramodernReleaseAgeApproval[] = [
   // FORK: fresh-cohort approvals are added only after the purpose-built review
   // artifact has an immutable pushed commit identity. Never attest a cohort
   // from a commit that predates its reviewed versions, timestamps, integrities,
-  // optional-platform closure, and patch applicability evidence.
-  ...rsbuildRspackRegistryReleases.map(
-    ([packageName, version, publishedAt, integrity]) =>
-      createReleaseAgeApproval({
-        packageName,
-        version,
-        reason: releaseAgeReasons.framework,
-        publishedAt,
-        integrity,
-        review: releaseAgeReviewEvidence.rsbuildRspack20260826,
-      }),
-  ),
+  // optional-platform closure, and patch applicability evidence. The 2026-08-26
+  // Rsbuild/Rspack 2.2.0 approvals expired on 2026-08-27 and the cohort now
+  // pins 2.2.3, which clears the minimum release age on its own.
 ];
 
 export const ULTRAMODERN_WORKSPACE_POLICY = {

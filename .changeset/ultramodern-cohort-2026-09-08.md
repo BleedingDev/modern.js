@@ -26,3 +26,8 @@ corrected SSR declarations, so the fork's router-core declaration patch is
 retired; the Zod and msgpackr CSP patches are regenerated for their new
 versions. Expired static release-age exclusions and the archived improvement
 campaign logs are removed.
+
+Retire the expired acceptance-policy approvals as well as generator defaults.
+Migration recognizes the exact historical Rsbuild/Rspack 2.2.0 selectors only
+for removal, while unknown neighboring versions and unmatched audit entries
+remain rejected.
