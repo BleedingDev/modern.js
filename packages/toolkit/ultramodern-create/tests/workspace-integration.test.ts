@@ -996,6 +996,15 @@ test('referenced remote declaration prebuild emits declarations from a clean cac
       workspaceDir,
       'verticals/catalog/tsconfig.json',
     );
+    const nodeTypesLink = path.join(workspaceDir, 'node_modules/@types/node');
+    fs.mkdirSync(path.dirname(nodeTypesLink), { recursive: true });
+    fs.symlinkSync(
+      path.dirname(
+        createRequire(import.meta.url).resolve('@types/node/package.json'),
+      ),
+      nodeTypesLink,
+      'dir',
+    );
     const declarationFile = path.resolve(
       workspaceDir,
       'verticals/catalog',
@@ -1104,8 +1113,8 @@ test('generated workspace scripts execute the complete ordered command plan and 
     const rootPackage = readJson(workspaceDir, 'package.json');
     assert.equal(
       rootPackage.scripts.typecheck,
-      'node ./scripts/ultramodern-typecheck.mts --project tsconfig.json',
-      'root typecheck must preserve strict project-mode checking',
+      'node ./scripts/ultramodern-typecheck.mts --build tsconfig.json',
+      'root typecheck must follow the workspace project references',
     );
 
     assertGeneratedWorkspaceScriptBehavior(workspaceDir, tempRoot);

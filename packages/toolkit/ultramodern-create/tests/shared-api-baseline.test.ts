@@ -46,7 +46,7 @@ const service = {
   api: { consumedBy: [], prefix: '/warehouse-api', stem: 'warehouse-items' },
 };
 const expectation = {
-  additionalPaths: {},
+  additionalPaths: { checkoutCartPath: '/warehouse-api/warehouse-items/cart' },
   apiPrefix: '/warehouse-api',
   basePath: '/warehouse-api/warehouse-items',
   effectClientPackage: '@modern-js/plugin-bff/effect-client',
@@ -105,6 +105,30 @@ const validate = (content: string, customize?: (owner: string) => void) => {
 describe('native shared API baseline AST', () => {
   test('accepts scoped readiness foundation with independent owner and prefix', () => {
     expect(validate(source)).toBeUndefined();
+  });
+  test('checks optional sample endpoint metadata without requiring consumer APIs to implement it', () => {
+    const withCart = source.replace(
+      "ownerId: 'inventory-stock'",
+      "checkoutCartPath: '/warehouse-api/warehouse-items/cart', ownerId: 'inventory-stock'",
+    );
+    expect(withCart).not.toBe(source);
+    expect(validate(withCart)).toBeUndefined();
+    expect(
+      validate(
+        withCart.replace(
+          "checkoutCartPath: '/warehouse-api/warehouse-items/cart'",
+          "checkoutCartPath: '/foreign/cart'",
+        ),
+      ),
+    ).toBeDefined();
+    expect(
+      validate(
+        source.replace(
+          "ownerId: 'inventory-stock'",
+          "unknownPath: '/foreign', ownerId: 'inventory-stock'",
+        ),
+      ),
+    ).toBeDefined();
   });
   test('accepts legacy root only when the exact owner exports its baseline', () => {
     const legacy = source.replaceAll(

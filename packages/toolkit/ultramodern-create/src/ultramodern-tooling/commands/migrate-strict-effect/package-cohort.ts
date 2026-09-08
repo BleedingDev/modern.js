@@ -261,6 +261,12 @@ function mergeGeneratedScript(
       return segment;
     }
 
+    const referenceBuild = segment.replace(
+      '--project tsconfig.json',
+      '--build tsconfig.json',
+    );
+    if (frameworkSegmentSet.has(referenceBuild)) return referenceBuild;
+
     // Generated package scripts used POSIX-only environment prefixes before
     // cross-env became part of the owned dependency cohort. Treat the exact
     // predecessor as framework history so migration replaces it instead of

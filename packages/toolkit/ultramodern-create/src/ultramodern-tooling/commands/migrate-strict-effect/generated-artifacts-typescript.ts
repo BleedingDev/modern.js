@@ -112,6 +112,12 @@ function mergeTypeScriptConfig(generated: unknown, existing: unknown) {
     ...existingCompilerOptions,
     ...generatedCompilerOptions,
   };
+  if (Array.isArray(generatedCompilerOptions.types)) {
+    compilerOptions.types = mergeUniqueJsonValues(
+      generatedCompilerOptions.types,
+      existingCompilerOptions.types,
+    );
+  }
   if (
     Array.isArray(generatedCompilerOptions.plugins) ||
     Array.isArray(existingCompilerOptions.plugins)

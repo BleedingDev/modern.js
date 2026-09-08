@@ -222,6 +222,7 @@ test('root package json pins workspace package versions and bridge workspace glo
     'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .',
   );
   assert.deepEqual(rootPackageJson.devDependencies, {
+    '@types/node': '^26.4.1',
     '@effect/tsgo': '0.41.0',
     '@modern-js/code-tools': packageVersion,
     '@modern-js/ultramodern-create': packageVersion,

@@ -58,6 +58,8 @@ export function updateRootPackageToolchain(packageJson: Record<string, any>) {
   }
   devDependencies['@typescript/native'] =
     ULTRAMODERN_PACKAGE_PINS.rootDevDependencies['@typescript/native'];
+  devDependencies['@types/node'] =
+    ULTRAMODERN_PACKAGE_PINS.rootDevDependencies['@types/node'];
   devDependencies.miniflare =
     ULTRAMODERN_PACKAGE_PINS.rootDevDependencies.miniflare;
 }

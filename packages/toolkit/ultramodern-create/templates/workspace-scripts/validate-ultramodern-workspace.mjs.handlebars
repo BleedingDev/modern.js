@@ -3614,7 +3614,7 @@ if (bridgeConfig) {
   }
   assert(rootPackage.scripts?.['bridge:check'], 'Bridge workspaces must expose bridge:check');
 } else {
-  assert(rootPackage.scripts?.typecheck === 'node ./scripts/ultramodern-typecheck.mts --project tsconfig.json', 'Root typecheck must run TS-Go across the root project reference graph');
+  assert(rootPackage.scripts?.typecheck === 'node ./scripts/ultramodern-typecheck.mts --build tsconfig.json', 'Root typecheck must run TS-Go across the root project reference graph');
 }
 assert(rootPackage.scripts?.['contract:check'] === 'node ./scripts/validate-ultramodern-workspace.mts', 'Root must expose contract:check');
 assert(rootPackage.scripts?.['api:check'] === 'node ./scripts/check-ultramodern-api-boundaries.mts', 'Root must expose api:check');
