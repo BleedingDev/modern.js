@@ -33,6 +33,15 @@ every PR.
 
 ---
 
+### 2026-09-08 public declaration closure
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production after Rslib copies prebundles; retain watcher/glob/Inquirer runtime bytes while restoring the complete strict TS7/Node26 type closure | `extension-point` + `capped-patch` |
+| `packages/toolkit/utils/package.json` | bleedingdev | Declare build-only RxJS input for self-contained Inquirer 8 declaration production, without adding a consumer runtime dependency | `capped-patch` |
+| `packages/cli/builder/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production to isolate optional Sass/SVG public types from malformed loader/Babel implementation declarations | `extension-point` + `capped-patch` |
+| `packages/cli/builder/package.json` | bleedingdev | Own the public Sass declaration dependency on the same sass-embedded implementation already used transitively by plugin-sass | `capped-patch` |
+
 ## 1. Maintenance contract
 
 **Rows below that cover upstream-owned paths under `packages/**` are enforced

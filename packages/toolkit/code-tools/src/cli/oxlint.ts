@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 
@@ -155,23 +155,32 @@ export const runOxlintRules = ({
     };
   }
 
+  const pluginPath = resolvePluginPath();
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'modern-code-tools-oxlint-'),
   );
   const configPath = path.join(tempDir, 'oxlint.config.mjs');
-  const pluginPath = resolvePluginPath();
+  const adapterPath = path.join(tempDir, 'oxlint-plugin.mjs');
 
-  fs.writeFileSync(
-    configPath,
-    `export default {
-  jsPlugins: [${JSON.stringify(pluginPath)}],
+  try {
+    // Native import(CJS) exposes the build's exports object, not its default
+    // plugin. Normalize at our CLI boundary, not in consumer configurations.
+    fs.writeFileSync(
+      adapterPath,
+      `import plugin from ${JSON.stringify(pathToFileURL(pluginPath).href)};
+export default plugin.rules ? plugin : plugin.default;
+`,
+      'utf-8',
+    );
+    fs.writeFileSync(
+      configPath,
+      `export default {
+  jsPlugins: [${JSON.stringify(adapterPath)}],
   rules: ${JSON.stringify(rules, null, 2)}
 };
 `,
-    'utf-8',
-  );
-
-  try {
+      'utf-8',
+    );
     const result = spawnSync(
       process.execPath,
       [

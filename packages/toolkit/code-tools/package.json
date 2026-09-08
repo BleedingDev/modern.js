@@ -69,7 +69,9 @@
   },
   "dependencies": {
     "oxlint": "1.81.0",
-    "typescript": "^7.0.2"
+    "@babel/parser": "8.0.4",
+    "@babel/traverse": "8.0.4",
+    "@babel/types": "8.0.4"
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",
