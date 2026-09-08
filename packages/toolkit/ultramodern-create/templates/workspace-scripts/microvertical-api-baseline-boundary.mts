@@ -682,7 +682,12 @@ const metadataIsExact = (
     ['basePath', expectation.basePath],
     ['ownerId', expectation.ownerId],
     ['readinessPath', expectation.readinessPath],
-    ...Object.entries(expectation.additionalPaths),
+    // Business endpoints may replace the scaffold's sample operations.
+    // Validate their metadata when exposed; the shared baseline requires only
+    // the owner, API prefix, base path, and readiness path.
+    ...Object.entries(expectation.additionalPaths).filter(([field]) =>
+      fields?.has(field)
+    ),
   ] as const;
   return (
     fields !== undefined &&
