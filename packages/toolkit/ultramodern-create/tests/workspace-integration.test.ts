@@ -190,6 +190,19 @@ function runGeneratedWorkspaceCheck(workspaceDir: string) {
 }
 
 function runGeneratedApiCheck(workspaceDir: string) {
+  // These fixtures deliberately skip install. Supply the real parser/tooling,
+  // never mock the validator or write through a shared node_modules symlink.
+  const modules = path.join(workspaceDir, 'scripts/node_modules');
+  for (const [name, target] of Object.entries({
+    '@modern-js/code-tools': path.resolve(packageRoot, '../code-tools'),
+    typescript: path.dirname(
+      createRequire(import.meta.url).resolve('typescript/package.json'),
+    ),
+  })) {
+    const link = path.join(modules, name);
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    if (!fs.existsSync(link)) fs.symlinkSync(target, link, 'dir');
+  }
   return spawnSync(
     process.execPath,
     ['scripts/check-ultramodern-api-boundaries.mts'],

@@ -31,7 +31,25 @@ async function compatibleRequireESM(
   }
 
   const requiredModule = await importPath(path);
-  return interop ? requiredModule.default : requiredModule;
+  if (!interop || !Object.hasOwn(requiredModule, 'default')) {
+    return requiredModule;
+  }
+  let value = requiredModule.default;
+  // Node marks CJS namespaces; genuine ESM default payloads stay untouched.
+  if (requiredModule['module.exports'] === value) {
+    const seen = new Set();
+    while (
+      value &&
+      typeof value === 'object' &&
+      value.__esModule === true &&
+      Object.hasOwn(value, 'default') &&
+      !seen.has(value)
+    ) {
+      seen.add(value);
+      value = value.default;
+    }
+  }
+  return value;
 }
 
 async function compatibleRequireCJS(

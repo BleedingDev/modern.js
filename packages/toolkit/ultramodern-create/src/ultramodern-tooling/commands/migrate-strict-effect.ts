@@ -70,6 +70,7 @@ import {
   preflightModuleFederationBridgeRouter,
   removeRetiredReactRouterDependency,
 } from './migrate-strict-effect/react-router-retirement';
+import { ensureSharedApiInfrastructure } from './migrate-strict-effect/shared-api-infrastructure';
 import {
   updateGeneratedToolchainFiles,
   updateRootPackageToolchain,
@@ -629,6 +630,14 @@ function migrateStrictEffect(
   );
   const hasBackendSurface = verticalApps.some(app => app.api);
   const shellOnly = verticalApps.length === 0;
+
+  if (hasBackendSurface) {
+    ensureSharedApiInfrastructure(
+      io,
+      migrated.workspace.packageScope,
+      packageSource,
+    );
+  }
 
   if (shellOnly) {
     io.log(

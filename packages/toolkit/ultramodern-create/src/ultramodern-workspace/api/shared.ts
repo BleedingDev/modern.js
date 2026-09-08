@@ -31,10 +31,13 @@ function createSharedApiImports(): string {
 `;
 }
 
-function createSharedApiContract(service: {
-  id: string;
-  api?: WorkspaceApi;
-}): string {
+function createSharedApiContract(
+  service: {
+    id: string;
+    api?: WorkspaceApi;
+  },
+  shared = false,
+): string {
   const schemaExport = verticalApiSchemaExport(service);
   const markerSchemaExport = verticalApiMarkerSchemaExport(service);
   const readinessSchemaExport = verticalApiReadinessSchemaExport(service);
@@ -98,7 +101,10 @@ function createSharedApiContract(service: {
           readinessOperationContext,
         }).trim();
 
-  return `export interface ${markerType} {
+  return `${
+    shared
+      ? `export type ${markerType} = MicroVerticalBuildMarker;`
+      : `export interface ${markerType} {
   readonly appId: string;
   readonly build: string;
   readonly buildMarker: string;
@@ -108,7 +114,8 @@ function createSharedApiContract(service: {
   readonly surface: string;
   readonly unitId: string;
   readonly version: string;
-}
+}`
+  }
 
 export interface ${itemType} {
   readonly id: string;
@@ -116,7 +123,10 @@ export interface ${itemType} {
   readonly title: string;
 }
 
-export interface ${readinessType} {
+${
+  shared
+    ? `export type ${readinessType} = MicroVerticalReadiness;`
+    : `export interface ${readinessType} {
   readonly checks: {
     readonly api: 'ready';
     readonly moduleFederation: 'ready';
@@ -126,6 +136,7 @@ export interface ${readinessType} {
   readonly marker: ${markerType};
   readonly status: 'ready';
   readonly versionSkew: 'none';
+}`
 }
 
 export interface ${createPayloadType} {
@@ -145,7 +156,10 @@ export interface ${notFoundErrorExport} {
   readonly id: string;
 }
 
-export const ${markerSchemaExport}: Schema.Codec<${markerType}> = Schema.Struct({
+${
+  shared
+    ? `export const ${markerSchemaExport}: Schema.Codec<${markerType}> = MicroVerticalBuildMarkerSchema;`
+    : `export const ${markerSchemaExport}: Schema.Codec<${markerType}> = Schema.Struct({
   appId: Schema.String,
   build: Schema.String,
   buildMarker: Schema.String,
@@ -155,7 +169,8 @@ export const ${markerSchemaExport}: Schema.Codec<${markerType}> = Schema.Struct(
   surface: Schema.String,
   unitId: Schema.String,
   version: Schema.String,
-});
+});`
+}
 
 export const ${schemaExport}: Schema.Codec<${itemType}> = Schema.Struct({
   id: Schema.String,
@@ -163,7 +178,10 @@ export const ${schemaExport}: Schema.Codec<${itemType}> = Schema.Struct({
   title: Schema.String,
 });
 
-export const ${readinessSchemaExport}: Schema.Codec<${readinessType}> = Schema.Struct({
+${
+  shared
+    ? `export const ${readinessSchemaExport}: Schema.Codec<${readinessType}> = MicroVerticalReadinessSchema;`
+    : `export const ${readinessSchemaExport}: Schema.Codec<${readinessType}> = Schema.Struct({
   checks: Schema.Struct({
     api: Schema.Literal('ready'),
     moduleFederation: Schema.Literal('ready'),
@@ -173,7 +191,8 @@ export const ${readinessSchemaExport}: Schema.Codec<${readinessType}> = Schema.S
   marker: ${markerSchemaExport},
   status: Schema.Literal('ready'),
   versionSkew: Schema.Literal('none'),
-});
+});`
+}
 
 export const ${createPayloadSchemaExport}: Schema.Codec<${createPayloadType}> = Schema.Struct({
   title: Schema.String,
@@ -185,7 +204,10 @@ ${checkoutCartSharedSchemaSection}export const ${notFoundSchemaExport}: Schema.C
   HttpApiSchema.status(404),
 );
 
-export interface OperationContext {
+${
+  shared
+    ? 'export type OperationContext = MicroVerticalOperationContext;'
+    : `export interface OperationContext {
   method: string;
   operationId: string;
   routePath: string;
@@ -197,9 +219,19 @@ export interface OperationContext {
     | 'data-platform'
     | 'unknown';
   traceId?: string;
+}`
 }
 
-export const ${apiExport} = HttpApi.make('${apiName}').add(
+${
+  shared
+    ? `export const ${groupName}FoundationApi = HttpApi.make('${apiName}Foundation').add(
+  HttpApiGroup.make('foundation').add(
+    HttpApiEndpoint.get('readiness', '/${stem}/readiness', { success: ${readinessSchemaExport} }),
+  ),
+);`
+    : ''
+}
+export const ${apiExport} = HttpApi.make('${apiName}')${shared ? `.addHttpApi(${groupName}FoundationApi)` : ''}.add(
   HttpApiGroup.make('${groupName}')
     .add(
       HttpApiEndpoint.get('list', '/${stem}', {
@@ -211,11 +243,16 @@ export const ${apiExport} = HttpApi.make('${apiName}').add(
         }),
       }),
     )
-    .add(
+${
+  shared
+    ? ''
+    : `    .add(
       HttpApiEndpoint.get('readiness', '/${stem}/readiness', {
         success: ${readinessSchemaExport},
       }),
     )
+`
+}
     .add(
       HttpApiEndpoint.get('get', '/${stem}/:id', {
         error: ${notFoundSchemaExport},
@@ -236,7 +273,7 @@ export const ${apiExport} = HttpApi.make('${apiName}').add(
 );
 
 export const ${groupName}OperationContexts = {
-${operationContextEntries}
+${shared ? operationContextEntries.replaceAll(/(\w+: )\{([\s\S]*?)\},/gu, (_, key: string, fields: string) => `${key}createMicroVerticalOperationContext({${fields.replace(/\n\s*source: 'generated-client',/u, '')}}),`) : operationContextEntries}
 } satisfies Record<string, OperationContext>;
 
 export const ${groupName}ApiContract = {
@@ -248,10 +285,18 @@ ${createCheckoutCartApiContractFields(service)}  ownerId: '${service.id}',
 `;
 }
 
-export function createSharedApi(service: {
-  id: string;
-  api?: WorkspaceApi;
-}): string {
+export function createSharedApi(
+  service: {
+    id: string;
+    api?: WorkspaceApi;
+  },
+  options?: { readonly scope: string },
+): string {
+  const imports = options
+    ? `import { MicroVerticalBuildMarkerSchema, MicroVerticalReadinessSchema, createMicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}';
+import type { MicroVerticalBuildMarker, MicroVerticalReadiness, MicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}';`
+    : '';
   return `${createSharedApiImports()}
-${createSharedApiContract(service)}`;
+${imports}
+${createSharedApiContract(service, options !== undefined)}`;
 }

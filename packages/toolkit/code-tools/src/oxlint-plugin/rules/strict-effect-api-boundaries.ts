@@ -1,4 +1,8 @@
 import {
+  createEffectApiImportResolver,
+  strictEffectRuntimeTopologyViolation,
+} from '../../strict-effect-runtime.ts';
+import {
   getSourceText,
   isApiEntryFile,
   isApiSourceFile,
@@ -64,34 +68,11 @@ export const createStrictEffectApiBoundariesRule = (): Rule => ({
         );
 
         if (isApiEntryFile(filename)) {
-          reportMissingProgramPattern(
-            context,
-            node,
+          const violation = strictEffectRuntimeTopologyViolation(
             source,
-            /\bdefineEffectBff\b/u,
-            'Generated API entries must export defineEffectBff(...).',
+            createEffectApiImportResolver(filename),
           );
-          reportMissingProgramPattern(
-            context,
-            node,
-            source,
-            /\bHttpApiBuilder\b/u,
-            'Generated API entries must implement handlers through HttpApiBuilder.',
-          );
-          reportMissingProgramPattern(
-            context,
-            node,
-            source,
-            /\bLayer\b/u,
-            'Generated API entries must compose dependencies with Effect Layer.',
-          );
-          reportMissingProgramPattern(
-            context,
-            node,
-            source,
-            /from\s+['"]\.\.\/shared\/api\.ts['"]/u,
-            'Generated API entries must import the contract from ../shared/api.ts.',
-          );
+          if (violation) context.report({ node, message: violation });
         }
 
         if (isSharedApiContractFile(filename)) {

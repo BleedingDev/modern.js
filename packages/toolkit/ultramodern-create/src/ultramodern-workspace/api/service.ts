@@ -28,6 +28,7 @@ import {
 export function createApiServiceEntry(
   service: { id: string; api?: WorkspaceApi },
   contractImportPath: string,
+  options?: { readonly scope: string },
 ): string {
   if ((service.api?.protocol ?? 'rest') === 'rpc') {
     return createRpcApiServiceEntry(service);
@@ -37,17 +38,22 @@ export function createApiServiceEntry(
   const groupName = verticalApiGroupName(service);
   const notFoundErrorExport = verticalApiNotFoundErrorExport(service);
   const stem = resolveApiStem(service);
-  return `import {
-  defineEffectBff,
+  const assemblyImport = options
+    ? `import { assembleEffectBffRuntime } from '${packageName(options.scope, 'shared-contracts')}/server/effect-bff-runtime';\n`
+    : '';
+  return `${assemblyImport}import {
+  ${options ? '' : 'defineEffectBff,'}
   Effect,
   HttpApiBuilder,
   Layer,
 } from '@modern-js/plugin-bff/effect-edge';
-import type {
-  EffectBffDefinition,
-  EffectBffRuntime,
+${
+  options
+    ? ''
+    : `import type {
   EffectRuntimeLayer,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/plugin-bff/effect-edge';`
+}
 import { ultramodernApiMarker } from '../shared/ultramodern-build.ts';
 import {
   ${apiExport},
@@ -77,24 +83,12 @@ const operationAttributes = (operationContext: OperationContext) => ({
       : {}),
   });
 
-const ${groupName}Layer = HttpApiBuilder.group(
+${
+  options
+    ? `const ${groupName}ReadinessLayer = HttpApiBuilder.group(
   ${apiExport},
-  '${groupName}',
-  (handlers) =>
-    handlers
-      .handle('list', ({ query }) =>
-        Effect.succeed({
-          items:
-            typeof query.limit === 'number'
-              ? ${groupName}Items.slice(0, query.limit)
-              : ${groupName}Items,
-        }).pipe(
-          Effect.withSpan('ultramodern.api.${groupName}.list', {
-            attributes: operationAttributes(${groupName}OperationContexts.list),
-            kind: 'server',
-          }),
-        ),
-      )
+  'foundation',
+  handlers => handlers
       .handle('readiness', () =>
         Effect.succeed({
           checks: {
@@ -113,6 +107,52 @@ const ${groupName}Layer = HttpApiBuilder.group(
           }),
         ),
       )
+,
+);`
+    : ''
+}
+
+const ${groupName}Layer = HttpApiBuilder.group(
+  ${apiExport},
+  '${groupName}',
+  (handlers) =>
+    handlers
+      .handle('list', ({ query }) =>
+        Effect.succeed({
+          items:
+            typeof query.limit === 'number'
+              ? ${groupName}Items.slice(0, query.limit)
+              : ${groupName}Items,
+        }).pipe(
+          Effect.withSpan('ultramodern.api.${groupName}.list', {
+            attributes: operationAttributes(${groupName}OperationContexts.list),
+            kind: 'server',
+          }),
+        ),
+      )
+${
+  options
+    ? ''
+    : `      .handle('readiness', () =>
+        Effect.succeed({
+          checks: {
+            api: 'ready' as const,
+            moduleFederation: 'ready' as const,
+            ssr: 'ready' as const,
+            translations: 'ready' as const,
+          },
+          marker: ultramodernApiMarker,
+          status: 'ready' as const,
+          versionSkew: 'none' as const,
+        }).pipe(
+          Effect.withSpan('ultramodern.api.${groupName}.readiness', {
+            attributes: operationAttributes(${groupName}OperationContexts.readiness),
+            kind: 'server',
+          }),
+        ),
+      )
+`
+}
       .handle('get', ({ params }) => {
         const matchedItem = ${groupName}Items.find(
           candidate => candidate.id === params.id,
@@ -152,14 +192,23 @@ const ${groupName}Layer = HttpApiBuilder.group(
       )${createCheckoutCartServerHandlers(service)},
 );
 
-const layer = HttpApiBuilder.layer(${apiExport}).pipe(
-  Layer.provide(${groupName}Layer),
-) satisfies EffectRuntimeLayer;
-const apiRuntime: EffectBffDefinition<typeof ${apiExport}, EffectRuntimeLayer> &
-  EffectBffRuntime<typeof ${apiExport}, EffectRuntimeLayer> = defineEffectBff({
-  api: ${apiExport},
-  layer,
-});
+${
+  options
+    ? `const apiHandlersLive = Layer.mergeAll(${groupName}Layer, ${groupName}ReadinessLayer);
+export const make${apiExport[0].toUpperCase()}${apiExport.slice(1)}Runtime = () => {
+  return assembleEffectBffRuntime({
+    api: ${apiExport},
+    handlers: apiHandlersLive,
+  });
+};`
+    : `export const make${apiExport[0].toUpperCase()}${apiExport.slice(1)}Runtime = () => {
+  const layer = HttpApiBuilder.layer(${apiExport}).pipe(
+    Layer.provide(${groupName}Layer),
+  ) satisfies EffectRuntimeLayer;
+  return defineEffectBff({ api: ${apiExport}, layer });
+};`
+}
+const apiRuntime = make${apiExport[0].toUpperCase()}${apiExport.slice(1)}Runtime();
 
 export default apiRuntime;
 `;

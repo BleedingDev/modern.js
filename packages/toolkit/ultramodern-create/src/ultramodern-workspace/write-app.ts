@@ -387,7 +387,7 @@ function writeAppApiAndRemoteExposeFiles({
       writeFile(
         targetDir,
         `${resolvedApp.directory}/shared/api.ts`,
-        createSharedApi(resolvedApp),
+        createSharedApi(resolvedApp, { scope }),
       );
     }
     writeFile(
@@ -396,6 +396,7 @@ function writeAppApiAndRemoteExposeFiles({
       createApiServiceEntry(
         resolvedApp,
         rpcProtocol ? '../shared/rpc.ts' : '../shared/api.ts',
+        { scope },
       ),
     );
     writeFile(
@@ -418,7 +419,7 @@ function writeAppApiAndRemoteExposeFiles({
       writeFile(
         targetDir,
         `${resolvedApp.directory}/src/api/${resolvedApp.api.stem}-client.ts`,
-        createApiClient(resolvedApp, '../../shared/api'),
+        createApiClient(resolvedApp, '../../shared/api', { scope }),
       );
     }
   }

@@ -107,6 +107,19 @@ and the person a sync conflict in that file is escalated to.
 freeze-vs-track decision determines whether the `upstream-PR` dispositions below
 are ever actually filed).
 
+### Native ESM server-plugin interop (2026-09-08)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/toolkit/utils/src/cli/require.ts` | bleedingdev | Normalize Node's CJS import namespace and tagged transpiler defaults so ESM-built utils load server-plugin factories; retain genuine ESM payloads, named-only namespaces, raw interop, and development reload behavior. | capped-patch; fixed-in-fork |
+
+### Standalone CLI type dependencies (2026-09-08)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/toolkit/types/cli/index.d.ts` | bleedingdev | Import React types explicitly so backend consumers with Node-only ambient types can resolve exported route declarations. | capped-patch; fixed-in-fork |
+| `packages/toolkit/types/package.json` | bleedingdev | Publish the React and type-fest declaration dependencies referenced by the public CLI surface instead of relying on consumer ambient types or dev-only hoisting. | capped-patch; fixed-in-fork |
+
 ### Disposition vocabulary
 
 | Disposition | Meaning |

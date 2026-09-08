@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   discoverModuleFederationConfigs,
   validateModuleFederationTypes,
 } from '../src/ultramodern-workspace/mf-validation';
+import { inspectModuleFederationConfigSource } from '../src/ultramodern-workspace/mf-validation/inspect';
 
 type WorkspaceFiles = Record<string, string | Buffer>;
 
@@ -325,6 +327,72 @@ export default createModuleFederationConfig({
     () => validateModuleFederationTypes({ workspaceRoot }),
     /compilerInstance must resolve "@effect\/tsgo"/,
   );
+});
+
+for (const format of ['source', 'cjs', 'esm', 'esm-node']) {
+  test(`${format} inspector permits dts:false only with zero frontend exposes`, async () => {
+    const module =
+      format === 'source'
+        ? { inspectModuleFederationConfigSource }
+        : await import(
+            pathToFileURL(
+              path.resolve(
+                __dirname,
+                `../dist/${format}/ultramodern-workspace/mf-validation/inspect.${format === 'cjs' ? 'cjs' : 'js'}`,
+              ),
+            ).href
+          );
+    const inspect = (source: string) =>
+      module.inspectModuleFederationConfigSource(
+        source,
+        'verticals/api',
+        'module-federation.config.ts',
+      );
+    assert.deepEqual(
+      inspect(
+        '// @ultramodern-mf no-exposes\nexport default { dts: false, exposes: {} };',
+      ).dts,
+      {},
+    );
+    assertThrowsWithMessage(
+      () =>
+        inspect(
+          'export default { dts: false, exposes: { "./Page": "./page.tsx" } };',
+        ),
+      /DTS cannot be disabled for exposed app/u,
+    );
+    assertThrowsWithMessage(
+      () => inspect('export default { dts: false, exposes: dynamic() };'),
+      /Cannot statically extract/u,
+    );
+  });
+}
+
+test('MF proof accepts explicit API-only intent but keeps exposed-app archives mandatory', () => {
+  const appDir = 'apps/api';
+  const workspaceRoot = createWorkspace({
+    [`${appDir}/module-federation.config.ts`]:
+      '// @ultramodern-mf no-exposes\nexport default { dts: false, exposes: {} };',
+  });
+  try {
+    const validate = () =>
+      validateModuleFederationTypes({ workspaceRoot, appDirs: [appDir] });
+    assert.equal(validate().hostOnlyAppCount, 1);
+    const configPath = path.join(
+      workspaceRoot,
+      appDir,
+      'module-federation.config.ts',
+    );
+    fs.writeFileSync(configPath, 'export default { dts: false, exposes: {} };');
+    assertThrowsWithMessage(
+      validate,
+      /without an explicit host-only\/no-exposes declaration/u,
+    );
+    fs.writeFileSync(configPath, mfConfig());
+    assertThrowsWithMessage(validate, /Missing Module Federation DTS archive/u);
+  } finally {
+    fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  }
 });
 
 test('rejects dynamic exposes without evaluating Module Federation config code', () => {

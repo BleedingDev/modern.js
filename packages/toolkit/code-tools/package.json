@@ -44,6 +44,11 @@
       },
       "default": "./dist/esm-node/index.js"
     },
+    "./strict-effect-runtime": {
+      "types": "./dist/types/strict-effect-runtime.d.ts",
+      "import": "./dist/esm-node/strict-effect-runtime.js",
+      "require": "./dist/cjs/strict-effect-runtime.cjs"
+    },
     "./oxlint-plugin": {
       "types": "./dist/types/oxlint-plugin.d.ts",
       "node": {
@@ -63,7 +68,8 @@
     "test": "rstest --passWithNoTests"
   },
   "dependencies": {
-    "oxlint": "1.81.0"
+    "oxlint": "1.81.0",
+    "typescript": "^7.0.2"
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",
@@ -86,6 +92,11 @@
           "require": "./dist/cjs/index.cjs"
         },
         "default": "./dist/esm-node/index.js"
+      },
+      "./strict-effect-runtime": {
+        "types": "./dist/types/strict-effect-runtime.d.ts",
+        "import": "./dist/esm-node/strict-effect-runtime.js",
+        "require": "./dist/cjs/strict-effect-runtime.cjs"
       },
       "./oxlint-plugin": {
         "types": "./dist/types/oxlint-plugin.d.ts",

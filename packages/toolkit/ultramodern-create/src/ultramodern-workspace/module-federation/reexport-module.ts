@@ -65,11 +65,8 @@ const ultramodernBuildArtifact = {
   },
 } as const;
 
-export { ultramodernBuildArtifact };
-
 export const ultramodernDeliveryUnit =
   ultramodernBuildArtifact.deliveryUnit;
-export const ultramodernVerticalIdentity = ultramodernDeliveryUnit;
 export const ultramodernUiMarker = ultramodernBuildArtifact.surfaces.ui;
 export const ultramodernApiMarker = ultramodernBuildArtifact.surfaces.api;
 `;
@@ -77,11 +74,9 @@ export const ultramodernApiMarker = ultramodernBuildArtifact.surfaces.api;
 
 export function createUltramodernBuildReexportModule(): string {
   return `export {
-  ultramodernBuildArtifact,
   ultramodernApiMarker,
   ultramodernDeliveryUnit,
   ultramodernUiMarker,
-  ultramodernVerticalIdentity,
 } from '../shared/ultramodern-build';
 `;
 }

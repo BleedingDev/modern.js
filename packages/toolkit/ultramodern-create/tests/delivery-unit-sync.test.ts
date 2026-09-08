@@ -222,10 +222,21 @@ test('sync-delivery-unit backfills identity blocks matching the generator', () =
       workspaceDir,
       'verticals/catalog/shared/ultramodern-build.ts',
     );
-    assert.deepEqual(
-      JSON.parse(JSON.stringify(buildModule.ultramodernBuildArtifact)),
-      buildArtifact,
-    );
+    assert.deepEqual(Object.keys(buildModule).sort(), [
+      'ultramodernApiMarker',
+      'ultramodernDeliveryUnit',
+      'ultramodernUiMarker',
+    ]);
+    for (const [exportName, expected] of [
+      ['ultramodernDeliveryUnit', buildArtifact.deliveryUnit],
+      ['ultramodernApiMarker', buildArtifact.surfaces.api],
+      ['ultramodernUiMarker', buildArtifact.surfaces.ui],
+    ] as const) {
+      assert.deepEqual(
+        JSON.parse(JSON.stringify(buildModule[exportName])),
+        expected,
+      );
+    }
     assert.equal(
       buildModule.ultramodernDeliveryUnit.unitId,
       buildArtifact.deliveryUnit.unitId,

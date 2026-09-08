@@ -238,6 +238,13 @@ export function writeGeneratedWorkspaceScripts(
     'check-ultramodern-api-boundaries',
     createWorkspaceApiBoundaryValidationScript(),
   );
+  writeWorkspaceOwnedMtsScript(
+    targetDir,
+    'microvertical-api-baseline-boundary',
+    readFileTemplate(
+      'workspace-scripts/microvertical-api-baseline-boundary.mts',
+    ),
+  );
   if (!shellOnly) {
     writeFileReplacing(
       targetDir,
@@ -313,6 +320,12 @@ export function migratedWorkspaceScriptArtifacts(options: {
       relativePath: 'scripts/check-ultramodern-i18n-boundaries.mts',
       content: createWorkspaceI18nBoundaryValidationScript(),
       legacyPath: 'scripts/check-ultramodern-i18n-boundaries.mjs',
+    },
+    {
+      relativePath: 'scripts/microvertical-api-baseline-boundary.mts',
+      content: readFileTemplate(
+        'workspace-scripts/microvertical-api-baseline-boundary.mts',
+      ),
     },
     {
       relativePath: 'scripts/check-ultramodern-api-boundaries.mts',

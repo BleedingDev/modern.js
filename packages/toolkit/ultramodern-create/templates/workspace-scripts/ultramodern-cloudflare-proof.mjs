@@ -1068,9 +1068,28 @@ async function validateJsonSmokeEvidence(evidence, app, publicUrl) {
   }
 }
 
+function isProofRoute(value) {
+  return typeof value === 'string' && value.startsWith('/') &&
+    !value.startsWith('//') && !/[\\\\%?#\s]/u.test(value) &&
+    !value.split('/').some(segment => segment === '.' || segment === '..');
+}
+
 async function validateApp(app, publicUrl) {
   const routes = app.deploy?.cloudflare?.routes ?? {};
   const evidence = createAppEvidence(app, publicUrl);
+  const exposes = app.moduleFederation?.exposes;
+  const noFrontendExposes = exposes === undefined ||
+    (Array.isArray(exposes) ? exposes.length === 0 :
+      exposes !== null && typeof exposes === 'object' && Object.keys(exposes).length === 0);
+  // An API readiness contract without frontend exposes need not invent UI routes.
+  const apiOnlyRoutes = noFrontendExposes && isProofRoute(routes.apiReadiness);
+  for (const field of ['ssr', 'locale']) {
+    if (Object.hasOwn(routes, field)) {
+      assert(isProofRoute(routes[field]), `${app.id} declared ${field} route must be a root-relative path`);
+    } else {
+      assert(apiOnlyRoutes, `${app.id} missing ${field} route requires an API-only/no-frontend-exposes contract`);
+    }
+  }
 
   if (routes.rpc) {
     const rpcSmokeCheck = (

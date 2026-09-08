@@ -57,6 +57,111 @@ const collectNestedStrings = (value: unknown, key: string): string[] => {
   ]);
 };
 
+// Empty native MF producers emit no remote entry or exposed execution assets.
+// Only their routeAssets declarations may supply the missing browser evidence.
+const emptyProducerRouteModules = async (
+  distDirectory: string,
+  files: string[],
+  manifest: unknown,
+  manifestLogicalPath: string,
+): Promise<string[]> => {
+  if (
+    !isRecord(manifest) ||
+    !Array.isArray(manifest.exposes) ||
+    manifest.exposes.length !== 0 ||
+    !Array.isArray(manifest.remotes) ||
+    manifest.remotes.length !== 0 ||
+    !isRecord(manifest.metaData) ||
+    !isRecord(manifest.metaData.remoteEntry) ||
+    manifest.metaData.remoteEntry.name !== '' ||
+    manifest.metaData.remoteEntry.path !== '' ||
+    manifest.metaData.remoteEntry.type !== 'global'
+  ) {
+    return [];
+  }
+  const publicPath = manifest.metaData.publicPath;
+  // Reject encoded/ambiguous paths before URL parsing can normalize traversal.
+  const safeReference = (value: unknown): value is string =>
+    typeof value === 'string' &&
+    value.length > 0 &&
+    !/[\\\\%?#\s]/u.test(value) &&
+    !value.split('/').some(segment => segment === '.' || segment === '..');
+  if (!safeReference(publicPath)) {
+    return [];
+  }
+  const absoluteBase = /^https?:\/\//u.test(publicPath);
+  if (
+    publicPath !== 'auto' &&
+    (!publicPath.endsWith('/') ||
+      (!absoluteBase &&
+        (!publicPath.startsWith('/') || publicPath.startsWith('//'))))
+  ) {
+    return [];
+  }
+  if (absoluteBase) {
+    const base = new URL(publicPath);
+    if (base.username || base.password || base.href !== publicPath) {
+      return [];
+    }
+  }
+  const directory = path.posix.dirname(manifestLogicalPath);
+  const routesManifest = await readJson(
+    path.join(distDirectory, directory, 'routes-manifest.json'),
+  );
+  if (!isRecord(routesManifest) || !isRecord(routesManifest.routeAssets)) {
+    return [];
+  }
+  const modules = new Set<string>();
+  for (const route of Object.values(routesManifest.routeAssets)) {
+    if (!isRecord(route) || !Array.isArray(route.assets)) {
+      return [];
+    }
+    for (const reference of route.assets) {
+      if (!safeReference(reference) || reference.startsWith('//')) {
+        return [];
+      }
+      let relative = reference;
+      if (/^https?:\/\//u.test(reference)) {
+        if (!absoluteBase || !reference.startsWith(publicPath)) {
+          return [];
+        }
+        relative = reference.slice(publicPath.length);
+      } else if (reference.startsWith('/')) {
+        const prefix =
+          publicPath === 'auto'
+            ? '/'
+            : absoluteBase
+              ? new URL(publicPath).pathname
+              : publicPath;
+        if (!reference.startsWith(prefix)) {
+          return [];
+        }
+        relative = reference.slice(prefix.length);
+      }
+      // Never allow API, SSR, backend containers, or unrelated on-disk modules.
+      if (
+        !/^(?:static|html|public)\/[^:]+$/u.test(relative) ||
+        relative.includes('//')
+      ) {
+        return [];
+      }
+      const logicalPath = path.posix.join(directory, relative);
+      if (!files.includes(logicalPath)) {
+        return [];
+      }
+      // A browser-named symlink to server/private bytes is not browser evidence.
+      const assetStat = await fs.lstat(path.join(distDirectory, logicalPath));
+      if (!assetStat.isFile()) {
+        return [];
+      }
+      if (COMPILED_MODULE_PATTERN.test(logicalPath)) {
+        modules.add(logicalPath);
+      }
+    }
+  }
+  return [...modules];
+};
+
 const manifestReferencedClientModules = async (
   distDirectory: string,
   files: string[],
@@ -77,7 +182,7 @@ const manifestReferencedClientModules = async (
       .map(value => value.replace(/^https?:\/\/[^/]+/u, ''))
       .map(value => value.replace(/^\/+/u, '')),
   );
-  return files.filter(
+  const modules = files.filter(
     logicalPath =>
       COMPILED_MODULE_PATTERN.test(logicalPath) &&
       [...normalizedReferences].some(
@@ -87,6 +192,14 @@ const manifestReferencedClientModules = async (
           logicalPath.endsWith(`/${reference}`),
       ),
   );
+  return modules.length > 0
+    ? modules
+    : emptyProducerRouteModules(
+        distDirectory,
+        files,
+        manifest,
+        manifestLogicalPath,
+      );
 };
 
 const routeReferencedSsrModules = async (

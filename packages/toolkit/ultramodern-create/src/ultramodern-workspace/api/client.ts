@@ -19,6 +19,7 @@ import {
 export function createApiClient(
   service: { id: string; api?: WorkspaceApi },
   contractImportPath: string,
+  options?: { readonly scope: string },
 ): string {
   const apiExport = verticalApiExport(service);
   const contractExport = verticalApiGroupName(service);
@@ -136,7 +137,7 @@ export const ${readinessName} = (
     operationContext:
       options.operationContext ?? ${groupName}OperationContexts.readiness,
   }).pipe(
-    Effect.flatMap(client => client.${groupName}.readiness({})),
+    Effect.flatMap(client => client.${options ? 'foundation' : groupName}.readiness({})),
   );
 
 export const ${getName} = (

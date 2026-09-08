@@ -314,9 +314,7 @@ export function App({ language }: { language: string }) {
     const output = combinedOutput(result);
 
     expect(result.exitCode).toBe(1);
-    expect(output).toContain(
-      '[Error/ultramodern(no-manual-locale-copy-branching)]',
-    );
+    expect(output).toContain('ultramodern(no-manual-locale-copy-branching)');
     expect(output).toContain(
       'Move locale-specific copy branch to i18n resources: "Bonjour"',
     );

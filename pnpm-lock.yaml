@@ -2593,6 +2593,9 @@ importers:
       oxlint:
         specifier: 1.81.0
         version: 1.81.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
     devDependencies:
       '@modern-js/rslib':
         specifier: workspace:*
@@ -2820,6 +2823,12 @@ importers:
       '@jest/types':
         specifier: ^30.5.1
         version: 30.5.1
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      type-fest:
+        specifier: 5.9.0
+        version: 5.9.0
     devDependencies:
       '@types/babel__core':
         specifier: ^7.20.5
@@ -2830,9 +2839,6 @@ importers:
       http-proxy-middleware:
         specifier: ^4.2.0
         version: 4.2.0(supports-color@8.1.1)
-      type-fest:
-        specifier: 5.9.0
-        version: 5.9.0
 
   packages/toolkit/ultramodern-create:
     dependencies:

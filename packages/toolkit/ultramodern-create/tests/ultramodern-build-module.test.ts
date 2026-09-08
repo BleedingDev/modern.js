@@ -63,7 +63,18 @@ test('generated build module applies one compiled identity to UI, API, and deliv
         fs.readFileSync(path.join(outputRoot, 'ultramodern-build.js'), 'utf8'),
         { ...globals, exports: module.exports, module },
       );
-      return module.exports.ultramodernBuildArtifact;
+      assert.deepEqual(Object.keys(module.exports).sort(), [
+        'ultramodernApiMarker',
+        'ultramodernDeliveryUnit',
+        'ultramodernUiMarker',
+      ]);
+      return {
+        deliveryUnit: module.exports.ultramodernDeliveryUnit,
+        surfaces: {
+          api: module.exports.ultramodernApiMarker,
+          ui: module.exports.ultramodernUiMarker,
+        },
+      };
     };
 
     const fallback = execute({});

@@ -179,8 +179,6 @@ export const runOxlintRules = ({
         ...resolvedTargets,
         '--config',
         configPath,
-        '--format',
-        'unix',
         '--quiet',
       ],
       {

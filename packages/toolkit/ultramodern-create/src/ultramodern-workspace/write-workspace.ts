@@ -24,6 +24,7 @@ import {
 import {
   copyRootTemplate,
   formatGeneratedWorkspaceFiles,
+  readFileTemplate,
   writeFile,
   writeFileReplacing,
   writeJson,
@@ -85,12 +86,21 @@ function hasExplicitInstallRequest(options: UltramodernWorkspaceOptions) {
   );
 }
 
-function writeSharedPackages(targetDir: string, scope: string) {
+function writeSharedPackages(
+  targetDir: string,
+  scope: string,
+  packageSource: ResolvedPackageSource,
+) {
   for (const sharedPackage of sharedPackages) {
     writeJson(
       targetDir,
       `${sharedPackage.directory}/package.json`,
-      createSharedPackage(scope, sharedPackage.id, sharedPackage.description),
+      createSharedPackage(
+        scope,
+        sharedPackage.id,
+        sharedPackage.description,
+        packageSource,
+      ),
     );
     writeJson(
       targetDir,
@@ -103,6 +113,11 @@ function writeSharedPackages(targetDir: string, scope: string) {
     targetDir,
     'packages/shared-contracts/src/index.ts',
     createSharedContractsIndex(),
+  );
+  writeFile(
+    targetDir,
+    'packages/shared-contracts/src/effect-bff-runtime.ts',
+    readFileTemplate('packages/effect-bff-runtime.ts'),
   );
   writeFile(
     targetDir,
@@ -380,7 +395,7 @@ function generateUltramodernWorkspaceInPlace(
       bridge,
     );
   }
-  writeSharedPackages(options.targetDir, scope);
+  writeSharedPackages(options.targetDir, scope, packageSource);
   writeGeneratedWorkspaceScripts(
     options.targetDir,
     scope,

@@ -316,6 +316,7 @@ export function createSharedPackage(
   scope: string,
   id: string,
   description: string,
+  packageSource?: ResolvedPackageSource,
 ): JsonValue {
   const packageJson: Record<string, JsonValue> = {
     private: true,
@@ -335,6 +336,19 @@ export function createSharedPackage(
     },
   };
 
+  if (id === 'shared-contracts') {
+    packageJson.exports = {
+      '.': './src/index.ts',
+      './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
+    };
+    packageJson.dependencies = {
+      ...ULTRAMODERN_PACKAGE_PINS.bffEffectDependencies,
+      '@modern-js/plugin-bff': packageSource
+        ? modernPackageSpecifier('@modern-js/plugin-bff', packageSource)
+        : WORKSPACE_PACKAGE_VERSION,
+    };
+  }
+
   if (id === 'shared-design-tokens') {
     packageJson.exports = {
       ...(packageJson.exports as Record<string, JsonValue>),
@@ -346,5 +360,5 @@ export function createSharedPackage(
 }
 
 export function createSharedContractsIndex(): string {
-  return readFileTemplate('packages/shared-contracts-index.ts');
+  return `${readFileTemplate('packages/microvertical-api-baseline.ts')}\n${readFileTemplate('packages/shared-contracts-index.ts')}`;
 }

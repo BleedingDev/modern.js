@@ -40,7 +40,16 @@ function extractExposes(
 function extractDtsSettings(
   configPath: string,
   value: string | undefined,
+  exposes: string[],
 ): ModuleFederationConfigInspection['dts'] {
+  if (value === 'false') {
+    if (exposes.length > 0) {
+      throw new Error(
+        `Module Federation DTS cannot be disabled for exposed app ${configPath}.`,
+      );
+    }
+    return {};
+  }
   if (value === undefined) {
     return {};
   }
@@ -118,7 +127,11 @@ export function inspectModuleFederationConfigSource(
   return {
     appDir,
     configPath,
-    dts: extractDtsSettings(configPath, properties.properties.get('dts')),
+    dts: extractDtsSettings(
+      configPath,
+      properties.properties.get('dts'),
+      exposes,
+    ),
     exposes,
     hostOnlyNoExposes,
   };

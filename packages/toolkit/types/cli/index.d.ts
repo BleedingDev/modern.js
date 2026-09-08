@@ -1,4 +1,5 @@
 import type { Config as JestConfigTypes } from '@jest/types';
+import type * as React from 'react';
 
 export type JestConfig = JestConfigTypes.InitialOptions;
 

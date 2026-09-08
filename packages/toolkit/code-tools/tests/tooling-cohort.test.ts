@@ -20,8 +20,8 @@ describe('central tooling cohort', () => {
     );
 
     expect(rootPackage.packageManager).toBe('pnpm@11.24.0');
-    expect(rootPackage.devDependencies).toMatchObject({ oxfmt: '0.65.0' });
-    expect(codeToolsPackage.dependencies).toMatchObject({ oxlint: '1.80.0' });
+    expect(rootPackage.devDependencies).toMatchObject({ oxfmt: '0.66.0' });
+    expect(codeToolsPackage.dependencies).toMatchObject({ oxlint: '1.81.0' });
     expect(miseConfig).toMatch(/^pnpm = "11\.24\.0"$/m);
   });
 
