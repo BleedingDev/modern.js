@@ -532,9 +532,25 @@ test('published .15 Tractor bootstrap carries the full cohort and active audited
     '--workspace',
     root,
   ]).releaseAgePolicyPath;
+  assert.deepEqual(
+    resolveTractorMinimumReleaseAgeExclude({
+      release: strictRelease,
+      releaseAgePolicyPath: policyPath,
+      now: new Date('2026-09-08T00:00:00.000Z'),
+    }),
+    firstPartyTargets
+      .map(targetName => `${targetName}@${releaseVersion}`)
+      .sort(),
+    'the default policy must not resurrect retired third-party exceptions',
+  );
+  // Positive approval coverage uses an independent fixture, not live defaults.
+  const reviewedPolicyPath = writeReleaseAgePolicy(
+    root,
+    stableRsbuildRspackSelectors.map(selector => releaseAgeEntry(selector)),
+  );
   const minimumReleaseAgeExclude = resolveTractorMinimumReleaseAgeExclude({
     release: strictRelease,
-    releaseAgePolicyPath: policyPath,
+    releaseAgePolicyPath: reviewedPolicyPath,
     now: new Date('2026-08-26T12:00:00.000Z'),
   });
   const expected = [
