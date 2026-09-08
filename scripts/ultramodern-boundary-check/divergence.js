@@ -100,7 +100,9 @@ const runGit = ({
   allowFailure = false,
   maxBuffer = GIT_MAX_BUFFER_BYTES,
 }) => {
-  const result = spawnSync('git', args, {
+  // Paths from recorded identities must never become Git wildcard pathspecs.
+  // Apply this to every Git query, including post-provenance history checks.
+  const result = spawnSync('git', ['--literal-pathspecs', ...args], {
     cwd: rootDir,
     encoding: 'utf8',
     env: sanitizedGitEnv(),
@@ -212,7 +214,9 @@ const validateCanonicalRepoPath = (value, label) => {
   if (value.includes('\\')) {
     throw new Error(`${label} must use POSIX separators: ${value}`);
   }
-  if (value.startsWith(':') || /[*?[]/.test(value)) {
+  // Brackets are valid in concrete tracked identities (for example [lang]).
+  // Identity membership is checked exactly; caller scopes remain stricter below.
+  if (value.startsWith(':') || /[*?]/.test(value)) {
     throw new Error(`${label} must be a literal repository path: ${value}`);
   }
   if (path.posix.isAbsolute(value) || path.posix.normalize(value) !== value) {
@@ -234,9 +238,16 @@ const validatePathspec = (pathspec, { label = 'Divergence pathspec' } = {}) => {
     throw new Error(`${label} must be a non-empty array.`);
   }
 
-  const validated = pathspec.map((entry, index) =>
-    validateCanonicalRepoPath(entry, `${label}[${String(index)}]`),
-  );
+  const validated = pathspec.map((entry, index) => {
+    const entryLabel = `${label}[${String(index)}]`;
+    const file = validateCanonicalRepoPath(entry, entryLabel);
+    if (file.includes('[')) {
+      throw new Error(
+        `${entryLabel} must be a literal repository path: ${file}`,
+      );
+    }
+    return file;
+  });
   const seen = new Set();
   for (let index = 0; index < validated.length; index += 1) {
     const entry = validated[index];
@@ -424,19 +435,24 @@ const validateDivergenceAllowlist = (
       descendantRef: resolvedIdentityRef,
       label: `${source} identity target does not incorporate reviewed provenance`,
     });
-    return (
-      runGit({
-        rootDir: repositoryRoot,
-        args: [
-          'log',
-          '-1',
-          '--format=%H',
-          `${resolvedUpstream}..${resolvedIdentityRef}`,
-          '--',
-          file,
-        ],
-      }).trim().length > 0
-    );
+    // Even literal Git paths can select a directory: require the exact file,
+    // retaining historical identities after deletion or rename.
+    return runGit({
+      rootDir: repositoryRoot,
+      args: [
+        'log',
+        '--format=',
+        '--name-only',
+        '-z',
+        '-m',
+        '--no-renames',
+        `${resolvedUpstream}..${resolvedIdentityRef}`,
+        '--',
+        file,
+      ],
+    })
+      .split('\0')
+      .includes(file);
   };
   for (const scope of pathspec) {
     if (!baseTreePaths.some(file => pathIsInScope(file, scope))) {

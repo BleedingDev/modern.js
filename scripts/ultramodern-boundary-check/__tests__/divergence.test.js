@@ -433,6 +433,228 @@ test('full recorded repository scope remains green and fully measured', () => {
   assert.equal(report.cleared.length, 0);
 });
 
+test('tracked bracketed route identities retain measurement, ledger, and PR cap enforcement', t => {
+  const file =
+    'packages/toolkit/ultramodern-create/templates/workspace/apps/shell-super-app/src/routes/[lang]/page.tsx.handlebars';
+  const fixture = makeGitFixture({
+    files: { [file]: 'export const a = 1;\n' },
+  });
+  t.after(() => cleanup(fixture.rootDir));
+  const baseSnapshot = createDivergenceSnapshot({
+    baseRef: fixture.upstreamBase,
+    pathspec: ['packages'],
+  });
+  writeRepoFile(fixture.rootDir, file, 'export const a = 2;\n');
+  appendLedgerRow(fixture.rootDir, file);
+  const headRef = commitAll(fixture.rootDir, 'change tracked bracketed route');
+  const measure = ref =>
+    measureDivergence({
+      rootDir: fixture.rootDir,
+      baseRef: fixture.upstreamBase,
+      headRef: ref,
+    });
+  const measured = measure(headRef);
+  assert.deepEqual(measured.files, [
+    {
+      file,
+      hunks: 1,
+      changedLines: 2,
+      addedLines: 1,
+      removedLines: 1,
+    },
+  ]);
+  const snapshot = createDivergenceSnapshot({
+    ...measured,
+    pathspec: ['packages'],
+  });
+  assert.deepEqual(
+    validateDivergenceAllowlist(snapshot, {
+      rootDir: fixture.rootDir,
+      identityRef: headRef,
+    }),
+    snapshot,
+  );
+  assert.equal(
+    compareDivergence({
+      measuredFiles: measured.files,
+      allowlistFiles: baseSnapshot.files,
+    }).violations.length,
+    1,
+    'valid path identity does not grant a budget',
+  );
+  const govern = (ref, headAllowlist) =>
+    evaluateDivergenceGovernance({
+      rootDir: fixture.rootDir,
+      mergeBaseRef: fixture.upstreamBase,
+      headRef: ref,
+      baseAllowlist: baseSnapshot,
+      headAllowlist,
+    });
+  const governed = govern(headRef, snapshot);
+  assert.deepEqual(governed.errors, []);
+  assert.equal(governed.rule5Changes[0].changedLines, 2);
+  assert.deepEqual(governed.ledgerEvidence.rows[0].problems, []);
+  writeRepoFile(
+    fixture.rootDir,
+    file,
+    replacementLines(CAPPED_PATCH_LINES + 1),
+  );
+  const oversizedHead = commitAll(
+    fixture.rootDir,
+    'oversized bracketed route change',
+  );
+  const oversized = govern(
+    oversizedHead,
+    createDivergenceSnapshot({
+      ...measure(oversizedHead),
+      pathspec: ['packages'],
+    }),
+  );
+  assert.equal(oversized.ok, false);
+  assert.match(oversized.errors.join('\n'), /exceeding the exact 20-line cap/);
+});
+
+test('post-provenance bracketed identities require literal tracked history, not matching siblings', t => {
+  const fixture = makeGitFixture();
+  t.after(() => cleanup(fixture.rootDir));
+  const file = 'packages/runtime/src/routes/[lang]/page.tsx';
+  const sibling = 'packages/runtime/src/routes/l/page.tsx';
+  writeRepoFile(fixture.rootDir, file, 'export const route = 1;\n');
+  writeRepoFile(fixture.rootDir, sibling, 'export const sibling = 1;\n');
+  const headRef = commitAll(
+    fixture.rootDir,
+    'add bracketed route and glob-matching sibling',
+  );
+  const snapshotFor = identity =>
+    createDivergenceSnapshot({
+      baseRef: fixture.upstreamBase,
+      pathspec: ['packages'],
+      files: [{ file: identity, hunks: 1, changedLines: 1 }],
+    });
+  const validate = (identity, identityRef = headRef) =>
+    validateDivergenceAllowlist(snapshotFor(identity), {
+      rootDir: fixture.rootDir,
+      identityRef,
+    });
+  assert.equal(validate(file).files[0].file, file);
+  for (const untracked of [
+    'packages/runtime/src/routes/[l]/page.tsx',
+    'packages/runtime/src/routes/[LANG]/page.tsx',
+    'packages/runtime/src/routes/[lang]',
+    'packages/runtime/src/routes',
+  ]) {
+    assert.throws(
+      () => validate(untracked),
+      /neither a canonical reviewed-upstream identity/,
+    );
+  }
+  assert.throws(
+    () => validate(file, fixture.upstreamBase),
+    /neither a canonical reviewed-upstream identity/,
+  );
+  fs.unlinkSync(path.join(fixture.rootDir, file));
+  const deletionHead = commitAll(
+    fixture.rootDir,
+    'delete tracked bracketed route',
+  );
+  assert.equal(validate(file, deletionHead).files[0].file, file);
+});
+
+test('bracketed identities introduced by a merge retain exact historical ownership', t => {
+  const fixture = makeGitFixture();
+  t.after(() => cleanup(fixture.rootDir));
+  const branch = runGit(fixture.rootDir, ['branch', '--show-current']);
+  runGit(fixture.rootDir, ['switch', '-c', 'side']);
+  writeRepoFile(fixture.rootDir, 'side.txt', 'side\n');
+  commitAll(fixture.rootDir, 'side change');
+  runGit(fixture.rootDir, ['switch', branch]);
+  writeRepoFile(fixture.rootDir, 'main.txt', 'main\n');
+  commitAll(fixture.rootDir, 'main change');
+  runGit(fixture.rootDir, ['merge', '--no-ff', '--no-commit', 'side']);
+  const file = 'packages/runtime/src/routes/[merge]/page.tsx';
+  writeRepoFile(fixture.rootDir, file, 'export const route = 1;\n');
+  const headRef = commitAll(
+    fixture.rootDir,
+    'introduce route in merge resolution',
+  );
+  const snapshot = createDivergenceSnapshot({
+    baseRef: fixture.upstreamBase,
+    pathspec: ['packages'],
+    files: [{ file, hunks: 1, changedLines: 1 }],
+  });
+  assert.deepEqual(
+    validateDivergenceAllowlist(snapshot, {
+      rootDir: fixture.rootDir,
+      identityRef: headRef,
+    }),
+    snapshot,
+  );
+});
+
+test('bracketed file support does not admit wildcard, magic, traversal, or caller scopes', t => {
+  const file = 'packages/runtime/src/routes/[lang]/page.tsx';
+  const fixture = makeGitFixture({
+    files: { [file]: 'export const a = 1;\n' },
+  });
+  t.after(() => cleanup(fixture.rootDir));
+  const snapshot = createDivergenceSnapshot({
+    baseRef: fixture.upstreamBase,
+    pathspec: ['packages'],
+    files: [{ file, hunks: 1, changedLines: 2 }],
+  });
+  const invalidPaths = [
+    'packages/runtime/src/routes/*/page.tsx',
+    'packages/runtime/src/routes/?/page.tsx',
+    ':(glob)packages/**',
+    ':(exclude)packages/runtime',
+    ':/packages/runtime',
+    '../packages/runtime',
+    'packages/runtime/../runtime',
+    './packages/runtime',
+    '/packages/runtime',
+    'packages\\runtime',
+  ];
+  for (const invalidPath of invalidPaths) {
+    const invalid = structuredClone(snapshot);
+    invalid.files[0].file = invalidPath;
+    assert.throws(
+      () =>
+        validateDivergenceAllowlist(invalid, {
+          rootDir: fixture.rootDir,
+        }),
+      /literal repository path|canonical repository path|POSIX separators/,
+      invalidPath,
+    );
+  }
+  for (const scope of [
+    ...invalidPaths,
+    file,
+    'packages/runtime/src/routes/[a-z]',
+  ]) {
+    assert.throws(
+      () =>
+        validateDivergenceAllowlist(
+          { ...snapshot, pathspec: [scope] },
+          {
+            rootDir: fixture.rootDir,
+          },
+        ),
+      /literal repository path|canonical repository path|POSIX separators/,
+      scope,
+    );
+    assert.throws(
+      () =>
+        measureDivergence({
+          rootDir: fixture.rootDir,
+          baseRef: fixture.upstreamBase,
+          pathspec: [scope],
+        }),
+      /literal repository path|canonical repository path|POSIX separators/,
+      scope,
+    );
+  }
+});
+
 test('direct verifier rejects narrower, broader, empty, duplicate, and normalized scopes', () => {
   const fixture = makeLegacyFixture();
   try {

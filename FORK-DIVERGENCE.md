@@ -107,18 +107,32 @@ and the person a sync conflict in that file is escalated to.
 freeze-vs-track decision determines whether the `upstream-PR` dispositions below
 are ever actually filed).
 
+### One-release compatibility exception (2026-09-08)
+
+The repository owner explicitly authorized publication of the tested native
+MicroVertical compatibility repair as `3.9.0-ultramodern.3` despite the inherited
+fork-audit failures and the audit's capped classification of the generator
+changes. This exception applies only to this compatibility release, based on
+`7a7852b59ea0b8d4d6bf47f2f84a8d4b84f8a1b4`; it is not a general policy change.
+
+The starting branch reported 759 cumulative divergence violations. No divergence
+budgets, audited base, reviewed provenance, or canonical scope were reset or
+raised. Runtime, type, security, immutable release, and downstream acceptance
+checks remain mandatory. Ownership/budget reconciliation remains outstanding;
+this record does not claim that audit passed.
+
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/utils/src/cli/require.ts` | bleedingdev | Normalize Node's CJS import namespace and tagged transpiler defaults so ESM-built utils load server-plugin factories; retain genuine ESM payloads, named-only namespaces, raw interop, and development reload behavior. | capped-patch; fixed-in-fork |
+| `packages/toolkit/utils/src/cli/require.ts` | bleedingdev | Normalize Node's CJS import namespace and tagged transpiler defaults so ESM-built utils load server-plugin factories; retain genuine ESM payloads, named-only namespaces, raw interop, and development reload behavior. | capped-patch |
 
 ### Standalone CLI type dependencies (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/types/cli/index.d.ts` | bleedingdev | Import React types explicitly so backend consumers with Node-only ambient types can resolve exported route declarations. | capped-patch; fixed-in-fork |
-| `packages/toolkit/types/package.json` | bleedingdev | Publish the React and type-fest declaration dependencies referenced by the public CLI surface instead of relying on consumer ambient types or dev-only hoisting. | capped-patch; fixed-in-fork |
+| `packages/toolkit/types/cli/index.d.ts` | bleedingdev | Import React types explicitly so backend consumers with Node-only ambient types can resolve exported route declarations. | capped-patch |
+| `packages/toolkit/types/package.json` | bleedingdev | Publish the React and type-fest declaration dependencies referenced by the public CLI surface instead of relying on consumer ambient types or dev-only hoisting. | capped-patch |
 
 ### Disposition vocabulary
 
