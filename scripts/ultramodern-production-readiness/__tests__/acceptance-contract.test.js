@@ -1334,6 +1334,55 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
       });
 
     const result = await auditAt(new Date('2026-08-11T01:00:00.000Z'));
+    const { bindSupplyChainEvidence } = await import(
+      '../published-create-proof/acceptance-receipt.mjs'
+    );
+    const receipt = {
+      binding: {
+        manifest: { sha256: 'c'.repeat(64) },
+        supplyChain: { closureSha256: null },
+      },
+    };
+    bindSupplyChainEvidence(receipt, result.digests);
+    assert.equal(
+      receipt.binding.supplyChain.closureSha256,
+      result.digests.closureSha256,
+    );
+
+    const url = `https://example.test/tool@${'a'.repeat(40)}.tgz`;
+    const tarballKey = `consumer-tool@${url}`;
+    lock.importers['.'].dependencies['consumer-tool'] = {
+      specifier: url,
+      version: url,
+    };
+    lock.packages[tarballKey] = {
+      version: '1.0.0',
+      resolution: { tarball: url, integrity: 'sha512-dGFyYmFsbA==' },
+    };
+    lock.snapshots[tarballKey] = {};
+    fs.writeFileSync(lockPath, JSON.stringify(lock));
+    const withTarball = await auditAt(new Date('2026-08-11T01:00:00.000Z'));
+    assert.notEqual(
+      withTarball.digests.closureSha256,
+      result.digests.closureSha256,
+    );
+    assert.deepEqual(
+      Object.keys(withTarball.digests).sort(),
+      Object.keys(result.digests).sort(),
+    );
+    bindSupplyChainEvidence(
+      {
+        binding: {
+          manifest: receipt.binding.manifest,
+          supplyChain: { closureSha256: null },
+        },
+      },
+      withTarball.digests,
+    );
+    delete lock.importers['.'].dependencies['consumer-tool'];
+    delete lock.packages[tarballKey];
+    delete lock.snapshots[tarballKey];
+    fs.writeFileSync(lockPath, JSON.stringify(lock));
 
     assert.deepEqual(
       result.approvals.map(approval => [

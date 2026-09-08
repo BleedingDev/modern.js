@@ -246,7 +246,7 @@ if (checkOnly) {
 
 fs.mkdirSync(installDir, { recursive: true });
 
-const installSkillFromDir = (sourceSkillDir, skillName) => {
+const installSkillFromDir = async (sourceSkillDir, skillName) => {
   const targetSkillDir = path.join(installDir, skillName);
   if (path.resolve(sourceSkillDir) === path.resolve(targetSkillDir)) {
     console.log(`Pinned Codex skill ${skillName} is already present`);
@@ -256,7 +256,7 @@ const installSkillFromDir = (sourceSkillDir, skillName) => {
     removeTree(targetSkillDir);
   }
   fs.mkdirSync(path.dirname(targetSkillDir), { recursive: true });
-  fs.cpSync(sourceSkillDir, targetSkillDir, { recursive: true });
+  await fs.promises.cp(sourceSkillDir, targetSkillDir, { recursive: true });
   console.log(`Installed Codex skill ${skillName}`);
 };
 
@@ -268,7 +268,7 @@ for (const source of vendoredSources) {
         `Vendored Codex skill ${skill.name} not found in ${vendoredSkillsDir}`,
       );
     }
-    installSkillFromDir(sourceSkillDir, skill.name);
+    await installSkillFromDir(sourceSkillDir, skill.name);
   }
 }
 
@@ -298,7 +298,7 @@ for (const source of cloneInstallSources) {
           `Skill ${skill.name} not found in ${source.repository}`,
         );
       }
-      installSkillFromDir(sourceSkillDir, skill.name);
+      await installSkillFromDir(sourceSkillDir, skill.name);
     }
   } finally {
     removeTree(tempDir);

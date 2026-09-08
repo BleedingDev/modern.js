@@ -150,6 +150,9 @@ test('bootstrap-agent-skills --postinstall installs vendored Codex skills and ke
   const { tempRoot, workspaceDir } = scaffoldWorkspace();
 
   try {
+    const expectedSkill = fs.readFileSync(
+      path.join(workspaceDir, '.codex/skills/rsbuild-best-practices/SKILL.md'),
+    );
     fs.rmSync(path.join(workspaceDir, '.codex/skills/rsbuild-best-practices'), {
       force: true,
       recursive: true,
@@ -181,6 +184,15 @@ test('bootstrap-agent-skills --postinstall installs vendored Codex skills and ke
     );
 
     assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(
+      fs.readFileSync(
+        path.join(
+          workspaceDir,
+          '.codex/skills/rsbuild-best-practices/SKILL.md',
+        ),
+      ),
+      expectedSkill,
+    );
     assert.match(
       result.stderr,
       /Advisory: unable to install Codex skills from https:\/\/github.com\/module-federation\/agent-skills/,

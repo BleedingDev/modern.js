@@ -1202,8 +1202,9 @@ async function auditReleaseAgePolicy({
   }));
   const digests = {
     lockSha256: nativeLock.sha256,
-    closureSha256: sha256(canonicalJson(closureResult.closure)),
-    tarballsSha256: sha256(canonicalJson(closureResult.tarballs)),
+    closureSha256: sha256(
+      canonicalJson([...closureResult.closure, ...closureResult.tarballs]),
+    ),
     registryMetadataSha256: sha256(canonicalJson(metadataIdentity)),
     exceptionPolicySha256: sha256(canonicalJson(policy)),
     releaseManifestSha256: release.manifestSha256,

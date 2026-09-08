@@ -890,6 +890,8 @@ test('migration preserves authored tooling, deployment topology, and federation 
       packageSource: { strategy: 'workspace' },
     });
     const authoredFiles = {
+      'apps/shell-super-app/src/modern-app-env.d.ts':
+        "/// <reference types='@modern-js/app-tools/types' />\ndeclare module 'orders/Page*' { const Page: import('react').ComponentType<{ id: string }>; export default Page; }\n",
       'scripts/validate-ultramodern-workspace.mts':
         "import { Effect } from 'effect';\nEffect.runSync(Effect.log('consumer authorization and workspace checks'));\n",
       'scripts/setup-agent-reference-repos.mjs':
