@@ -7,6 +7,7 @@ import traverse, { type NodePath } from '@babel/traverse';
 import {
   CLOUDFLARE_WORKER_BUNDLE_DIRECTORY,
   CLOUDFLARE_WORKER_NODE_BUILTINS,
+  CLOUDFLARE_WORKER_PLATFORM_MODULES,
 } from '../cloudflare-output-contract';
 import type { CloudflareOutputVerifierIssue, JsonObject } from './issues';
 import { addIssue } from './issues';
@@ -436,9 +437,10 @@ const getPackageName = (specifier: string) =>
     ? specifier.split('/').slice(0, 2).join('/')
     : specifier.split('/')[0];
 
-const CLOUDFLARE_WORKER_NODE_BUILTIN_SPECIFIERS = new Set(
-  CLOUDFLARE_WORKER_NODE_BUILTINS.map(builtin => `node:${builtin}`),
-);
+const CLOUDFLARE_WORKER_NODE_BUILTIN_SPECIFIERS = new Set([
+  ...CLOUDFLARE_WORKER_NODE_BUILTINS.map(builtin => `node:${builtin}`),
+  ...CLOUDFLARE_WORKER_PLATFORM_MODULES,
+]);
 
 const isInsideDirectory = (directory: string, filePath: string) => {
   const relative = path.relative(directory, filePath);

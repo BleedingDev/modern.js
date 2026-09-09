@@ -143,6 +143,12 @@ this record does not claim that audit passed.
 | --- | --- | --- | --- |
 | `packages/solutions/app-tools/src/plugins/deploy/utils/generator.ts` | bleedingdev | Resolve native ESM namespace wrappers around transpiled CommonJS default factories so Module Federation's Node server plugin starts. | capped-patch |
 
+### Worker API implementation graph (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-bff/src/loader.ts` | bleedingdev | Delegate the worker API implementation graph to the fork-owned source bundler so imported server helpers do not pass through client API generation. | capped-patch |
+
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
