@@ -1,6 +1,7 @@
 // @effect-diagnostics asyncFunction:off nodeBuiltinImport:off strictBooleanExpressions:off
 import { type GenClientOptions, generateClient } from '@modern-js/bff-core';
 import {
+  bundleEffectWorkerRuntimeSource,
   generateEffectClientCode,
   resolveEffectEntryFile,
   generateEffectWorkerRuntimeWrapper as workerWrapper,
@@ -87,7 +88,11 @@ async function loader(
     path.resolve(effectEntryFile) === path.resolve(resourcePath) &&
     resourceQueries.has(EFFECT_BFF_WORKER_RUNTIME_SOURCE_QUERY)
   ) {
-    const code = await transformEffectRuntimeSource(source, resourcePath);
+    const code = await bundleEffectWorkerRuntimeSource(
+      await transformEffectRuntimeSource(source, resourcePath),
+      resourcePath,
+      this,
+    );
     callback(undefined, code);
     return;
   }

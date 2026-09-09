@@ -2,10 +2,8 @@ import appToolsDefault, {
   appTools,
   build,
   closeServer,
-  createPresetUltramodernConfig,
   deploy,
   mergeConfig,
-  presetUltramodern,
 } from '../src';
 
 describe('app-tools export', () => {
@@ -17,15 +15,7 @@ describe('app-tools export', () => {
     expect(appTools).toBeDefined();
     expect(build).toBeDefined();
     expect(closeServer).toBeDefined();
-    expect(createPresetUltramodernConfig).toBeDefined();
     expect(deploy).toBeDefined();
-    expect(presetUltramodern).toBeDefined();
-  });
-
-  it('registers the Cloudflare builder plugin', () => {
-    const pluginNames = appTools().usePlugins?.map(plugin => plugin.name);
-
-    expect(pluginNames).toContain('@modern-js/cloudflare-builder');
   });
 });
 

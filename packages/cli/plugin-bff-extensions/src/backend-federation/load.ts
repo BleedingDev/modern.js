@@ -1,4 +1,4 @@
-import { BACKEND_FEDERATION_EFFECT_EXPOSE } from '@modern-js/utils/universal';
+import { BACKEND_FEDERATION_EFFECT_EXPOSE } from '@modern-js/backend-federation-contracts';
 import * as Effect from 'effect/Effect';
 import * as Logger from 'effect/Logger';
 

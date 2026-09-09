@@ -5,7 +5,7 @@ import {
   BACKEND_FEDERATION_EFFECT_EXPOSE,
   BACKEND_FEDERATION_MANIFEST_FILE,
   BACKEND_FEDERATION_NODE_ADAPTER_VERSION,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 
 export {
   type BackendFederationExpectedIdentity,

@@ -156,6 +156,33 @@ function removeReleaseEnvelopePlugin(source: string) {
     .replace(/^\s*ultramodernReleaseEnvelopePlugin\(\),?\r?\n/gmu, '');
 }
 
+// Reconstruct only the predecessor template, never consumer text. The caller
+// still requires a whole-program AST match before accepting this transition.
+function previousNativeCompositionConfig(source: string) {
+  return source
+    .replace(
+      `import { defineConfig } from '@modern-js/app-tools';
+import {
+  presetUltramodern,
+  ultramodernAppTools,
+} from '@modern-js/ultramodern-app-tools';`,
+      `import {
+  appTools,
+  defineConfig,
+  presetUltramodern,
+  ultramodernReleaseEnvelopePlugin,
+} from '@modern-js/app-tools';`,
+    )
+    .replace(
+      '        ultramodernAppTools(),\n',
+      '        appTools(),\n        ultramodernReleaseEnvelopePlugin(),\n',
+    )
+    .replaceAll(
+      '@modern-js/app-tools-extensions/config',
+      '@modern-js/app-tools/config',
+    );
+}
+
 export function updateGeneratedModernConfigs(
   io: MigrationIo,
   config: UltramodernToolingConfig,
@@ -206,15 +233,17 @@ export function updateGeneratedModernConfigs(
     ];
     const [generatedModernConfig, ...recognizedGeneratedModernConfigs] =
       formatGeneratedModernConfigCandidates(
-        currentGeneratedModernConfigs.flatMap(source => {
-          const withoutReleaseEnvelope = removeReleaseEnvelopePlugin(source);
-          return [
-            source,
-            removeTsCheckerBuildOverride(source),
-            withoutReleaseEnvelope,
-            removeTsCheckerBuildOverride(withoutReleaseEnvelope),
-          ];
-        }),
+        currentGeneratedModernConfigs
+          .flatMap(source => [source, previousNativeCompositionConfig(source)])
+          .flatMap(source => {
+            const withoutReleaseEnvelope = removeReleaseEnvelopePlugin(source);
+            return [
+              source,
+              removeTsCheckerBuildOverride(source),
+              withoutReleaseEnvelope,
+              removeTsCheckerBuildOverride(withoutReleaseEnvelope),
+            ];
+          }),
       );
     if (!fs.existsSync(modernConfigPath)) {
       io.writeGenerated(modernConfigPath, generatedModernConfig);
@@ -273,7 +302,13 @@ export function updateGeneratedModernConfigs(
     const recognizedModuleFederationConfigs = [
       generatedModuleFederationConfig,
       createGeneratedModuleFederationConfig(!enableBridgeRouter),
-    ];
+    ].flatMap(source => [
+      source,
+      source.replaceAll(
+        '@modern-js/app-tools-extensions/config',
+        '@modern-js/app-tools/config',
+      ),
+    ]);
     const ownsUiComposition =
       !fs.existsSync(moduleFederationConfigPath) ||
       recognizedModuleFederationConfigs.some(

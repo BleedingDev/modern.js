@@ -1,6 +1,5 @@
 import { rslibConfig } from '@modern-js/rslib';
 import { defineConfig } from '@rslib/core';
-import { publicDeclarationsPlugin } from '../../../scripts/prebundle/ultramodern/public-declarations.mjs';
 
 const APP_TOOLS_CODE_ENTRY_GLOBS = [
   './src/**/*.{js,jsx,ts,tsx,mts,cts}',
@@ -9,10 +8,6 @@ const APP_TOOLS_CODE_ENTRY_GLOBS = [
 
 export default defineConfig({
   ...rslibConfig,
-  plugins: [
-    ...(rslibConfig.plugins ?? []),
-    publicDeclarationsPlugin('app-tools'),
-  ],
   lib: rslibConfig.lib?.map(libConfig => {
     return {
       ...libConfig,

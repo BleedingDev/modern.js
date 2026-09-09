@@ -97,7 +97,9 @@
     "esbuild": "^0.28.2",
     "oxfmt": "0.66.0",
     "ultracite": "7.11.0",
-    "miniflare": "4.20260730.0"
+    "miniflare": "4.20260730.0",
+    "@modern-js/backend-federation-contracts": "workspace:*",
+    "@modern-js/app-tools-extensions": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",

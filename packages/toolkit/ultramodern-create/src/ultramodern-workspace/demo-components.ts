@@ -306,8 +306,8 @@ export function createFederatedComponentsRegistry(
     )
     .join('\n');
   const runtimeImports = worker
-    ? "import { DistributedSsrBoundary } from '@modern-js/runtime/module-federation';\nimport type { ComponentType, ReactNode } from 'react';"
-    : "import { createLazyComponent } from '@module-federation/modern-js-v3/react';\nimport { getInstance } from '@module-federation/modern-js-v3/runtime';\nimport { createDistributedSsrComponent } from '@modern-js/runtime/module-federation';\nimport type { ComponentType, FunctionComponent, ReactNode } from 'react';";
+    ? "import { DistributedSsrBoundary } from '@modern-js/federation-runtime';\nimport type { ComponentType, ReactNode } from 'react';"
+    : "import { createLazyComponent } from '@module-federation/modern-js-v3/react';\nimport { getInstance } from '@module-federation/modern-js-v3/runtime';\nimport { createDistributedSsrComponent } from '@modern-js/federation-runtime';\nimport type { ComponentType, FunctionComponent, ReactNode } from 'react';";
   const moduleType = `
 ${
   worker
@@ -519,7 +519,7 @@ export function createRemoteExposeFragmentPage(
   const pageName = `${componentName}FragmentPage`;
 
   return `import type { ComponentProps } from 'react';
-import { useDistributedSsrFragmentProps } from '@modern-js/runtime/module-federation/distributed-ssr';
+import { useDistributedSsrFragmentProps } from '@modern-js/federation-runtime/distributed-ssr';
 import ${componentName} from '${importPath}';
 
 export default function ${pageName}() {

@@ -149,7 +149,11 @@ export const tanstackRouterPlugin = (
         const history = supportHtml5History
           ? createBrowserHistory()
           : createHashHistory();
-        const rewrite = createModernBasepathRewrite(_basename);
+        const rewrite = createModernBasepathRewrite(
+          _basename,
+          false,
+          getRouteObjects(),
+        );
         const serializationAdapters = getGlobalEnableRsc()
           ? getTanstackRscSerializationAdapters()
           : undefined;

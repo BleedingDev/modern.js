@@ -4,17 +4,32 @@ import os from 'node:os';
 import path from 'node:path';
 import { format } from 'oxfmt';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
+import { updateGeneratedModernConfigs } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-modern-configs';
+import { updateGeneratedTypeScriptSurfaces } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-typescript';
 import {
   generatedUiSourceRequiresRewrite,
   writeGeneratedUiSourceIfChanged,
 } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-ui-source';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 import {
+  allWorkspaceAppsFromToolingConfig,
+  readUltramodernConfig,
+} from '../src/ultramodern-tooling/config';
+import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
-import { createRemoteExposeFragmentPage } from '../src/ultramodern-workspace/demo-components';
+import { createAppRuntimeConfig } from '../src/ultramodern-workspace/app-files';
+import {
+  createFederatedComponentsRegistry,
+  createRemoteExposeFragmentPage,
+} from '../src/ultramodern-workspace/demo-components';
 import { formatGeneratedSourceCandidates } from '../src/ultramodern-workspace/fs-io';
+import {
+  createAppModernConfig,
+  createRemoteModuleFederationConfig,
+  createShellModuleFederationConfig,
+} from '../src/ultramodern-workspace/module-federation';
 import { createPackagedWorkspaceValidationScript } from '../src/ultramodern-workspace/workspace-scripts';
 
 function readJson(workspaceRoot: string, relativePath: string) {
@@ -88,6 +103,26 @@ function removeReleaseEnvelopePlugin(source: string) {
     .replace(/\bultramodernReleaseEnvelopePlugin,\s*/gu, '')
     .replace(/,\s*ultramodernReleaseEnvelopePlugin(?=\s*\})/gu, '')
     .replace(/^\s*ultramodernReleaseEnvelopePlugin\(\),?\r?\n/gmu, '');
+}
+
+function previousCompositionSource(source: string) {
+  return source
+    .replace(
+      /import\s*\{[^}]*\bultramodernAppTools\b[^}]*\}\s*from\s*['"]@modern-js\/ultramodern-app-tools['"];?\s*/u,
+      '',
+    )
+    .replace(
+      /import\s*\{\s*defineConfig\s*\}\s*from\s*['"]@modern-js\/app-tools['"];?/u,
+      "import { appTools, defineConfig, presetUltramodern, ultramodernReleaseEnvelopePlugin } from '@modern-js/app-tools';",
+    )
+    .replace(
+      'ultramodernAppTools()',
+      'appTools(),\n        ultramodernReleaseEnvelopePlugin()',
+    )
+    .replaceAll(
+      '@modern-js/app-tools-extensions/config',
+      '@modern-js/app-tools/config',
+    );
 }
 
 function addLegacyGeneratedDefaults(source: string) {
@@ -222,7 +257,7 @@ test('migrate converges the published .15 generated Tailwind config to native de
   }
 });
 
-test('migrate adds the release-envelope plugin to its previous generated Modern config', async () => {
+test('migrate composes the previous generated app-tools and release-envelope plugins natively', async () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-migrate-release-envelope-'),
   );
@@ -242,7 +277,7 @@ test('migrate adds the release-envelope plugin to its previous generated Modern 
     );
     const currentGeneratedConfig = fs.readFileSync(modernConfigPath, 'utf-8');
     const predecessorGeneratedConfig = removeReleaseEnvelopePlugin(
-      currentGeneratedConfig,
+      previousCompositionSource(currentGeneratedConfig),
     );
     assert.notEqual(predecessorGeneratedConfig, currentGeneratedConfig);
     assert.doesNotMatch(
@@ -1102,4 +1137,169 @@ test('native formatter import sorting recognizes generated fragments but not sid
     ),
     true,
   );
+});
+
+test.each([
+  80, 120, 160,
+])('native provider migration recognizes prior generated imports at width %s and preserves authored programs', async printWidth => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-native-provider-migration-'),
+  );
+  try {
+    generateUltramodernWorkspace({
+      targetDir: root,
+      packageName: 'native-providers',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource: { strategy: 'workspace' },
+    });
+    addUltramodernVertical({
+      workspaceRoot: root,
+      name: 'catalog',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource: { strategy: 'workspace' },
+    });
+    const config = readUltramodernConfig(root);
+    const shellConfig = config.topology.apps.find(app => app.kind === 'shell')!;
+    shellConfig.moduleFederation ??= {};
+    // Exercise an explicit shell-to-vertical registry with real generator output.
+    shellConfig.moduleFederation.verticalRefs = ['catalog'];
+    const apps = allWorkspaceAppsFromToolingConfig(config);
+    const shell = apps.find(app => app.kind === 'shell')!;
+    const remotes = apps.filter(app => app.kind !== 'shell');
+    for (const worker of [false, true])
+      fs.writeFileSync(
+        path.join(
+          root,
+          `apps/shell-super-app/src/federated-components${worker ? '.worker' : ''}.tsx`,
+        ),
+        createFederatedComponentsRegistry(
+          config.workspace.packageScope,
+          shell,
+          remotes,
+          worker,
+        ),
+      );
+    fs.writeFileSync(
+      path.join(root, 'apps/shell-super-app/src/modern.runtime.ts'),
+      createAppRuntimeConfig(shell, config.workspace.packageScope, remotes),
+    );
+    for (const app of apps) {
+      fs.writeFileSync(
+        path.join(root, app.directory, 'modern.config.ts'),
+        createAppModernConfig(
+          config.workspace.packageScope,
+          app,
+          remotes,
+          true,
+        ),
+      );
+      fs.writeFileSync(
+        path.join(root, app.directory, 'module-federation.config.ts'),
+        app.kind === 'shell'
+          ? createShellModuleFederationConfig(
+              config.workspace.packageScope,
+              app,
+              remotes,
+              false,
+            )
+          : createRemoteModuleFederationConfig(
+              config.workspace.packageScope,
+              app,
+              remotes,
+              false,
+            ),
+      );
+    }
+    const files = [
+      'apps/shell-super-app/src/modern.runtime.ts',
+      'apps/shell-super-app/src/federated-components.tsx',
+      'apps/shell-super-app/src/federated-components.worker.tsx',
+      'verticals/catalog/src/routes/[lang]/_mf/fragment/widget/page.tsx',
+      'apps/shell-super-app/modern.config.ts',
+      'apps/shell-super-app/module-federation.config.ts',
+      'verticals/catalog/modern.config.ts',
+      'verticals/catalog/module-federation.config.ts',
+    ];
+    const current = new Map(
+      files.map(file => [file, fs.readFileSync(path.join(root, file), 'utf8')]),
+    );
+    const old = new Map<string, string>();
+    for (const [file, source] of current) {
+      const previous = (
+        file.endsWith('/modern.config.ts')
+          ? previousCompositionSource(source)
+          : source
+      )
+        .replaceAll(
+          '@modern-js/federation-runtime/distributed-ssr',
+          '@modern-js/runtime/module-federation/distributed-ssr',
+        )
+        .replaceAll(
+          '@modern-js/federation-runtime',
+          '@modern-js/runtime/module-federation',
+        )
+        .replaceAll(
+          '@modern-js/boundary-debugger',
+          '@modern-js/runtime-extensions/boundary-debugger',
+        )
+        .replaceAll(
+          '@modern-js/app-tools-extensions/config',
+          '@modern-js/app-tools/config',
+        );
+      assert.notEqual(previous, source, file);
+      const formatted = (
+        await format(file, previous, {
+          printWidth,
+          singleQuote: printWidth === 120,
+          trailingComma: printWidth === 80 ? 'none' : 'all',
+        })
+      ).code;
+      old.set(file, formatted);
+      fs.writeFileSync(path.join(root, file), formatted);
+    }
+    const run = () => {
+      const io = createMigrationIo(root, false);
+      updateGeneratedTypeScriptSurfaces(io, config);
+      updateGeneratedModernConfigs(io, config);
+    };
+    run();
+    const migrated = new Map<string, string>();
+    for (const [file, source] of current) {
+      const output = fs.readFileSync(path.join(root, file), 'utf8');
+      assert.equal(
+        generatedUiSourceRequiresRewrite(output, source),
+        false,
+        file,
+      );
+      assert.doesNotMatch(
+        output,
+        /@modern-js\/(?:runtime\/module-federation|runtime-extensions\/boundary-debugger|app-tools\/config)/u,
+        file,
+      );
+      migrated.set(file, output);
+    }
+    run();
+    for (const [file, source] of migrated)
+      assert.equal(
+        fs.readFileSync(path.join(root, file), 'utf8'),
+        source,
+        file,
+      );
+    for (const [file, source] of old)
+      fs.writeFileSync(
+        path.join(root, file),
+        `${source}\nexport const authoredBusinessPolicy = 'keep';\n`,
+      );
+    run();
+    for (const [file, source] of old)
+      assert.equal(
+        fs.readFileSync(path.join(root, file), 'utf8'),
+        `${source}\nexport const authoredBusinessPolicy = 'keep';\n`,
+        file,
+      );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

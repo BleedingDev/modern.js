@@ -1730,8 +1730,7 @@ const createEffectOperationContract = app => ({
 const createAppConfigContract = app => ({
   preset: 'presetUltramodern',
   plugins: [
-    'appTools',
-    'ultramodernReleaseEnvelopePlugin',
+    'ultramodernAppTools',
     'tanstackRouterPlugin',
     'i18nPlugin',
     ...(app.api ? ['bffPlugin'] : []),

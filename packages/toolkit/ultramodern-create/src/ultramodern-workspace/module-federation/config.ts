@@ -378,7 +378,7 @@ export function createRemoteModuleFederationConfig(
   ];
   const appToolsConfigImport =
     appToolsConfigImports.length > 0
-      ? `import { ${appToolsConfigImports.join(', ')} } from '@modern-js/app-tools/config';\n`
+      ? `import { ${appToolsConfigImports.join(', ')} } from '@modern-js/app-tools-extensions/config';\n`
       : '';
   const tsgoCompilerInstance = hasExposes
     ? `

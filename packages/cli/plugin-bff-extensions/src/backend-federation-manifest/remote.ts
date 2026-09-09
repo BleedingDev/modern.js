@@ -1,10 +1,10 @@
 // @effect-diagnostics asyncFunction:off extendsNativeError:off globalTimers:off newPromise:off strictBooleanExpressions:off
 
+import { backendFederationExposeNames } from '@modern-js/backend-federation-contracts';
 import {
   BackendFederationRemoteEntryError,
   resolveBackendFederationRemoteEntryVerification,
 } from '@modern-js/server-runtime-extensions/backend-federation-security';
-import { backendFederationExposeNames } from '@modern-js/utils/universal';
 import {
   BACKEND_FEDERATION_EFFECT_EXPOSE,
   type BackendFederationRemote,

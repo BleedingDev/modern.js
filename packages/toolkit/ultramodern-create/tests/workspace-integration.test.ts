@@ -263,7 +263,7 @@ function evaluateRuntimeFramework(source: string): string {
       if (specifier === '@modern-js/runtime') {
         return { defineRuntimeConfig: (config: unknown) => config };
       }
-      if (specifier === '@modern-js/runtime-extensions/boundary-debugger') {
+      if (specifier === '@modern-js/boundary-debugger') {
         return { ultramodernBoundaryDebuggerPlugin: () => ({}) };
       }
       if (specifier === 'i18next') {

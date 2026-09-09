@@ -108,6 +108,7 @@ function compile(file) {
 }
 const positive = `import { chokidar, fastGlob, inquirer, lodash, upath } from '@modern-js/utils';
 import { defineConfig } from '@modern-js/app-tools';
+import type { AppUserConfig } from '@modern-js/ultramodern-app-tools';
 const watcher = chokidar.watch('src/**/*.ts');
 watcher.add(['src/**/*.tsx']).unwatch('src/generated/**');
 const closed: Promise<void> = watcher.close();
@@ -122,13 +123,15 @@ weak.set(Symbol(), 'valid modern weak key');
 const normalized: string = upath.win32.normalize('a/b');
 defineConfig({ tools: { sass: { api: 'modern', sassOptions: { style: 'compressed' }, additionalData: (content, context) => String(content) + context.resourcePath } }, output: { svgDefaultExport: 'component' } });
 defineConfig({ tools: { sass: { api: 'legacy', sassOptions: { outputStyle: 'compressed', includePaths: ['src'] } } }, output: { svgDefaultExport: 'url' } });
-defineConfig({ tools: { minifyCss: options => { options.parallel = 2; options.warningsFilter = (warning, file) => file.endsWith('.css'); return options; } }, output: { precompress: { gzip: { threshold: 1024, filename: data => String(data.filename) + '.gz', compressionOptions: { level: 6 } }, brotli: false } } });
+const compressed: AppUserConfig = { tools: { minifyCss: options => { options.parallel = 2; options.warningsFilter = (warning, file) => file.endsWith('.css'); return options; } }, output: { precompress: { gzip: { threshold: 1024, filename: data => String(data.filename) + '.gz', compressionOptions: { level: 6 } }, brotli: false } } };
+void compressed;
 `;
 try {
   discover(join(root, 'packages'));
   mkdirSync(modules, { recursive: true });
   stage('@modern-js/utils');
   stage('@modern-js/app-tools');
+  stage('@modern-js/ultramodern-app-tools');
   link(
     '@types/node',
     realpathSync(join(root, 'packages/toolkit/utils/node_modules/@types/node')),
@@ -143,7 +146,9 @@ try {
   writeFileSync(file, positive);
   const built = compile(file);
   assert.equal(built.status, 0, built.output);
-  console.log('BUILT Utils/AppTools: strict TS7 + Node-only consumer passed');
+  console.log(
+    'BUILT Utils/AppTools/fork composition: strict TS7 + Node-only consumer passed',
+  );
   // Start from clean producer input: overlaying raw declarations would leave
   // restored Inquirer modules from the build and conceal the original defect.
   rmSync(utils, { recursive: true });
@@ -158,7 +163,7 @@ try {
     'rxjs',
     realpathSync(join(root, 'packages/toolkit/utils/node_modules/rxjs')),
   );
-  for (const kind of ['utils', 'builder', 'app-tools']) {
+  for (const kind of ['utils', 'builder', 'app-tools-extensions']) {
     let emit;
     publicDeclarationsPlugin(kind).setup({
       context: { rootPath: join(modules, `@modern-js/${kind}`) },
@@ -207,21 +212,22 @@ try {
     negative,
     `import { chokidar, fastGlob, inquirer, upath } from '@modern-js/utils';
 import { defineConfig } from '@modern-js/app-tools';
+import type { AppUserConfig } from '@modern-js/ultramodern-app-tools';
 chokidar.watch('src').ref();
 fastGlob.sync('src', { objectMode: 'yes' });
 inquirer.prompt<{ name: string }>({ type: 'input', name: 'name' }).then(value => { const invalid: number = value.name; });
 upath.win32.normalize(42);
 defineConfig({ tools: { sass: { api: 'invalid' } }, output: { svgDefaultExport: 'invalid' } });
 defineConfig({ tools: { minifyCss: { parallel: 'invalid' } } });
-defineConfig({ output: { precompress: { gzip: { threshold: 'invalid' } } } });
+const invalidCompression: AppUserConfig = { output: { precompress: { gzip: { threshold: 'invalid' } } } };
 `,
   );
   const rejected = compile(negative);
   assert.notEqual(rejected.status, 0);
-  for (const line of [3, 4, 5, 6, 7, 8, 9])
+  for (const line of [4, 5, 6, 7, 8, 9, 10])
     assert.match(rejected.output, new RegExp(`negative.ts\\(${line},`));
   console.log(
-    'Public Utils/AppTools strict TypeScript 7 + Node 26 declaration cone passed.',
+    'Public Utils/AppTools/fork composition strict TypeScript 7 + Node 26 declaration cone passed.',
   );
 } finally {
   rmSync(temp, { recursive: true, force: true });

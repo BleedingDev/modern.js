@@ -1024,7 +1024,11 @@ function migrateStrictEffect(
       updateRootPackageToolchain(packageJson);
     }
 
-    updateModernDependencies(packageJson, packageSource, releaseCohort);
+    updateModernDependencies(packageJson, packageSource, releaseCohort, {
+      app: migratedWorkspace.apps.find(
+        app => `${app.directory}/package.json` === relativePackageFile,
+      ),
+    });
     const ownsGeneratedScripts =
       relativePackageFile === 'package.json' ||
       allMigratedApps.some(

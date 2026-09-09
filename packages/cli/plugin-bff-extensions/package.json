@@ -193,7 +193,8 @@
     "@modern-js/types": "workspace:*",
     "@modern-js/utils": "workspace:*",
     "@module-federation/runtime": "2.9.0",
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "@modern-js/backend-federation-contracts": "workspace:*"
   },
   "peerDependencies": {
     "@effect/opentelemetry": "4.0.0-rc.112",

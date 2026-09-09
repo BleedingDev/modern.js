@@ -5,7 +5,7 @@ import {
   DELIVERY_UNIT_SCHEMA_VERSION,
   type DeliveryUnitRecord,
   deliveryUnitContractBlock,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import { packageName } from './naming';
 import type { WorkspaceApp } from './types';
 

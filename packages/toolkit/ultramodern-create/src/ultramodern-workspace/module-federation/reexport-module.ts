@@ -1,4 +1,4 @@
-import { createUltramodernBuildArtifact } from '@modern-js/utils/universal';
+import { createUltramodernBuildArtifact } from '@modern-js/backend-federation-contracts';
 import { createDeliveryUnitRecord } from '../delivery-unit';
 import { appEmitsBrowserUi, appHasApi } from '../descriptors';
 import type { WorkspaceApp } from '../types';

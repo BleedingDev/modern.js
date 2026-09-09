@@ -1,4 +1,8 @@
 // @effect-diagnostics strictBooleanExpressions:off
+import { createLocalisedRouteRewrite } from '@modern-js/i18n-runtime-extensions';
+import type { RouteObject } from '@modern-js/runtime-utils/router';
+import { composeRewrites } from '@tanstack/react-router';
+
 function normalizeBasepath(basepath: string): string {
   if (!basepath) {
     return '/';
@@ -15,10 +19,12 @@ function normalizeBasepath(basepath: string): string {
 export function createModernBasepathRewrite(
   basepath: string,
   caseSensitive = false,
+  routes: RouteObject[] = [],
 ) {
+  const localisedRewrite = createLocalisedRouteRewrite(routes);
   const normalizedBasepath = normalizeBasepath(basepath);
   if (normalizedBasepath === '/') {
-    return undefined;
+    return localisedRewrite;
   }
 
   const normalizedBasepathWithSlash = `${normalizedBasepath}/`;
@@ -29,7 +35,7 @@ export function createModernBasepathRewrite(
     ? normalizedBasepathWithSlash
     : normalizedBasepathWithSlash.toLowerCase();
 
-  return {
+  const basepathRewrite = {
     input: ({ url }: { url: URL }) => {
       const pathname = caseSensitive
         ? url.pathname
@@ -57,4 +63,7 @@ export function createModernBasepathRewrite(
       return url;
     },
   };
+  return localisedRewrite
+    ? composeRewrites([basepathRewrite, localisedRewrite])
+    : basepathRewrite;
 }

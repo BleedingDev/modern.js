@@ -5,7 +5,7 @@ import {
   ModuleFederationRemoteComponentContractError,
   ModuleFederationRemoteLoadError,
   ModuleFederationRemoteLoadTimeoutError,
-} from '@modern-js/runtime/module-federation';
+} from '@modern-js/federation-runtime';
 
 export const DEFAULT_REMOTE_TIMEOUT_MS = 4000;
 export const DEFAULT_REMOTE_RETRIES = 1;

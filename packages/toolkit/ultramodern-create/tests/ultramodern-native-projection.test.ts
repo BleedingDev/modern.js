@@ -189,6 +189,42 @@ test('packaged validator validates a fresh native workspace without invoking its
       modernVersion: '3.8.3',
       packageSource: { strategy: 'workspace' },
     });
+    const shellPackage = JSON.parse(
+      fs.readFileSync(
+        path.join(workspaceRoot, shellApp.directory, 'package.json'),
+        'utf8',
+      ),
+    );
+    expect(shellPackage.dependencies['@modern-js/boundary-debugger']).toBe(
+      'workspace:*',
+    );
+    const shellRuntime = fs.readFileSync(
+      path.join(workspaceRoot, shellApp.directory, 'src/modern.runtime.ts'),
+      'utf8',
+    );
+    expect(shellPackage.dependencies['@modern-js/federation-runtime']).toBe(
+      'workspace:*',
+    );
+    expect(
+      shellPackage.devDependencies['@modern-js/ultramodern-app-tools'],
+    ).toBe('workspace:*');
+    expect(
+      shellPackage.devDependencies['@modern-js/app-tools-extensions'],
+    ).toBe('workspace:*');
+    const modernConfig = fs.readFileSync(
+      path.join(workspaceRoot, shellApp.directory, 'modern.config.ts'),
+      'utf8',
+    );
+    expect(modernConfig).toContain("from '@modern-js/ultramodern-app-tools'");
+    expect(modernConfig).toContain('ultramodernAppTools()');
+    expect(modernConfig).not.toContain('ultramodernReleaseEnvelopePlugin()');
+    expect(modernConfig).toContain(
+      "from '@modern-js/app-tools-extensions/config'",
+    );
+    expect(shellRuntime).toContain("from '@modern-js/boundary-debugger'");
+    expect(shellRuntime).not.toContain(
+      '@modern-js/runtime-extensions/boundary-debugger',
+    );
     expect(runValidate({ workspaceRoot, invocationCwd: workspaceRoot })).toBe(
       0,
     );

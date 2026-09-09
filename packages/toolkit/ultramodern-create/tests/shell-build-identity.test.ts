@@ -1,4 +1,4 @@
-import { DELIVERY_UNIT_DEPLOY_PROFILE } from '@modern-js/utils/universal';
+import { DELIVERY_UNIT_DEPLOY_PROFILE } from '@modern-js/backend-federation-contracts';
 import {
   createDeliveryUnitRecord,
   deliveryUnitContractBlock,

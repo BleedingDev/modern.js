@@ -35,6 +35,8 @@ const DEFAULT_PATHSPEC = Object.freeze(['packages']);
 const FORK_OWNED_PACKAGE_ROOTS = Object.freeze([
   'packages/cli/plugin-bff-extensions',
   'packages/document/ultramodern-preset',
+  'packages/runtime/boundary-debugger',
+  'packages/runtime/federation-runtime',
   'packages/runtime/i18n-extensions',
   'packages/runtime/plugin-tanstack',
   'packages/runtime/runtime-extensions',
@@ -44,7 +46,10 @@ const FORK_OWNED_PACKAGE_ROOTS = Object.freeze([
   'packages/sidecar/ipx',
   'packages/sidecar/rsbuild-image-core',
   'packages/solutions/app-tools-extensions',
+  'packages/solutions/ultramodern-app-tools',
+  'packages/toolkit/backend-federation-contracts',
   'packages/toolkit/code-tools',
+  'packages/toolkit/surface-resolution',
   'packages/toolkit/ultramodern-create',
   'packages/toolkit/ultramodern-sandpack-profile',
 ]);

@@ -18,7 +18,7 @@ export function createModuleFederationRemoteUrlHelpers(
   }
 
   const appToolsImport = includeAppToolsImport
-    ? "import { getBuildConfigEnvironment } from '@modern-js/app-tools/config';\n\n"
+    ? "import { getBuildConfigEnvironment } from '@modern-js/app-tools-extensions/config';\n\n"
     : '';
 
   return `${appToolsImport}const cloudflareDeployEnabled =

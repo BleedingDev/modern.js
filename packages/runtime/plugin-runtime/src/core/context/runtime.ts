@@ -1,3 +1,4 @@
+import { getRuntimeReactContext } from '@modern-js/runtime-extensions/react-context';
 import type {
   RouteObject,
   StaticHandlerContext,
@@ -40,8 +41,8 @@ export interface TInternalRuntimeContext extends TRuntimeContext {
   _internalRouterBaseName?: any;
 }
 
-export const InternalRuntimeContext = createContext<TInternalRuntimeContext>(
-  {} as TInternalRuntimeContext,
+export const InternalRuntimeContext = getRuntimeReactContext('internal', () =>
+  createContext<TInternalRuntimeContext>({} as TInternalRuntimeContext),
 );
 
 export const getInitialContext = (

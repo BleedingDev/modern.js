@@ -61,15 +61,6 @@
       },
       "default": "./dist/esm/buildIdentity.mjs"
     },
-    "./boundary-debugger": {
-      "types": "./dist/types/boundary-debugger/index.d.ts",
-      "modern:source": "./src/boundary-debugger/index.tsx",
-      "node": {
-        "import": "./dist/esm-node/boundary-debugger/index.mjs",
-        "require": "./dist/cjs/boundary-debugger/index.js"
-      },
-      "default": "./dist/esm/boundary-debugger/index.mjs"
-    },
     "./workspace-events": {
       "types": "./dist/types/workspaceEvents.d.ts",
       "modern:source": "./src/workspaceEvents.ts",
@@ -78,6 +69,28 @@
         "require": "./dist/cjs/workspaceEvents.js"
       },
       "default": "./dist/esm/workspaceEvents.mjs"
+    },
+    "./rsc-disabled/*": {
+      "types": "./dist/types/rsc-disabled/*.d.ts",
+      "default": "./dist/esm/rsc-disabled/*.mjs"
+    },
+    "./localised-loader-identity": {
+      "types": "./dist/types/localisedLoaderIdentity.d.ts",
+      "modern:source": "./src/localisedLoaderIdentity.ts",
+      "node": {
+        "import": "./dist/esm-node/localisedLoaderIdentity.mjs",
+        "require": "./dist/cjs/localisedLoaderIdentity.js"
+      },
+      "default": "./dist/esm/localisedLoaderIdentity.mjs"
+    },
+    "./react-context": {
+      "types": "./dist/types/reactContext.d.ts",
+      "modern:source": "./src/reactContext.ts",
+      "node": {
+        "import": "./dist/esm-node/reactContext.mjs",
+        "require": "./dist/cjs/reactContext.js"
+      },
+      "default": "./dist/esm/reactContext.mjs"
     }
   },
   "typesVersions": {
@@ -102,13 +115,17 @@
         "./dist/types/buildIdentity.d.ts",
         "./src/buildIdentity.ts"
       ],
-      "boundary-debugger": [
-        "./dist/types/boundary-debugger/index.d.ts",
-        "./src/boundary-debugger/index.tsx"
-      ],
       "workspace-events": [
         "./dist/types/workspaceEvents.d.ts",
         "./src/workspaceEvents.ts"
+      ],
+      "localised-loader-identity": [
+        "./dist/types/localisedLoaderIdentity.d.ts",
+        "./src/localisedLoaderIdentity.ts"
+      ],
+      "react-context": [
+        "./dist/types/reactContext.d.ts",
+        "./src/reactContext.ts"
       ]
     }
   },
@@ -149,8 +166,5 @@
     "react": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "@modern-js/plugin": "workspace:*"
   }
 }

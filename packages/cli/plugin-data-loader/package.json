@@ -48,6 +48,7 @@
     "test": "rstest --passWithNoTests"
   },
   "dependencies": {
+    "@modern-js/runtime-extensions": "workspace:*",
     "@modern-js/runtime-utils": "workspace:*",
     "@modern-js/utils": "workspace:*",
     "@swc/helpers": "^0.5.23",

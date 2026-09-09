@@ -70,6 +70,16 @@ stored budgets. An upstream-owned identity moved into any of these roots
 remains governed, and a listed package present in reviewed upstream is not
 exempt.
 
+The relocation inventory also includes `packages/runtime/boundary-debugger`,
+`packages/runtime/federation-runtime`, `packages/solutions/ultramodern-app-tools`,
+`packages/toolkit/backend-federation-contracts` and
+`packages/toolkit/surface-resolution`. Their entire directory trees are absent
+at both immutable upstream pins; the behavior suite verifies that evidence.
+These roots contain fork-owned subsystems moved out of upstream packages.
+Registering them does not exempt any audited identity moved into them, adjacent
+package paths, or packages introduced by reviewed upstream. The recorded scope,
+provenance and all allowance budgets remain unchanged.
+
 ### Fail-closed recorded contract
 
 The allowlist, not the caller, owns verification context. Before diffing, the

@@ -130,8 +130,7 @@
   "scripts": {
     "prepublishOnly": "only-allow-pnpm",
     "dev": "rslib build --watch",
-    "build": "rslib build && pnpm run verify:public-surface && node ./bin/modern-bundle-docs.js",
-    "verify:public-surface": "node ./tests/config/verify-public-surface.mjs",
+    "build": "rslib build && node ./bin/modern-bundle-docs.js",
     "test": "rstest"
   },
   "dependencies": {

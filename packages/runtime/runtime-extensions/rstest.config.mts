@@ -23,13 +23,6 @@ export default {
     withTestPreset({
       name: 'runtime-extensions-node',
       testEnvironment: 'node',
-      exclude: ['tests/boundary-debugger/client.test.tsx'],
-      extends: commonConfig,
-    }),
-    withTestPreset({
-      name: 'runtime-extensions-client',
-      testEnvironment: 'happy-dom',
-      include: ['tests/boundary-debugger/client.test.tsx'],
       extends: commonConfig,
     }),
   ],

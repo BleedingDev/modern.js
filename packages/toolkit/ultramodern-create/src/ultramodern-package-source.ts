@@ -25,6 +25,7 @@ export const ULTRAMODERN_SINGLE_APP_MODERN_PACKAGES = [
 
 export const ULTRAMODERN_WORKSPACE_MODERN_PACKAGES = [
   '@modern-js/bff-effect',
+  '@modern-js/boundary-debugger',
   ULTRAMODERN_CREATE_PACKAGE,
   '@modern-js/code-tools',
   '@modern-js/app-tools',
@@ -33,6 +34,9 @@ export const ULTRAMODERN_WORKSPACE_MODERN_PACKAGES = [
   '@modern-js/plugin-tanstack',
   '@modern-js/runtime',
   '@modern-js/runtime-extensions',
+  '@modern-js/federation-runtime',
+  '@modern-js/app-tools-extensions',
+  '@modern-js/ultramodern-app-tools',
 ] as const;
 
 export type UltramodernPackageSourceStrategy = 'workspace' | 'install';

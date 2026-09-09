@@ -5,7 +5,7 @@ import {
   type DeliveryUnitRecord,
   formatBackendFederationValidationErrors,
   validateBackendFederationMetadata,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import { verticalApiExport, verticalApiGroupName } from './api';
 import {
   rpcPath,

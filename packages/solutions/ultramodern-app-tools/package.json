@@ -1,0 +1,61 @@
+{
+  "name": "@modern-js/ultramodern-app-tools",
+  "description": "Native UltraModern.js build, preset and release plugin composition.",
+  "homepage": "https://bleedingdev.github.io/ultramodern.js/",
+  "bugs": "https://github.com/BleedingDev/ultramodern.js/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BleedingDev/ultramodern.js",
+    "directory": "packages/solutions/ultramodern-app-tools"
+  },
+  "license": "MIT",
+  "version": "3.8.3",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "types": "./dist/types/native-composition/index.d.ts",
+  "main": "./dist/cjs/native-composition/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/types/native-composition/index.d.ts",
+      "modern:source": "./src/native-composition/index.ts",
+      "import": "./dist/esm-node/native-composition/index.mjs",
+      "require": "./dist/cjs/native-composition/index.js"
+    }
+  },
+  "scripts": {
+    "prepublishOnly": "only-allow-pnpm",
+    "build": "rslib build && pnpm run verify:deploy-output",
+    "test": "rstest",
+    "verify:deploy-output": "node ./tests/deploy-output/verify-public-surface.mjs"
+  },
+  "engines": {
+    "node": ">=26.7.0"
+  },
+  "dependencies": {
+    "@modern-js/app-tools": "workspace:*",
+    "@modern-js/app-tools-extensions": "workspace:*",
+    "@modern-js/plugin": "workspace:*",
+    "@modern-js/server-core": "workspace:*",
+    "@rsbuild/core": "2.2.3"
+  },
+  "devDependencies": {
+    "@modern-js/backend-federation-contracts": "workspace:*",
+    "@modern-js/builder": "workspace:*",
+    "@modern-js/plugin-bff": "workspace:*",
+    "@modern-js/rslib": "workspace:*",
+    "@modern-js/tsconfig": "workspace:*",
+    "@modern-js/utils": "workspace:*",
+    "@rslib/core": "1.0.0",
+    "@scripts/rstest-config": "workspace:*",
+    "@types/node": "^26.4.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "types": "./dist/types/native-composition/index.d.ts"
+  }
+}

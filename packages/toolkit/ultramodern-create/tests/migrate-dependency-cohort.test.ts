@@ -179,3 +179,84 @@ test('net delta rejects a target subprocess changing consumer source or unprepar
     ]),
   );
 });
+
+import { shellApp } from '../src/ultramodern-workspace/descriptors';
+import type { WorkspaceApp } from '../src/ultramodern-workspace/types';
+
+test('historical migration registers app providers by declared surface and preserves consumer dependency sections', () => {
+  const source = {
+    strategy: 'workspace' as const,
+    modernPackageVersion: 'workspace:*',
+  };
+  const cases: Array<{ app?: WorkspaceApp; runtime: string[] }> = [
+    {
+      app: shellApp,
+      runtime: [
+        '@modern-js/federation-runtime',
+        '@modern-js/boundary-debugger',
+      ],
+    },
+    {
+      app: { ...shellApp, kind: 'vertical', surfaceProfile: 'ui-only' },
+      runtime: ['@modern-js/federation-runtime'],
+    },
+    {
+      app: { ...shellApp, kind: 'vertical', surfaceProfile: 'api-only' },
+      runtime: [],
+    },
+    { runtime: [] },
+  ];
+  for (const { app, runtime } of cases) {
+    const manifest: Record<string, any> = {
+      dependencies: { consumer: '^1.2.3' },
+      devDependencies: { 'consumer-tool': '^2.3.4' },
+      peerDependencies: { 'consumer-peer': '^3.4.5' },
+      optionalDependencies: { 'consumer-optional': '^4.5.6' },
+      scripts: { custom: 'consumer --keep' },
+    };
+    updateModernDependencies(manifest, source, undefined, { app });
+    assert.deepEqual(manifest.dependencies, {
+      consumer: '^1.2.3',
+      ...Object.fromEntries(runtime.map(name => [name, 'workspace:*'])),
+    });
+    assert.deepEqual(manifest.devDependencies, {
+      'consumer-tool': '^2.3.4',
+      ...(app
+        ? {
+            '@modern-js/ultramodern-app-tools': 'workspace:*',
+            '@modern-js/app-tools-extensions': 'workspace:*',
+          }
+        : {}),
+    });
+    assert.deepEqual(manifest.peerDependencies, { 'consumer-peer': '^3.4.5' });
+    assert.deepEqual(manifest.optionalDependencies, {
+      'consumer-optional': '^4.5.6',
+    });
+    assert.deepEqual(manifest.scripts, { custom: 'consumer --keep' });
+    assert.equal(
+      updateModernDependencies(manifest, source, undefined, { app }),
+      false,
+    );
+  }
+});
+
+test('historical app provider registration rejects an incomplete target cohort before changing the manifest', () => {
+  const source = {
+    strategy: 'install' as const,
+    modernPackageVersion: '3.9.0-ultramodern.4',
+    aliasScope: 'bleedingdev',
+    aliasPackageNamePrefix: 'modern-js-',
+  };
+  const manifest = { dependencies: { consumer: '^1.2.3' } };
+  assert.throws(
+    () =>
+      updateModernDependencies(
+        manifest,
+        source,
+        { packages: [] },
+        { app: shellApp },
+      ),
+    /absent from the authenticated target cohort/,
+  );
+  assert.deepEqual(manifest, { dependencies: { consumer: '^1.2.3' } });
+});

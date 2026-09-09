@@ -10,6 +10,7 @@ const {
   DEFAULT_DIVERGENCE_ALLOWLIST_PATH,
   DEFAULT_DIVERGENCE_BASE_REF,
   DEFAULT_UPSTREAM_PROVENANCE_REF,
+  FORK_OWNED_PACKAGE_ROOTS,
   checkAllowlistGovernance,
   checkForkDivergence,
   compareDivergence,
@@ -1374,7 +1375,35 @@ test('added production source inside an explicit fork-owned package passes', () 
   }
 });
 
+const relocatedForkPackageRoots = [
+  'packages/runtime/boundary-debugger',
+  'packages/runtime/federation-runtime',
+  'packages/solutions/ultramodern-app-tools',
+  'packages/toolkit/backend-federation-contracts',
+  'packages/toolkit/surface-resolution',
+];
+
+test('relocated fork package roots are wholly absent from both immutable upstream pins', () => {
+  for (const root of relocatedForkPackageRoots) {
+    assert.ok(
+      FORK_OWNED_PACKAGE_ROOTS.includes(root),
+      `${root} must be registered`,
+    );
+    for (const ref of [
+      DEFAULT_DIVERGENCE_BASE_REF,
+      DEFAULT_UPSTREAM_PROVENANCE_REF,
+    ]) {
+      assert.equal(
+        runGit(repoRoot, ['ls-tree', '-r', '--name-only', ref, '--', root]),
+        '',
+        `${root} must not overlap any upstream identity at ${ref}`,
+      );
+    }
+  }
+});
+
 for (const root of [
+  ...relocatedForkPackageRoots,
   'packages/document/ultramodern-preset',
   'packages/runtime/runtime-extensions',
   'packages/toolkit/ultramodern-create',
@@ -1462,6 +1491,37 @@ for (const root of [
       assert.equal(governance.rule5Changes[0].file, original);
       assert.equal(governance.rule5Changes[0].renamed, true);
       assert.match(governance.errors.join('\n'), /requires a same-PR/);
+    } finally {
+      cleanup(fixture.rootDir);
+    }
+  });
+}
+
+for (const root of relocatedForkPackageRoots) {
+  test(`${root} keeps changed audited source governed after relocation`, () => {
+    const fixture = makeGitFixture();
+    try {
+      writeSnapshot({
+        rootDir: fixture.rootDir,
+        baseRef: fixture.upstreamBase,
+      });
+      const original = 'packages/runtime/src/index.ts';
+      const contents = fs.readFileSync(
+        path.join(fixture.rootDir, original),
+        'utf8',
+      );
+      writeRepoFile(
+        fixture.rootDir,
+        `${root}/src/moved.ts`,
+        contents.replace('a = 1', 'a = 9'),
+      );
+      fs.unlinkSync(path.join(fixture.rootDir, original));
+      runGit(fixture.rootDir, ['add', '-A']);
+      const report = checkForkDivergence({ rootDir: fixture.rootDir });
+      assert.equal(report.ok, false);
+      assert.equal(report.violationCount, 1);
+      assert.equal(report.violations[0].file, original);
+      assert.equal(report.violations[0].measuredChangedLines, 2);
     } finally {
       cleanup(fixture.rootDir);
     }

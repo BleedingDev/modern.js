@@ -3,7 +3,7 @@
 import {
   formatBackendFederationValidationErrors,
   validateBackendFederationManifest as validateBackendFederationManifestContract,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import {
   BACKEND_FEDERATION_CONTRACT_VERSION,
   BACKEND_FEDERATION_NODE_ADAPTER_VERSION,

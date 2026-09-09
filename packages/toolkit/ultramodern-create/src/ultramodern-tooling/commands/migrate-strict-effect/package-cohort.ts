@@ -6,6 +6,7 @@ import {
   ULTRAMODERN_WORKSPACE_MODERN_PACKAGES,
 } from '../../../ultramodern-package-source';
 import type { UltramodernReleaseCohort } from '../../../ultramodern-release-cohort';
+import { appEmitsBrowserUi } from '../../../ultramodern-workspace/descriptors';
 import { ULTRAMODERN_PACKAGE_PINS } from '../../../ultramodern-workspace/policy';
 import type { WorkspaceApp } from '../../../ultramodern-workspace/types';
 import {
@@ -59,8 +60,63 @@ export function updateModernDependencies(
   packageJson: Record<string, any>,
   packageSource: ResolvedUltramodernPackageSource,
   releaseCohort?: Pick<UltramodernReleaseCohort, 'packages'>,
+  options: { app?: WorkspaceApp } = {},
 ) {
+  // Provider registration is a historical migration for declared Modern apps.
+  // The narrow same-contract helper intentionally cannot add these names.
+  const providers: Array<[string, string]> = options.app
+    ? [
+        ['devDependencies', '@modern-js/ultramodern-app-tools'],
+        ['devDependencies', '@modern-js/app-tools-extensions'],
+        ...(appEmitsBrowserUi(options.app)
+          ? [
+              ['dependencies', '@modern-js/federation-runtime'] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
+        ...(options.app.kind === 'shell'
+          ? [
+              ['dependencies', '@modern-js/boundary-debugger'] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
+      ]
+    : [];
+  for (const [section, name] of providers) {
+    if (
+      packageJson[section] !== undefined &&
+      (!packageJson[section] ||
+        typeof packageJson[section] !== 'object' ||
+        Array.isArray(packageJson[section]))
+    ) {
+      throw new Error(`${section} must be an object to register ${name}.`);
+    }
+    if (
+      releaseCohort &&
+      !releaseCohort.packages.some(
+        item =>
+          item.sourceName === name &&
+          item.version === packageSource.modernPackageVersion,
+      )
+    ) {
+      throw new Error(
+        `Required migrated app provider ${name} is absent from the authenticated target cohort.`,
+      );
+    }
+  }
   let changed = false;
+  for (const [section, name] of providers) {
+    const dependencies = packageJson[section] ?? (packageJson[section] = {});
+    const specifier = modernPackageSpecifier(name, packageSource);
+    if (dependencies[name] !== specifier) {
+      dependencies[name] = specifier;
+      changed = true;
+    }
+  }
   for (const section of ['dependencies', 'devDependencies']) {
     const dependencies = packageJson[section];
     if (dependencies && Object.hasOwn(dependencies, '@modern-js/runtime')) {

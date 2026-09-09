@@ -1,4 +1,4 @@
-import { ULTRAMODERN_CREATE_PACKAGE } from '../ultramodern-package-source';
+import { ULTRAMODERN_WORKSPACE_MODERN_PACKAGES } from '../ultramodern-package-source';
 import type { UltramodernReleaseCohort } from '../ultramodern-release-cohort';
 import { verticalApiGroupName } from './api';
 import { createBackendFederationMetadata } from './backend-federation';
@@ -55,18 +55,6 @@ const WORKSPACE_VALIDATION_CONTRACT_SCHEMA_VERSION = 2;
 const WORKSPACE_METADATA_SCHEMA_VERSION = 1;
 const WORKSPACE_VALIDATION_CONTRACT_KIND =
   'modernjs.ultramodern-workspace-validation-contract';
-
-const modernPackageCohort = [
-  '@modern-js/bff-effect',
-  ULTRAMODERN_CREATE_PACKAGE,
-  '@modern-js/code-tools',
-  '@modern-js/app-tools',
-  '@modern-js/plugin-bff',
-  '@modern-js/plugin-i18n',
-  '@modern-js/plugin-tanstack',
-  '@modern-js/runtime',
-  '@modern-js/runtime-extensions',
-] as const;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -354,7 +342,7 @@ export function createWorkspaceValidationContract(
         : {}),
     },
     cohort: {
-      modernPackages: [...modernPackageCohort],
+      modernPackages: [...ULTRAMODERN_WORKSPACE_MODERN_PACKAGES],
       ...(releaseCohort ? { releaseCohort } : {}),
       appIds: workspaceApps.map(app => app.id),
       ...(additionalShells.length > 0

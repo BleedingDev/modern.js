@@ -44,6 +44,10 @@ export function appDependencies(
       '@modern-js/plugin-i18n',
       packageSource,
     ),
+    '@modern-js/federation-runtime': modernPackageSpecifier(
+      '@modern-js/federation-runtime',
+      packageSource,
+    ),
     '@modern-js/runtime-extensions': modernPackageSpecifier(
       '@modern-js/runtime-extensions',
       packageSource,
@@ -70,6 +74,10 @@ export function appDependencies(
   }
 
   if (app.kind === 'shell') {
+    dependencies['@modern-js/boundary-debugger'] = modernPackageSpecifier(
+      '@modern-js/boundary-debugger',
+      packageSource,
+    );
     dependencies['@modern-js/plugin-bff'] = modernPackageSpecifier(
       '@modern-js/plugin-bff',
       packageSource,
@@ -112,6 +120,14 @@ function appDevDependencies(
   } = ULTRAMODERN_PACKAGE_PINS.appDevDependencies;
 
   return {
+    '@modern-js/ultramodern-app-tools': modernPackageSpecifier(
+      '@modern-js/ultramodern-app-tools',
+      packageSource,
+    ),
+    '@modern-js/app-tools-extensions': modernPackageSpecifier(
+      '@modern-js/app-tools-extensions',
+      packageSource,
+    ),
     '@modern-js/app-tools': modernPackageSpecifier(
       '@modern-js/app-tools',
       packageSource,
@@ -223,6 +239,14 @@ export function createRootPackageJson(
     },
     devDependencies: {
       ...ULTRAMODERN_PACKAGE_PINS.rootDevDependencies,
+      '@modern-js/ultramodern-app-tools': modernPackageSpecifier(
+        '@modern-js/ultramodern-app-tools',
+        packageSource,
+      ),
+      '@modern-js/app-tools-extensions': modernPackageSpecifier(
+        '@modern-js/app-tools-extensions',
+        packageSource,
+      ),
       '@modern-js/bff-effect': modernPackageSpecifier(
         '@modern-js/bff-effect',
         packageSource,

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@effect/opentelemetry": "4.0.0-rc.112",
+    "@modern-js/federation-runtime": "workspace:*",
     "@modern-js/plugin-tanstack": "workspace:*",
     "@modern-js/runtime": "workspace:*",
     "@module-federation/modern-js-v3": "2.9.0",

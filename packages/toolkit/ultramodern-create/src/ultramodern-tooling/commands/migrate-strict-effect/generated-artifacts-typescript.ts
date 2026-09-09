@@ -1,17 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { parse } from '@babel/parser';
 import { ULTRAMODERN_CREATE_PACKAGE } from '../../../ultramodern-package-source';
 import {
   createAppEnvDts,
   createAppRuntimeConfig,
 } from '../../../ultramodern-workspace/app-files';
 import {
+  createFederatedComponentsRegistry,
   createRemoteExposeFragmentPage,
+  createShellRemoteComponents,
+  createShellWorkerRemoteComponents,
   regenerateGeneratedNavigationSurface,
   regenerateGeneratedProductRouteAdapter,
   remoteComponentOutputPath,
 } from '../../../ultramodern-workspace/demo-components';
 import {
+  appEmitsBrowserUi,
   appI18nNamespace,
   distributedSsrExposes,
   distributedSsrFragmentSlug,
@@ -27,7 +32,7 @@ import {
   allWorkspaceAppsFromToolingConfig,
   type UltramodernToolingConfig,
 } from '../../config';
-import { writeGeneratedUiSourceIfChanged } from './generated-ui-source';
+import { generatedUiSourceRequiresRewrite } from './generated-ui-source';
 import { type MigrationIo, writeJsonFile } from './io';
 
 type JsonObject = Record<string, unknown>;
@@ -43,6 +48,92 @@ function readJsonObject(filePath: string) {
     return undefined;
   }
   return jsonObject(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
+}
+
+/**
+ * Move imports only when the complete program still matches a generated
+ * target. A filename, metadata marker, or old package name alone is not
+ * ownership evidence for an authored runtime or federation component.
+ */
+function migrateGeneratedProviderImports(
+  io: MigrationIo,
+  filePath: string,
+  generatedSource: string,
+) {
+  if (!fs.existsSync(filePath)) return false;
+  const source = fs.readFileSync(filePath, 'utf8');
+  const legacyProviders: Record<string, readonly string[]> = {
+    '@modern-js/federation-runtime': ['@modern-js/runtime/module-federation'],
+    '@modern-js/federation-runtime/distributed-ssr': [
+      '@modern-js/runtime/module-federation',
+      '@modern-js/runtime/module-federation/distributed-ssr',
+    ],
+    '@modern-js/boundary-debugger': [
+      '@modern-js/runtime-extensions/boundary-debugger',
+      '@modern-js/runtime/boundary-debugger',
+    ],
+  };
+  let updated = source;
+  try {
+    const options = {
+      sourceType: 'module' as const,
+      plugins: ['typescript' as const, 'jsx' as const],
+    };
+    const current = parse(source, options);
+    const generated = parse(generatedSource, options);
+    const targets = generated.program.body.filter(
+      statement => statement.type === 'ImportDeclaration',
+    );
+    const edits: Array<{ start: number; end: number; content: string }> = [];
+    for (const statement of current.program.body) {
+      if (statement.type !== 'ImportDeclaration') continue;
+      const matches = targets.filter(
+        target =>
+          target.type === 'ImportDeclaration' &&
+          legacyProviders[target.source.value]?.includes(
+            statement.source.value,
+          ) &&
+          statement.specifiers.every(
+            specifier =>
+              specifier.type === 'ImportSpecifier' &&
+              target.specifiers.some(
+                expected =>
+                  expected.type === 'ImportSpecifier' &&
+                  (expected.imported.type === 'Identifier'
+                    ? expected.imported.name
+                    : expected.imported.value) ===
+                    (specifier.imported.type === 'Identifier'
+                      ? specifier.imported.name
+                      : specifier.imported.value),
+              ),
+          ),
+      );
+      if (matches.length !== 1) continue;
+      edits.push({
+        start: statement.source.start!,
+        end: statement.source.end!,
+        content: JSON.stringify(matches[0].source.value),
+      });
+    }
+    if (edits.length === 0) return false;
+    for (const edit of edits.toSorted(
+      (left, right) => right.start - left.start,
+    ))
+      updated =
+        updated.slice(0, edit.start) + edit.content + updated.slice(edit.end);
+    if (generatedUiSourceRequiresRewrite(updated, generatedSource)) {
+      io.log(
+        `${path.relative(io.workspaceRoot, filePath)} preserved authored source: native provider migration requires the complete generated program.`,
+      );
+      return false;
+    }
+  } catch {
+    io.log(
+      `${path.relative(io.workspaceRoot, filePath)} preserved authored source: native provider imports could not be proven.`,
+    );
+    return false;
+  }
+  return io.write(filePath, updated);
 }
 
 function writeMergedTypeScriptConfig(
@@ -439,32 +530,57 @@ export function updateGeneratedTypeScriptSurfaces(
       createAppEnvDts(app, remotes, config.workspace.packageScope),
     );
 
-    if (app.kind !== 'shell') {
-      for (const expose of distributedSsrExposes(app)) {
-        const fragmentPagePath = path.join(
-          io.workspaceRoot,
-          app.directory,
-          'src/routes/[lang]/_mf/fragment',
-          distributedSsrFragmentSlug(expose),
-          'page.tsx',
-        );
-        if (!fs.existsSync(fragmentPagePath)) {
-          continue;
-        }
-        const fragmentPageSource = fs.readFileSync(fragmentPagePath, 'utf-8');
-        if (
-          !fragmentPageSource.includes(
-            "from '@modern-js/runtime/module-federation';",
-          ) ||
-          !fragmentPageSource.includes(
-            'data-modern-distributed-ssr-marker="start"',
-          )
-        ) {
-          continue;
-        }
-        writeGeneratedUiSourceIfChanged(
+    migrateGeneratedProviderImports(
+      io,
+      path.join(io.workspaceRoot, app.directory, 'src/modern.runtime.ts'),
+      createAppRuntimeConfig(app, config.workspace.packageScope, remotes),
+    );
+    if ((app.verticalRefs?.length ?? 0) > 0) {
+      for (const worker of [false, true]) {
+        migrateGeneratedProviderImports(
           io,
-          fragmentPagePath,
+          path.join(
+            io.workspaceRoot,
+            app.directory,
+            `src/federated-components${worker ? '.worker' : ''}.tsx`,
+          ),
+          createFederatedComponentsRegistry(
+            config.workspace.packageScope,
+            app,
+            remotes,
+            worker,
+          ),
+        );
+      }
+    }
+    if (app.kind === 'shell') {
+      const uiRemotes = resolveRemoteRefs(app, remotes).filter(
+        appEmitsBrowserUi,
+      );
+      for (const worker of [false, true]) {
+        migrateGeneratedProviderImports(
+          io,
+          path.join(
+            io.workspaceRoot,
+            app.directory,
+            `src/routes/vertical-components${worker ? '.worker' : ''}.tsx`,
+          ),
+          worker
+            ? createShellWorkerRemoteComponents(app, uiRemotes)
+            : createShellRemoteComponents(app, uiRemotes),
+        );
+      }
+    } else {
+      for (const expose of distributedSsrExposes(app)) {
+        migrateGeneratedProviderImports(
+          io,
+          path.join(
+            io.workspaceRoot,
+            app.directory,
+            'src/routes/[lang]/_mf/fragment',
+            distributedSsrFragmentSlug(expose),
+            'page.tsx',
+          ),
           createRemoteExposeFragmentPage(app, expose),
         );
       }

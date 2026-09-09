@@ -43,7 +43,7 @@ export const genPluginImportsCode = (plugins: PluginItem[], isESM = false) => {
       const im = isESM
         ? `import * as plugin_${index}_ns from '${name}'`
         : `const plugin_${index}_ns = require('${name}')`;
-      return `${im};const plugin_${index} = plugin_${index}_ns.default || plugin_${index}_ns`;
+      return `${im};const plugin_${index} = typeof plugin_${index}_ns === 'function' ? plugin_${index}_ns : typeof plugin_${index}_ns.default === 'function' ? plugin_${index}_ns.default : plugin_${index}_ns.default?.default`;
     })
     .join(';\n');
 };

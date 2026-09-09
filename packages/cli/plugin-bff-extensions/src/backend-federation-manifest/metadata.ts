@@ -3,7 +3,7 @@
 import {
   backendFederationMetadata as sharedBackendFederationMetadata,
   backendFederationVersionBoundary as sharedBackendFederationVersionBoundary,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import type { BackendFederationManifest } from './types';
 
 export function stringValue(value: unknown) {

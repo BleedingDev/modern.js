@@ -1,4 +1,3 @@
-import { createCloudflareBuilderPlugin } from '@modern-js/app-tools-extensions/cloudflare-builder';
 import { castArray } from '@modern-js/builder';
 import { getLocaleLanguage } from '@modern-js/i18n-utils/language-detector';
 import { createAsyncHook } from '@modern-js/plugin';
@@ -22,7 +21,6 @@ import { compatPlugin } from './compat';
 import { DEFAULT_RUNTIME_CONFIG_FILE } from './constants';
 import { i18n } from './locale';
 import analyzePlugin from './plugins/analyze';
-import backendFederationBuildPlugin from './plugins/backendFederationBuild';
 import deployPlugin from './plugins/deploy';
 import initializePlugin from './plugins/initialize';
 import serverBuildPlugin from './plugins/serverBuild';
@@ -45,7 +43,6 @@ import { initAppContext } from './utils/initAppContext';
 import { restart } from './utils/restart';
 
 export * from './defineConfig';
-export * from './presetUltramodern';
 
 export const appTools = (): CliPlugin<AppTools> => ({
   name: '@modern-js/app-tools',
@@ -55,9 +52,7 @@ export const appTools = (): CliPlugin<AppTools> => ({
     initializePlugin(),
     analyzePlugin(),
     serverBuildPlugin(),
-    backendFederationBuildPlugin(),
     deployPlugin(),
-    createCloudflareBuilderPlugin(),
   ],
   post: [
     '@modern-js/plugin-initialize',

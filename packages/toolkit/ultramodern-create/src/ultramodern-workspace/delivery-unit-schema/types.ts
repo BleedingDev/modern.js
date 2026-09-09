@@ -18,7 +18,7 @@ import {
   DELIVERY_UNIT_KIND,
   DELIVERY_UNIT_SCHEMA_VERSION,
   type DeliveryUnitRecord,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import {
   isVerticalApiProtocol,
   type JsonObject,

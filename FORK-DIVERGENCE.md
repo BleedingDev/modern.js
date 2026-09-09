@@ -140,6 +140,50 @@ raised. Runtime, type, security, immutable release, and downstream acceptance
 checks remain mandatory. Ownership/budget reconciliation remains outstanding;
 this record does not claim that audit passed.
 
+### One-release compatibility exception for `.4` (2026-09-09)
+
+The repository owner explicitly authorized publication of
+`3.9.0-ultramodern.4` with 790 cumulative fork-audit violations, followed by
+updating OntOS and Tractor to the published cohort. This exception applies only
+to this compatibility release; it is not a general policy change.
+
+The accepted immutable bundle was produced from
+`ef99279246046685f1684c59ca145f2a6a3f9d53` by workflow run `34328906405`,
+attempt `1`. Source qualification, publish security, exact-tarball validation,
+ERP-10, Tractor, and OntOS acceptance passed before authorization. Publication
+must reuse that bundle and complete the published-registry acceptance checks.
+
+No divergence budgets, audited base, reviewed provenance, or canonical scope
+were reset or raised. Runtime, type, security, immutable release, and downstream
+acceptance checks remain mandatory. Ownership/budget reconciliation and broader
+repository CI debt remain outstanding; this record does not claim that the
+fork audit passed. Owner: `bleedingdev`.
+
+### Native build boundaries (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/builder/package.json` | bleedingdev | Resolve disabled RSC browser runtimes from the fork-owned runtime package rather than the Builder Node output. | capped-patch |
+
+### Deployed server plugin interop (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/solutions/app-tools/src/plugins/deploy/utils/generator.ts` | bleedingdev | Resolve native ESM namespace wrappers around transpiled CommonJS default factories so Module Federation's Node server plugin starts. | capped-patch |
+
+### Worker API implementation graph (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-bff/src/loader.ts` | bleedingdev | Delegate the worker API implementation graph to the fork-owned source bundler so imported server helpers do not pass through client API generation. | capped-patch |
+
+### Localized server loader identity (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-data-loader/src/runtime/index.ts` | bleedingdev | Delegate canonical loader-ID resolution to the fork-owned runtime helper only after the router has matched the requested localized URL; retain cross-route rejection and deferred-data identity. | capped-patch |
+| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Declare the runtime-extensions dependency that owns localized loader identity mapping without coupling CLI builds to the React/i18n runtime. | capped-patch |
+
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
@@ -854,3 +898,22 @@ current evidence — do not cite it.
    until an identity-preserving budget carry-forward has been designed and
    reviewed. Never substitute a release tag, PR merge-base, push before-SHA, or
    `HEAD`, and never re-record a fresh snapshot to erase existing debt.
+
+### Runtime React context identity (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/context/public.ts` (split from audited `runtime.ts`) | bleedingdev | Delegate public React context identity to the fork-owned runtime helper so independently bundled federation runtime paths read the current SSR provider instead of stale context. | capped-patch |
+| `packages/runtime/plugin-runtime/src/core/context/runtime.ts` | bleedingdev | Delegate the separate internal React context identity to the same fork-owned helper; React providers continue to own per-request values. | capped-patch |
+
+### Streaming hydration identity (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Preserve the streaming server's end-marker sibling slot during hydration so React-generated input IDs and accessibility references use the same tree positions. | capped-patch |
+
+### Eager SSR bootstrap rejection (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/cli/code.ts` | bleedingdev | Observe the eager SSR handler promise before a renderer consumes it, preventing remote startup failures from terminating Node while preserving the original rejection for request error handling. | capped-patch |

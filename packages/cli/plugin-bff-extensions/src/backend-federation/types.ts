@@ -1,9 +1,9 @@
+import type { BACKEND_FEDERATION_EFFECT_EXPOSE } from '@modern-js/backend-federation-contracts';
 import type { EffectApiModule } from '@modern-js/bff-effect/effect';
 import type {
   BackendFederationRemoteEntryPolicy,
   BackendFederationRemoteEntryVerification,
 } from '@modern-js/server-runtime-extensions/backend-federation-security';
-import type { BACKEND_FEDERATION_EFFECT_EXPOSE } from '@modern-js/utils/universal';
 import type {
   ModuleFederation,
   ModuleFederationRuntimePlugin,
