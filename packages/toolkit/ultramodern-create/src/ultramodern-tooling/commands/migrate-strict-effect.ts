@@ -810,6 +810,7 @@ function migrateStrictEffect(
       developmentOverlay,
     ),
   );
+  artifactOwnership.refreshReleaseCohort(releaseCohort);
 
   for (const relativePath of retiredMetadataPaths) {
     io.remove(path.join(io.workspaceRoot, relativePath));
