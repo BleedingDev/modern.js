@@ -65,6 +65,7 @@ const expectedWorkspaceManifest = [
   'apps/shell-super-app/src/routes/ultramodern-route-metadata.ts',
   'apps/shell-super-app/src/routes/vertical-components.tsx',
   'apps/shell-super-app/src/routes/vertical-components.worker.tsx',
+  'apps/shell-super-app/src/ultramodern-build.ts',
   'apps/shell-super-app/tailwind.config.ts',
   'apps/shell-super-app/tsconfig.json',
   'apps/shell-super-app/tsconfig.mf-types.json',

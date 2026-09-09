@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { appEmitsBrowserUi } from '../../../ultramodern-workspace/descriptors';
 import {
   createUltramodernBuildArtifactJson,
   createUltramodernBuildModule,
@@ -87,15 +88,22 @@ export function updateGeneratedBuildIdentityModules(
       app.directory,
       'src/ultramodern-build.ts',
     );
+    const includeUiMarker =
+      appEmitsBrowserUi(app) &&
+      (app.kind !== 'shell' || fs.existsSync(reexportPath));
     if (fs.existsSync(reexportPath)) {
       io.writeGenerated(
         reexportPath,
-        createUltramodernBuildReexportModule(app),
+        createUltramodernBuildReexportModule(app, includeUiMarker),
       );
     }
     io.writeGenerated(
       path.join(io.workspaceRoot, app.directory, 'shared/ultramodern-build.ts'),
-      createUltramodernBuildModule(config.workspace.packageScope, app),
+      createUltramodernBuildModule(
+        config.workspace.packageScope,
+        app,
+        includeUiMarker,
+      ),
     );
     io.write(
       path.join(

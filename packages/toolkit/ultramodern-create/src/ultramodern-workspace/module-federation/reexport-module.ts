@@ -23,6 +23,7 @@ export function createUltramodernBuildArtifactJson(
 export function createUltramodernBuildModule(
   scope: string,
   app: WorkspaceApp,
+  includeUiMarker = appEmitsBrowserUi(app),
 ): string {
   const record = deliveryUnitRecordFor(scope, app);
   return `import { resolveUltramodernBuildArtifact } from '@modern-js/runtime-extensions/build-identity';
@@ -34,15 +35,15 @@ const ultramodernBuildArtifact = resolveUltramodernBuildArtifact(${JSON.stringif
   )} as const);
 
 export const ultramodernDeliveryUnit = ultramodernBuildArtifact.deliveryUnit;
-${app.kind !== 'shell' && appEmitsBrowserUi(app) ? 'export const ultramodernUiMarker = ultramodernBuildArtifact.surfaces.ui;\n' : ''}${app.kind !== 'shell' && appHasApi(app) ? 'export const ultramodernApiMarker = ultramodernBuildArtifact.surfaces.api;\n' : ''}`;
+${includeUiMarker ? 'export const ultramodernUiMarker = ultramodernBuildArtifact.surfaces.ui;\n' : ''}${app.kind !== 'shell' && appHasApi(app) ? 'export const ultramodernApiMarker = ultramodernBuildArtifact.surfaces.api;\n' : ''}`;
 }
 
 export function createUltramodernBuildReexportModule(
   app: WorkspaceApp,
+  includeUiMarker = appEmitsBrowserUi(app),
 ): string {
   const names = ['ultramodernDeliveryUnit'];
-  if (app.kind !== 'shell' && appEmitsBrowserUi(app))
-    names.push('ultramodernUiMarker');
+  if (includeUiMarker) names.push('ultramodernUiMarker');
   if (app.kind !== 'shell' && appHasApi(app))
     names.push('ultramodernApiMarker');
   return `export { ${names.join(', ')} } from '../shared/ultramodern-build';\n`;
