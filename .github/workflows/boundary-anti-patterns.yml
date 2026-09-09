@@ -2,6 +2,11 @@ name: Boundary Anti-Patterns
 
 on:
   workflow_dispatch:
+    inputs:
+      governance_base:
+        description: Commit or ref to use as the reviewed PR governance base
+        required: true
+        type: string
   # Trusted-base orchestration: fork PRs cannot rewrite runner selection before
   # allocation. The job remains read-only and checks out the exact fork head
   # only after an external PR has been assigned ubuntu-latest.
@@ -51,6 +56,14 @@ jobs:
         with:
           node-version: '26.7.0'
 
+      - name: Install boundary parser dependency
+        env:
+          BOUNDARY_PARSER_DIR: ${{ runner.temp }}/ultramodern-boundary-parser
+        run: |
+          npm install --prefix "$BOUNDARY_PARSER_DIR" --no-save --ignore-scripts \
+            --no-package-lock --no-audit --no-fund '@babel/core@8.0.1'
+          printf 'NODE_PATH=%s/node_modules\n' "$BOUNDARY_PARSER_DIR" >> "$GITHUB_ENV"
+
       - name: Run boundary anti-pattern guards
         run: node scripts/boundary-guards/check-boundary-violations.js --profile scripts/boundary-guards/profile.json
 
@@ -78,17 +91,21 @@ jobs:
             --mode divergence --head "$DIVERGENCE_HEAD_SHA"
 
       - name: Enforce UltraModern divergence allowlist governance
-        if: ${{ !cancelled() && (github.event_name == 'pull_request_target' || github.event_name == 'push') }}
+        if: ${{ !cancelled() && (github.event_name == 'pull_request_target' || github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
         working-directory: ${{ github.workspace }}
         env:
           DIVERGENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
+          DISPATCH_BASE_REF: ${{ inputs.governance_base }}
         run: |
           set -euo pipefail
 
           if [[ "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
             GOVERNANCE_BASE_SHA="$(git merge-base "$PR_BASE_SHA" "$DIVERGENCE_HEAD_SHA")"
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            DISPATCH_BASE_SHA="$(git rev-parse --verify --end-of-options "${DISPATCH_BASE_REF}^{commit}")"
+            GOVERNANCE_BASE_SHA="$(git merge-base "$DISPATCH_BASE_SHA" "$DIVERGENCE_HEAD_SHA")"
           else
             GOVERNANCE_BASE_SHA="$PUSH_BEFORE_SHA"
           fi
