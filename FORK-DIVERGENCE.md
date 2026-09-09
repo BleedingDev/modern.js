@@ -877,3 +877,9 @@ current evidence — do not cite it.
 | --- | --- | --- | --- |
 | `packages/runtime/plugin-runtime/src/core/context/public.ts` (split from audited `runtime.ts`) | bleedingdev | Delegate public React context identity to the fork-owned runtime helper so independently bundled federation runtime paths read the current SSR provider instead of stale context. | capped-patch |
 | `packages/runtime/plugin-runtime/src/core/context/runtime.ts` | bleedingdev | Delegate the separate internal React context identity to the same fork-owned helper; React providers continue to own per-request values. | capped-patch |
+
+### Streaming hydration identity (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Preserve the streaming server's end-marker sibling slot during hydration so React-generated input IDs and accessibility references use the same tree positions. | capped-patch |
