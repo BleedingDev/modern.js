@@ -35,6 +35,7 @@ import {
   type TanstackRouterPluginAPI,
   type TanstackRouterRuntimePlugin,
 } from './pluginShared';
+import { Link } from './prefetchLink';
 import {
   createRouteTreeFromRouteObjects,
   getModernRouteIdsFromMatches,
@@ -97,6 +98,8 @@ export const tanstackRouterPlugin = (
         if (!modifiedRouteObjects.length) {
           return;
         }
+
+        context.router = { Link };
 
         const {
           request,

@@ -1,6 +1,12 @@
 import type { TInternalRuntimeContext } from '@modern-js/runtime/context';
 import { routerProviderRegistryHooks } from '@modern-js/runtime/context';
-import { getRouterServerSnapshot } from '../../src/runtime/lifecycle';
+import { type AnyRouter, RouterProvider } from '@tanstack/react-router';
+import { createElement } from 'react';
+import { renderToString } from 'react-dom/server';
+import {
+  getRouterRuntimeState,
+  getRouterServerSnapshot,
+} from '../../src/runtime/lifecycle';
 import { tanstackRouterPlugin } from '../../src/runtime/plugin.node';
 import type { TanstackRouterPluginAPI } from '../../src/runtime/pluginShared';
 import type { RouterConfig } from '../../src/runtime/types';
@@ -48,6 +54,42 @@ function createServerContext(pathname: string) {
 describe('tanstack server plugin router results', () => {
   afterEach(() => {
     rstest.restoreAllMocks();
+  });
+
+  test.each([
+    '/cs/login',
+    '/en/login',
+  ])('renders native link active attributes during SSR at %s', async pathname => {
+    const { context } = createServerContext(pathname);
+    const beforeRender = collectBeforeRender(() => [
+      {
+        id: 'login',
+        path: '/:lang/login',
+        Component: () => {
+          const Link = context.router?.Link;
+          if (!Link) {
+            throw new Error('SSR router did not provide its native Link');
+          }
+          return createElement(Link, { to: '/cs' }, 'Home');
+        },
+      },
+    ]);
+    await beforeRender(context, value => value);
+
+    expect(context.router?.Link).toBeTypeOf('function');
+    const html = renderToString(
+      createElement(RouterProvider, {
+        router: getRouterRuntimeState(context)?.instance as AnyRouter,
+      }),
+    );
+    expect(html).toContain('href="/cs"');
+    if (pathname === '/cs/login') {
+      expect(html).toContain('data-status="active"');
+      expect(html).toContain('aria-current="page"');
+    } else {
+      expect(html).not.toContain('data-status="active"');
+      expect(html).not.toContain('aria-current="page"');
+    }
   });
 
   test('uses the router render result as the HTTP and hydration status', async () => {
