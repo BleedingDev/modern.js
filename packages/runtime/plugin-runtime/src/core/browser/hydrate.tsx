@@ -66,8 +66,13 @@ export function hydrateRoot(
       const SSRApp: React.FC = () => (
         <WithCallback callback={callback}>{App}</WithCallback>
       );
+      // StreamServerRootWrapper adds an end-marker sibling during SSR.
+      // Preserve its empty slot so React useId follows the same tree path.
       return ModernHydrate(
-        wrapRuntimeContextProvider(<SSRApp />, hydrateContext),
+        <>
+          {wrapRuntimeContextProvider(<SSRApp />, hydrateContext)}
+          {null}
+        </>,
       );
     } else {
       return ModernRender(wrapRuntimeContextProvider(App, context));
