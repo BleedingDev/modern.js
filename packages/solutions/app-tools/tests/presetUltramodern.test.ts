@@ -11,11 +11,21 @@ import {
 } from '../src/presetUltramodern';
 import type { AppUserConfig } from '../src/types';
 
-type BundlerChainFn = (chain: unknown, utils: { isProd: boolean }) => void;
+type BundlerChainFn = (
+  chain: unknown,
+  utils: { isProd: boolean; CHAIN_ID: { PLUGIN: { TS_CHECKER: string } } },
+) => void;
 
 const getBundlerChain = (
   config: ReturnType<typeof createPresetUltramodernConfig>,
-) => config.tools?.bundlerChain as BundlerChainFn;
+) => {
+  const hook = config.tools?.bundlerChain as BundlerChainFn;
+  return (chain: unknown, utils: { isProd: boolean }) =>
+    hook(chain, {
+      ...utils,
+      CHAIN_ID: { PLUGIN: { TS_CHECKER: 'ts-checker' } },
+    });
+};
 
 const createFakeChain = (context?: string) => {
   const aliases = new Map<string, string>();
@@ -23,6 +33,7 @@ const createFakeChain = (context?: string) => {
   return {
     aliases,
     chain: {
+      plugins: new Map(),
       get: (key: string) => (key === 'context' ? context : undefined),
       resolve: {
         alias: {
@@ -456,6 +467,11 @@ describe('presetUltramodern config', () => {
       origin: { bundlerConfigs },
     } = await rsbuild.inspectConfig();
     const bundlerConfig = bundlerConfigs[0];
+    const pluginNames = bundlerConfig.plugins?.map(
+      plugin => plugin?.constructor.name,
+    );
+    expect(pluginNames).toContain('UltramodernNativeTypeChecker');
+    expect(pluginNames).not.toContain('TsCheckerRspackPlugin');
     const moduleRules = JSON.stringify(bundlerConfig.module?.rules);
     expect(config.output?.splitRouteChunks).toBe(true);
     expect(bundlerConfig.optimization?.splitChunks).toBeTruthy();

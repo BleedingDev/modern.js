@@ -131,6 +131,12 @@ raised. Runtime, type, security, immutable release, and downstream acceptance
 checks remain mandatory. Ownership/budget reconciliation remains outstanding;
 this record does not claim that audit passed.
 
+### Native build boundaries (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/builder/package.json` | bleedingdev | Resolve disabled RSC browser runtimes from the fork-owned runtime package rather than the Builder Node output. | capped-patch |
+
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
