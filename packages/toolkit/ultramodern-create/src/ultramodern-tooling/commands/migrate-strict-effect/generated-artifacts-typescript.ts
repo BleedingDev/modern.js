@@ -38,12 +38,6 @@ function jsonObject(value: unknown): JsonObject | undefined {
     : undefined;
 }
 
-function hasStringName(
-  value: JsonObject | undefined,
-): value is JsonObject & { name: string } {
-  return typeof value?.name === 'string';
-}
-
 function readJsonObject(filePath: string) {
   if (!fs.existsSync(filePath)) {
     return undefined;
@@ -51,113 +45,21 @@ function readJsonObject(filePath: string) {
   return jsonObject(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
 }
 
-function mergeUniqueJsonValues(generated: unknown, existing: unknown) {
-  const generatedValues = Array.isArray(generated) ? generated : [];
-  const existingValues = Array.isArray(existing) ? existing : [];
-  const seen = new Set(generatedValues.map(value => JSON.stringify(value)));
-  return [
-    ...generatedValues,
-    ...existingValues.filter(value => {
-      const key = JSON.stringify(value);
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    }),
-  ];
-}
-
-function mergeTypeScriptPlugins(generated: unknown, existing: unknown) {
-  const generatedPlugins = Array.isArray(generated) ? generated : [];
-  const existingPlugins = Array.isArray(existing) ? existing : [];
-  const existingByName = new Map(
-    existingPlugins
-      .map(jsonObject)
-      .filter(hasStringName)
-      .map(plugin => [plugin.name, plugin] as const),
-  );
-  const merged = generatedPlugins.map(generatedPlugin => {
-    const generatedObject = jsonObject(generatedPlugin);
-    const existingObject =
-      typeof generatedObject?.name === 'string'
-        ? existingByName.get(generatedObject.name)
-        : undefined;
-    if (!generatedObject || !existingObject) {
-      return generatedPlugin;
-    }
-    existingByName.delete(generatedObject.name as string);
-    return {
-      ...generatedObject,
-      ...existingObject,
-      diagnosticSeverity: {
-        ...jsonObject(generatedObject.diagnosticSeverity),
-        ...jsonObject(existingObject.diagnosticSeverity),
-      },
-    };
-  });
-  return [...merged, ...existingByName.values()];
-}
-
-function mergeTypeScriptConfig(generated: unknown, existing: unknown) {
-  const generatedConfig = jsonObject(generated) ?? {};
-  const existingConfig = jsonObject(existing) ?? {};
-  const generatedCompilerOptions =
-    jsonObject(generatedConfig.compilerOptions) ?? {};
-  const existingCompilerOptions = {
-    ...(jsonObject(existingConfig.compilerOptions) ?? {}),
-  };
-  delete existingCompilerOptions.skipLibCheck;
-  const compilerOptions = {
-    ...existingCompilerOptions,
-    ...generatedCompilerOptions,
-  };
-  if (Array.isArray(generatedCompilerOptions.types)) {
-    compilerOptions.types = mergeUniqueJsonValues(
-      generatedCompilerOptions.types,
-      existingCompilerOptions.types,
-    );
-  }
-  if (
-    Array.isArray(generatedCompilerOptions.plugins) ||
-    Array.isArray(existingCompilerOptions.plugins)
-  ) {
-    compilerOptions.plugins = mergeTypeScriptPlugins(
-      generatedCompilerOptions.plugins,
-      existingCompilerOptions.plugins,
-    );
-  }
-  const merged: JsonObject = { ...existingConfig, ...generatedConfig };
-  if (Object.keys(compilerOptions).length > 0) {
-    merged.compilerOptions = compilerOptions;
-  }
-  for (const key of ['include', 'exclude', 'references'] as const) {
-    if (
-      Array.isArray(generatedConfig[key]) ||
-      Array.isArray(existingConfig[key])
-    ) {
-      merged[key] = mergeUniqueJsonValues(
-        generatedConfig[key],
-        existingConfig[key],
-      );
-    }
-  }
-  return merged;
-}
-
 function writeMergedTypeScriptConfig(
   io: MigrationIo,
   filePath: string,
   generated: unknown,
 ) {
-  const existing = readJsonObject(filePath);
-  const merged = mergeTypeScriptConfig(generated, existing);
-  if (existing && JSON.stringify(merged) !== JSON.stringify(generated)) {
+  if (fs.existsSync(filePath)) {
+    // A generated-looking JSON shape does not prove ownership of compiler
+    // options, references, or formatting. Historical source upgrades require
+    // an explicit recognized transition, never a merge with template defaults.
     io.log(
-      `${path.relative(io.workspaceRoot, filePath)} preserved consumer-owned TypeScript configuration.`,
+      `${path.relative(io.workspaceRoot, filePath)} preserved consumer-owned TypeScript configuration byte-for-byte.`,
     );
+    return false;
   }
-  return writeJsonFile(io, filePath, merged);
+  return writeJsonFile(io, filePath, generated);
 }
 
 function generatedManifest(io: MigrationIo, config: UltramodernToolingConfig) {

@@ -97,7 +97,7 @@ const result = createBin
 ${toolWrapperResultHandling}`;
 }
 
-export function createWorkspaceValidationScript(
+export function createPackagedWorkspaceValidationScript(
   scope: string,
   enableTailwind: boolean,
   remotes: WorkspaceApp[] = [],
@@ -131,6 +131,14 @@ export function createWorkspaceValidationScript(
   );
 }
 
+// The stable consumer entrypoint delegates to the installed cohort's validator.
+// Release and topology data are read by that command at invocation time.
+export function createWorkspaceValidationScript(
+  ..._options: Parameters<typeof createPackagedWorkspaceValidationScript>
+): string {
+  return createToolWrapperScript('validate');
+}
+
 function createWorkspaceI18nBoundaryValidationScript(): string {
   return readFileTemplate(
     'workspace-scripts/check-ultramodern-i18n-boundaries.mts',
@@ -143,12 +151,8 @@ function createPerformanceReadinessConfigScript(): string {
   );
 }
 
-function createWorkerdSsrProofScript(): string {
-  return readFileTemplate('workspace-scripts/proof-workerd-ssr.mts');
-}
-
 export function createZeropsRuntimeMaterializationScript(): string {
-  return readFileTemplate('workspace-scripts/materialize-zerops-runtime.mjs');
+  return createToolWrapperScript('zerops-materialize');
 }
 
 export function writeGeneratedWorkspaceScripts(
@@ -236,17 +240,6 @@ const workspaceScriptDefinitions: readonly WorkspaceScriptDefinition[] = [
     legacyPath: 'scripts/setup-agent-reference-repos.mjs',
     createContent: createAgentReferenceReposSetupScript,
   },
-  {
-    relativePath: 'scripts/proof-workerd-ssr.mts',
-    legacyPath: 'scripts/proof-workerd-ssr.mjs',
-    createContent: createWorkerdSsrProofScript,
-    requiresRemotes: true,
-  },
-  {
-    relativePath: 'scripts/materialize-zerops-runtime.mjs',
-    createContent: createZeropsRuntimeMaterializationScript,
-    requiresRemotes: true,
-  },
 ];
 
 export interface WorkspaceScriptArtifact {
@@ -275,9 +268,6 @@ export function createWorkspaceScriptArtifacts(options: {
         command.id === 'validate' && options.validationScript !== undefined
           ? options.validationScript
           : createToolWrapperScript(command.command),
-      ...(command.id === 'validate' && options.validationScript !== undefined
-        ? { generatedDataBinding: 'workspaceValidationContract' }
-        : {}),
     })),
   ];
 }
@@ -289,5 +279,7 @@ export const migratedWorkspaceScriptBasenames: readonly string[] = [
   ...workspaceScriptDefinitions
     .filter(definition => definition.legacyPath !== undefined)
     .map(definition => path.basename(definition.relativePath, '.mts')),
-  ...generatedToolingCommands.map(command => command.wrapperName),
+  ...generatedToolingCommands
+    .filter(command => command.legacyPath !== undefined)
+    .map(command => command.wrapperName),
 ];

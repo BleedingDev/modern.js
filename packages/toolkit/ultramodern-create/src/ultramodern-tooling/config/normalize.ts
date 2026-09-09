@@ -136,6 +136,7 @@ function normalizeCompactConfigV1(
 
               return {
                 id: String(app.id),
+                ...(app.deliveryUnit ? { deliveryUnit: app.deliveryUnit } : {}),
                 kind: app.kind,
                 path: typeof app.path === 'string' ? app.path : '.',
                 package:
@@ -284,6 +285,7 @@ export function workspaceAppsFromToolingConfig(
     if (app.kind === 'shell') {
       return {
         ...shellApp,
+        ...(app.deliveryUnit ? { deliveryUnit: app.deliveryUnit } : {}),
         directory: app.path,
         packageSuffix: app.packageSuffix ?? shellApp.packageSuffix,
         displayName: app.displayName ?? shellApp.displayName,
@@ -315,6 +317,7 @@ export function workspaceAppsFromToolingConfig(
 
     return {
       id: app.id,
+      ...(app.deliveryUnit ? { deliveryUnit: app.deliveryUnit } : {}),
       directory: app.path,
       packageSuffix,
       displayName: app.displayName ?? `${domain} Vertical`,

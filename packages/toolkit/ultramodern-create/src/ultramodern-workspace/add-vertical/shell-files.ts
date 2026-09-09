@@ -48,6 +48,7 @@ export function updateRootWorkspaceScripts(
   additionalShells: WorkspaceApp[] = [],
   previousRemotes: WorkspaceApp[] = remotes,
   primaryShell: WorkspaceApp = shellApp,
+  previousAdditionalShells: WorkspaceApp[] = additionalShells,
 ) {
   const packagePath = path.join(workspaceRoot, 'package.json');
   const rootPackage = readJsonFile(packagePath);
@@ -63,7 +64,7 @@ export function updateRootWorkspaceScripts(
     packageSource,
     previousRemotes,
     bridge,
-    additionalShells,
+    previousAdditionalShells,
   ) as Record<string, any>;
   const existingScripts = rootPackage.scripts ?? {};
   rootPackage.scripts = { ...generatedRootPackage.scripts, ...existingScripts };

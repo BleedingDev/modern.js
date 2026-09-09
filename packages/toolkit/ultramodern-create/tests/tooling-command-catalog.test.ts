@@ -21,7 +21,9 @@ cloudflareProof|cloudflare-proof|proof-cloudflare-version|cloudflare:proof
 cloudflareOutputVerify|cloudflare-output-verify|verify-cloudflare-output|cloudflare-output:verify
 performanceReadiness|performance-readiness|ultramodern-performance-readiness|performance:readiness
 migrateStrictEffect|migrate-strict-effect|migrate-strict-effect|migrate:strict-effect
-routesGenerate|routes-generate|generate-tanstack-routes|`
+routesGenerate|routes-generate|generate-tanstack-routes|
+zeropsMaterialize|zerops-materialize|materialize-zerops-runtime|zerops:materialize
+cloudflareSsrProof|cloudflare-ssr-proof|proof-workerd-ssr|cloudflare:ssr-proof`
     .split('\n')
     .map(line => line.split('|'));
 
@@ -40,7 +42,7 @@ test('shared artifact metadata preserves the published wrapper identities', () =
     Object.fromEntries(
       publishedIdentities.map(([id, , basename]) => [
         id,
-        `scripts/${basename}.mts`,
+        `scripts/${basename}.${id === 'zeropsMaterialize' ? 'mjs' : 'mts'}`,
       ]),
     ),
   );
@@ -50,7 +52,12 @@ test('shared artifact metadata preserves the published wrapper identities', () =
   );
   for (const command of generatedToolingCommands) {
     assert.equal(GENERATED_TOOLING_COMMANDS[command.id], command);
-    assert.equal(command.legacyPath, `scripts/${command.wrapperName}.mjs`);
+    assert.equal(
+      command.legacyPath,
+      command.id === 'zeropsMaterialize'
+        ? undefined
+        : `scripts/${command.wrapperName}.mjs`,
+    );
   }
 });
 
@@ -72,6 +79,11 @@ test.each([
       .map(([id]) => id)
       .filter(
         id =>
+          !('shellOnly' in options && options.shellOnly) ||
+          !['zeropsMaterialize', 'cloudflareSsrProof'].includes(id),
+      )
+      .filter(
+        id =>
           backend ||
           !['backendFederationGenerate', 'backendFederationProof'].includes(id),
       ),
@@ -89,7 +101,7 @@ test('help exposes all wrapper and ad hoc commands without adding wrappers', () 
       '  skills install',
       '  skills check',
     ]);
-    assert.equal(generatedToolingCommands.length, 11);
+    assert.equal(generatedToolingCommands.length, 13);
   } finally {
     output.mockRestore();
   }

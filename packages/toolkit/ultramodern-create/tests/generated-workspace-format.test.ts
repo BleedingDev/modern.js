@@ -71,8 +71,17 @@ test('generated formatter composes Ultracite during preformat and workspace chec
   const configPath = createFormatHarness(tempRoot, workspaceDir);
   const relativePath = path.join('packages', 'format-probe.tsx');
   const probePath = path.join(workspaceDir, relativePath);
-  const unsortedProbe =
-    'export const Probe = () => <div className="p-4 flex items-center">probe</div>;\n';
+  const firstArgument = 'a'.repeat(40);
+  const secondArgument = 'b'.repeat(
+    120 - "export const atWidth = pair('', '');".length - firstArgument.length,
+  );
+  const atWidth = `export const atWidth = pair('${firstArgument}', '${secondArgument}');`;
+  const unsortedProbe = [
+    'export const Probe = () => <div className="p-4 flex items-center">probe</div>;',
+    atWidth,
+    `export const beyondWidth = pair('${firstArgument}', '${secondArgument}');`,
+    '',
+  ].join('\n');
 
   try {
     fs.writeFileSync(probePath, unsortedProbe, 'utf-8');
@@ -91,9 +100,19 @@ test('generated formatter composes Ultracite during preformat and workspace chec
       0,
       'generated formatter idempotence check',
     );
+    const formattedProbe = fs.readFileSync(probePath, 'utf-8');
+    assert.equal(atWidth.length, 120);
+    assert.ok(formattedProbe.includes(`${atWidth}\n`));
+    assert.ok(
+      formattedProbe.includes(
+        `export const beyondWidth = pair(\n  '${firstArgument}',\n  '${secondArgument}',\n);\n`,
+      ),
+      'calls longer than 120 columns wrap and include the final argument comma',
+    );
 
     fs.writeFileSync(probePath, unsortedProbe, 'utf-8');
     formatGeneratedWorkspaceFiles(workspaceDir, [relativePath]);
+    assert.equal(fs.readFileSync(probePath, 'utf-8'), formattedProbe);
     assertFormatStatus(
       runGeneratedFormat(workspaceDir, configPath, relativePath, true),
       0,

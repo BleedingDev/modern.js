@@ -356,6 +356,12 @@ export function createSharedPackage(
     };
     packageJson.dependencies = {
       ...ULTRAMODERN_PACKAGE_PINS.bffEffectDependencies,
+      '@modern-js/bff-effect': packageSource
+        ? modernPackageSpecifier('@modern-js/bff-effect', packageSource)
+        : WORKSPACE_PACKAGE_VERSION,
+      '@modern-js/runtime-extensions': packageSource
+        ? modernPackageSpecifier('@modern-js/runtime-extensions', packageSource)
+        : WORKSPACE_PACKAGE_VERSION,
       '@modern-js/plugin-bff': packageSource
         ? modernPackageSpecifier('@modern-js/plugin-bff', packageSource)
         : WORKSPACE_PACKAGE_VERSION,

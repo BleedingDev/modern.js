@@ -17,7 +17,10 @@
     "ultramodern.js"
   ],
   "version": "3.8.3",
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "types": "./dist/types/index.d.ts",
   "main": "./dist/cjs/index.js",
   "imports": {
@@ -95,13 +98,31 @@
       },
       "import": "./dist/esm/data-platform/index.mjs",
       "default": "./dist/esm/data-platform/index.mjs"
+    },
+    "./assembly": {
+      "types": "./dist/types/assembly.d.ts",
+      "modern:source": "./src/assembly.ts",
+      "node": {
+        "import": "./dist/esm-node/assembly.mjs",
+        "require": "./dist/cjs/assembly.js"
+      },
+      "default": "./dist/esm/assembly.mjs"
     }
   },
   "typesVersions": {
     "*": {
-      ".": ["./dist/types/index.d.ts", "./src/index.ts"],
-      "effect": ["./dist/types/effect/index.d.ts", "./src/effect/index.ts"],
-      "effect-edge": ["./dist/types/effect/edge.d.ts", "./src/effect/edge.ts"],
+      ".": [
+        "./dist/types/index.d.ts",
+        "./src/index.ts"
+      ],
+      "effect": [
+        "./dist/types/effect/index.d.ts",
+        "./src/effect/index.ts"
+      ],
+      "effect-edge": [
+        "./dist/types/effect/edge.d.ts",
+        "./src/effect/edge.ts"
+      ],
       "effect-client": [
         "./dist/types/effect-client/index.d.ts",
         "./src/effect-client/index.ts"
@@ -117,6 +138,10 @@
       "data-platform": [
         "./dist/types/data-platform/index.d.ts",
         "./src/data-platform/index.ts"
+      ],
+      "assembly": [
+        "./dist/types/assembly.d.ts",
+        "./src/assembly.ts"
       ]
     }
   },

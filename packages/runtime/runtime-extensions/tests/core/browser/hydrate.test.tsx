@@ -33,7 +33,9 @@ describe('hydrateRoot loadable chunk loading global', () => {
   });
 
   test('uses the loadable fallback when no build constant is present', async () => {
-    const { hydrateRoot } = await import('../../../src/core/browser/hydrate');
+    const { hydrateRoot } = await import(
+      '../../../../plugin-runtime/src/core/browser/hydrate'
+    );
     const hydratedRoot = { kind: 'hydrated-root' };
     const ModernHydrate = rstest.fn().mockResolvedValue(hydratedRoot);
 
@@ -54,7 +56,7 @@ describe('hydrateRoot loadable chunk loading global', () => {
 
   test('delegates hydration to the native React root and preserves the promise contract', async () => {
     const { hydrateWithReact } = await import(
-      '../../../src/core/browser/hydrate'
+      '../../../../plugin-runtime/src/core/browser/hydrate'
     );
     const App = React.createElement('main');
     const rootElement = {} as HTMLElement;
@@ -72,7 +74,9 @@ describe('hydrateRoot loadable chunk loading global', () => {
     const nodeProcess = globalThis.process;
     rstest.stubGlobal('process', undefined);
 
-    const hydrate = await import('../../../src/core/browser/hydrate');
+    const hydrate = await import(
+      '../../../../plugin-runtime/src/core/browser/hydrate'
+    );
     expect(hydrate).toBeDefined();
 
     rstest.stubGlobal('process', nodeProcess);

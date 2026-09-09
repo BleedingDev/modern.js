@@ -3,9 +3,9 @@
   "compilerOptions": {
     "declaration": false,
     "jsx": "preserve",
+    "rootDir": "./src",
     "paths": {},
-    "esModuleInterop": true,
-    "rootDir": "./src"
+    "esModuleInterop": true
   },
   "include": ["src"]
 }

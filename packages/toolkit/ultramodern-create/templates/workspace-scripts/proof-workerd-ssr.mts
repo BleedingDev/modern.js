@@ -5,7 +5,7 @@ import http from "node:http";
 import path from "node:path";
 import { Log, LogLevel, Miniflare } from "miniflare";
 
-const workspaceRoot = process.cwd();
+const workspaceRoot = path.resolve(process.env.ULTRAMODERN_WORKSPACE_ROOT ?? process.cwd());
 const defaultProofRoutes = ["/en"];
 const reportPath = path.join(
   workspaceRoot,

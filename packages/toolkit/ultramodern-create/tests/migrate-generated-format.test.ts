@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,9 +39,9 @@ function assertGeneratedFilesAreFormatted(
     }
     formatGeneratedWorkspaceFiles(formatRoot, relativePaths);
     for (const relativePath of relativePaths) {
-      assert.deepEqual(
-        fs.readFileSync(path.join(formatRoot, relativePath)),
-        fs.readFileSync(path.join(workspaceRoot, relativePath)),
+      assert.equal(
+        fs.readFileSync(path.join(formatRoot, relativePath), 'utf-8'),
+        fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf-8'),
         `${relativePath} must already contain canonical Oxfmt bytes`,
       );
     }
@@ -49,7 +50,11 @@ function assertGeneratedFilesAreFormatted(
   }
 }
 
-test('migrate formats only proven whole-file generated artifacts and stays byte-idempotent', async () => {
+test.each([
+  { printWidth: 80, singleQuote: false, trailingComma: 'none' },
+  { printWidth: 120, singleQuote: true, trailingComma: 'all' },
+  { printWidth: 160, singleQuote: false, trailingComma: 'es5' },
+])('migrate preserves authored formatter settings %j and stays byte-idempotent', async formatterSettings => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-migrate-format-'));
   const workspaceRoot = path.join(tempRoot, 'format-workspace');
   try {
@@ -70,13 +75,22 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
 
     const fragmentPath =
       'verticals/catalog/src/routes/[lang]/_mf/fragment/widget/page.tsx';
+    const historicalConfigPath = path.join(tempRoot, '.oxfmtrc.json');
+    fs.writeFileSync(historicalConfigPath, JSON.stringify(formatterSettings));
+    const historicalFormat = spawnSync(
+      process.execPath,
+      [
+        path.resolve(__dirname, '../node_modules/oxfmt/bin/oxfmt'),
+        '--config',
+        historicalConfigPath,
+        fragmentPath,
+      ],
+      { cwd: workspaceRoot, encoding: 'utf-8' },
+    );
+    assert.equal(historicalFormat.status, 0, historicalFormat.stderr);
     const fragmentSource = fs.readFileSync(
       path.join(workspaceRoot, fragmentPath),
       'utf-8',
-    );
-    fs.writeFileSync(
-      path.join(workspaceRoot, fragmentPath),
-      fragmentSource.replaceAll('\n  ', '\n'),
     );
 
     const consumerProbePath = 'packages/format-probe.tsx';
@@ -87,6 +101,11 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
       path.join(workspaceRoot, consumerProbePath),
       consumerProbe,
     );
+    const consumerConfigPath = path.join(workspaceRoot, 'oxfmt.config.ts');
+    const consumerConfig = Buffer.from(
+      `export default ${JSON.stringify(formatterSettings)};\n`,
+    );
+    fs.writeFileSync(consumerConfigPath, consumerConfig);
 
     const shellUiMarker = 'apps/shell-super-app/src/ultramodern-build.ts';
     fs.writeFileSync(
@@ -131,7 +150,6 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
         'verticals/catalog/backend-federation.config.ts',
         'verticals/catalog/shared/ultramodern-build.ts',
         'verticals/catalog/api/backend-federation.ts',
-        fragmentPath,
       ]),
     ].sort((left, right) => left.localeCompare(right));
 
@@ -151,6 +169,11 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
       /export const ultramodernUiMarker/u,
     );
     assertGeneratedFilesAreFormatted(workspaceRoot, generatedPaths);
+    assert.equal(
+      fs.readFileSync(path.join(workspaceRoot, fragmentPath), 'utf-8'),
+      fragmentSource,
+    );
+    assert.deepEqual(fs.readFileSync(consumerConfigPath), consumerConfig);
     assert.deepEqual(
       fs.readFileSync(path.join(workspaceRoot, consumerProbePath)),
       consumerProbe,
@@ -165,6 +188,11 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
       0,
     );
     assert.deepEqual(readFiles(workspaceRoot, generatedPaths), firstMigration);
+    assert.equal(
+      fs.readFileSync(path.join(workspaceRoot, fragmentPath), 'utf-8'),
+      fragmentSource,
+    );
+    assert.deepEqual(fs.readFileSync(consumerConfigPath), consumerConfig);
     assert.deepEqual(
       fs.readFileSync(path.join(workspaceRoot, consumerProbePath)),
       consumerProbe,

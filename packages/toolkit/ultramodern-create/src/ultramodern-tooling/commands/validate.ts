@@ -1,5 +1,5 @@
 import { readWorkspaceReleaseCohort } from '../../ultramodern-release-cohort';
-import { createWorkspaceValidationScript } from '../../ultramodern-workspace/workspace-scripts';
+import { createPackagedWorkspaceValidationScript } from '../../ultramodern-workspace/workspace-scripts';
 import {
   additionalShellsFromToolingConfig,
   readUltramodernConfig,
@@ -17,7 +17,7 @@ export function runValidate(context: CommandContext) {
     config.packageSource?.strategy === 'install'
       ? readWorkspaceReleaseCohort(context.workspaceRoot)
       : undefined;
-  const source = createWorkspaceValidationScript(
+  const source = createPackagedWorkspaceValidationScript(
     config.workspace.packageScope,
     config.features.tailwind,
     remotes,

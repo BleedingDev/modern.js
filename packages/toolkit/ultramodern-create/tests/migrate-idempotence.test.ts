@@ -100,7 +100,7 @@ snapshots: {}
   options: {
     beforeExit?: string;
     exitCode?: number;
-    requireLockfileAbsent?: boolean;
+    requireLockfilePresent?: boolean;
   } = {},
 ) {
   const binDir = path.join(tempRoot, 'bin');
@@ -111,7 +111,7 @@ snapshots: {}
     executable,
     `#!/bin/sh
 set -eu
-${options.requireLockfileAbsent ? 'test ! -e pnpm-lock.yaml' : ''}
+${options.requireLockfilePresent ? 'test -f pnpm-lock.yaml' : ''}
 printf '%s\\n' "$*" >> "$ULTRAMODERN_TEST_PNPM_LOG"
 cat > pnpm-lock.yaml <<'LOCKFILE'
 ${lockfile}LOCKFILE
@@ -186,9 +186,7 @@ test('source-checkout migrate uses workspace links and is byte-idempotent after 
 
   try {
     const extension = seedRetiredMetadata(workspaceDir);
-    const { binDir, invocationLog } = installFakePnpm(tempRoot, undefined, {
-      requireLockfileAbsent: true,
-    });
+    const { binDir, invocationLog } = installFakePnpm(tempRoot);
     process.env.PATH = `${binDir}${path.delimiter}${previousPath ?? ''}`;
     process.env.ULTRAMODERN_TEST_PNPM_LOG = invocationLog;
 
@@ -271,8 +269,8 @@ test('source-checkout migrate uses workspace links and is byte-idempotent after 
     assert.deepEqual(
       fs.readFileSync(invocationLog, 'utf-8').trim().split('\n'),
       [
-        'install --lockfile-only --ignore-scripts',
-        'install --lockfile-only --ignore-scripts',
+        'install --no-frozen-lockfile --ignore-scripts',
+        'install --no-frozen-lockfile --ignore-scripts',
       ],
     );
   } finally {
@@ -343,7 +341,7 @@ chmod 600 consumer-tool.sh
 mkdir -p .modernjs/failed-lock-refresh
 printf 'created by failed refresh\\n' > .modernjs/failed-lock-refresh/artifact.txt`,
       exitCode: 23,
-      requireLockfileAbsent: true,
+      requireLockfilePresent: true,
     });
     process.env.PATH = `${binDir}${path.delimiter}${previousPath ?? ''}`;
     process.env.ULTRAMODERN_TEST_PNPM_LOG = invocationLog;

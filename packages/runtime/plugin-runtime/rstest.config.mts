@@ -23,7 +23,6 @@ export default {
       name: 'plugin-runtime-node',
       testEnvironment: 'node',
       exclude: [
-        'tests/boundary-debugger/client.test.tsx',
         'tests/router/plugin.client.test.tsx',
         'tests/router/prefetch.test.tsx',
         'tests/router/prefetch-realm-isolation.test.tsx',
@@ -52,7 +51,6 @@ export default {
       name: 'plugin-runtime-client',
       testEnvironment: 'happy-dom',
       include: [
-        'tests/boundary-debugger/client.test.tsx',
         'tests/router/plugin.client.test.tsx',
         'tests/router/prefetch.test.tsx',
         'tests/router/prefetch-realm-isolation.test.tsx',

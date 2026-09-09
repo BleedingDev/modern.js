@@ -631,3 +631,64 @@ export function updateGeneratedPackageScripts(
 
   return changed;
 }
+
+/** Only change already-declared leaves whose source identity is authenticated. */
+export function updateSameContractDependencies(
+  packageJson: Record<string, any>,
+  sourceCohort: UltramodernReleaseCohort,
+  targetCohort: UltramodernReleaseCohort,
+) {
+  const sourcePins = new Map(
+    sourceCohort.packages.flatMap(
+      item =>
+        [
+          [item.sourceName, `npm:${item.targetName}@${item.version}`],
+          [item.targetName, item.version],
+        ] as Array<[string, string]>,
+    ),
+  );
+  const targetPins = new Map(
+    targetCohort.packages.flatMap(
+      item =>
+        [
+          [item.sourceName, `npm:${item.targetName}@${item.version}`],
+          [item.targetName, item.version],
+        ] as Array<[string, string]>,
+    ),
+  );
+  const changes: Array<{ section: string; name: string; value: string }> = [];
+  for (const section of [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ]) {
+    const dependencies = packageJson[section];
+    if (dependencies === undefined) continue;
+    if (
+      !dependencies ||
+      typeof dependencies !== 'object' ||
+      Array.isArray(dependencies)
+    ) {
+      throw new Error(`${section} must be an object.`);
+    }
+    for (const [name, previous] of Object.entries(dependencies)) {
+      const source = sourcePins.get(name);
+      if (source === undefined) continue;
+      if (previous !== source)
+        throw new Error(
+          `${section}.${name} does not match the authenticated source cohort.`,
+        );
+      const target = targetPins.get(name);
+      if (target === undefined)
+        throw new Error(
+          `${section}.${name} has no authenticated target cohort member.`,
+        );
+      if (previous !== target) {
+        dependencies[name] = target;
+        changes.push({ section, name, value: target });
+      }
+    }
+  }
+  return changes;
+}

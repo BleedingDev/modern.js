@@ -2,9 +2,10 @@ const fs = require('fs');
 const path = require('path');
 
 const { extractImportSpecifiers } = require('../boundary-guards/validator');
-const { runCommand } = require('../lib/process-kit');
+const { createProcessEnv, runCommand } = require('../lib/process-kit');
+const { resolveCommitSha, resolveRepositoryTopLevel } = require('./divergence');
 
-const DEFAULT_BASE_REF = '8a744c1b';
+const DEFAULT_BASE_REF = '8a744c1b3178d1e85d4113f29e8837ff94079fb3';
 const DEFAULT_ALLOWLIST_PATH = path.join(__dirname, 'allowlist.json');
 const SOURCE_FILE_PATTERN =
   /^packages\/.+\/src\/.+\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/;
@@ -26,13 +27,24 @@ const DEFAULT_DENYLIST = Object.freeze([
 const toPosixPath = value => value.split(path.sep).join('/');
 
 const runGit = ({ rootDir, args, allowFailure = false }) => {
-  const result = runCommand('git', args, {
+  const env = createProcessEnv(
+    Object.fromEntries(
+      Object.keys(process.env)
+        .filter(key => key.toUpperCase().startsWith('GIT_'))
+        .map(key => [key, undefined]),
+    ),
+  );
+  const result = runCommand('git', ['--literal-pathspecs', ...args], {
+    env,
     cwd: rootDir,
     encoding: 'utf8',
     stdio: 'pipe',
   });
   const status = result.processStatus;
 
+  if (result.error) {
+    throw new Error(`git ${args.join(' ')} failed: ${result.error.message}`);
+  }
   if (!allowFailure && status !== 0) {
     const stderr = result.stderr.trim();
     const suffix = stderr ? `: ${stderr}` : '';
@@ -60,18 +72,20 @@ const sortViolationRecords = violations =>
       left.specifier.localeCompare(right.specifier),
   );
 
-const listPackageSourceFiles = rootDir => {
+const listPackageSourceFiles = (rootDir, headRef) => {
   const result = runGit({
     rootDir,
-    args: ['ls-files', '--', 'packages'],
+    args: headRef
+      ? ['ls-tree', '-r', '--name-only', '-z', headRef, '--', 'packages']
+      : ['ls-files', '-z', '--', 'packages'],
   });
 
   return result.stdout
-    .split(/\r?\n/)
+    .split('\0')
     .filter(Boolean)
     .map(toPosixPath)
     .filter(file => SOURCE_FILE_PATTERN.test(file))
-    .filter(file => fs.existsSync(path.join(rootDir, file)))
+    .filter(file => headRef || fs.existsSync(path.join(rootDir, file)))
     .sort();
 };
 
@@ -89,12 +103,17 @@ const listUpstreamOwnedPackageSourceFiles = ({
   rootDir,
   baseRef = DEFAULT_BASE_REF,
   files,
+  headRef,
 }) => {
-  const candidateFiles = files ?? listPackageSourceFiles(rootDir);
-
-  return candidateFiles.filter(file =>
-    pathExistsAtRef({ rootDir, baseRef, file }),
-  );
+  const resolvedBase = resolveCommitSha({ rootDir, ref: baseRef });
+  if (!resolvedBase) {
+    throw new Error(
+      `Import ownership base ${String(baseRef)} does not resolve to a commit.`,
+    );
+  }
+  const candidateFiles = files ?? listPackageSourceFiles(rootDir, headRef);
+  const ownedFiles = new Set(listPackageSourceFiles(rootDir, resolvedBase));
+  return candidateFiles.filter(file => ownedFiles.has(file));
 };
 
 const findDenylistMatches = ({ specifier, denylist = DEFAULT_DENYLIST }) => {
@@ -110,16 +129,39 @@ const scanUpstreamOwnedForkImports = ({
   baseRef = DEFAULT_BASE_REF,
   denylist = DEFAULT_DENYLIST,
   files,
+  headRef,
 } = {}) => {
+  rootDir = resolveRepositoryTopLevel({ rootDir });
+  const targetRef = headRef ?? 'HEAD';
+  const resolvedHead = resolveCommitSha({ rootDir, ref: targetRef });
+  if (!resolvedHead) {
+    throw new Error(
+      `Import target ${String(targetRef)} does not resolve to a commit.`,
+    );
+  }
+  const resolvedBase = resolveCommitSha({ rootDir, ref: baseRef });
+  if (!resolvedBase) {
+    throw new Error(
+      `Import ownership base ${String(baseRef)} does not resolve to a commit.`,
+    );
+  }
+  runGit({
+    rootDir,
+    args: ['merge-base', '--is-ancestor', resolvedBase, resolvedHead],
+  });
   const upstreamOwnedFiles = listUpstreamOwnedPackageSourceFiles({
     rootDir,
-    baseRef,
+    baseRef: resolvedBase,
     files,
+    headRef: headRef === undefined ? undefined : resolvedHead,
   });
   const violations = [];
 
   upstreamOwnedFiles.forEach(file => {
-    const content = fs.readFileSync(path.join(rootDir, file), 'utf8');
+    const content =
+      headRef === undefined
+        ? fs.readFileSync(path.join(rootDir, file), 'utf8')
+        : runGit({ rootDir, args: ['show', `${resolvedHead}:${file}`] }).stdout;
     const specifiers = [...new Set(extractImportSpecifiers(content))];
 
     specifiers.forEach(specifier => {
@@ -137,6 +179,8 @@ const scanUpstreamOwnedForkImports = ({
   });
 
   return {
+    baseRef: resolvedBase,
+    headRef: headRef === undefined ? null : resolvedHead,
     scannedFiles: upstreamOwnedFiles.length,
     violations: sortViolationRecords(violations),
   };
@@ -242,28 +286,37 @@ const checkForkImportBoundary = ({
   allowlistPath = DEFAULT_ALLOWLIST_PATH,
   denylist = DEFAULT_DENYLIST,
   files,
+  headRef,
 } = {}) => {
   const current = scanUpstreamOwnedForkImports({
     rootDir,
     baseRef,
     denylist,
     files,
+    headRef,
   });
   const allowlist = readAllowlist(allowlistPath);
+  const recordedBase = resolveCommitSha({ rootDir, ref: allowlist.baseRef });
+  if (!recordedBase || recordedBase !== current.baseRef) {
+    throw new Error(
+      'Import allowlist ownership base does not match the measured base.',
+    );
+  }
   const diff = diffViolations({
     currentViolations: current.violations,
     allowlistViolations: allowlist.violations,
   });
 
   return {
-    baseRef,
+    baseRef: current.baseRef,
+    headRef: current.headRef,
     allowlistPath,
     scannedFiles: current.scannedFiles,
     currentViolations: current.violations,
     allowlistViolations: allowlist.violations,
     added: diff.added,
     removed: diff.removed,
-    ok: diff.added.length === 0,
+    ok: current.violations.length === 0,
   };
 };
 
@@ -279,7 +332,7 @@ const formatBoundaryReport = report => {
   const lines = [
     `[ultramodern-boundary] checked ${String(
       report.scannedFiles,
-    )} upstream-owned packages/**/src files at ${report.baseRef}`,
+    )} upstream-owned packages/**/src files at ${report.baseRef}; target=${report.headRef ?? 'worktree'}`,
     `[ultramodern-boundary] current=${String(
       report.currentViolations.length,
     )} allowlist=${String(report.allowlistViolations.length)} added=${String(
@@ -287,11 +340,11 @@ const formatBoundaryReport = report => {
     )} removed=${String(report.removed.length)}`,
   ];
 
-  if (report.added.length > 0) {
+  if (report.currentViolations.length > 0) {
     lines.push(
       '',
-      'New upstream-owned imports of fork-only code:',
-      ...report.added.map(formatViolation),
+      'Current upstream-owned imports of fork-only code (allowances do not permit edges):',
+      ...report.currentViolations.map(formatViolation),
     );
   }
 
@@ -303,8 +356,8 @@ const formatBoundaryReport = report => {
     );
   }
 
-  if (report.added.length === 0) {
-    lines.push('', 'No new upstream-owned imports of fork-only code.');
+  if (report.currentViolations.length === 0) {
+    lines.push('', 'No current upstream-owned imports of fork-only code.');
   }
 
   return lines.join('\n');

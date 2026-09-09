@@ -91,36 +91,16 @@ export function createAppRuntimeConfig(
   const routeNamespace = emitsUi ? 'ultramodernRouteNamespace' : "'api'";
 
   return `import { defineRuntimeConfig } from '@modern-js/runtime';
-${app.kind === 'shell' ? "import { ultramodernBoundaryDebuggerPlugin } from '@modern-js/runtime/boundary-debugger';\n" : ''}import type { I18nInstance } from '@modern-js/plugin-i18n/runtime';
+${app.kind === 'shell' ? "import { ultramodernBoundaryDebuggerPlugin } from '@modern-js/runtime-extensions/boundary-debugger';\n" : ''}import type { I18nInstance } from '@modern-js/plugin-i18n/runtime';
 import { createInstance } from 'i18next';
 import csResource from '../locales/cs/${appI18nNamespace(app)}.json';
 import enResource from '../locales/en/${appI18nNamespace(app)}.json';
 ${routeMetadataImport}
 
-type LocaleResource = string | { readonly [key: string]: LocaleResource };
-
-const flattenLocaleResource = (
-  resource: LocaleResource,
-  prefix = '',
-): Record<string, string> => {
-  if (typeof resource === 'string') {
-    return prefix.length > 0 ? { [prefix]: resource } : {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(resource).flatMap(([key, value]) => {
-      const nextKey = prefix.length > 0 ? \`\${prefix}.\${key}\` : key;
-      return typeof value === 'string'
-        ? [[nextKey, value]]
-        : Object.entries(flattenLocaleResource(value, nextKey));
-    }),
-  );
-};
-
 const i18nInstance = createInstance();
 const resources = {
-  cs: { [${routeNamespace}]: flattenLocaleResource(csResource) },
-  en: { [${routeNamespace}]: flattenLocaleResource(enResource) },
+  cs: { [${routeNamespace}]: csResource },
+  en: { [${routeNamespace}]: enResource },
 } as const;
 
 export default defineRuntimeConfig({

@@ -7,6 +7,7 @@ import { normalizePath } from '../naming';
 type WorkspaceFile = {
   content: Buffer;
   mode: number;
+  symlink?: true;
 };
 
 type WorkspaceSnapshot = Map<string, WorkspaceFile>;
@@ -54,6 +55,11 @@ export const __transactionTestHooks: {
     workspaceRoot: string;
     relativePath: string;
   }) => void;
+  afterPublishPath?: (details: {
+    workspaceRoot: string;
+    relativePath: string;
+    index: number;
+  }) => void;
   beforeFreshPublish?: (details: { workspaceRoot: string }) => void;
 } = {};
 
@@ -82,7 +88,7 @@ function walkWorkspaceFiles(
       }
       if (entry.isDirectory()) {
         collect(entryPath);
-      } else if (entry.isFile()) {
+      } else if (entry.isFile() || entry.isSymbolicLink()) {
         onFile(relativePath, entryPath);
       } else {
         throw new WorkspaceTransactionConflictError(
@@ -95,13 +101,27 @@ function walkWorkspaceFiles(
   collect(root);
 }
 
-function captureWorkspace(root: string): WorkspaceSnapshot {
+function captureWorkspace(
+  root: string,
+  publishedRoot = root,
+): WorkspaceSnapshot {
   const files: WorkspaceSnapshot = new Map();
   walkWorkspaceFiles(root, (relativePath, absolutePath) => {
-    const stat = fs.statSync(absolutePath);
+    const stat = fs.lstatSync(absolutePath);
+    const target = stat.isSymbolicLink()
+      ? fs.readlinkSync(absolutePath)
+      : undefined;
     files.set(relativePath, {
-      content: fs.readFileSync(absolutePath),
-      mode: stat.mode & 0o777,
+      content:
+        target === undefined
+          ? fs.readFileSync(absolutePath)
+          : Buffer.from(
+              path.isAbsolute(target) && isInside(root, target)
+                ? path.join(publishedRoot, path.relative(root, target))
+                : target,
+            ),
+      mode: stat.mode & 0o7777,
+      ...(target === undefined ? {} : { symlink: true as const }),
     });
   });
   return files;
@@ -114,7 +134,11 @@ function sameFile(
   if (left === undefined || right === undefined) {
     return left === right;
   }
-  return left.mode === right.mode && left.content.equals(right.content);
+  return (
+    left.symlink === right.symlink &&
+    left.mode === right.mode &&
+    left.content.equals(right.content)
+  );
 }
 
 function buildChangePlan(
@@ -231,6 +255,10 @@ function assertFreshTarget(
 }
 
 function publishFileExclusive(sourcePath: string, targetPath: string): void {
+  if (fs.lstatSync(sourcePath).isSymbolicLink()) {
+    fs.symlinkSync(fs.readlinkSync(sourcePath), targetPath);
+    return;
+  }
   try {
     fs.linkSync(sourcePath, targetPath);
   } catch (error) {
@@ -245,24 +273,56 @@ function publishFileExclusive(sourcePath: string, targetPath: string): void {
   }
 }
 
+function isInside(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return (
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
 function copyWorkspaceToStage(root: string, stagingRoot: string): void {
+  // Validate links before copying anything: no staged operation may follow an
+  // external target. Descendant links are copied as links, never dereferenced.
+  walkWorkspaceFiles(root, (relativePath, absolutePath) => {
+    if (!fs.lstatSync(absolutePath).isSymbolicLink()) return;
+    let target: string;
+    try {
+      target = fs.realpathSync.native(absolutePath);
+    } catch (cause) {
+      throw new WorkspaceTransactionConflictError(
+        `Unsupported dangling or cyclic workspace link: ${relativePath}`,
+        { cause },
+      );
+    }
+    if (
+      !isInside(root, target) ||
+      isIgnoredRelativePath(path.relative(root, target))
+    ) {
+      throw new WorkspaceTransactionConflictError(
+        `Workspace transaction conflict: link escapes the staged input: ${relativePath}`,
+      );
+    }
+  });
   fs.cpSync(root, stagingRoot, {
     mode: fs.constants.COPYFILE_FICLONE,
     recursive: true,
-    filter(sourcePath) {
-      const relativePath = path.relative(root, sourcePath);
-      if (relativePath === '') {
-        return true;
-      }
-      if (isIgnoredRelativePath(relativePath)) {
-        return false;
-      }
-      // A preserved symlink would still point outside the private stage. Any
-      // generator write through it could mutate the live workspace (or an
-      // external tree) before publication. Leave links out of the stage; an
-      // owned output beneath one then fails at the live-parent check.
-      return !fs.lstatSync(sourcePath).isSymbolicLink();
-    },
+    verbatimSymlinks: true,
+    filter: sourcePath =>
+      !isIgnoredRelativePath(path.relative(root, sourcePath)),
+  });
+  walkWorkspaceFiles(stagingRoot, (_relativePath, absolutePath) => {
+    if (!fs.lstatSync(absolutePath).isSymbolicLink()) return;
+    const target = fs.readlinkSync(absolutePath);
+    if (path.isAbsolute(target)) {
+      const realTarget = fs.realpathSync.native(target);
+      fs.unlinkSync(absolutePath);
+      fs.symlinkSync(
+        path.join(stagingRoot, path.relative(root, realTarget)),
+        absolutePath,
+      );
+    }
   });
 }
 
@@ -296,6 +356,7 @@ export function relocateStagedWorkspaceReferences(
   const stagedPath = Buffer.from(stagingRoot);
   const publishedPath = Buffer.from(workspaceRoot);
   walkWorkspaceFiles(stagingRoot, (_relativePath, absolutePath) => {
+    if (fs.lstatSync(absolutePath).isSymbolicLink()) return;
     const content = fs.readFileSync(absolutePath);
     if (!content.includes(stagedPath)) {
       return;
@@ -327,14 +388,17 @@ function readFilePath(
     }
     throw error;
   }
-  if (!stat.isFile()) {
+  if (!stat.isFile() && !stat.isSymbolicLink()) {
     throw new WorkspaceTransactionConflictError(
       `Workspace target changed type during generation: ${displayPath}`,
     );
   }
   return {
-    content: fs.readFileSync(absolutePath),
-    mode: stat.mode & 0o777,
+    content: stat.isSymbolicLink()
+      ? Buffer.from(fs.readlinkSync(absolutePath))
+      : fs.readFileSync(absolutePath),
+    mode: stat.mode & 0o7777,
+    ...(stat.isSymbolicLink() ? { symlink: true as const } : {}),
   };
 }
 
@@ -397,6 +461,10 @@ function temporaryFilePath(root: string, relativePath: string, role: string) {
 }
 
 function writeTemporaryFile(filePath: string, file: WorkspaceFile): void {
+  if (file.symlink) {
+    fs.symlinkSync(file.content.toString(), filePath);
+    return;
+  }
   fs.writeFileSync(filePath, file.content, {
     flag: 'wx',
     mode: file.mode,
@@ -418,28 +486,17 @@ function removeIfPresent(filePath: string | undefined): void {
 
 function prepareChanges(
   root: string,
-  changes: WorkspaceChange[],
-  createdDirectories: string[],
   preparedChanges: PreparedChange[],
+  createdDirectories: string[],
 ): void {
-  for (const change of changes) {
-    ensureOwnedParentDirectories(root, change.relativePath, createdDirectories);
-    const prepared: PreparedChange = { ...change, published: false };
-    preparedChanges.push(prepared);
-    if (change.after) {
-      prepared.publishPath = temporaryFilePath(
-        root,
-        change.relativePath,
-        'publish',
-      );
-      writeTemporaryFile(prepared.publishPath, change.after);
-    }
-    if (change.before) {
-      prepared.rollbackPath = temporaryFilePath(
-        root,
-        change.relativePath,
-        change.after ? 'rollback' : 'removed',
-      );
+  for (const prepared of preparedChanges) {
+    ensureOwnedParentDirectories(
+      root,
+      prepared.relativePath,
+      createdDirectories,
+    );
+    if (prepared.after && prepared.publishPath) {
+      writeTemporaryFile(prepared.publishPath, prepared.after);
     }
   }
 }
@@ -693,6 +750,247 @@ function publishChange(root: string, change: PreparedChange): void {
   change.published = true;
 }
 
+const receiptSuffix = '.receipt.json';
+
+type TransactionReceipt = {
+  schema: 'ultramodern-workspace-transaction-v1';
+  root: string;
+  rootIdentity: { dev: number; ino: number };
+  stagingIdentity: { dev: number; ino: number };
+  pid: number;
+  state: 'publishing' | 'committed';
+  changes: Array<
+    Omit<PreparedChange, 'before' | 'after'> & {
+      before?: { content: string; mode: number; symlink?: true };
+      after?: { content: string; mode: number; symlink?: true };
+    }
+  >;
+};
+
+function persistReceipt(receiptPath: string, receipt: TransactionReceipt) {
+  const temporary = `${receiptPath}.next`;
+  const fd = fs.openSync(temporary, 'wx', 0o600);
+  try {
+    fs.writeFileSync(fd, JSON.stringify(receipt));
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(temporary, receiptPath);
+  const directory = fs.openSync(path.dirname(receiptPath), 'r');
+  try {
+    fs.fsyncSync(directory);
+  } finally {
+    fs.closeSync(directory);
+  }
+}
+
+function encodedReceipt(
+  root: string,
+  stagingRoot: string,
+  changes: PreparedChange[],
+): TransactionReceipt {
+  const encode = (file: WorkspaceFile | undefined) =>
+    file
+      ? {
+          ...file,
+          content: file.content.toString('base64'),
+        }
+      : undefined;
+  const identity = (filePath: string) => {
+    const { dev, ino } = fs.lstatSync(filePath);
+    return { dev, ino };
+  };
+  return {
+    schema: 'ultramodern-workspace-transaction-v1',
+    root,
+    rootIdentity: identity(root),
+    stagingIdentity: identity(stagingRoot),
+    pid: process.pid,
+    state: 'publishing',
+    changes: changes.map(change => ({
+      ...change,
+      before: encode(change.before),
+      after: encode(change.after),
+    })),
+  };
+}
+
+function decodeReceipt(
+  receiptPath: string,
+  root: string,
+): { receipt: TransactionReceipt; changes: PreparedChange[] } {
+  const stat = fs.lstatSync(receiptPath);
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    (typeof process.getuid === 'function' && stat.uid !== process.getuid())
+  ) {
+    throw new WorkspaceTransactionConflictError(
+      `Unsafe interrupted transaction receipt: ${receiptPath}`,
+    );
+  }
+  const receipt = JSON.parse(
+    fs.readFileSync(receiptPath, 'utf8'),
+  ) as TransactionReceipt;
+  const stagingRoot = receiptPath.slice(0, -receiptSuffix.length);
+  if (
+    receipt.schema !== 'ultramodern-workspace-transaction-v1' ||
+    receipt.root !== root ||
+    !['publishing', 'committed'].includes(receipt.state) ||
+    !Number.isSafeInteger(receipt.pid) ||
+    receipt.pid <= 0 ||
+    !sameIdentity(fs.lstatSync(root), receipt.rootIdentity) ||
+    !sameIdentity(fs.lstatSync(stagingRoot), receipt.stagingIdentity) ||
+    !Array.isArray(receipt.changes)
+  ) {
+    throw new WorkspaceTransactionConflictError(
+      `Unrecognized interrupted transaction receipt: ${receiptPath}`,
+    );
+  }
+  const paths = new Set<string>();
+  const decode = (
+    file: TransactionReceipt['changes'][number]['before'],
+  ): WorkspaceFile | undefined => {
+    if (file === undefined) return undefined;
+    if (
+      !file ||
+      typeof file.content !== 'string' ||
+      !Number.isInteger(file.mode) ||
+      file.mode < 0 ||
+      file.mode > 0o7777 ||
+      (file.symlink !== undefined && file.symlink !== true) ||
+      Buffer.from(file.content, 'base64').toString('base64') !== file.content
+    ) {
+      throw new WorkspaceTransactionConflictError(
+        `Malformed interrupted transaction preimage: ${receiptPath}`,
+      );
+    }
+    return { ...file, content: Buffer.from(file.content, 'base64') };
+  };
+  const changes = receipt.changes.map(change => {
+    const relative = change.relativePath;
+    if (
+      typeof relative !== 'string' ||
+      !relative ||
+      path.isAbsolute(relative) ||
+      normalizePath(path.normalize(relative)) !== relative ||
+      !isInside(root, path.resolve(root, relative)) ||
+      isIgnoredRelativePath(relative) ||
+      paths.has(relative)
+    ) {
+      throw new WorkspaceTransactionConflictError(
+        `Unsafe interrupted transaction target: ${String(relative)}`,
+      );
+    }
+    paths.add(relative);
+    for (const temporary of [change.publishPath, change.rollbackPath]) {
+      if (
+        temporary !== undefined &&
+        (typeof temporary !== 'string' ||
+          path.dirname(temporary) !== path.dirname(path.join(root, relative)) ||
+          !path
+            .basename(temporary)
+            .startsWith(`.${path.basename(relative)}.ultramodern-`) ||
+          !temporary.endsWith('.tmp'))
+      ) {
+        throw new WorkspaceTransactionConflictError(
+          `Unsafe interrupted transaction temporary: ${String(temporary)}`,
+        );
+      }
+    }
+    return {
+      relativePath: relative,
+      before: decode(change.before),
+      after: decode(change.after),
+      publishPath: change.publishPath,
+      rollbackPath: change.rollbackPath,
+      published: false,
+    };
+  });
+  return { receipt, changes };
+}
+
+/** Recover only our validated durable publication receipts, never unknown stages. */
+export function recoverWorkspaceTransactions(root: string): void {
+  const workspaceRoot = fs.realpathSync.native(root);
+  const parent = path.dirname(workspaceRoot);
+  const prefix = `.${path.basename(workspaceRoot)}.ultramodern-stage-`;
+  for (const entry of fs.readdirSync(parent).sort()) {
+    if (!entry.startsWith(prefix) || !entry.endsWith(receiptSuffix)) continue;
+    const receiptPath = path.join(parent, entry);
+    const { receipt, changes } = decodeReceipt(receiptPath, workspaceRoot);
+    try {
+      process.kill(receipt.pid, 0);
+      throw new WorkspaceTransactionConflictError(
+        `Workspace publication is still owned by process ${receipt.pid}: ${receiptPath}`,
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+    }
+    // Validate every target and owned temporary before restoring any path.
+    for (const change of changes) {
+      ensureOwnedParentDirectories(workspaceRoot, change.relativePath, []);
+      for (const [temporary, expected] of [
+        [change.publishPath, change.after],
+        [change.rollbackPath, change.before],
+      ] as const) {
+        if (
+          temporary &&
+          fs.existsSync(temporary) &&
+          !sameFile(readFilePath(temporary, temporary), expected)
+        ) {
+          throw new WorkspaceTransactionConflictError(
+            `Interrupted transaction temporary changed; preserved at ${temporary}`,
+          );
+        }
+      }
+      if (receipt.state === 'committed') continue;
+      const current = readWorkspaceFile(workspaceRoot, change.relativePath);
+      if (sameFile(current, change.before)) continue;
+      if (sameFile(current, change.after)) {
+        change.published = true;
+        if (
+          change.before &&
+          change.rollbackPath &&
+          !fs.existsSync(change.rollbackPath)
+        )
+          writeTemporaryFile(change.rollbackPath, change.before);
+      } else if (
+        current === undefined &&
+        change.before &&
+        change.rollbackPath &&
+        fs.existsSync(change.rollbackPath)
+      ) {
+        // The process stopped after quarantining the exact preimage but before
+        // publishing its replacement. Exclusive restore cannot clobber a writer.
+        if (
+          !restoreQuarantinedPreimage(
+            change,
+            path.join(workspaceRoot, change.relativePath),
+          )
+        ) {
+          throw new WorkspaceTransactionConflictError(
+            `Interrupted preimage cannot be restored: ${change.relativePath}`,
+          );
+        }
+      } else {
+        throw new WorkspaceTransactionConflictError(
+          `Interrupted transaction conflicts with newer consumer bytes: ${change.relativePath}; receipt ${receiptPath}`,
+        );
+      }
+    }
+    if (receipt.state === 'publishing')
+      rollbackPublishedChanges(workspaceRoot, changes);
+    cleanupPreparedChanges(changes, []);
+    removeOwnedTemporaryDirectory(
+      receiptPath.slice(0, -receiptSuffix.length),
+      receipt.stagingIdentity,
+    );
+    removeIfPresent(receiptPath);
+  }
+}
+
 function publishChangePlan(
   root: string,
   stagingRoot: string,
@@ -703,18 +1001,31 @@ function publishChangePlan(
     stagingRoot,
     changedPaths: changes.map(change => change.relativePath),
   });
-
-  for (const change of changes) {
-    assertPreimage(root, change);
-  }
-
+  for (const change of changes) assertPreimage(root, change);
+  if (changes.length === 0) return;
   const createdDirectories: string[] = [];
-  const preparedChanges: PreparedChange[] = [];
+  const preparedChanges: PreparedChange[] = changes.map(change => ({
+    ...change,
+    published: false,
+    ...(change.after
+      ? { publishPath: temporaryFilePath(root, change.relativePath, 'publish') }
+      : {}),
+    ...(change.before
+      ? {
+          rollbackPath: temporaryFilePath(
+            root,
+            change.relativePath,
+            'rollback',
+          ),
+        }
+      : {}),
+  }));
+  const receiptPath = `${stagingRoot}${receiptSuffix}`;
+  const receipt = encodedReceipt(root, stagingRoot, preparedChanges);
+  persistReceipt(receiptPath, receipt);
   try {
-    prepareChanges(root, changes, createdDirectories, preparedChanges);
-    for (const change of preparedChanges) {
-      assertPreimage(root, change);
-    }
+    prepareChanges(root, preparedChanges, createdDirectories);
+    for (const change of preparedChanges) assertPreimage(root, change);
     preparedChanges.forEach((change, index) => {
       __transactionTestHooks.beforePublishPath?.({
         workspaceRoot: root,
@@ -722,21 +1033,33 @@ function publishChangePlan(
         index,
       });
       publishChange(root, change);
+      __transactionTestHooks.afterPublishPath?.({
+        workspaceRoot: root,
+        relativePath: change.relativePath,
+        index,
+      });
     });
+    persistReceipt(receiptPath, { ...receipt, state: 'committed' });
   } catch (error) {
     try {
       rollbackPublishedChanges(root, preparedChanges);
     } catch (rollbackError) {
       throw new WorkspaceTransactionConflictError(
-        'Workspace transaction failed and concurrent target changes prevented a safe rollback.',
+        `Workspace transaction failed and concurrent target changes prevented a safe rollback; recovery receipt ${receiptPath}.`,
         { cause: rollbackError },
       );
-    } finally {
-      cleanPreparedChanges(preparedChanges, createdDirectories);
     }
+    cleanPreparedChanges(preparedChanges, createdDirectories);
+    if (
+      !preparedChanges.some(
+        change => change.preserveRollback || change.preservedPaths?.length,
+      )
+    )
+      removeIfPresent(receiptPath);
     throw error;
   }
   cleanPreparedChanges(preparedChanges, []);
+  removeIfPresent(receiptPath);
 }
 
 /**
@@ -748,26 +1071,51 @@ function publishChangePlan(
 export function runWorkspaceTransaction<T>(
   root: string,
   mutate: (stagingRoot: string) => T,
+  options: {
+    commitWhen?: (result: Awaited<T>) => boolean;
+    inspectChanges?: (changes: readonly WorkspaceChange[]) => void;
+  } = {},
 ): T {
   const workspaceRoot = fs.realpathSync.native(path.resolve(root));
   if (!fs.statSync(workspaceRoot).isDirectory()) {
     throw new Error(`Workspace root is not a directory: ${root}`);
   }
+  recoverWorkspaceTransactions(workspaceRoot);
   const stagingRoot = createTemporarySibling(workspaceRoot);
   const stagingIdentity = fs.lstatSync(stagingRoot);
+  const cleanup = () => {
+    // A failed rollback retains both the durable receipt and its owned stage.
+    if (!fs.existsSync(`${stagingRoot}${receiptSuffix}`))
+      cleanOwnedTemporaryDirectory(stagingRoot, stagingIdentity);
+  };
   try {
     copyWorkspaceToStage(workspaceRoot, stagingRoot);
-    // Diff the private stage against its own pre-mutation state. A consumer
-    // edit that lands while the stage is being copied is either part of both
-    // snapshots or neither; it can never be mistaken for generator output.
-    const before = captureWorkspace(stagingRoot);
+    const before = captureWorkspace(stagingRoot, workspaceRoot);
+    const finish = (result: Awaited<T>) => {
+      if (options.commitWhen && !options.commitWhen(result)) return result;
+      relocateStagedWorkspaceReferences(stagingRoot, root);
+      const changes = buildChangePlan(
+        before,
+        captureWorkspace(stagingRoot, workspaceRoot),
+      );
+      options.inspectChanges?.(changes);
+      publishChangePlan(workspaceRoot, stagingRoot, changes);
+      return result;
+    };
     const result = mutate(stagingRoot);
-    relocateStagedWorkspaceReferences(stagingRoot, root);
-    const changes = buildChangePlan(before, captureWorkspace(stagingRoot));
-    publishChangePlan(workspaceRoot, stagingRoot, changes);
-    return result;
-  } finally {
-    cleanOwnedTemporaryDirectory(stagingRoot, stagingIdentity);
+    if (
+      result !== null &&
+      (typeof result === 'object' || typeof result === 'function') &&
+      typeof (result as unknown as PromiseLike<unknown>).then === 'function'
+    ) {
+      return Promise.resolve(result).then(finish).finally(cleanup) as T;
+    }
+    const completed = finish(result as Awaited<T>);
+    cleanup();
+    return completed as T;
+  } catch (error) {
+    cleanup();
+    throw error;
   }
 }
 

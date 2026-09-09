@@ -140,6 +140,7 @@ export function verticalsFromTopology(
       port: typeof ports[vertical.id] === 'number' ? ports[vertical.id] : 0,
       mfName:
         vertical.moduleFederation?.name ?? `vertical${toPascalCase(domain)}`,
+      ...(vertical.deliveryUnit ? { deliveryUnit: vertical.deliveryUnit } : {}),
       ...(surfaceProfile === undefined ? {} : { surfaceProfile }),
       ...(deliveryUnitKind === undefined ? {} : { deliveryUnitKind }),
       ...(Array.isArray(vertical.moduleFederation?.exposes)
@@ -147,11 +148,12 @@ export function verticalsFromTopology(
             exposes: Object.fromEntries(
               vertical.moduleFederation.exposes.map((expose: string) => [
                 expose,
-                expose === './Route'
-                  ? './src/federation-entry.tsx'
-                  : expose === './Widget'
-                    ? `./src/components/${domain}-widget.tsx`
-                    : '',
+                vertical.moduleFederation?.exposePaths?.[expose] ??
+                  (expose === './Route'
+                    ? './src/federation-entry.tsx'
+                    : expose === './Widget'
+                      ? `./src/components/${domain}-widget.tsx`
+                      : ''),
               ]),
             ),
           }
@@ -189,7 +191,19 @@ export function createPrimaryShellDescriptor(
       : [];
   return {
     ...shellApp,
+    ...(compactShell?.deliveryUnit || topology.shell?.deliveryUnit
+      ? {
+          deliveryUnit:
+            compactShell?.deliveryUnit ?? topology.shell.deliveryUnit,
+        }
+      : {}),
     verticalRefs,
+    ...(typeof compactShell?.packageSuffix === 'string'
+      ? { packageSuffix: compactShell.packageSuffix }
+      : {}),
+    ...(typeof compactShell?.displayName === 'string'
+      ? { displayName: compactShell.displayName }
+      : {}),
     ...(typeof compactShell?.path === 'string'
       ? { directory: compactShell.path }
       : {}),

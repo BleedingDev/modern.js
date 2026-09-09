@@ -1,8 +1,13 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from '@babel/parser';
-import type { UltramodernReleaseCohort } from '../../../ultramodern-release-cohort';
+import {
+  parseUltramodernReleaseCohort,
+  type UltramodernReleaseCohort,
+} from '../../../ultramodern-release-cohort';
 import { formatGeneratedSourceCandidates } from '../../../ultramodern-workspace/fs-io';
+import { historicalValidatorHashes } from './api-artifact-hashes';
 import type { MigrationIo } from './io';
 
 type ArtifactCandidate = {
@@ -208,105 +213,223 @@ function staticPropertyValue(node: any, name: string) {
   return value;
 }
 
-/** Replace only authenticated release data, never the surrounding authored program. */
-function refreshValidatorReleaseCohort(
-  source: string,
-  releaseCohort: UltramodernReleaseCohort,
-) {
-  try {
-    const parsed = parse(source, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-      tokens: true,
-    });
-    const constants = parsed.program.body.flatMap(statement =>
-      statement.type === 'VariableDeclaration' && statement.kind === 'const'
-        ? statement.declarations
-        : [],
-    );
-    const matches = [];
-    for (const statement of parsed.program.body) {
-      if (
-        statement.type !== 'VariableDeclaration' ||
-        statement.kind !== 'const'
+const nativeCohortModule = '../.modernjs/release-cohort.json';
+
+function validatorCohortSyntax(source: string) {
+  const parsed = parse(source, {
+    sourceType: 'module',
+    plugins: ['typescript'],
+    tokens: true,
+  });
+  const constants = parsed.program.body.flatMap(statement =>
+    statement.type === 'VariableDeclaration' && statement.kind === 'const'
+      ? statement.declarations
+      : [],
+  );
+  const literals = new Map(
+    constants.flatMap(declaration =>
+      declaration.id.type === 'Identifier' &&
+      declaration.init &&
+      ['StringLiteral', 'NumericLiteral', 'BooleanLiteral'].includes(
+        declaration.init.type,
       )
-        continue;
-      for (const declaration of statement.declarations) {
-        const kind = staticPropertyValue(declaration.init, 'kind');
-        if (
-          kind?.type !== 'StringLiteral' ||
-          kind.value !== 'modernjs.ultramodern-workspace-validation-contract'
-        )
-          continue;
-        const cohort = staticPropertyValue(
-          staticPropertyValue(declaration.init, 'cohort'),
-          'releaseCohort',
-        );
-        const schema = staticPropertyValue(cohort, 'schema');
-        const schemaVersion = staticPropertyValue(cohort, 'schemaVersion');
-        const version = staticPropertyValue(
-          staticPropertyValue(cohort, 'release'),
-          'version',
-        );
-        const versionConstant =
-          version?.type === 'Identifier'
-            ? constants.find(
-                declaration =>
-                  declaration.id.type === 'Identifier' &&
-                  declaration.id.name === version.name &&
-                  declaration.init?.type === 'StringLiteral',
-              )
-            : undefined;
-        if (
-          schema?.type === 'StringLiteral' &&
-          schema.value === 'bleedingdev.ultramodern.release-cohort' &&
-          schemaVersion?.type === 'NumericLiteral' &&
-          schemaVersion.value === 1 &&
-          isLiteralData(
-            cohort,
-            versionConstant ? new Set([version.name]) : undefined,
-          )
-        )
-          matches.push({ cohort, version, versionConstant });
-      }
-    }
-    if (matches.length !== 1) return source;
-    const { cohort, version, versionConstant } = matches[0];
-    let content = JSON.stringify(releaseCohort, null, 2);
-    const edits = [];
-    // A factored version constant remains authored if anything else uses it.
-    // When the cohort is its sole reader, retain the binding and update its
-    // literal value instead of leaving an unused declaration behind.
+        ? [[declaration.id.name, declaration.init] as const]
+        : [],
+    ),
+  );
+  const value = (node: any): unknown => {
+    if (node?.type === 'Identifier') node = literals.get(node.name);
+    if (!node) throw new Error('release data is not static');
     if (
-      versionConstant &&
-      !parsed.tokens?.some(
+      ['StringLiteral', 'NumericLiteral', 'BooleanLiteral'].includes(node.type)
+    )
+      return node.value;
+    if (node.type === 'NullLiteral') return null;
+    if (node.type === 'ArrayExpression') return node.elements.map(value);
+    if (node.type === 'ObjectExpression') {
+      const entries: Array<[string, unknown]> = [];
+      for (const property of node.properties) {
+        if (
+          property.type !== 'ObjectProperty' ||
+          property.computed ||
+          property.shorthand ||
+          !['Identifier', 'StringLiteral'].includes(property.key.type)
+        )
+          throw new Error('release data contains authored expressions');
+        const key = property.key.name ?? property.key.value;
+        if (entries.some(([previous]) => previous === key))
+          throw new Error('release data contains duplicate keys');
+        entries.push([key, value(property.value)]);
+      }
+      return Object.fromEntries(entries);
+    }
+    throw new Error('release data is not literal');
+  };
+  const cohorts = constants.flatMap(declaration => {
+    const kind = staticPropertyValue(declaration.init, 'kind');
+    if (!kind) return [];
+    try {
+      if (value(kind) !== 'modernjs.ultramodern-workspace-validation-contract')
+        return [];
+    } catch {
+      return [];
+    }
+    const cohort = staticPropertyValue(
+      staticPropertyValue(declaration.init, 'cohort'),
+      'releaseCohort',
+    );
+    return [cohort];
+  });
+  const imports = parsed.program.body.filter(
+    statement =>
+      statement.type === 'ImportDeclaration' &&
+      statement.source.value === nativeCohortModule,
+  );
+  return { parsed, constants, cohorts, imports, value };
+}
+
+/** A recognized authored validator reads its one contract cohort from native JSON. */
+export function recognizesReleaseCohortRead(source: string): boolean {
+  try {
+    const { cohorts, imports } = validatorCohortSyntax(source);
+    if (cohorts.length !== 1 || imports.length !== 1) return false;
+    const statement = imports[0];
+    if (
+      statement.type !== 'ImportDeclaration' ||
+      statement.importKind === 'type'
+    )
+      return false;
+    const binding = statement.specifiers[0];
+    return (
+      statement.specifiers.length === 1 &&
+      binding?.type === 'ImportDefaultSpecifier' &&
+      statement.attributes?.length === 1 &&
+      (statement.attributes[0].key.type === 'Identifier'
+        ? statement.attributes[0].key.name
+        : statement.attributes[0].key.value) === 'type' &&
+      statement.attributes[0].value.value === 'json' &&
+      cohorts[0].type === 'Identifier' &&
+      cohorts[0].name === binding.local.name
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Extract data once; subsequent releases update JSON without touching this program. */
+function refreshValidatorReleaseCohort(source: string) {
+  if (recognizesReleaseCohortRead(source)) return source;
+  const { parsed, constants, cohorts, imports, value } =
+    validatorCohortSyntax(source);
+  if (cohorts.length !== 1 || imports.length !== 0)
+    throw new Error('expected one unambiguous literal contract cohort');
+  const cohort = cohorts[0];
+  parseUltramodernReleaseCohort(value(cohort));
+  if (
+    parsed.comments?.some(
+      comment => comment.start! >= cohort.start && comment.end! <= cohort.end,
+    )
+  )
+    throw new Error('release data contains authored comments');
+  const names = new Set(
+    parsed.tokens
+      ?.filter(token => token.type.label === 'name')
+      .map(token => token.value),
+  );
+  let binding = 'ultramodernReleaseCohortDocument';
+  while (names.has(binding)) binding += '_';
+  const edits = [{ start: cohort.start, end: cohort.end, content: binding }];
+  // Remove only private literal data declarations whose sole readers were in
+  // the extracted region; every externally used constant remains byte-identical.
+  for (const declaration of constants) {
+    if (
+      declaration.id.type !== 'Identifier' ||
+      !declaration.init ||
+      !['StringLiteral', 'NumericLiteral', 'BooleanLiteral'].includes(
+        declaration.init.type,
+      )
+    )
+      continue;
+    const identifier = declaration.id;
+    const readers =
+      parsed.tokens?.filter(
         token =>
           token.type.label === 'name' &&
-          token.value === version.name &&
-          token.start !== versionConstant.id.start &&
-          (token.start < cohort.start || token.end > cohort.end),
+          token.value === identifier.name &&
+          token.start !== identifier.start,
+      ) ?? [];
+    if (
+      !readers.length ||
+      readers.some(
+        token => token.start < cohort.start || token.end > cohort.end,
       )
-    ) {
-      content = content.replaceAll(
-        `"version": ${JSON.stringify(releaseCohort.release.version)}`,
-        `"version": ${version.name}`,
-      );
-      edits.push({
-        start: versionConstant.init!.start!,
-        end: versionConstant.init!.end!,
-        content: JSON.stringify(releaseCohort.release.version),
-      });
-    }
-    edits.push({ start: cohort.start, end: cohort.end, content });
-    for (const edit of edits.toSorted(
-      (left, right) => right.start - left.start,
-    ))
-      source =
-        source.slice(0, edit.start) + edit.content + source.slice(edit.end);
-    return source;
-  } catch {
-    return source;
+    )
+      continue;
+    const statement = parsed.program.body.find(
+      statement =>
+        statement.type === 'VariableDeclaration' &&
+        statement.declarations.length === 1 &&
+        statement.declarations[0] === declaration,
+    );
+    if (
+      !statement ||
+      parsed.comments?.some(
+        comment =>
+          comment.start! >= statement.start! && comment.end! <= statement.end!,
+      )
+    )
+      continue;
+    edits.push({ start: statement.start!, end: statement.end!, content: '' });
   }
+  for (const edit of edits.toSorted((left, right) => right.start - left.start))
+    source =
+      source.slice(0, edit.start) + edit.content + source.slice(edit.end);
+  const insertion = parsed.program.interpreter?.end ?? 0;
+  return (
+    source.slice(0, insertion) +
+    `${insertion ? '\n' : ''}import ${binding} from '${nativeCohortModule}' with { type: 'json' };\n` +
+    source.slice(insertion)
+  );
+}
+
+function isHistoricalValidator(source: string) {
+  const parsed = parse(source, {
+    sourceType: 'module',
+    plugins: ['typescript'],
+  });
+  const contracts = parsed.program.body.flatMap(statement =>
+    statement.type === 'VariableDeclaration' && statement.kind === 'const'
+      ? statement.declarations.filter(
+          declaration =>
+            declaration.id.type === 'Identifier' &&
+            declaration.id.name === 'workspaceValidationContract' &&
+            declaration.init &&
+            isLiteralData(declaration.init),
+        )
+      : [],
+  );
+  if (contracts.length !== 1) return false;
+  contracts[0].init = { type: 'ObjectExpression', properties: [] };
+  const omitted = new Set([
+    'start',
+    'end',
+    'loc',
+    'extra',
+    'leadingComments',
+    'trailingComments',
+    'innerComments',
+  ]);
+  const identity = JSON.stringify(
+    {
+      body: parsed.program.body,
+      comments: parsed.comments?.map(({ type, value }) => ({ type, value })),
+    },
+    (key, value) => (omitted.has(key) ? undefined : value),
+  );
+  const digest = createHash('sha256').update(identity).digest('hex');
+  return historicalValidatorHashes.some(
+    historical => historical.sha256 === digest,
+  );
 }
 
 /** Protect authored replacements before any stage can delete or regenerate them. */
@@ -360,6 +483,8 @@ export function preserveConsumerWorkspaceArtifacts(
           );
           const canonical = canonicalSources[index];
           recognized =
+            (candidate.generatedDataBinding === 'workspaceValidationContract' &&
+              isHistoricalValidator(source)) ||
             normalized === canonical ||
             formatGeneratedSourceCandidates([[relativePath, normalized]])[0] ===
               canonical;
@@ -414,10 +539,15 @@ export function preserveConsumerWorkspaceArtifacts(
           const filePath = path.join(io.workspaceRoot, relativePath);
           if (!fs.existsSync(filePath)) continue;
           const source = fs.readFileSync(filePath, 'utf8');
-          io.write(
-            filePath,
-            refreshValidatorReleaseCohort(source, releaseCohort),
-          );
+          try {
+            const migrated = refreshValidatorReleaseCohort(source);
+            if (migrated !== source) io.write(filePath, migrated);
+          } catch (cause) {
+            throw new Error(
+              `Workspace validator migration conflict: ${relativePath}: cannot extract native release data (${cause instanceof Error ? cause.message : String(cause)}). Preserve the authored checks and replace the embedded cohort with a default JSON import from ${nativeCohortModule} before retrying.`,
+              { cause },
+            );
+          }
         }
       }
     },

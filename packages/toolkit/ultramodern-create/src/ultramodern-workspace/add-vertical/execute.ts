@@ -41,6 +41,7 @@ import type {
   UltramodernGenerationResult,
 } from '../types';
 import {
+  createPackagedWorkspaceValidationScript,
   createWorkspaceScriptArtifacts,
   createWorkspaceValidationScript,
   writeGeneratedWorkspaceScripts,
@@ -147,6 +148,21 @@ function executeAddUltramodernVertical(
         ),
       }),
       {
+        relativePath: 'scripts/validate-ultramodern-workspace.mts',
+        legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
+        generatedDataBinding: 'workspaceValidationContract',
+        content: createPackagedWorkspaceValidationScript(
+          scope,
+          enableTailwind,
+          existingVerticals,
+          undefined,
+          previousApps.filter(
+            app => app.kind === 'shell' && app.id !== primaryShell.id,
+          ),
+          previousApps.find(app => app.id === primaryShell.id),
+        ),
+      },
+      {
         relativePath: 'zerops.yaml',
         content: `${createZeropsYaml(scope, previousApps)}\n`,
       },
@@ -213,9 +229,13 @@ function executeAddUltramodernVertical(
   if (targetShell.id === primaryShell.id) {
     topology.shell ??= {};
     // The primary shell is its own delivery unit (G29): stamp identity too.
-    topology.shell.deliveryUnit = deliveryUnitContractBlock(
-      createDeliveryUnitRecord(scope, shellApp),
-    );
+    topology.shell.deliveryUnit = {
+      ...deliveryUnitContractBlock(
+        createDeliveryUnitRecord(scope, primaryShell),
+      ),
+      ...primaryShell.deliveryUnit,
+      ...topology.shell.deliveryUnit,
+    };
     topology.shell.verticalRefs = nextTargetShell.verticalRefs;
     topology.shell.moduleFederation ??= {};
     topology.shell.moduleFederation.remotes =

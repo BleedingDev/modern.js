@@ -60,6 +60,24 @@
         "require": "./dist/cjs/buildIdentity.js"
       },
       "default": "./dist/esm/buildIdentity.mjs"
+    },
+    "./boundary-debugger": {
+      "types": "./dist/types/boundary-debugger/index.d.ts",
+      "modern:source": "./src/boundary-debugger/index.tsx",
+      "node": {
+        "import": "./dist/esm-node/boundary-debugger/index.mjs",
+        "require": "./dist/cjs/boundary-debugger/index.js"
+      },
+      "default": "./dist/esm/boundary-debugger/index.mjs"
+    },
+    "./workspace-events": {
+      "types": "./dist/types/workspaceEvents.d.ts",
+      "modern:source": "./src/workspaceEvents.ts",
+      "node": {
+        "import": "./dist/esm-node/workspaceEvents.mjs",
+        "require": "./dist/cjs/workspaceEvents.js"
+      },
+      "default": "./dist/esm/workspaceEvents.mjs"
     }
   },
   "typesVersions": {
@@ -83,6 +101,14 @@
       "build-identity": [
         "./dist/types/buildIdentity.d.ts",
         "./src/buildIdentity.ts"
+      ],
+      "boundary-debugger": [
+        "./dist/types/boundary-debugger/index.d.ts",
+        "./src/boundary-debugger/index.tsx"
+      ],
+      "workspace-events": [
+        "./dist/types/workspaceEvents.d.ts",
+        "./src/workspaceEvents.ts"
       ]
     }
   },
@@ -96,14 +122,35 @@
     "@modern-js/rslib": "workspace:*",
     "@rslib/core": "1.0.0",
     "@scripts/rstest-config": "workspace:*",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "typescript": "^7.0.2"
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2",
+    "@rsbuild/core": "2.2.3",
+    "@modern-js/utils": "workspace:*",
+    "@loadable/component": "5.16.7"
   },
   "sideEffects": false,
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public",
     "types": "./dist/types/index.d.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@modern-js/plugin": "workspace:*"
   }
 }

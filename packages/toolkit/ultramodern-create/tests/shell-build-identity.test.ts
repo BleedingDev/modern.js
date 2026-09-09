@@ -59,10 +59,11 @@ test.each([
     expect(identity.packageName).toBe(recorded.packageName);
   }
   const module = createUltramodernBuildModule('identity-proof', shell);
-  expect(module).toContain(`"appId": "${id}"`);
   expect(module).toContain(
-    `"deployProfile": "${DELIVERY_UNIT_DEPLOY_PROFILE}"`,
+    "import buildArtifact from './ultramodern-build.json'",
   );
+  expect(module).toContain('resolveUltramodernBuildArtifact(buildArtifact,');
+  expect(module).not.toContain(recorded.buildMarker);
   expect(shell.deliveryUnit).toEqual(compact);
 });
 

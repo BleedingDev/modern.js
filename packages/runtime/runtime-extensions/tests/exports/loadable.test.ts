@@ -18,7 +18,9 @@ rstest.mock('@loadable/component', () => ({
 
 describe('runtime loadable export', () => {
   test('unwraps nested CommonJS default exports to the callable loadable function', async () => {
-    const loadable = await import('../../src/exports/loadable');
+    const loadable = await import(
+      '../../../plugin-runtime/src/exports/loadable'
+    );
 
     expect(loadable.default).toBe(callableLoadable);
     expect(loadable.lazy).toBe(callableLoadable.lazy);

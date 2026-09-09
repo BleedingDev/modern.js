@@ -16,5 +16,7 @@ export default defineConfig({
     '**/modern-tanstack/**',
     '**/routeTree.gen.*',
   ],
+  printWidth: 120,
   singleQuote: true,
+  trailingComma: 'all',
 });

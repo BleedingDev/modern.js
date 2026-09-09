@@ -2,11 +2,20 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { format } from 'oxfmt';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
+import {
+  generatedUiSourceRequiresRewrite,
+  writeGeneratedUiSourceIfChanged,
+} from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-ui-source';
+import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
+import { createRemoteExposeFragmentPage } from '../src/ultramodern-workspace/demo-components';
+import { formatGeneratedSourceCandidates } from '../src/ultramodern-workspace/fs-io';
+import { createPackagedWorkspaceValidationScript } from '../src/ultramodern-workspace/workspace-scripts';
 
 function readJson(workspaceRoot: string, relativePath: string) {
   return JSON.parse(
@@ -76,8 +85,9 @@ function removeTsCheckerBuildOverride(source: string) {
 
 function removeReleaseEnvelopePlugin(source: string) {
   return source
-    .replace('  ultramodernReleaseEnvelopePlugin,\n', '')
-    .replace('        ultramodernReleaseEnvelopePlugin(),\n', '');
+    .replace(/\bultramodernReleaseEnvelopePlugin,\s*/gu, '')
+    .replace(/,\s*ultramodernReleaseEnvelopePlugin(?=\s*\})/gu, '')
+    .replace(/^\s*ultramodernReleaseEnvelopePlugin\(\),?\r?\n/gmu, '');
 }
 
 function addLegacyGeneratedDefaults(source: string) {
@@ -104,7 +114,7 @@ function addLegacyGeneratedDefaults(source: string) {
 ${withLegacySsr.slice(optionsEndIndex)}`;
 }
 
-test('migration refreshes canonical validator data without classifying it as a tooling wrapper', async () => {
+test('migration replaces recognized historical validator with the native tooling entry point', async () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-validator-refresh-'),
   );
@@ -120,8 +130,16 @@ test('migration refreshes canonical validator data without classifying it as a t
       workspaceRoot,
       'scripts/validate-ultramodern-workspace.mts',
     );
-    const source = fs.readFileSync(validatorPath, 'utf8');
-    const stale = source.replace('schemaVersion: 2', 'schemaVersion: -123');
+    const nativeSource = fs.readFileSync(validatorPath, 'utf8');
+    const source = createPackagedWorkspaceValidationScript(
+      'workspace',
+      false,
+      [],
+    );
+    const stale = source.replace(
+      /"?schemaVersion"?: 2/u,
+      '"schemaVersion": -123',
+    );
     assert.notEqual(stale, source);
     fs.writeFileSync(validatorPath, stale);
     assert.equal(
@@ -133,7 +151,7 @@ test('migration refreshes canonical validator data without classifying it as a t
     );
     const migrated = fs.readFileSync(validatorPath, 'utf8');
     assert.doesNotMatch(migrated, /schemaVersion: -123/u);
-    assert.match(migrated, /const workspaceValidationContract =/u);
+    assert.equal(migrated, nativeSource);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -439,11 +457,12 @@ const cloudflareDeployEnabled =`,
       rootPackage.scripts['product:artifacts'],
     );
     const migratedBaseTsConfig = readJson(workspaceRoot, 'tsconfig.base.json');
+    assert.deepEqual(migratedBaseTsConfig, baseTsConfig);
     assert.deepEqual(migratedBaseTsConfig.references, baseTsConfig.references);
-    assert.deepEqual(migratedBaseTsConfig.compilerOptions.types, [
-      'node',
-      ...baseTsConfig.compilerOptions.types,
-    ]);
+    assert.deepEqual(
+      migratedBaseTsConfig.compilerOptions.types,
+      baseTsConfig.compilerOptions.types,
+    );
     assert.deepEqual(
       migratedBaseTsConfig.compilerOptions.plugins.find(
         (plugin: Record<string, unknown>) =>
@@ -989,4 +1008,98 @@ test('migration preserves authored tooling, deployment topology, and federation 
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test('generated source ownership ignores width, quotes and commas while preserving consumer bytes', async () => {
+  const source = `import { createRemoteComponent } from '@modern-js/runtime/mf';
+export const registry = { orders: createRemoteComponent({ loader: () => import('orders/Page'), loading: 'Please wait for the order interface to finish loading' }) };
+`;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-semantic-owned-'));
+  try {
+    const file = path.join(root, 'registry.ts');
+    for (const printWidth of [80, 120, 160]) {
+      for (const singleQuote of [false, true]) {
+        for (const trailingComma of ['all', 'none'] as const) {
+          const formatted = await format('registry.ts', source, {
+            printWidth,
+            singleQuote,
+            trailingComma,
+          });
+          const authored = `// Consumer formatting and explanatory comment.\n${formatted.code}`;
+          assert.equal(
+            generatedUiSourceRequiresRewrite(authored, source),
+            false,
+          );
+          fs.writeFileSync(file, authored);
+          assert.equal(
+            writeGeneratedUiSourceIfChanged(
+              createMigrationIo(root, false),
+              file,
+              source,
+            ),
+            false,
+          );
+          assert.equal(fs.readFileSync(file, 'utf8'), authored);
+          const changed = authored.replace(
+            'orders/Page',
+            'orders/ConsumerPage',
+          );
+          assert.equal(generatedUiSourceRequiresRewrite(changed, source), true);
+          fs.writeFileSync(file, changed);
+          assert.equal(
+            writeGeneratedUiSourceIfChanged(
+              createMigrationIo(root, false),
+              file,
+              source,
+            ),
+            false,
+          );
+          assert.equal(fs.readFileSync(file, 'utf8'), changed);
+        }
+      }
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('native formatter import sorting recognizes generated fragments but not side-effect order or JSX content edits', () => {
+  const source = createRemoteExposeFragmentPage(
+    {
+      id: 'catalog',
+      directory: 'verticals/catalog',
+      kind: 'vertical',
+      packageSuffix: 'catalog',
+      displayName: 'Catalog',
+      portEnv: 'PORT_CATALOG',
+      ownership: { team: 'catalog' },
+      mfName: 'catalog',
+      port: 3100,
+      exposes: { './Widget': './src/components/widget.tsx' },
+    },
+    './Widget',
+  );
+  const [formatted] = formatGeneratedSourceCandidates([['page.tsx', source]]);
+  assert.equal(generatedUiSourceRequiresRewrite(formatted, source), false);
+  assert.equal(
+    generatedUiSourceRequiresRewrite(
+      "import './register-first';\nimport './register-second';\nexport const ready = true;",
+      "import './register-second';\nimport './register-first';\nexport const ready = true;",
+    ),
+    true,
+  );
+  assert.equal(
+    generatedUiSourceRequiresRewrite(
+      'export const Page = () => <p>consumer text</p>;',
+      'export const Page = () => <p>consumer  text</p>;',
+    ),
+    true,
+  );
+  assert.equal(
+    generatedUiSourceRequiresRewrite(
+      "export const value = 'consumer text';",
+      "export const value = 'consumer  text';",
+    ),
+    true,
+  );
 });

@@ -3,11 +3,11 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { rspack } from '@rsbuild/core';
-import LoadablePlugin from '../../../src/cli/ssr/loadable-bundler-plugin';
+import LoadablePlugin from '../../../../plugin-runtime/src/cli/ssr/loadable-bundler-plugin';
 
 const hydrateEntryPath = path.resolve(
   __dirname,
-  '../../../src/core/browser/hydrate.tsx',
+  '../../../../plugin-runtime/src/core/browser/hydrate.tsx',
 );
 
 const compileHydrationBundle = async (chunkLoadingGlobal: string) => {

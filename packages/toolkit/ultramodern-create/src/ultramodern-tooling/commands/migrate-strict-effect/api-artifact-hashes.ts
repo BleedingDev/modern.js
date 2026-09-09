@@ -77,3 +77,20 @@ export default {
     },
   ],
 };
+
+// AST identities from npm-SRI-verified creator tarballs, with only the generated
+// workspaceValidationContract literal replaced by {}. Comments remain owned.
+export const historicalValidatorHashes = [
+  {
+    version: '3.8.2-ultramodern.12',
+    sha256: 'eb91080a86fd38fd2663baf8e6db5c5c949f3386cfa79cea409f67ad43118c49',
+  },
+  {
+    version: '3.9.0-ultramodern.3',
+    sha256: 'd922fb39b37b6ee1e88ff851ece6615f7f4ebcdfb7b96ecef58b4d11425f4739',
+  },
+  {
+    version: '3.9.0-ultramodern.4',
+    sha256: 'd922fb39b37b6ee1e88ff851ece6615f7f4ebcdfb7b96ecef58b4d11425f4739',
+  },
+];

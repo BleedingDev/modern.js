@@ -48,5 +48,6 @@ export function createDeliveryUnitRecord(
     sourceRevision: 'workspace',
     unitId: `${scope}/${app.domain ?? app.id}`,
     version: '0.1.0',
+    ...app.deliveryUnit,
   };
 }

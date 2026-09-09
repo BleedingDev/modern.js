@@ -43,7 +43,8 @@ describe('ultramodern boundary debugger chromium overlay', () => {
     try {
       writeFileSync(
         entryPath,
-        `import React from 'react';
+        `import { runtime } from '@modern-js/plugin/runtime';
+import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ultramodernBoundaryDebuggerPlugin from ${JSON.stringify(
           path.resolve(__dirname, '../../src/boundary-debugger/index.tsx'),
@@ -87,8 +88,9 @@ function App() {
   );
 }
 
-let WrappedApp;
-ultramodernBoundaryDebuggerPlugin({
+const { runtimeContext } = runtime.run({
+  config: {},
+  plugins: [ultramodernBoundaryDebuggerPlugin({
   metadata: {
     appId: 'shell',
     boundaries: [
@@ -108,11 +110,9 @@ ultramodernBoundaryDebuggerPlugin({
     ],
     schemaVersion: 1,
   },
-}).setup({
-  wrapRoot(factory) {
-    WrappedApp = factory(App);
-  },
+  })],
 });
+const WrappedApp = runtimeContext.hooks.wrapRoot.call(App);
 
 createRoot(document.getElementById('root')).render(
   React.createElement(WrappedApp),

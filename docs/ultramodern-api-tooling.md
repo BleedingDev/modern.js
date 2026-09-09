@@ -19,11 +19,13 @@ reachable endpoint composition using bounded analysis in the current process.
 It does not start the TypeScript native compiler.
 
 Generated `api:check` uses the full command. The aggregate generated pipeline uses
-the files command after its existing topology validation. Running ordinary lint
-alone does not replace the full API check.
+the files command after its existing topology validation. Run `pnpm check` once for aggregate static validation; its API-file and contract
+stages already cover that pipeline. Use `pnpm api:check` separately to diagnose
+API failures. Running ordinary lint alone does not replace the full API check.
 
-The existing `migrate:strict-effect` workflow upgrades supported generated
-workspaces. It removes the old local baseline and checker files only when their
+Use the existing `migrate-strict-effect` entry point for generated workspace
+updates. See [native workflows](./ultramodern-native-workflows.md) for the exact
+release-qualified command, migration boundaries and rollback limits. It removes the old local baseline and checker files only when their
 contents match a known generated version. Customized copies produce a conflict
 before the migration promotes its staged changes; review and resolve the custom
 behavior instead of deleting it or adding a compatibility alias. Unrelated

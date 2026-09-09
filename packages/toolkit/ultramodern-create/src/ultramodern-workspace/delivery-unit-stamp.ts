@@ -15,12 +15,21 @@ export function stampDeliveryUnitIdentity(
   scope: string,
   app: WorkspaceApp,
 ): void {
-  const block = deliveryUnitContractBlock(createDeliveryUnitRecord(scope, app));
+  const block = {
+    ...deliveryUnitContractBlock(createDeliveryUnitRecord(scope, app)),
+    ...app.deliveryUnit,
+    ...(isPlainObject(entry.deliveryUnit) ? entry.deliveryUnit : {}),
+  };
 
   entry.deliveryUnit = block;
 
   if (isPlainObject(entry.backendFederation)) {
-    entry.backendFederation.deliveryUnit = block;
+    entry.backendFederation.deliveryUnit = {
+      ...(isPlainObject(entry.backendFederation.deliveryUnit)
+        ? entry.backendFederation.deliveryUnit
+        : {}),
+      ...block,
+    };
     if (!isPlainObject(entry.backendFederation.versionBoundary)) {
       entry.backendFederation.versionBoundary = {};
     }

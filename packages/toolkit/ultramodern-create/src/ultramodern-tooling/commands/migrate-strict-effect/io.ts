@@ -610,7 +610,13 @@ export function writeJsonFile(
   return io.write(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-export function listWorkspacePackageFiles(workspaceRoot: string) {
+export function listWorkspacePackageFiles(
+  workspaceRoot: string,
+  options: {
+    appDirectories?: readonly string[];
+    workspacePatterns?: readonly string[];
+  } = {},
+) {
   const packageFiles = ['package.json'];
 
   for (const directory of ['apps', 'verticals', 'packages']) {
@@ -632,5 +638,33 @@ export function listWorkspacePackageFiles(workspaceRoot: string) {
     }
   }
 
-  return packageFiles;
+  for (const directory of options.appDirectories ?? []) {
+    const file = path.resolve(workspaceRoot, directory, 'package.json');
+    if (!isPathInsideRoot(path.resolve(workspaceRoot), file)) {
+      throw new Error(
+        `Workspace participant is outside the transaction: ${directory}`,
+      );
+    }
+    if (!fs.existsSync(file))
+      throw new Error(
+        `Declared workspace participant is missing: ${directory}/package.json`,
+      );
+    packageFiles.push(
+      path.relative(workspaceRoot, file).split(path.sep).join('/'),
+    );
+  }
+  for (const pattern of options.workspacePatterns ?? []) {
+    if (path.isAbsolute(pattern) || pattern.split(/[\\/]/u).includes('..')) {
+      throw new Error(
+        `External workspace participant requires coordinated ownership: ${pattern}`,
+      );
+    }
+    const entries = fs.globSync(`${pattern.replace(/\/$/u, '')}/package.json`, {
+      cwd: workspaceRoot,
+      exclude: ['**/node_modules/**', '**/.git/**'],
+    });
+    for (const entry of entries)
+      packageFiles.push(entry.split(path.sep).join('/'));
+  }
+  return [...new Set(packageFiles)].sort();
 }

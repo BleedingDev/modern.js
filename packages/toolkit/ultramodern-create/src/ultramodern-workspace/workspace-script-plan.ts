@@ -65,14 +65,14 @@ const workspaceRootPackageScriptNames = {
   cloudflareBuild: 'cloudflare:build',
   cloudflareDeploy: 'cloudflare:deploy',
   cloudflareProof: rootToolingScriptName('cloudflareProof'),
-  cloudflareSsrProof: 'cloudflare:ssr-proof',
+  cloudflareSsrProof: rootToolingScriptName('cloudflareSsrProof'),
   cloudflareOutputVerify: rootToolingScriptName('cloudflareOutputVerify'),
   backendFederationGenerate: rootToolingScriptName('backendFederationGenerate'),
   nodeProof: rootToolingScriptName('backendFederationProof'),
   mfTypes: rootToolingScriptName('mfTypes'),
   performanceReadiness: rootToolingScriptName('performanceReadiness'),
   migrateStrictEffect: rootToolingScriptName('migrateStrictEffect'),
-  zeropsMaterialize: 'zerops:materialize',
+  zeropsMaterialize: rootToolingScriptName('zeropsMaterialize'),
   contractCheck: rootToolingScriptName('validate'),
   typecheck: 'typecheck',
   check: 'check',
@@ -287,7 +287,7 @@ export function createWorkspaceRootScriptPlan(
     cloudflareProof: `${rootToolingWrapperCommand(
       'cloudflareProof',
     )} --out .codex/reports/cloudflare-version-proof/public-url-proof.json`,
-    cloudflareSsrProof: 'node ./scripts/proof-workerd-ssr.mts',
+    cloudflareSsrProof: rootToolingWrapperCommand('cloudflareSsrProof'),
     cloudflareOutputVerify: rootToolingWrapperCommand('cloudflareOutputVerify'),
     backendFederationGenerate: rootToolingWrapperCommand(
       'backendFederationGenerate',
@@ -296,7 +296,7 @@ export function createWorkspaceRootScriptPlan(
     mfTypes: rootToolingWrapperCommand('mfTypes'),
     performanceReadiness: rootToolingWrapperCommand('performanceReadiness'),
     migrateStrictEffect: rootToolingWrapperCommand('migrateStrictEffect'),
-    zeropsMaterialize: 'node ./scripts/materialize-zerops-runtime.mjs',
+    zeropsMaterialize: rootToolingWrapperCommand('zeropsMaterialize'),
     contractCheck: rootToolingWrapperCommand('validate'),
     typecheck:
       options.typecheck ??

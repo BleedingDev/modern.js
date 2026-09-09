@@ -3,7 +3,9 @@ import path from 'node:path';
 import {
   RELEASE_COHORT_PROJECTION_PATH,
   readCreateReleaseCohort,
+  type UltramodernReleaseCohort,
 } from '../../ultramodern-release-cohort';
+import { runWorkspaceTransaction } from '../../ultramodern-workspace/add-vertical/transaction';
 import { createAppEnvDts } from '../../ultramodern-workspace/app-files';
 import {
   createDevelopmentOverlay,
@@ -11,11 +13,13 @@ import {
   createUltramodernConfig,
 } from '../../ultramodern-workspace/contracts';
 import { stampDeliveryUnitIdentity } from '../../ultramodern-workspace/delivery-unit-stamp';
+import { appEmitsBrowserUi } from '../../ultramodern-workspace/descriptors';
 import { ULTRAMODERN_WORKSPACE_POLICY } from '../../ultramodern-workspace/policy';
 import { createAdditionalShellConfigEntry } from '../../ultramodern-workspace/shells';
 import { generatedToolingCommands } from '../../ultramodern-workspace/tooling-command-catalog';
 import type { WorkspaceApp } from '../../ultramodern-workspace/types';
 import {
+  createPackagedWorkspaceValidationScript,
   createWorkspaceScriptArtifacts,
   createWorkspaceValidationScript,
   writeGeneratedWorkspaceScripts,
@@ -53,7 +57,10 @@ import {
   updateGeneratedZeropsArtifacts,
 } from './migrate-strict-effect/generated-artifacts';
 import { migrateStrictEffectHelp } from './migrate-strict-effect/help';
-import { runPnpmLockfileRefresh } from './migrate-strict-effect/install';
+import {
+  runPnpmLockfileRefresh,
+  runStagedTargetChecks,
+} from './migrate-strict-effect/install';
 import {
   createMigrationIo,
   listWorkspacePackageFiles,
@@ -78,6 +85,14 @@ import {
   preflightModuleFederationBridgeRouter,
   removeRetiredReactRouterDependency,
 } from './migrate-strict-effect/react-router-retirement';
+import {
+  assertSameContractDelta,
+  hasCoherentCohortLock,
+  prepareSameContractUpdate,
+  readInstalledSourceCohort,
+  type SameContractPlan,
+  type UpdateOutcome,
+} from './migrate-strict-effect/same-contract';
 import { ensureSharedApiInfrastructure } from './migrate-strict-effect/shared-api-infrastructure';
 import {
   updateGeneratedToolchainFiles,
@@ -459,9 +474,8 @@ function deriveValidationContractInputs(
     );
   }
 
-  const appPackageFiles = listWorkspacePackageFiles(workspaceRoot).filter(
-    relativePath =>
-      relativePath.startsWith('apps/') || relativePath.startsWith('verticals/'),
+  const appPackageFiles = migratedApps.map(
+    app => `${app.directory}/package.json`,
   );
   const manifests = appPackageFiles.map(relativePath => ({
     relativePath,
@@ -510,23 +524,24 @@ function deriveValidationContractInputs(
         `Compact topology app ${expected.id} path ${app.directory} does not match reference path ${expected.path}.`,
       );
     }
-    tailwindStates.push(
-      Object.hasOwn(
-        requireRecord(
-          manifest.packageJson.devDependencies ?? {},
-          `${manifest.relativePath} devDependencies`,
+    if (appEmitsBrowserUi(app))
+      tailwindStates.push(
+        Object.hasOwn(
+          requireRecord(
+            manifest.packageJson.devDependencies ?? {},
+            `${manifest.relativePath} devDependencies`,
+          ),
+          '@rsbuild/plugin-tailwindcss',
         ),
-        '@rsbuild/plugin-tailwindcss',
-      ),
-    );
+      );
   }
 
-  if (new Set(tailwindStates).size !== 1) {
+  if (new Set(tailwindStates).size > 1) {
     throw new Error(
       'Generated app package manifests disagree on the Tailwind feature state.',
     );
   }
-  const enableTailwind = tailwindStates[0] ?? false;
+  const enableTailwind = tailwindStates[0] ?? migrated.features.tailwind;
   if (migrated.features.tailwind !== enableTailwind) {
     throw new Error(
       `Compact Tailwind state ${migrated.features.tailwind} does not match package manifests ${enableTailwind}.`,
@@ -654,6 +669,8 @@ function migrateStrictEffect(
   io: MigrationIo,
   dryRun: boolean,
   skipInstall: boolean,
+  installedSource: UltramodernReleaseCohort | undefined,
+  classify: (plan: SameContractPlan) => void,
 ) {
   const compactPath = path.join(io.workspaceRoot, '.modernjs/ultramodern.json');
   let raw: Record<string, any>;
@@ -687,17 +704,89 @@ function migrateStrictEffect(
     currentWorkspace.apps,
   );
   const packageSource = createMigrationPackageSource(args, current);
-  const result = (status: number) => ({
+  let updatePlan: SameContractPlan | undefined;
+  const result = (status: number): UpdateOutcome => ({
     status,
     version: packageSource.modernPackageVersion,
+    classification: updatePlan?.classification ?? 'historical-migration',
+    outcome: status !== 0 ? 'failed' : dryRun ? 'dry-run' : 'applied',
+    changed:
+      updatePlan?.writes.map(write => ({
+        path: write.path,
+        pointers: write.pointers,
+        reason: 'Authenticated cohort dependency or release-data leaf.',
+      })) ?? [],
+    preserved:
+      updatePlan?.classification === 'same-contract'
+        ? [
+            {
+              path: '**/*',
+              reason:
+                'Consumer source, configuration, scripts, patches and delivery identity are preserved outside the reported dependency/release-data leaves and lock.',
+            },
+          ]
+        : [],
+    conflicts: [],
+    validation: skipInstall
+      ? 'partial'
+      : packageSource.strategy === 'workspace'
+        ? 'local-workspace'
+        : 'staged-target',
   });
   const releaseCohort =
     packageSource.strategy === 'install'
       ? readCreateReleaseCohort()
       : undefined;
 
+  updatePlan = prepareSameContractUpdate(
+    io,
+    raw,
+    packageSource,
+    releaseCohort,
+    installedSource,
+  );
+  classify(updatePlan);
+  io.log(`${updatePlan.classification}: ${updatePlan.reason}`);
+  if (updatePlan.classification === 'same-contract') {
+    if (updatePlan.coherentLock)
+      return {
+        ...result(0),
+        outcome: dryRun ? 'dry-run' : 'noop',
+        validation: 'coherent-existing-lock' as const,
+      };
+    for (const write of updatePlan.writes)
+      io.write(path.join(io.workspaceRoot, write.path), write.content);
+    if (skipInstall) return result(0);
+    const status = runPnpmLockfileRefresh(context);
+    if (status !== 0) return result(status);
+    if (
+      !hasCoherentCohortLock(
+        io.workspaceRoot,
+        updatePlan.manifests,
+        releaseCohort!,
+      )
+    )
+      throw new Error(
+        'Resolved lock does not match the authenticated target dependency cohort.',
+      );
+    return validateGeneratedPnpmLockReleaseAgePolicy(
+      io.workspaceRoot,
+      packageSource,
+      { releaseCohort },
+    ).then(() =>
+      result(runStagedTargetChecks(context, packageSource.strategy)),
+    );
+  }
+
   const allCurrentApps = currentWorkspace.apps;
   const artifactOwnership = preserveConsumerWorkspaceArtifacts(io, [
+    {
+      relativePath: 'scripts/validate-ultramodern-workspace.mts',
+      content: createWorkspaceValidationScript(
+        current.workspace.packageScope,
+        current.features.tailwind,
+      ),
+    },
     ...allCurrentApps.map(app => ({
       relativePath: `${app.directory}/src/modern-app-env.d.ts`,
       content: createAppEnvDts(
@@ -709,7 +798,7 @@ function migrateStrictEffect(
     ...createWorkspaceScriptArtifacts({
       shellOnly: false,
       hasBackendSurface: true,
-      validationScript: createWorkspaceValidationScript(
+      validationScript: createPackagedWorkspaceValidationScript(
         current.workspace.packageScope,
         current.features.tailwind,
         currentWorkspace.verticals,
@@ -717,7 +806,11 @@ function migrateStrictEffect(
         currentWorkspace.additionalShells,
         currentWorkspace.primaryShell,
       ),
-    }),
+    }).map(artifact =>
+      artifact.relativePath.includes('validate-ultramodern-workspace')
+        ? { ...artifact, generatedDataBinding: 'workspaceValidationContract' }
+        : artifact,
+    ),
     {
       relativePath: 'zerops.yaml',
       content: `${createZeropsYaml(current.workspace.packageScope, currentWorkspace.apps)}\n`,
@@ -829,7 +922,11 @@ function migrateStrictEffect(
     for (const relativePath of [
       ...generatedToolingCommands
         .filter(command => command.requiresBackendSurface)
-        .flatMap(command => [command.wrapperPath, command.legacyPath]),
+        .flatMap(command =>
+          command.legacyPath
+            ? [command.wrapperPath, command.legacyPath]
+            : [command.wrapperPath],
+        ),
       'scripts/materialize-zerops-runtime.mjs',
       'zerops.yaml',
     ]) {
@@ -844,7 +941,11 @@ function migrateStrictEffect(
       for (const relativePath of [
         ...generatedToolingCommands
           .filter(command => command.requiresBackendSurface)
-          .flatMap(command => [command.wrapperPath, command.legacyPath]),
+          .flatMap(command =>
+            command.legacyPath
+              ? [command.wrapperPath, command.legacyPath]
+              : [command.wrapperPath],
+          ),
       ]) {
         removeGeneratedFileIfExists(io, relativePath);
       }
@@ -908,6 +1009,12 @@ function migrateStrictEffect(
 
   for (const relativePackageFile of listWorkspacePackageFiles(
     io.workspaceRoot,
+    {
+      appDirectories: migratedWorkspace.apps.map(app => app.directory),
+      workspacePatterns: migratedWorkspace.config.bridge?.workspacePackages.map(
+        entry => entry.pattern,
+      ),
+    },
   )) {
     const packageFile = path.join(io.workspaceRoot, relativePackageFile);
     const packageJson = readJsonFile(packageFile);
@@ -985,31 +1092,20 @@ function migrateStrictEffect(
   ensureGeneratedOxlintComponentStyle(io);
 
   if (!skipInstall) {
-    return io.withStagedWorkspace(stagedWorkspaceRoot => {
-      fs.rmSync(path.join(stagedWorkspaceRoot, 'pnpm-lock.yaml'), {
-        force: true,
-      });
-      const status = runPnpmLockfileRefresh({
-        ...context,
-        workspaceRoot: stagedWorkspaceRoot,
-      });
-      if (status !== 0) {
-        return result(status);
-      }
-      return validateGeneratedPnpmLockReleaseAgePolicy(
-        stagedWorkspaceRoot,
-        packageSource,
-        { releaseCohort },
-      ).then(() => {
-        io.write(
-          path.join(io.workspaceRoot, 'pnpm-lock.yaml'),
-          fs.readFileSync(
-            path.join(stagedWorkspaceRoot, 'pnpm-lock.yaml'),
-            'utf-8',
-          ),
-        );
-        return result(0);
-      });
+    // The outer publisher owns this private stage. Preserve the consumer lock
+    // as resolver input; neither failed install nor target checks touch live files.
+    const status = runPnpmLockfileRefresh(context);
+    if (status !== 0) return result(status);
+    return validateGeneratedPnpmLockReleaseAgePolicy(
+      io.workspaceRoot,
+      packageSource,
+      { releaseCohort },
+    ).then(() => {
+      const checkStatus = runStagedTargetChecks(
+        context,
+        packageSource.strategy,
+      );
+      return result(checkStatus);
     });
   }
 
@@ -1036,36 +1132,83 @@ export function runMigrateStrictEffect(
 
   const dryRun = hasFlag(args, '--dry-run');
   const skipInstall = dryRun || hasFlag(args, '--skip-install');
+  const installedSource = readInstalledSourceCohort(context.workspaceRoot);
+  let updatePlan: SameContractPlan | undefined;
+  let netChanges: string[] = [];
   const runMigration = (io: MigrationIo, migrationContext: CommandContext) =>
     io.transaction(
       () =>
-        migrateStrictEffect(args, migrationContext, io, dryRun, skipInstall),
+        migrateStrictEffect(
+          args,
+          migrationContext,
+          io,
+          dryRun,
+          skipInstall,
+          installedSource,
+          plan => {
+            updatePlan = plan;
+          },
+        ),
       { commitWhen: migrationResult => migrationResult.status === 0 },
     );
+  const withContext = (io: MigrationIo) => {
+    const invocationRelativePath = path.relative(
+      context.workspaceRoot,
+      context.invocationCwd,
+    );
+    const invocationIsOutsideWorkspace =
+      invocationRelativePath === '..' ||
+      invocationRelativePath.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(invocationRelativePath);
+    return runMigration(io, {
+      workspaceRoot: io.workspaceRoot,
+      invocationCwd: invocationIsOutsideWorkspace
+        ? context.invocationCwd
+        : path.join(io.workspaceRoot, invocationRelativePath),
+    });
+  };
   const migration = dryRun
-    ? withStagedDryRunMigrationIo(context.workspaceRoot, io => {
-        const invocationRelativePath = path.relative(
-          context.workspaceRoot,
-          context.invocationCwd,
-        );
-        const invocationIsOutsideWorkspace =
-          invocationRelativePath === '..' ||
-          invocationRelativePath.startsWith(`..${path.sep}`) ||
-          path.isAbsolute(invocationRelativePath);
-        return runMigration(io, {
-          workspaceRoot: io.workspaceRoot,
-          invocationCwd: invocationIsOutsideWorkspace
-            ? context.invocationCwd
-            : path.join(io.workspaceRoot, invocationRelativePath),
-        });
-      })
-    : runMigration(createMigrationIo(context.workspaceRoot, false), context);
+    ? withStagedDryRunMigrationIo(context.workspaceRoot, withContext)
+    : runWorkspaceTransaction(
+        context.workspaceRoot,
+        stage => withContext(createMigrationIo(stage, false)),
+        {
+          commitWhen: migrationResult => migrationResult.status === 0,
+          inspectChanges: changes => {
+            if (updatePlan?.classification === 'same-contract')
+              assertSameContractDelta(updatePlan, changes);
+            netChanges = changes.map(change => change.relativePath);
+          },
+        },
+      );
 
   const report = (migrationResult: Awaited<typeof migration>) => {
+    if (!dryRun) {
+      migrationResult.changed = netChanges.map(relativePath => ({
+        path: relativePath,
+        pointers: updatePlan?.writes.find(write => write.path === relativePath)
+          ?.pointers,
+        reason:
+          relativePath === 'pnpm-lock.yaml'
+            ? 'Package-manager-produced dependency lock.'
+            : migrationResult.classification === 'same-contract'
+              ? 'Authenticated dependency/release-data leaf.'
+              : 'Recognized historical migration.',
+      }));
+      if (migrationResult.status === 0 && netChanges.length === 0)
+        migrationResult.outcome = 'noop';
+    }
+    process.stdout.write(`${JSON.stringify(migrationResult)}\n`);
     if (migrationResult.status === 0 && !dryRun) {
       process.stdout.write(
-        `UltraModern strict Effect metadata migrated to ${migrationResult.version}. ` +
-          'Run pnpm api:check && pnpm contract:check next.\n',
+        `UltraModern ${migrationResult.classification} ${migrationResult.outcome} for ${migrationResult.version}. ` +
+          (migrationResult.validation === 'partial'
+            ? 'Partial validation (--skip-install); lock and target checks were skipped.\n'
+            : migrationResult.validation === 'coherent-existing-lock'
+              ? 'Existing authenticated dependency lock is coherent; no install was needed.\n'
+              : migrationResult.validation === 'local-workspace'
+                ? 'Local workspace dependencies resolved in staging; published-target checks do not apply.\n'
+                : 'Target dependencies and checks passed in staging. Run pnpm install to materialize the promoted lock locally.\n'),
       );
     }
     return migrationResult.status;

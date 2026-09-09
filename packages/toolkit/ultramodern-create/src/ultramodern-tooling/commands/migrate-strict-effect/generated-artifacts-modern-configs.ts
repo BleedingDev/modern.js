@@ -26,16 +26,12 @@ import {
   allWorkspaceAppsFromToolingConfig,
   type UltramodernToolingConfig,
 } from '../../config';
-import { writeGeneratedUiSourceIfChanged } from './generated-ui-source';
+import {
+  generatedUiSourceRequiresRewrite,
+  writeGeneratedUiSourceIfChanged,
+} from './generated-ui-source';
 import { type MigrationIo, readJsonFile } from './io';
 import { appDeclaresReactRouter } from './react-router-retirement';
-
-function isGeneratedShellComposition(source: string) {
-  return (
-    source.includes('const createRemoteComponent =') &&
-    source.includes('export const VerticalShowcase =')
-  );
-}
 
 function writeOwnedTypeScriptConfig(
   io: MigrationIo,
@@ -47,10 +43,14 @@ function writeOwnedTypeScriptConfig(
     return io.writeGenerated(filePath, generatedSource);
   }
   const existingSource = fs.readFileSync(filePath, 'utf-8');
-  if (existingSource === generatedSource) {
-    return io.writeGenerated(filePath, existingSource);
+  if (!generatedUiSourceRequiresRewrite(existingSource, generatedSource)) {
+    return false;
   }
-  if (recognizedGeneratedSources.includes(existingSource)) {
+  if (
+    recognizedGeneratedSources.some(
+      candidate => !generatedUiSourceRequiresRewrite(existingSource, candidate),
+    )
+  ) {
     return io.writeGenerated(filePath, generatedSource);
   }
   io.log(
@@ -68,7 +68,15 @@ function removeOwnedTypeScriptConfig(
   if (!fs.existsSync(filePath)) {
     return false;
   }
-  if (recognizedGeneratedSources.includes(fs.readFileSync(filePath, 'utf-8'))) {
+  if (
+    recognizedGeneratedSources.some(
+      candidate =>
+        !generatedUiSourceRequiresRewrite(
+          fs.readFileSync(filePath, 'utf-8'),
+          candidate,
+        ),
+    )
+  ) {
     return io.remove(filePath);
   }
   io.log(
@@ -117,7 +125,9 @@ function isGeneratedModernConfig(
   source: string,
   generatedSources: readonly string[],
 ) {
-  return generatedSources.includes(source);
+  return generatedSources.some(
+    candidate => !generatedUiSourceRequiresRewrite(source, candidate),
+  );
 }
 
 function addPreviousTailwindOptimizationOverride(source: string) {
@@ -141,8 +151,9 @@ function removeTsCheckerBuildOverride(source: string) {
 
 function removeReleaseEnvelopePlugin(source: string) {
   return source
-    .replace('  ultramodernReleaseEnvelopePlugin,\n', '')
-    .replace('        ultramodernReleaseEnvelopePlugin(),\n', '');
+    .replace(/\bultramodernReleaseEnvelopePlugin,\s*/gu, '')
+    .replace(/,\s*ultramodernReleaseEnvelopePlugin(?=\s*\})/gu, '')
+    .replace(/^\s*ultramodernReleaseEnvelopePlugin\(\),?\r?\n/gmu, '');
 }
 
 export function updateGeneratedModernConfigs(
@@ -209,8 +220,13 @@ export function updateGeneratedModernConfigs(
       io.writeGenerated(modernConfigPath, generatedModernConfig);
     } else {
       const existingModernConfig = fs.readFileSync(modernConfigPath, 'utf-8');
-      if (existingModernConfig === generatedModernConfig) {
-        io.writeGenerated(modernConfigPath, existingModernConfig);
+      if (
+        !generatedUiSourceRequiresRewrite(
+          existingModernConfig,
+          generatedModernConfig,
+        )
+      ) {
+        // Preserve existing formatting and authored comments.
       } else if (
         isGeneratedModernConfig(existingModernConfig, [
           generatedModernConfig,
@@ -260,8 +276,12 @@ export function updateGeneratedModernConfigs(
     ];
     const ownsUiComposition =
       !fs.existsSync(moduleFederationConfigPath) ||
-      recognizedModuleFederationConfigs.includes(
-        fs.readFileSync(moduleFederationConfigPath, 'utf8'),
+      recognizedModuleFederationConfigs.some(
+        candidate =>
+          !generatedUiSourceRequiresRewrite(
+            fs.readFileSync(moduleFederationConfigPath, 'utf8'),
+            candidate,
+          ),
       );
     if (appEmitsBrowserUi(app)) {
       // Existing configs are never regenerated wholesale without byte-exact
@@ -324,25 +344,37 @@ export function updateGeneratedModernConfigs(
         app.directory,
         'src/routes/vertical-components.worker.tsx',
       );
+      const components = createShellRemoteComponents(app, shellUiRemotes);
+      const workerComponents = createShellWorkerRemoteComponents(
+        app,
+        shellUiRemotes,
+      );
+      const recognizedComponents = [components];
+      const recognizedWorkerComponents = [workerComponents];
       const existingComponents = fs.existsSync(componentsPath)
         ? fs.readFileSync(componentsPath, 'utf-8')
         : undefined;
       if (
         existingComponents === undefined ||
-        isGeneratedShellComposition(existingComponents)
+        recognizedComponents.some(
+          candidate =>
+            !generatedUiSourceRequiresRewrite(existingComponents, candidate),
+        )
       ) {
-        io.writeGenerated(
-          componentsPath,
-          createShellRemoteComponents(app, shellUiRemotes),
-        );
-        io.writeGenerated(
+        writeGeneratedUiSourceIfChanged(io, componentsPath, components);
+        writeGeneratedUiSourceIfChanged(
+          io,
           workerComponentsPath,
-          createShellWorkerRemoteComponents(app, shellUiRemotes),
+          workerComponents,
         );
       } else if (
         fs.existsSync(workerComponentsPath) &&
-        isGeneratedShellComposition(
-          fs.readFileSync(workerComponentsPath, 'utf-8'),
+        recognizedWorkerComponents.some(
+          candidate =>
+            !generatedUiSourceRequiresRewrite(
+              fs.readFileSync(workerComponentsPath, 'utf-8'),
+              candidate,
+            ),
         )
       ) {
         // A custom host composition is environment-neutral and obtains its

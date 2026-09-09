@@ -13,9 +13,26 @@ either fails. Use `--mode imports` or `--mode divergence` to run one gate.
 
 ## 1. Import boundary (`checker.js`)
 
-This gate freezes the set of upstream-owned source files that import
-UltraModern-only code relative to merge-base `8a744c1b`. Its independent
-baseline is `allowlist.json`.
+This gate rejects every current governed import of UltraModern-only code in
+upstream-owned source files. Its ownership base is the exact commit
+`8a744c1b3178d1e85d4113f29e8837ff94079fb3`. The independent `allowlist.json`
+records migration history: matching an allowance does not permit an edge or
+make verification pass. The default `--mode all` applies this same strict rule.
+
+`--head <commit>` scans source paths and bytes from that resolved commit, even
+when the worktree differs. Without `--head`, the gate scans the worktree.
+The ownership base and target must resolve, and the base must be an ancestor
+of the target. Import verification rejects `--root`, `--base-ref`, `--allowlist`,
+`--base`, `--pathspec`, and `--divergence-allowlist`; inherited Git repository
+context variables are removed before Git runs.
+
+The classifier remains the existing literal import-specifier marker scan over
+`packages/**/src` files present at the import ownership base. Literal dynamic
+imports, requires, type imports and direct re-exports are covered. This check
+does not yet prove alias resolution, transitive barrel resolution, renamed
+source identity, or imports in later upstream-added source. Strict success is
+therefore evidence about the existing governed inventory, not a substitute for
+those remaining final-gate proofs.
 
 ```bash
 node scripts/ultramodern-boundary-check/check-fork-import-boundary.js --mode imports

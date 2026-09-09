@@ -67,7 +67,22 @@ export function updateGeneratedBuildIdentityModules(
   io: MigrationIo,
   config: UltramodernToolingConfig,
 ) {
-  for (const app of allWorkspaceAppsFromToolingConfig(config)) {
+  for (const configuredApp of allWorkspaceAppsFromToolingConfig(config)) {
+    const artifactPath = path.join(
+      io.workspaceRoot,
+      configuredApp.directory,
+      'shared/ultramodern-build.json',
+    );
+    const previousArtifact = fs.existsSync(artifactPath)
+      ? JSON.parse(fs.readFileSync(artifactPath, 'utf8'))
+      : undefined;
+    const app = {
+      ...configuredApp,
+      deliveryUnit: {
+        ...configuredApp.deliveryUnit,
+        ...previousArtifact?.deliveryUnit,
+      },
+    };
     const sharedApiPath = path.join(
       io.workspaceRoot,
       app.directory,
@@ -105,13 +120,34 @@ export function updateGeneratedBuildIdentityModules(
         includeUiMarker,
       ),
     );
-    io.write(
-      path.join(
-        io.workspaceRoot,
-        app.directory,
-        'shared/ultramodern-build.json',
-      ),
+    const projected = JSON.parse(
       createUltramodernBuildArtifactJson(config.workspace.packageScope, app),
     );
+    const artifact = previousArtifact
+      ? {
+          ...previousArtifact,
+          ...projected,
+          deliveryUnit: {
+            ...previousArtifact.deliveryUnit,
+            ...projected.deliveryUnit,
+          },
+          surfaces: {
+            ...previousArtifact.surfaces,
+            api: {
+              ...previousArtifact.surfaces?.api,
+              ...projected.surfaces.api,
+            },
+            ui: { ...previousArtifact.surfaces?.ui, ...projected.surfaces.ui },
+          },
+        }
+      : projected;
+    // Existing delivery identity is consumer data, distinct from the framework
+    // release. Avoid even a formatting write when its projection is unchanged.
+    if (
+      !previousArtifact ||
+      JSON.stringify(previousArtifact) !== JSON.stringify(artifact)
+    ) {
+      io.write(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
+    }
   }
 }

@@ -59,14 +59,18 @@ const writeFixtureAllowlist = ({ rootDir, baseRef, violations = [] }) => {
   return allowlistPath;
 };
 
-test('repo allowlist has no new upstream-owned imports of fork-only code', () => {
+test('repo report fails whenever current governed imports remain', () => {
   const report = checkForkImportBoundary({
     rootDir: repoRoot,
     baseRef: DEFAULT_BASE_REF,
     allowlistPath: DEFAULT_ALLOWLIST_PATH,
   });
 
-  assert.equal(report.added.length, 0, formatBoundaryReport(report));
+  assert.equal(
+    report.ok,
+    report.currentViolations.length === 0,
+    formatBoundaryReport(report),
+  );
 });
 
 test('detects a new fork-only import in an upstream-owned source file', () => {
@@ -125,7 +129,7 @@ test('ignores package source files that did not exist at the merge-base', () => 
   }
 });
 
-test('writeAllowlist creates a green baseline for current violations', () => {
+test('writeAllowlist cannot permit existing governed imports', () => {
   const { rootDir, baseRef } = makeGitFixture();
 
   try {
@@ -147,9 +151,183 @@ test('writeAllowlist creates a green baseline for current violations', () => {
     });
 
     assert.equal(writeReport.violations.length, 1);
-    assert.equal(checkReport.ok, true);
+    assert.equal(checkReport.ok, false);
     assert.equal(checkReport.added.length, 0);
   } finally {
     fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+for (const source of [
+  "export * from '@modern-js/plugin-tanstack';\n",
+  "import type { Plugin } from '@modern-js/plugin-tanstack';\n",
+  "const load = () => import('@modern-js/plugin-tanstack');\n",
+  "const plugin = require('@modern-js/plugin-tanstack');\n",
+]) {
+  test(`strict check rejects allowlisted import syntax: ${source.trim()}`, () => {
+    const { rootDir, baseRef } = makeGitFixture();
+    try {
+      const file = 'packages/runtime/src/index.ts';
+      fs.writeFileSync(path.join(rootDir, file), source);
+      const allowlistPath = writeFixtureAllowlist({
+        rootDir,
+        baseRef,
+        violations: [{ file, specifier: '@modern-js/plugin-tanstack' }],
+      });
+      const report = checkForkImportBoundary({
+        rootDir,
+        baseRef,
+        allowlistPath,
+      });
+      assert.equal(report.added.length, 0);
+      assert.equal(report.currentViolations.length, 1);
+      assert.equal(report.ok, false);
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+}
+
+test('committed head scans its tree regardless of worktree contents or deletions', () => {
+  const { rootDir, baseRef } = makeGitFixture();
+  try {
+    const file = path.join(rootDir, 'packages/runtime/src/index.ts');
+    const allowlistPath = writeFixtureAllowlist({ rootDir, baseRef });
+    fs.writeFileSync(file, "import '@modern-js/plugin-tanstack';\n");
+    runGit(rootDir, ['add', '.']);
+    runGit(rootDir, ['commit', '-m', 'fork import']);
+    const headRef = runGit(rootDir, ['rev-parse', 'HEAD']);
+    fs.unlinkSync(file);
+    const report = checkForkImportBoundary({
+      rootDir,
+      baseRef,
+      headRef,
+      allowlistPath,
+    });
+    assert.equal(report.ok, false);
+    assert.equal(report.headRef, headRef);
+    assert.equal(report.currentViolations.length, 1);
+    assert.equal(
+      checkForkImportBoundary({
+        rootDir,
+        baseRef,
+        headRef: baseRef,
+        allowlistPath,
+      }).ok,
+      true,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('missing refs and unrelated ownership bases fail closed', () => {
+  const { rootDir, baseRef } = makeGitFixture();
+  try {
+    const allowlistPath = writeFixtureAllowlist({ rootDir, baseRef });
+    assert.throws(
+      () =>
+        checkForkImportBoundary({
+          rootDir,
+          baseRef: 'missing-ref',
+          allowlistPath,
+        }),
+      /ownership base.*does not resolve/,
+    );
+    assert.throws(
+      () =>
+        checkForkImportBoundary({
+          rootDir,
+          baseRef,
+          headRef: 'missing-ref',
+          allowlistPath,
+        }),
+      /target.*does not resolve/,
+    );
+    runGit(rootDir, ['checkout', '--orphan', 'unrelated']);
+    runGit(rootDir, ['commit', '-m', 'unrelated base']);
+    const unrelated = runGit(rootDir, ['rev-parse', 'HEAD']);
+    assert.throws(
+      () =>
+        checkForkImportBoundary({
+          rootDir,
+          baseRef,
+          headRef: unrelated,
+          allowlistPath,
+        }),
+      /is-ancestor.*failed/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('allowlist base cannot substitute a different ownership tree', () => {
+  const { rootDir, baseRef } = makeGitFixture();
+  try {
+    const allowlistPath = writeFixtureAllowlist({
+      rootDir,
+      baseRef: 'missing-ref',
+    });
+    assert.throws(
+      () => checkForkImportBoundary({ rootDir, baseRef, allowlistPath }),
+      /ownership base does not match/,
+    );
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('inherited Git repository redirection cannot empty the import scan', () => {
+  const { rootDir, baseRef } = makeGitFixture();
+  const previous = process.env.GIT_DIR;
+  try {
+    const allowlistPath = writeFixtureAllowlist({ rootDir, baseRef });
+    fs.writeFileSync(
+      path.join(rootDir, 'packages/runtime/src/index.ts'),
+      "import '@modern-js/plugin-tanstack';\n",
+    );
+    process.env.GIT_DIR = path.join(rootDir, 'missing-git-directory');
+    assert.equal(
+      checkForkImportBoundary({ rootDir, baseRef, allowlistPath })
+        .currentViolations.length,
+      1,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = previous;
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('import verification CLI rejects scope and ownership overrides', () => {
+  const cli = path.join(
+    repoRoot,
+    'scripts/ultramodern-boundary-check/check-fork-import-boundary.js',
+  );
+  for (const [flag, value] of [
+    ['--root', repoRoot],
+    ['--base-ref', 'HEAD'],
+    ['--allowlist', DEFAULT_ALLOWLIST_PATH],
+    ['--pathspec', 'packages/runtime'],
+    ['--base', 'HEAD'],
+    ['--divergence-allowlist', DEFAULT_ALLOWLIST_PATH],
+  ]) {
+    assert.throws(
+      () =>
+        execFileSync(
+          process.execPath,
+          [cli, '--mode', 'imports', flag, value],
+          { cwd: repoRoot, stdio: 'pipe' },
+        ),
+      error => {
+        assert.equal(error.status, 1);
+        assert.match(
+          error.stderr.toString(),
+          /is not accepted in verification modes/,
+        );
+        return true;
+      },
+    );
   }
 });

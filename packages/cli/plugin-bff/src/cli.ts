@@ -90,7 +90,7 @@ export const bffPlugin = (): CliPlugin<AppTools> => ({
                 requestId: bff?.requestId,
                 target: name,
                 // Internal field
-                requestCreator: bff?.requestCreator,
+                requestCreator: (bff as any)?.requestCreator,
                 httpMethodDecider,
                 bffRuntimeFramework,
                 effectEntry: bff?.effect?.entry,
