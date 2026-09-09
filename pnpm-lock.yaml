@@ -1264,6 +1264,9 @@ importers:
 
   packages/cli/plugin-data-loader:
     dependencies:
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/runtime-extensions
       '@modern-js/runtime-utils':
         specifier: workspace:*
         version: link:../../toolkit/runtime-utils

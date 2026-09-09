@@ -64,6 +64,15 @@
     "./rsc-disabled/*": {
       "types": "./dist/types/rsc-disabled/*.d.ts",
       "default": "./dist/esm/rsc-disabled/*.mjs"
+    },
+    "./localised-loader-identity": {
+      "types": "./dist/types/localisedLoaderIdentity.d.ts",
+      "modern:source": "./src/localisedLoaderIdentity.ts",
+      "node": {
+        "import": "./dist/esm-node/localisedLoaderIdentity.mjs",
+        "require": "./dist/cjs/localisedLoaderIdentity.js"
+      },
+      "default": "./dist/esm/localisedLoaderIdentity.mjs"
     }
   },
   "typesVersions": {
@@ -87,6 +96,10 @@
       "build-identity": [
         "./dist/types/buildIdentity.d.ts",
         "./src/buildIdentity.ts"
+      ],
+      "localised-loader-identity": [
+        "./dist/types/localisedLoaderIdentity.d.ts",
+        "./src/localisedLoaderIdentity.ts"
       ]
     }
   },
