@@ -16,15 +16,20 @@ export class UltramodernNativeTypeChecker {
   ) {}
 
   async check(): Promise<void> {
-    const { compiler, configFile, build } = this.options;
+    const { configFile, build } = this.options;
     const args = build
       ? ['--build', configFile, '--stopBuildOnErrors']
       : ['--project', configFile, '--noEmit'];
+    await this.run([...args, '--pretty', 'false']);
+  }
+
+  private async run(args: string[]): Promise<string> {
     try {
-      await execute(compiler(), [...args, '--pretty', 'false'], {
-        cwd: path.dirname(configFile),
+      const result = await execute(this.options.compiler(), args, {
+        cwd: path.dirname(this.options.configFile),
         maxBuffer: 16 * 1024 * 1024,
       });
+      return result.stdout;
     } catch (cause) {
       const output = cause as { stdout?: string; stderr?: string };
       throw new Error(
@@ -34,10 +39,51 @@ export class UltramodernNativeTypeChecker {
     }
   }
 
+  private async watchInputs(): Promise<Set<string>> {
+    const inputs = new Set<string>();
+    const projects = [this.options.configFile];
+    const visited = new Set<string>();
+    for (const configFile of projects) {
+      if (visited.has(configFile)) continue;
+      visited.add(configFile);
+      inputs.add(configFile);
+      const config = JSON.parse(
+        await this.run(['--showConfig', '--project', configFile]),
+      ) as {
+        files?: string[];
+        references?: { path: string }[];
+      };
+      const directory = path.dirname(configFile);
+      for (const file of config.files ?? [])
+        inputs.add(path.resolve(directory, file));
+      for (const reference of config.references ?? []) {
+        const target = path.resolve(directory, reference.path);
+        projects.push(
+          path.extname(target) === '.json'
+            ? target
+            : path.join(target, 'tsconfig.json'),
+        );
+      }
+    }
+    return inputs;
+  }
+
   apply(compiler: Rspack.Compiler): void {
-    compiler.hooks.beforeCompile.tapPromise(name, () => this.check());
     compiler.hooks.thisCompilation.tap(name, compilation => {
       compilation.fileDependencies.add(this.options.configFile);
+      compilation.hooks.processAssets.tapPromise(name, async () => {
+        try {
+          for (const file of await this.watchInputs())
+            compilation.fileDependencies.add(file);
+          await this.check();
+        } catch (cause) {
+          compilation.errors.push(
+            new Error(cause instanceof Error ? cause.message : String(cause), {
+              cause,
+            }),
+          );
+        }
+      });
     });
   }
 }
