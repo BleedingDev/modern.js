@@ -216,8 +216,14 @@ test('migration subprocesses preserve staged command order, nonzero exits and la
     assert.equal(runPnpmLockfileRefresh(context), 23);
 
     process.env.PATH = '';
-    assert.throws(() => runPnpmLockfileRefresh(context), /ENOENT/u);
-    assert.throws(() => runStagedTargetChecks(context, 'install'), /ENOENT/u);
+    if (process.platform === 'win32') {
+      // cmd.exe reports a missing command through its nonzero exit status.
+      assert.notEqual(runPnpmLockfileRefresh(context), 0);
+      assert.notEqual(runStagedTargetChecks(context, 'install'), 0);
+    } else {
+      assert.throws(() => runPnpmLockfileRefresh(context), /ENOENT/u);
+      assert.throws(() => runStagedTargetChecks(context, 'install'), /ENOENT/u);
+    }
   } finally {
     if (previousPath === undefined) delete process.env.PATH;
     else process.env.PATH = previousPath;

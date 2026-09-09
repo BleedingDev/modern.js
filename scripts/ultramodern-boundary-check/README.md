@@ -71,7 +71,8 @@ remains governed, and a listed package present in reviewed upstream is not
 exempt.
 
 The relocation inventory also includes `packages/runtime/boundary-debugger`,
-`packages/runtime/federation-runtime`, `packages/solutions/ultramodern-app-tools`,
+`packages/runtime/federation-runtime`, `packages/runtime/renderer-extensions`,
+`packages/solutions/ultramodern-app-tools`,
 `packages/toolkit/backend-federation-contracts` and
 `packages/toolkit/surface-resolution`. Their entire directory trees are absent
 at both immutable upstream pins; the behavior suite verifies that evidence.

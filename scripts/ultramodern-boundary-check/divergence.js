@@ -39,6 +39,7 @@ const FORK_OWNED_PACKAGE_ROOTS = Object.freeze([
   'packages/runtime/federation-runtime',
   'packages/runtime/i18n-extensions',
   'packages/runtime/plugin-tanstack',
+  'packages/runtime/renderer-extensions',
   'packages/runtime/runtime-extensions',
   'packages/server/bff-effect',
   'packages/server/runtime-extensions',

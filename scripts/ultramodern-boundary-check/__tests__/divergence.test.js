@@ -1370,6 +1370,7 @@ test('added production source inside an explicit fork-owned package passes', () 
 const relocatedForkPackageRoots = [
   'packages/runtime/boundary-debugger',
   'packages/runtime/federation-runtime',
+  'packages/runtime/renderer-extensions',
   'packages/solutions/ultramodern-app-tools',
   'packages/toolkit/backend-federation-contracts',
   'packages/toolkit/surface-resolution',
