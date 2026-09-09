@@ -24,3 +24,12 @@ export {
   injectRscManifestPlugin,
   serverStaticPlugin,
 } from './plugins';
+export type {
+  ServerStaticPluginOptions,
+  ServeStaticAsset,
+  StaticAsset,
+  StaticAssetRequest,
+  StaticAssetResponder,
+  StaticPublicFallbackResponder,
+} from './plugins/static';
+export { serveStaticAsset } from './plugins/static';

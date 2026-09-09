@@ -7,7 +7,8 @@ export const handleRSCRedirect = (
   let redirectUrl = headers.get('Location');
 
   if (
-    !redirectUrl ||
+    redirectUrl === null ||
+    redirectUrl === '' ||
     ![301, 302, 303, 307, 308].includes(status) ||
     !URL.canParse(redirectUrl, 'http://localhost')
   ) {

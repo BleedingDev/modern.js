@@ -1,14 +1,13 @@
 import { createRslib, type RslibConfig } from '@rslib/core';
 import { afterAll, beforeAll, describe, expect, it } from '@rstest/core';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import appToolsRslibConfig from '../rslib.config.mts';
 
 const appToolsDirectory = path.resolve(__dirname, '..');
 const temporaryDirectory = fs.mkdtempSync(
-  path.join(os.tmpdir(), 'modernjs-app-tools-rslib-'),
+  path.join(appToolsDirectory, '.rslib-template-test-'),
 );
 const outputDirectory = path.join(temporaryDirectory, 'dist');
 const outputFormats = ['esm-node', 'esm', 'cjs'];
@@ -34,11 +33,6 @@ function getBuildConfig(): RslibConfig {
 
 describe('App Tools Rslib ESM loaders', () => {
   beforeAll(async () => {
-    fs.symlinkSync(
-      path.join(appToolsDirectory, 'node_modules'),
-      path.join(temporaryDirectory, 'node_modules'),
-      process.platform === 'win32' ? 'junction' : 'dir',
-    );
     const rslib = await createRslib({
       cwd: appToolsDirectory,
       config: getBuildConfig(),

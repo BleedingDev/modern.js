@@ -55,7 +55,7 @@ test('shared API infrastructure is additive, byte-stable, and preserves consumer
   expect(index).not.toContain('microvertical-api-baseline');
   expect(read(root, 'verticals/catalog/api/index.ts')).toBe(handler);
   expect(read(root, `${shared}/src/effect-bff-runtime.ts`)).toContain(
-    'defineEffectBff({ api, layer })',
+    "export { assembleEffectBffRuntime } from '@modern-js/bff-effect/assembly';",
   );
   expect(
     fs.existsSync(path.join(root, shared, 'src/microvertical-api-baseline.ts')),
@@ -68,7 +68,7 @@ test('shared API infrastructure is additive, byte-stable, and preserves consumer
     },
     dependencies: {
       'consumer-library': '1.2.3',
-      '@modern-js/plugin-bff': 'workspace:*',
+      '@modern-js/bff-effect': 'workspace:*',
     },
   });
   const files = ['src/index.ts', 'src/effect-bff-runtime.ts', 'package.json'];
@@ -163,7 +163,7 @@ test('owning migration restores missing shared infrastructure without regenerati
   write(workspace, `${shared}/src/index.ts`, business);
   const manifest = JSON.parse(read(workspace, `${shared}/package.json`));
   delete manifest.exports['./server/effect-bff-runtime'];
-  delete manifest.dependencies['@modern-js/plugin-bff'];
+  delete manifest.dependencies['@modern-js/bff-effect'];
   write(workspace, `${shared}/package.json`, JSON.stringify(manifest));
   const handlers = [
     'api/index.ts',
@@ -184,7 +184,7 @@ test('owning migration restores missing shared infrastructure without regenerati
   ).toEqual(before);
   expect(read(workspace, `${shared}/src/index.ts`)).toBe(business);
   expect(read(workspace, `${shared}/src/effect-bff-runtime.ts`)).toContain(
-    'defineEffectBff',
+    "export { assembleEffectBffRuntime } from '@modern-js/bff-effect/assembly';",
   );
   expect(
     fs.existsSync(

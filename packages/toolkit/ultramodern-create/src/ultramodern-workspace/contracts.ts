@@ -243,8 +243,9 @@ export function createUltramodernConfig(
   bridge?: UltramodernBridgeConfig,
   additionalShells: WorkspaceApp[] = [],
   primaryShell?: WorkspaceApp,
+  effectiveRemotes?: WorkspaceApp[],
 ): JsonValue {
-  const remotes = apps.filter(app => app.kind !== 'shell');
+  const remotes = effectiveRemotes ?? apps.filter(app => app.kind !== 'shell');
   const shellHost = primaryShell ?? createShellHost(remotes);
 
   return {
@@ -321,7 +322,10 @@ export function createUltramodernConfig(
         },
         ...optionalJsonEntry(
           'backendFederation',
-          createBackendFederationContract(scope, app),
+          createBackendFederationContract(
+            scope,
+            remotes.find(remote => remote.id === app.id) ?? app,
+          ),
         ),
         // Delivery-unit identity for ALL unit kinds (G29): shell and UI-only
         // verticals carry the record too; API-bearing apps keep the same key

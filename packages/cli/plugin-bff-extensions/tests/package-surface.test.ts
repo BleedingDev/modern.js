@@ -153,6 +153,7 @@ describe('@modern-js/plugin-bff-extensions package surface', () => {
   test('declares only the source graph runtime dependencies', () => {
     expect(Object.keys(packageManifest.dependencies).sort()).toEqual(
       [
+        '@modern-js/backend-federation-contracts',
         '@modern-js/bff-core',
         '@modern-js/bff-effect',
         '@modern-js/runtime-extensions',
@@ -297,6 +298,7 @@ describe('@modern-js/plugin-bff-extensions package surface', () => {
       Object.keys(await sourceLoaders['./effect-source-loader'].load()).sort(),
     ).toEqual([
       'bundleEffectEntryForNode',
+      'bundleEffectWorkerRuntimeSource',
       'generateEffectClientCode',
       'generateEffectWorkerRuntimeWrapper',
       'resolveEffectEntryFile',

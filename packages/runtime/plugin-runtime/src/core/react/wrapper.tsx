@@ -2,6 +2,7 @@ import type React from 'react';
 import { HelmetProvider } from 'react-helmet-async';
 import {
   getGlobalEnableRsc,
+  getGlobalInternalRuntimeContext,
   getInitialContext,
   InternalRuntimeContext,
   RuntimeContext,
@@ -64,10 +65,10 @@ export function wrapRuntimeContextProvider(
     ...rest
   } = contextValue as TInternalRuntimeContext;
 
-  const internalContextValue = contextValue as TInternalRuntimeContext;
+  let internalContextValue = contextValue as TInternalRuntimeContext;
   const helmetContext = ensureHelmetContext(internalContextValue);
 
-  const runtimeContextValue: TRuntimeContext = {
+  let runtimeContextValue: TRuntimeContext = {
     isBrowser,
     initialData,
     routes,
@@ -80,33 +81,41 @@ export function wrapRuntimeContextProvider(
   // keep using `internalContextValue`, which is the original object.
   stripRuntimeContextExtensions(runtimeContextValue);
 
-  if (getGlobalEnableRsc() === true && isBrowser === false) {
+  const isRsc = getGlobalEnableRsc() === true;
+  const isServerRsc = isRsc && isBrowser === false;
+  if (isServerRsc) {
     const rscSafeRequestContext = createRscSafeRequestContext(ssrContext);
-    const rscInternalContextValue = {
+    internalContextValue = {
       ...internalContextValue,
       context: rscSafeRequestContext,
       requestContext: rscSafeRequestContext,
     };
-    delete rscInternalContextValue.ssrContext;
-    const rscRuntimeContextValue = {
+    delete internalContextValue.ssrContext;
+    runtimeContextValue = {
       ...runtimeContextValue,
       context: rscSafeRequestContext,
       requestContext: rscSafeRequestContext,
     };
-
-    return (
-      <InternalRuntimeContext.Provider value={rscInternalContextValue}>
-        <RuntimeContext.Provider value={rscRuntimeContextValue}>
-          {App}
-        </RuntimeContext.Provider>
-      </InternalRuntimeContext.Provider>
-    );
   }
 
+  const projection = {
+    internalContext: internalContextValue,
+    publicContext: runtimeContextValue,
+  };
+  const values =
+    getGlobalInternalRuntimeContext()?.hooks.transformRuntimeContext?.call(
+      projection,
+      { context: contextValue, isRsc },
+    ) ?? projection;
+
   return (
-    <InternalRuntimeContext.Provider value={internalContextValue}>
-      <RuntimeContext.Provider value={runtimeContextValue}>
-        <HelmetProvider context={helmetContext}>{App}</HelmetProvider>
+    <InternalRuntimeContext.Provider value={values.internalContext}>
+      <RuntimeContext.Provider value={values.publicContext}>
+        {isServerRsc ? (
+          App
+        ) : (
+          <HelmetProvider context={helmetContext}>{App}</HelmetProvider>
+        )}
       </RuntimeContext.Provider>
     </InternalRuntimeContext.Provider>
   );

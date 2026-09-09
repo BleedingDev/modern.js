@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import execa from '@modern-js/utils/execa';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 import { ensureSharedApiInfrastructure } from '../src/ultramodern-tooling/commands/migrate-strict-effect/shared-api-infrastructure';
 import { addUltramodernVertical } from '../src/ultramodern-workspace';
@@ -138,19 +139,20 @@ function assertGeneratedWorkspaceLintClean(
   if (process.platform === 'win32') {
     env.Path = externalPath;
   }
-  const result = spawnSync(
-    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
+  const result = execa.sync(
+    'pnpm',
     ['--config.verify-deps-before-run=false', 'lint', '--format', 'json'],
     {
       cwd: workspaceDir,
       encoding: 'utf-8',
       env,
+      reject: false,
     },
   );
   const commandOutput = `${result.stdout}\n${result.stderr}`;
   assert.equal(
-    result.error,
-    undefined,
+    result.failed,
+    false,
     `${generatedState} lint failed to execute.\n${commandOutput}`,
   );
   const report = parseOxlintReport(result.stdout, commandOutput);
@@ -160,7 +162,7 @@ function assertGeneratedWorkspaceLintClean(
     `${generatedState} produced lint diagnostics.\n${commandOutput}`,
   );
   assert.equal(
-    result.status,
+    result.exitCode,
     0,
     `${generatedState} lint exited unsuccessfully.\n${commandOutput}`,
   );

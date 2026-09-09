@@ -357,7 +357,17 @@ function executeAddUltramodernVertical(
         );
         return app.id === primaryShell.id
           ? updateShellComposition(app, generated)
-          : app;
+          : {
+              ...app,
+              ...(generated?.backendFederation
+                ? {
+                    backendFederation: preserveUnknownProjectionFields(
+                      app.backendFederation,
+                      generated.backendFederation,
+                    ),
+                  }
+                : {}),
+            };
       }),
       newEntry,
     ],

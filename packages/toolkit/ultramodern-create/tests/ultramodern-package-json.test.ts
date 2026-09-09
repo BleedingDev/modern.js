@@ -46,6 +46,7 @@ const installAppDependencies = {
   '@modern-js/plugin-i18n': packageVersion,
   '@modern-js/runtime': packageVersion,
   '@modern-js/runtime-extensions': packageVersion,
+  '@modern-js/federation-runtime': packageVersion,
   '@module-federation/bridge-react': '2.9.0',
   '@module-federation/modern-js-v3': '2.9.0',
   '@module-federation/runtime': '2.9.0',
@@ -88,6 +89,7 @@ test('app dependencies pin generated framework deps and distinguish shell-only f
   assert.deepEqual(appDependencies(scope, installPackageSource, shellApp), {
     ...installAppDependencies,
     ...bffEffectDependencies,
+    '@modern-js/boundary-debugger': packageVersion,
     '@modern-js/plugin-bff': packageVersion,
   });
   assert.deepEqual(
@@ -98,6 +100,7 @@ test('app dependencies pin generated framework deps and distinguish shell-only f
     {
       ...installAppDependencies,
       ...bffEffectDependencies,
+      '@modern-js/boundary-debugger': packageVersion,
       '@modern-js/plugin-bff': packageVersion,
       '@tractor-store/catalog': 'workspace:*',
       '@tractor-store/checkout': 'workspace:*',
@@ -146,6 +149,7 @@ test('workspace package source uses workspace versions for generated framework d
     '@modern-js/plugin-i18n': 'workspace:*',
     '@modern-js/runtime': 'workspace:*',
     '@modern-js/runtime-extensions': 'workspace:*',
+    '@modern-js/federation-runtime': 'workspace:*',
     '@module-federation/bridge-react': '2.9.0',
     '@module-federation/modern-js-v3': '2.9.0',
     '@module-federation/runtime': '2.9.0',
@@ -161,6 +165,13 @@ test('workspace package source uses workspace versions for generated framework d
     '@modern-js/plugin-bff': 'workspace:*',
   });
   assert.equal(packageJson.devDependencies['cross-env'], '10.1.0');
+  for (const name of [
+    '@modern-js/app-tools',
+    '@modern-js/app-tools-extensions',
+    '@modern-js/ultramodern-app-tools',
+  ]) {
+    assert.equal(packageJson.devDependencies[name], 'workspace:*');
+  }
   const scripts = packageRecord(packageJson.scripts);
   assert.match(
     scripts.build as string,
@@ -229,6 +240,8 @@ test('root package json pins workspace package versions and bridge workspace glo
     '@types/node': '^26.4.1',
     '@effect/tsgo': '0.41.0',
     '@modern-js/code-tools': packageVersion,
+    '@modern-js/app-tools-extensions': packageVersion,
+    '@modern-js/ultramodern-app-tools': packageVersion,
     '@modern-js/ultramodern-create': packageVersion,
     '@modern-js/bff-effect': packageVersion,
     '@modern-js/plugin-bff': packageVersion,

@@ -137,6 +137,80 @@ const generatedContract = readGeneratedContractView(ultramodernConfig);`,
   return source;
 }
 
+/** Remove only the released checker requirement; whole-file ownership is checked afterward. */
+function normalizeHistoricalApiCheck(source: string): string {
+  const options: Parameters<typeof parse>[1] = {
+    sourceType: 'module',
+    plugins: ['typescript'],
+    tokens: true,
+  };
+  const parsed = parse(source, options);
+  const identity = (node: unknown) =>
+    JSON.stringify(node, (key, value) =>
+      [
+        'start',
+        'end',
+        'loc',
+        'extra',
+        'leadingComments',
+        'trailingComments',
+        'innerComments',
+      ].includes(key)
+        ? undefined
+        : value,
+    );
+  const expected = parse(
+    "rootPackage.scripts?.['api:check'] === 'node ./scripts/check-ultramodern-api-boundaries.mts'",
+    options,
+  ).program.body[0];
+  if (expected?.type !== 'ExpressionStatement') return source;
+  const expectedIdentity = identity(expected.expression);
+  const edits: Array<{ start: number; end: number; text: string }> = [];
+  const visit = (value: any): void => {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (
+      value.type === 'BinaryExpression' &&
+      identity(value) === expectedIdentity
+    ) {
+      edits.push({
+        start: value.right.start,
+        end: value.right.end,
+        text: "'modern-api-check'",
+      });
+    }
+    if (value.type === 'ArrayExpression') {
+      for (const element of value.elements) {
+        if (
+          element?.type !== 'StringLiteral' ||
+          element.value !== 'scripts/check-ultramodern-api-boundaries.mts'
+        )
+          continue;
+        edits.push({ start: element.start, end: element.end, text: '' });
+        const tokens = parsed.tokens ?? [];
+        const index = tokens.findIndex(
+          token => token.start === element.start && token.end === element.end,
+        );
+        const comma =
+          tokens[index + 1]?.type.label === ','
+            ? tokens[index + 1]
+            : tokens[index - 1]?.type.label === ','
+              ? tokens[index - 1]
+              : undefined;
+        if (comma) edits.push({ start: comma.start, end: comma.end, text: '' });
+      }
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(parsed.program);
+  for (const edit of edits.sort((a, b) => b.start - a.start))
+    source = source.slice(0, edit.start) + edit.text + source.slice(edit.end);
+  return source;
+}
+
 function withoutGeneratedData(
   source: string,
   binding?: string,
@@ -146,12 +220,7 @@ function withoutGeneratedData(
   if (binding === 'workspaceValidationContract') {
     if (currentGeneratedSource)
       source = normalizeHistoricalOverlayPair(source, currentGeneratedSource);
-    source = source
-      .replace(/^\s*'scripts\/check-ultramodern-api-boundaries\.mts',\n/mu, '')
-      .replace(
-        /rootPackage\.scripts\?\.\['api:check'\]\s*===\s*'node \.\/scripts\/check-ultramodern-api-boundaries\.mts'/u,
-        "rootPackage.scripts?.['api:check'] === 'modern-api-check'",
-      );
+    source = normalizeHistoricalApiCheck(source);
     // Only the exact historical assertion can adopt the current generated
     // postinstall block. The entire remaining validator must still match.
     const start = currentGeneratedSource?.indexOf(

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import {
   type BuilderInstance,
@@ -115,8 +115,10 @@ export async function assertCacheIsolation(configs: BundlerConfig[]) {
           );
           const entryModule = stats.stats[index]
             .toJson({ all: false, modules: true, cachedModules: true })
-            .modules.find((module: any) =>
-              module.nameForCondition?.endsWith('/entry.js'),
+            .modules.find(
+              (module: any) =>
+                module.nameForCondition &&
+                basename(module.nameForCondition) === 'entry.js',
             );
           assert.ok(entryModule, `expected fixture entry for ${config.name}`);
           assert.equal(

@@ -21,20 +21,45 @@ const templatePatchDir = path.join(packageRoot, 'template-workspace/patches');
 const pnpmModulesDir = path.join(repoRoot, 'node_modules/.pnpm');
 const pnpmLock = fs.readFileSync(path.join(repoRoot, 'pnpm-lock.yaml'), 'utf8');
 const require = createRequire(import.meta.url);
+const nativeTypeScriptManifestPath = require.resolve(
+  '@typescript/native-preview/package.json',
+);
+const nativeTypeScriptManifest = JSON.parse(
+  fs.readFileSync(nativeTypeScriptManifestPath, 'utf8'),
+) as { bin: { tsgo: string } };
+const nativeTypeScriptCli = path.resolve(
+  path.dirname(nativeTypeScriptManifestPath),
+  nativeTypeScriptManifest.bin.tsgo,
+);
 
-function packageStoreDirectory(prefix: string, packagePath: string): string {
-  const packageStoreEntry = fs
-    .readdirSync(pnpmModulesDir)
-    .find(entry => entry.startsWith(prefix));
-  assert.ok(
-    packageStoreEntry,
-    `${prefix} must be installed for patch validation`,
-  );
-  return path.join(
-    pnpmModulesDir,
-    packageStoreEntry,
-    'node_modules',
-    packagePath,
+function packageStoreDirectory(
+  packageName: string,
+  exactVersion?: string,
+): string {
+  for (const entry of fs.readdirSync(pnpmModulesDir)) {
+    const packageDirectory = path.join(
+      pnpmModulesDir,
+      entry,
+      'node_modules',
+      packageName,
+    );
+    const manifestPath = path.join(packageDirectory, 'package.json');
+    if (!fs.existsSync(manifestPath)) {
+      continue;
+    }
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      name: string;
+      version: string;
+    };
+    if (
+      manifest.name === packageName &&
+      (!exactVersion || manifest.version === exactVersion)
+    ) {
+      return fs.realpathSync(packageDirectory);
+    }
+  }
+  assert.fail(
+    `${packageName}${exactVersion ? `@${exactVersion}` : ''} must be installed for patch validation`,
   );
 }
 
@@ -45,8 +70,8 @@ function moduleFederationPackageDirectory(packageName: string): string {
   )?.[1];
   assert.ok(patchHash, `${selector} must have a lockfile patch hash`);
   return packageStoreDirectory(
-    `@module-federation+${packageName}@${MODULE_FEDERATION_VERSION}_patch_hash=${patchHash.slice(0, 12)}`,
     `@module-federation/${packageName}`,
+    MODULE_FEDERATION_VERSION,
   );
 }
 
@@ -110,11 +135,9 @@ function compileRuntimeCoreProof(temporaryDir: string): void {
   );
   try {
     execFileSync(
-      path.join(
-        repoRoot,
-        `node_modules/.bin/${process.platform === 'win32' ? 'tsgo.cmd' : 'tsgo'}`,
-      ),
+      process.execPath,
       [
+        nativeTypeScriptCli,
         '--noEmit',
         '--strict',
         '--skipLibCheck',
@@ -733,23 +756,9 @@ function assertDeclarationPatchesCompile(): void {
     for (const [packageName, exactVersion] of Object.entries(
       dependencyVersions,
     )) {
-      const normalizedPrefix = packageName.replace(/^@/, '@').replace('/', '+');
-      const storeEntry = fs
-        .readdirSync(pnpmModulesDir)
-        .find(entry =>
-          entry.startsWith(
-            `${normalizedPrefix}@${exactVersion ? exactVersion : ''}`,
-          ),
-        );
-      assert.ok(
-        storeEntry,
-        `${packageName} must be installed for declaration proof`,
-      );
-      const installedDependencyPath = path.join(
-        pnpmModulesDir,
-        storeEntry,
-        'node_modules',
+      const installedDependencyPath = packageStoreDirectory(
         packageName,
+        exactVersion,
       );
       const temporaryDependencyPath = path.join(
         temporaryDir,
@@ -771,8 +780,8 @@ function assertDeclarationPatchesCompile(): void {
     }
 
     const installedDrizzleDir = packageStoreDirectory(
-      `drizzle-orm@${DRIZZLE_ORM_VERSION}`,
       'drizzle-orm',
+      DRIZZLE_ORM_VERSION,
     );
     const temporaryDrizzleDir = path.join(
       temporaryDir,
@@ -805,11 +814,9 @@ function assertDeclarationPatchesCompile(): void {
       ].join('\n'),
     );
     execFileSync(
-      path.join(
-        repoRoot,
-        `node_modules/.bin/${process.platform === 'win32' ? 'tsgo.cmd' : 'tsgo'}`,
-      ),
+      process.execPath,
       [
+        nativeTypeScriptCli,
         '--noEmit',
         '--strict',
         '--skipLibCheck',
@@ -879,7 +886,7 @@ test('msgpackr patch only removes the dynamic record-reader optimizer', () => {
   );
   assert.match(
     patchSource,
-    /^ \t\tlet object = \{\};\n \t\tfor \(let i = 0, l = structure\.length; i < l; i\+\+\) \{\n \t\t\tlet key = structure\[i\];$/mu,
+    /^ \t\tlet object = \{\};\r?\n \t\tfor \(let i = 0, l = structure\.length; i < l; i\+\+\) \{\r?\n \t\t\tlet key = structure\[i\];$/mu,
     'the ordinary record decoder must remain as unchanged patch context',
   );
 });

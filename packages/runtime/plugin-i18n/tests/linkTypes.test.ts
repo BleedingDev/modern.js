@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const fixtureDir = path.resolve(__dirname, 'type-fixture');
@@ -18,9 +19,17 @@ function resolveTsgoBin() {
 }
 
 const tsgoBin = resolveTsgoBin();
-const useShell = process.platform === 'win32';
-const execOptions = { cwd: path.dirname(__dirname), shell: useShell };
-execFileSync('pnpm', ['build'], execOptions);
+for (const artifact of [
+  'dist/types/runtime/context.d.ts',
+  'dist/cjs/cli/index.js',
+  'dist/cjs/shared/utils.js',
+]) {
+  if (!fs.existsSync(path.resolve(__dirname, '..', artifact))) {
+    throw new Error(
+      `Missing plugin-i18n build artifact ${artifact}. Run pnpm build:required before unit tests.`,
+    );
+  }
+}
 
 describe('Link type-level tests', () => {
   test('fixture type-checks correctly: valid uses compile, invalid uses are rejected', () => {

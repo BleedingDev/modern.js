@@ -1,5 +1,5 @@
+import type { Middleware } from '@modern-js/server-core';
 import { fs } from '@modern-js/utils';
-import type { Middleware } from '../../../types';
 
 type SupportedEncoding = 'br' | 'gzip';
 
@@ -85,7 +85,7 @@ const getAcceptedRepresentations = (
   };
 
   const identityQuality =
-    qualityByEncoding.get('identity') ?? (wildcardQuality === 0 ? 0 : 1);
+    qualityByEncoding.get('identity') ?? wildcardQuality ?? 1;
 
   return [
     ...PRE_COMPRESSED_SUPPORTED_ENCODINGS.map(encoding => ({

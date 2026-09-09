@@ -21,13 +21,24 @@ const createFixtureApp = async () => {
   const apiDir = path.join(appDir, 'api');
   const resourcePath = path.join(apiDir, 'index.js');
   await fs.promises.mkdir(apiDir, { recursive: true });
+  const packageLinks = path.join(appDir, 'node_modules/@modern-js');
+  await fs.promises.mkdir(packageLinks, { recursive: true });
+  await fs.promises.symlink(
+    path.dirname(fixtureRequire.resolve('@modern-js/bff-effect/package.json')),
+    path.join(packageLinks, 'bff-effect'),
+    'dir',
+  );
+  const appRequire = createRequire(resourcePath);
+  expect(appRequire.resolve('@modern-js/bff-effect/effect-client')).toBe(
+    fixtureRequire.resolve('@modern-js/bff-effect/effect-client'),
+  );
   await fs.promises.writeFile(
     path.join(appDir, 'package.json'),
     JSON.stringify({ name: 'test-effect-app', version: '2.1.0' }),
   );
   await fs.promises.writeFile(
     resourcePath,
-    `const { HttpApi, HttpApiEndpoint, HttpApiGroup, Layer, Schema } = require('@modern-js/plugin-bff/effect-client');
+    `const { HttpApi, HttpApiEndpoint, HttpApiGroup, Layer, Schema } = require('@modern-js/bff-effect/effect-client');
 const api = HttpApi.make('CodegenTestApi').add(
   HttpApiGroup.make('greetings').add(
     HttpApiEndpoint.get('ping', '/ping', { success: Schema.Boolean }),
@@ -104,6 +115,7 @@ describe('Effect client generation', () => {
     ]);
     expect(Object.keys(sourceLoaderSurface).sort()).toEqual([
       'bundleEffectEntryForNode',
+      'bundleEffectWorkerRuntimeSource',
       'generateEffectClientCode',
       'generateEffectWorkerRuntimeWrapper',
       'resolveEffectEntryFile',
@@ -122,7 +134,9 @@ describe('Effect client generation', () => {
 
       const entry = path.join(apiDir, 'index.ts');
       await fs.promises.writeFile(entry, 'export const value = true;');
-      expect(resolveEffectEntryFile({ apiDir, appDir })).toBe(entry);
+      expect(resolveEffectEntryFile({ apiDir, appDir })).toBe(
+        entry.replaceAll(path.sep, '/'),
+      );
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }
@@ -201,12 +215,16 @@ describe('Effect client generation', () => {
       expect(wrapper).toContain(
         `from '@modern-js/plugin-bff/effect-edge/dispatcher'`,
       );
-      expect(wrapper).toContain(`${resourcePath}?modern-bff-runtime-source`);
+      expect(wrapper).toContain(
+        JSON.stringify(`${resourcePath}?modern-bff-runtime-source`),
+      );
       expect(wrapper).toContain(
         '...policy.expectedOperationContracts,\n      ...__generatedOperationContracts',
       );
       expect(wrapper).not.toContain('@modern-js/bff-effect');
-      expect(dependencies).toContain(path.join(appDir, 'package.json'));
+      expect(
+        dependencies.map(dependency => path.normalize(dependency)),
+      ).toContain(path.join(appDir, 'package.json'));
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }

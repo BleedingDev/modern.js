@@ -133,6 +133,7 @@ export const injectTelemetryPlugin = (): ServerPlugin => ({
 
     const {
       healthMonitor,
+      canaryCompatibility,
       gateSnapshotStorePromise,
       runtimeFallbackSignalConfig,
       runtimeStatusAuthConfig,
@@ -151,6 +152,7 @@ export const injectTelemetryPlugin = (): ServerPlugin => ({
       createRuntimeStatusMiddleware({
         registry,
         healthMonitor,
+        canaryCompatibility,
         runtimeFallbackSignalConfig,
         runtimeStatusAuthConfig,
       }),

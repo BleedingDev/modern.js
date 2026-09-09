@@ -383,7 +383,7 @@ test('prefers an explicit Effect TS-Go compiler path', async () => {
   }
 });
 
-test('materializes a private executable without mutating the package binary', async () => {
+test('repairs Unix execute bits and preserves Windows package paths without mutation', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'app-tools-effect-tsgo-mode-'));
   const compilerPath = join(directory, 'native/effect-tsgo');
   const temporaryRoot = join(directory, 'tmp');
@@ -401,16 +401,25 @@ test('materializes a private executable without mutating the package binary', as
           from: pathToFileURL(join(directory, 'modern.config.ts')),
         });
 
-        assert.notEqual(firstResolution, compilerPath);
+        if (process.platform === 'win32') {
+          assert.equal(firstResolution, compilerPath);
+        } else {
+          assert.notEqual(firstResolution, compilerPath);
+          accessSync(firstResolution, constants.X_OK);
+          assert.throws(() => accessSync(compilerPath, constants.X_OK));
+        }
         assert.equal(secondResolution, firstResolution);
         assert.equal(
           readFileSync(firstResolution, 'utf-8'),
           readFileSync(compilerPath, 'utf-8'),
         );
-        accessSync(firstResolution, constants.X_OK);
-        assert.throws(() => accessSync(compilerPath, constants.X_OK));
+        // Windows needs Node for this JS fixture; Unix must execute the repaired file.
         assert.equal(
-          execFileSync(firstResolution, { encoding: 'utf-8' }).trim(),
+          execFileSync(
+            process.platform === 'win32' ? process.execPath : firstResolution,
+            process.platform === 'win32' ? [firstResolution] : [],
+            { encoding: 'utf-8' },
+          ).trim(),
           'fixture compiler',
         );
       }),
@@ -420,7 +429,7 @@ test('materializes a private executable without mutating the package binary', as
   }
 });
 
-test('reuses one executable for identical Effect TS-Go package binaries', async () => {
+test('deduplicates Unix executable copies while retaining native Windows paths', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'app-tools-effect-tsgo-cache-'));
   const firstPackage = join(directory, 'first');
   const secondPackage = join(directory, 'second');
@@ -444,13 +453,37 @@ test('reuses one executable for identical Effect TS-Go package binaries', async 
           from: pathToFileURL(join(secondPackage, 'modern.config.ts')),
         });
 
-        assert.equal(secondResolution, firstResolution);
-        accessSync(firstResolution, constants.X_OK);
+        if (process.platform === 'win32') {
+          assert.equal(firstResolution, firstCompiler);
+          assert.equal(secondResolution, secondCompiler);
+        } else {
+          assert.equal(secondResolution, firstResolution);
+          accessSync(firstResolution, constants.X_OK);
+        }
+        for (const resolvedCompiler of [firstResolution, secondResolution]) {
+          assert.equal(
+            execFileSync(process.execPath, [resolvedCompiler], {
+              encoding: 'utf-8',
+            }).trim(),
+            'fixture compiler',
+          );
+        }
       }),
     );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('resolves and executes a platform-native compiler override directly', async () => {
+  await withEnvironment('EFFECT_TSGO_BIN', process.execPath, () => {
+    const compiler = resolveEffectTsgoCompiler({ from: import.meta.url });
+    assert.equal(compiler, process.execPath);
+    assert.equal(
+      execFileSync(compiler, ['--version'], { encoding: 'utf-8' }).trim(),
+      process.version,
+    );
+  });
 });
 
 test('resolves Effect TS-Go from the requesting module origin', async () => {

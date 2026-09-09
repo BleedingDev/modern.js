@@ -83,9 +83,15 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:packages/solutions/app-tools
+      '@modern-js/app-tools-extensions':
+        specifier: workspace:*
+        version: link:packages/solutions/app-tools-extensions
       '@modern-js/tsconfig':
         specifier: workspace:*
         version: link:packages/tsconfig
+      '@modern-js/ultramodern-create':
+        specifier: workspace:*
+        version: link:packages/toolkit/ultramodern-create
       '@rstest/core':
         specifier: 0.11.12
         version: 0.11.12(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)(happy-dom@20.14.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@25.0.1(bufferutil@4.1.0)(supports-color@10.2.2)(utf-8-validate@5.0.10))
@@ -4851,6 +4857,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../../packages/solutions/app-tools
+      '@modern-js/app-tools-extensions':
+        specifier: workspace:*
+        version: link:../../../../../packages/solutions/app-tools-extensions
       '@modern-js/plugin-ssg':
         specifier: workspace:*
         version: link:../../../../../packages/cli/plugin-ssg
@@ -4885,6 +4894,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../../packages/solutions/app-tools
+      '@modern-js/app-tools-extensions':
+        specifier: workspace:*
+        version: link:../../../../../packages/solutions/app-tools-extensions
       '@modern-js/plugin-ssg':
         specifier: workspace:*
         version: link:../../../../../packages/cli/plugin-ssg
@@ -5537,6 +5549,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../packages/solutions/app-tools
+      '@modern-js/app-tools-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/solutions/app-tools-extensions
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff

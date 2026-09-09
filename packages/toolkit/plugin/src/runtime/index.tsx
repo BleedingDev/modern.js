@@ -6,6 +6,10 @@ export type {
   RuntimePluginAPI,
   RuntimePluginExtends,
 } from '../types/runtime';
+export type {
+  RuntimeContextProjection,
+  TransformRuntimeContextFn,
+} from '../types/runtime/hooks';
 export { initPluginAPI } from './api';
 export { createRuntimeContext, initRuntimeContext } from './context';
 export { initHooks } from './hooks';

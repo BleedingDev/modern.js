@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 import { runOxlintRules } from '../src/cli/oxlint';
 
 const require = createRequire(import.meta.url);
@@ -52,7 +53,7 @@ for (const fixture of [
           'ultramodern/no-literal-visible-jsx-attributes': 'error',
         },
       });
-      const output = result.stdout + result.stderr;
+      const output = stripVTControlCharacters(result.stdout + result.stderr);
       if (fixture.diagnostic) {
         expect(result.exitCode).toBe(1);
         expect(output).toMatch(fixture.diagnostic);

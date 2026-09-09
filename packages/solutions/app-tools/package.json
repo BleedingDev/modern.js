@@ -35,12 +35,6 @@
       },
       "default": "./dist/cjs/builder/index.js"
     },
-    "./config": {
-      "types": "./dist/types/config/public.d.ts",
-      "import": "./dist/esm-node/config/public.mjs",
-      "require": "./dist/cjs/config/public.js",
-      "default": "./dist/cjs/config/public.js"
-    },
     "./cli": {
       "types": "./dist/types/index.d.ts",
       "node": {
@@ -56,12 +50,6 @@
         "require": "./dist/cjs/run/index.js"
       },
       "default": "./dist/cjs/run/index.js"
-    },
-    "./cloudflare-output-verifier": {
-      "types": "./dist/types/plugins/deploy/platforms/cloudflare-output-verifier/index.d.ts",
-      "import": "./dist/esm-node/plugins/deploy/platforms/cloudflare-output-verifier/index.mjs",
-      "require": "./dist/cjs/plugins/deploy/platforms/cloudflare-output-verifier/index.js",
-      "default": "./dist/cjs/plugins/deploy/platforms/cloudflare-output-verifier/index.js"
     },
     "./types": {
       "types": "./lib/types.d.ts",
@@ -88,9 +76,6 @@
       ],
       "builder": [
         "./dist/types/builder/index.d.ts"
-      ],
-      "config": [
-        "./dist/types/config/public.d.ts"
       ],
       "bundle-docs": [
         "./dist/types/bundleDocs.d.ts"

@@ -30,7 +30,6 @@ import {
 import {
   createAppMfTypesTsConfig,
   createAppTsConfig,
-  createSharedPackageTsConfig,
 } from '../src/ultramodern-workspace/package-json';
 import {
   renderMinimumReleaseAgeExclude,
@@ -1910,7 +1909,8 @@ export default catalogResource;
       'verticals/catalog/shared/ultramodern-build.json',
       'verticals/catalog/shared/ultramodern-build.ts',
     ]) {
-      fs.writeFileSync(path.join(workspaceDir, relativePath), 'stale\n');
+      // Missing generated artifacts are repairable; arbitrary source bytes are consumer-owned.
+      fs.rmSync(path.join(workspaceDir, relativePath), { force: true });
     }
     fs.rmSync(
       path.join(workspaceDir, 'scripts/proof-node-backend-federation.mjs'),
@@ -2106,6 +2106,19 @@ declare module '*.css' {}
       );
     }
 
+    const consumerTsConfigPaths = [
+      'tsconfig.base.json',
+      'packages/shared-contracts/tsconfig.json',
+      'packages/shared-design-tokens/tsconfig.json',
+      'apps/shell-super-app/tsconfig.json',
+      'apps/shell-super-app/tsconfig.mf-types.json',
+      'verticals/catalog/tsconfig.json',
+      'verticals/catalog/tsconfig.mf-types.json',
+    ];
+    const consumerTsConfigs = consumerTsConfigPaths.map(relativePath =>
+      fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
+    );
+
     assert.equal(
       await runUltramodernToolingCli(
         ['migrate-strict-effect', '--skip-install'],
@@ -2172,7 +2185,7 @@ declare module '*.css' {}
     );
     assert.equal(
       migratedTopologyIdentityCatalog.deliveryUnit.buildMarker,
-      migratedBuildArtifact.deliveryUnit.buildMarker,
+      'stale-reference-marker',
     );
     assert.equal(
       compactConfig.tooling.wrappers.backendFederationProof,
@@ -2443,8 +2456,8 @@ declare module '*.css' {}
     const migratedBaseTsConfig = readJson(workspaceDir, 'tsconfig.base.json');
     assert.equal(
       migratedBaseTsConfig.compilerOptions.skipLibCheck,
-      undefined,
-      'migrate-strict-effect must remove generated skipLibCheck',
+      true,
+      'migrate-strict-effect must preserve consumer TypeScript options',
     );
     assertGitIgnored(workspaceDir, [
       '.mf/diagnostics.json',
@@ -2484,22 +2497,20 @@ declare module '*.css' {}
       'module-federation.config.ts',
     ]);
 
-    for (const sharedPackageDir of [
-      'packages/shared-contracts',
-      'packages/shared-design-tokens',
-    ]) {
-      assert.deepEqual(
-        readJson(workspaceDir, `${sharedPackageDir}/tsconfig.json`),
-        createSharedPackageTsConfig(sharedPackageDir),
-      );
-    }
+    assert.deepEqual(
+      consumerTsConfigPaths.map(relativePath =>
+        fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
+      ),
+      consumerTsConfigs,
+      'Consumer TypeScript configurations must retain every byte',
+    );
 
     for (const appDir of ['apps/shell-super-app', 'verticals/catalog']) {
       const mfTypesTsConfig = readJson(
         workspaceDir,
         `${appDir}/tsconfig.mf-types.json`,
       );
-      assert.equal(mfTypesTsConfig.extends, '../../tsconfig.base.json');
+      assert.equal(mfTypesTsConfig.extends, './tsconfig.json');
 
       assert.equal(
         exists(workspaceDir, `${appDir}/src/modern-app-env.d.ts`),

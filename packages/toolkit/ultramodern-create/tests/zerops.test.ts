@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import execa from '@modern-js/utils/execa';
 import yaml from 'js-yaml';
 import type { WorkspaceApp } from '../src/ultramodern-workspace/types';
 import { createZeropsYaml } from '../src/ultramodern-workspace/zerops';
@@ -11,6 +12,47 @@ type CommandRecord = {
   argv: string[];
   cwd: string;
 };
+
+function resolvePosixShell() {
+  const candidates: string[] = [];
+  if (process.platform === 'win32') {
+    const fromPath = execa.sync('where.exe', ['sh.exe'], { reject: false });
+    if (!fromPath.failed) {
+      candidates.push(...fromPath.stdout.trim().split(/\r?\n/u));
+    }
+    const git = execa.sync('git', ['--exec-path'], { reject: false });
+    if (!git.failed) {
+      const gitRoot = path.resolve(git.stdout.trim(), '../../..');
+      candidates.push(
+        path.join(gitRoot, 'usr/bin/sh.exe'),
+        path.join(gitRoot, 'bin/sh.exe'),
+      );
+    }
+  } else {
+    candidates.push('/bin/sh');
+  }
+
+  for (const candidate of candidates) {
+    if (!path.isAbsolute(candidate) || !fs.existsSync(candidate)) {
+      continue;
+    }
+    try {
+      if (
+        execFileSync(candidate, ['-c', 'printf ultramodern-posix-shell'], {
+          encoding: 'utf8',
+          timeout: 5000,
+        }) === 'ultramodern-posix-shell'
+      ) {
+        return candidate;
+      }
+    } catch {
+      // Try the next installed POSIX shell; this test executes Linux commands.
+    }
+  }
+  throw new Error(
+    'Zerops command tests require a POSIX shell. Install Git for Windows or provide sh.exe on PATH.',
+  );
+}
 
 function writeExecutable(filePath: string, source: string) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -39,6 +81,7 @@ const ownership = {
 };
 
 test('Zerops commands preserve interpolated arguments and launch the materialized runtime', () => {
+  const shell = resolvePosixShell();
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-zerops-command-'));
   const app: WorkspaceApp = {
     id: "catalog 'quoted' app",
@@ -127,7 +170,7 @@ fs.appendFileSync(
       UM_ZEROPS_COMMAND_RECORD: commandRecordPath,
       UM_ZEROPS_SERVE_RECORD: serveRecordPath,
     };
-    execFileSync('/bin/sh', ['-c', service.build.buildCommands[0]], {
+    execFileSync(shell, ['-c', service.build.buildCommands[0]], {
       cwd: tempRoot,
       env: probeEnvironment,
       stdio: 'pipe',
@@ -181,7 +224,7 @@ fs.appendFileSync(
       '{}\n',
     );
 
-    execFileSync('/bin/sh', ['-c', service.run.start], {
+    execFileSync(shell, ['-c', service.run.start], {
       cwd: tempRoot,
       env: probeEnvironment,
       stdio: 'pipe',

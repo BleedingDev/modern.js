@@ -28,7 +28,9 @@ const isNullBodyStatus = (status: number): boolean =>
 
 const getRedirectLocation = (headers: Headers): string | undefined => {
   const location = headers.get('Location');
-  return location && URL.canParse(location, 'http://localhost')
+  return location !== null &&
+    location !== '' &&
+    URL.canParse(location, 'http://localhost')
     ? location
     : undefined;
 };
@@ -90,7 +92,7 @@ export const createLoaderRedirectResponse = (
   }
 
   const redirectUrl = getRedirectLocation(beforeRenderResult.headers);
-  if (!redirectUrl) {
+  if (redirectUrl === undefined) {
     return;
   }
   return processRedirect(

@@ -2,8 +2,6 @@
  * forked and modified from https://github.com/devongovett/rsc-html-stream/blob/main/server.js
  * license at https://github.com/devongovett/rsc-html-stream/blob/main/LICENSE
  */
-import { injectRSCPayload as injectExtendedRSCPayload } from '@modern-js/runtime-extensions/rsc-html-stream';
-
 const encoder = new TextEncoder();
 const closingTagsPattern = /<\/body>\s*<\/html>\s*$/i;
 
@@ -15,105 +13,122 @@ export function injectRSCPayload(
     injectClosingTags?: boolean;
   },
 ): TransformStream {
-  if (injectClosingTags) {
-    return injectExtendedRSCPayload(rscStream);
-  }
   const decoder = new TextDecoder();
-  let resolveFlightDataPromise: (value: void) => void;
-  const flightDataPromise = new Promise<void>(
-    resolve => (resolveFlightDataPromise = resolve),
-  );
-  let startedRSC = false;
+  let pendingHtml = '';
+  let closingBody = false;
+  let closingHtml = false;
+  let closingProbe = '';
+  let flightReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let flightPromise: Promise<void> | undefined;
 
-  // Buffer all HTML chunks enqueued during the current tick of the event loop (roughly)
-  // and write them to the output stream all at once. This ensures that we don't generate
-  // invalid HTML by injecting RSC in between two partial chunks of HTML.
-  const buffered: Uint8Array[] = [];
-  let timeout: NodeJS.Timeout | null = null;
-
-  function flushBufferedChunks(
+  function startFlight(
     controller: TransformStreamDefaultController<Uint8Array>,
   ) {
-    let buf = '';
-    for (const chunk of buffered) {
-      buf += decoder.decode(chunk, { stream: true });
+    if (!flightPromise) {
+      flightReader = rscStream.getReader();
+      flightPromise = writeRSCStream(flightReader, controller).finally(() => {
+        flightReader = undefined;
+      });
+      void flightPromise.catch(error => controller.error(error));
     }
-
-    if (closingTagsPattern.test(buf)) {
-      buf = buf.replace(closingTagsPattern, '');
-    }
-
-    if (buf) {
-      controller.enqueue(encoder.encode(buf));
-    }
-
-    buffered.length = 0;
-    timeout = null;
+    return flightPromise;
   }
 
-  return new TransformStream({
-    transform(
-      chunk: Uint8Array,
-      controller: TransformStreamDefaultController<Uint8Array>,
-    ) {
-      buffered.push(chunk);
-      if (timeout) {
+  async function writeHtml(
+    value: string,
+    controller: TransformStreamDefaultController<Uint8Array>,
+  ) {
+    let html = pendingHtml + value;
+    pendingHtml = '';
+    if (!closingBody) {
+      const bodyIndex = html.search(
+        /<\/body>\s*(?:<\/html>\s*|<\/h(?:t(?:m(?:l>?)?)?)?|<\/?|<)?$/i,
+      );
+      if (bodyIndex !== -1) {
+        controller.enqueue(encoder.encode(html.slice(0, bodyIndex)));
+        await startFlight(controller);
+        closingBody = true;
+        html = html.slice(bodyIndex);
+      }
+    }
+    if (closingBody) {
+      if (!injectClosingTags) {
+        pendingHtml = html;
         return;
       }
+      closingHtml ||= /<\/html>/i.test(closingProbe + html);
+      closingProbe = (closingProbe + html).slice(-6);
+    } else {
+      // Keep an incomplete tag out of the output while Flight scripts stream.
+      const tagIndex = html.lastIndexOf('<');
+      if (tagIndex > html.lastIndexOf('>')) {
+        pendingHtml = html.slice(tagIndex);
+        html = html.slice(0, tagIndex);
+      }
+    }
+    if (html) {
+      controller.enqueue(encoder.encode(html));
+      void startFlight(controller);
+    }
+  }
 
-      timeout = setTimeout(async () => {
-        flushBufferedChunks(controller);
-        if (!startedRSC) {
-          startedRSC = true;
-          writeRSCStream(rscStream, controller)
-            .catch(err => controller.error(err))
-            .then(() => resolveFlightDataPromise());
-        }
-      }, 0);
+  // Transformer.cancel is standard but is still missing from the DOM typings.
+  const transformer: Transformer<Uint8Array, Uint8Array> & {
+    cancel(reason: unknown): Promise<void>;
+  } = {
+    transform(chunk: Uint8Array, controller) {
+      return writeHtml(decoder.decode(chunk, { stream: true }), controller);
     },
-    async flush(controller: TransformStreamDefaultController<Uint8Array>) {
-      await flightDataPromise;
-      if (timeout) {
-        clearTimeout(timeout);
-        flushBufferedChunks(controller);
+    async flush(controller) {
+      await writeHtml(decoder.decode(), controller);
+      await startFlight(controller);
+      const tail = injectClosingTags
+        ? pendingHtml
+        : pendingHtml.replace(closingTagsPattern, '');
+      if (tail) {
+        controller.enqueue(encoder.encode(tail));
       }
-      const remaining = decoder.decode();
-      if (remaining) {
-        controller.enqueue(encoder.encode(remaining));
-      }
-      if (injectClosingTags) {
-        controller.enqueue(encoder.encode('</body></html>'));
+      if (injectClosingTags && !closingHtml) {
+        controller.enqueue(
+          encoder.encode(closingBody ? '</html>' : '</body></html>'),
+        );
       }
     },
-  });
+    cancel(reason) {
+      return flightReader
+        ? flightReader.cancel(reason)
+        : rscStream.cancel(reason);
+    },
+  };
+  return new TransformStream(transformer);
 }
 
 async function writeRSCStream(
-  rscStream: ReadableStream,
-  controller: TransformStreamDefaultController,
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  controller: TransformStreamDefaultController<Uint8Array>,
 ): Promise<void> {
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  // @ts-ignore
-  for await (const chunk of rscStream) {
-    // Try decoding the chunk to send as a string.
-    // If that fails (e.g. binary data that is invalid unicode), write as base64.
-    try {
-      writeChunk(
-        JSON.stringify(decoder.decode(chunk, { stream: true })),
-        controller,
-      );
-    } catch (err) {
-      const base64 = JSON.stringify(btoa(String.fromCodePoint(...chunk)));
-      writeChunk(
-        `Uint8Array.from(atob(${base64}), m => m.codePointAt(0))`,
-        controller,
-      );
+  const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        return;
+      }
+      let chunk: string;
+      try {
+        // Decode complete chunks only: split or invalid UTF-8 must retain every byte.
+        chunk = JSON.stringify(decoder.decode(value));
+      } catch {
+        let binary = '';
+        for (const byte of value) {
+          binary += String.fromCharCode(byte);
+        }
+        chunk = `Uint8Array.from(atob(${JSON.stringify(btoa(binary))}), m => m.codePointAt(0))`;
+      }
+      writeChunk(chunk, controller);
     }
-  }
-
-  const remaining = decoder.decode();
-  if (remaining.length) {
-    writeChunk(JSON.stringify(remaining), controller);
+  } finally {
+    reader.releaseLock();
   }
 }
 
@@ -163,63 +178,51 @@ export function injectCSS(
 
   const decoder = new TextDecoder();
   const headTrailer = '</head>';
-  const bodyTrailer = '</body>';
-
-  // Buffer all HTML chunks enqueued during the current tick of the event loop (roughly)
-  // and write them to the output stream all at once. This ensures that we don't generate
-  // invalid HTML by injecting CSS in between two partial chunks of HTML.
-  const buffered: Uint8Array[] = [];
-  let timeout: NodeJS.Timeout | null = null;
+  let pendingHtml = '';
   let cssInjected = false;
-
   const cssLinks = cssFiles
     .map(css => `<link href="${css}" rel="stylesheet" />`)
     .join('');
 
-  function flushBufferedChunks(
+  function writeHtml(
+    value: string,
     controller: TransformStreamDefaultController<Uint8Array>,
+    final = false,
   ) {
-    for (const chunk of buffered) {
-      let buf = decoder.decode(chunk);
-
-      // Try to inject CSS before </head> first
-      if (!cssInjected && buf.includes(headTrailer)) {
-        buf = buf.replace(headTrailer, `${cssLinks}${headTrailer}`);
+    let html = pendingHtml + value;
+    pendingHtml = '';
+    if (!cssInjected) {
+      const headIndex = html.toLowerCase().indexOf(headTrailer);
+      if (headIndex !== -1) {
+        html = html.slice(0, headIndex) + cssLinks + html.slice(headIndex);
         cssInjected = true;
+      } else if (!final) {
+        // Only a suffix shorter than </head> can be part of a split closing tag.
+        let retain = Math.min(headTrailer.length - 1, html.length);
+        while (
+          retain &&
+          !html.toLowerCase().endsWith(headTrailer.slice(0, retain))
+        ) {
+          retain--;
+        }
+        pendingHtml = html.slice(html.length - retain);
+        html = html.slice(0, html.length - retain);
       }
-
-      controller.enqueue(encoder.encode(buf));
     }
-
-    buffered.length = 0;
-    timeout = null;
+    if (html) {
+      controller.enqueue(encoder.encode(html));
+    }
   }
 
   return new TransformStream({
-    transform(
-      chunk: Uint8Array,
-      controller: TransformStreamDefaultController<Uint8Array>,
-    ) {
-      buffered.push(chunk);
-      if (timeout) {
-        return;
-      }
-
-      timeout = setTimeout(() => {
-        flushBufferedChunks(controller);
-      }, 0);
+    transform(chunk: Uint8Array, controller) {
+      writeHtml(decoder.decode(chunk, { stream: true }), controller);
     },
-    async flush(controller: TransformStreamDefaultController<Uint8Array>) {
-      if (timeout) {
-        clearTimeout(timeout);
-        flushBufferedChunks(controller);
-      }
-
-      // If CSS hasn't been injected yet, inject it before closing tags
+    flush(controller) {
+      writeHtml(decoder.decode(), controller, true);
       if (!cssInjected) {
         controller.enqueue(encoder.encode(cssLinks));
       }
-
       if (injectClosingTags) {
         controller.enqueue(encoder.encode('</body></html>'));
       }

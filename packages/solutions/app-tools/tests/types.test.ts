@@ -3,7 +3,6 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createAppEnvDts } from '../../../toolkit/ultramodern-create/src/ultramodern-workspace/app-files';
 import { shellApp } from '../../../toolkit/ultramodern-create/src/ultramodern-workspace/descriptors';
-import * as buildConfigApi from '../src/config/public';
 
 const repoRoot = join(__dirname, '../../../..');
 
@@ -92,7 +91,7 @@ describe('app-tools types', () => {
     });
   });
 
-  it('declares the config export and exposes its source API', () => {
+  it('retires the fork config export from native app-tools', () => {
     const packageRoot = join(repoRoot, 'packages/solutions/app-tools');
     const appToolsPackage = JSON.parse(
       readFileSync(join(packageRoot, 'package.json'), 'utf-8'),
@@ -104,16 +103,6 @@ describe('app-tools types', () => {
     };
     const configExport = appToolsPackage.exports['./config'];
 
-    expect(configExport).toEqual({
-      types: './dist/types/config/public.d.ts',
-      import: './dist/esm-node/config/public.mjs',
-      require: './dist/cjs/config/public.js',
-      default: './dist/cjs/config/public.js',
-    });
-    expect(Object.keys(buildConfigApi).sort()).toEqual([
-      'getBuildConfigEnvironment',
-      'resolveEffectTsgoCompiler',
-      'withBuildConfigEnvironment',
-    ]);
+    expect(configExport).toBeUndefined();
   });
 });

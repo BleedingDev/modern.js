@@ -2524,6 +2524,144 @@ test('reviewed growth writer independently enforces refs, ledger, and canonical 
   }
 });
 
+test('reviewed inherited growth requires exact same-PR ledger evidence without source changes', () => {
+  const sourcePath = 'packages/runtime/src/index.ts';
+  const otherPath = 'packages/runtime/src/other.ts';
+  for (const scenario of [
+    'reviewed',
+    'historical',
+    'unrelated',
+    'malformed',
+    'ambiguous',
+    'partially-reviewed',
+  ]) {
+    const fixture = makeGitFixture({
+      files: {
+        [sourcePath]: 'export const value = 1;\n',
+        [otherPath]: 'export const other = 1;\n',
+      },
+    });
+    try {
+      writeRepoFile(fixture.rootDir, sourcePath, 'export const value = 2;\n');
+      const { allowlistPath } = writeSnapshot({
+        rootDir: fixture.rootDir,
+        baseRef: fixture.upstreamBase,
+      });
+      commitAll(fixture.rootDir, 'record original native patch');
+      writeRepoFile(
+        fixture.rootDir,
+        sourcePath,
+        'export const value = 3;\nexport const compatible = true;\n',
+      );
+      if (scenario === 'historical') {
+        appendLedgerRow(fixture.rootDir, sourcePath);
+      }
+      if (scenario === 'partially-reviewed') {
+        writeRepoFile(fixture.rootDir, otherPath, 'export const other = 2;\n');
+      }
+      const mergeBase = commitAll(fixture.rootDir, 'inherited native changes');
+      if (scenario !== 'historical') {
+        appendLedgerRow(
+          fixture.rootDir,
+          scenario === 'unrelated' ? otherPath : sourcePath,
+          scenario === 'malformed' ? { owner: '' } : {},
+        );
+      }
+      if (scenario === 'ambiguous') {
+        appendLedgerRow(fixture.rootDir, sourcePath, {
+          reason: 'Conflicting second review',
+        });
+      }
+      writeRepoFile(fixture.rootDir, 'review.md', `${scenario} review\n`);
+      const headRef = commitAll(
+        fixture.rootDir,
+        'review inherited native patch',
+      );
+      assert.equal(
+        runGit(fixture.rootDir, [
+          'diff',
+          '--name-only',
+          mergeBase,
+          headRef,
+          '--',
+          'packages',
+        ]),
+        '',
+      );
+      const before = fs.readFileSync(allowlistPath);
+      const writerOptions = {
+        rootDir: fixture.rootDir,
+        baseRef: fixture.upstreamBase,
+        headRef,
+        mergeBaseRef: mergeBase,
+        allowlistPath,
+      };
+      assert.throws(
+        () => writeDivergenceAllowlist(writerOptions),
+        /explicit --record-growth/,
+      );
+      assert.deepEqual(fs.readFileSync(allowlistPath), before);
+      const write = () =>
+        writeDivergenceAllowlist({ ...writerOptions, recordGrowth: true });
+      const error =
+        scenario === 'ambiguous'
+          ? /ambiguous duplicate\/conflicting/
+          : scenario === 'malformed'
+            ? /owner/
+            : scenario === 'partially-reviewed'
+              ? /other\.ts.*requires a same-PR strict/
+              : /requires a same-PR strict/;
+      if (scenario === 'reviewed') {
+        const report = write();
+        assert.equal(report.growth.length, 1);
+        assert.equal(report.governance.ok, true);
+        assert.deepEqual(report.governance.rule5Changes, []);
+        assert.equal(report.snapshot.baseRef, fixture.upstreamBase);
+        assert.equal(report.snapshot.upstreamRef, fixture.upstreamBase);
+        assert.deepEqual(report.snapshot.pathspec, ['packages']);
+      } else {
+        assert.throws(write, error, scenario);
+        assert.deepEqual(fs.readFileSync(allowlistPath), before);
+        writeSnapshot({
+          rootDir: fixture.rootDir,
+          baseRef: fixture.upstreamBase,
+          headRef,
+        });
+      }
+      const recordedHead = commitAll(
+        fixture.rootDir,
+        'record candidate budgets',
+      );
+      const governance = loadGovernance({
+        rootDir: fixture.rootDir,
+        mergeBase,
+        headRef: recordedHead,
+      });
+      assert.deepEqual(governance.rule5Changes, []);
+      assert.equal(
+        governance.ok,
+        scenario === 'reviewed',
+        governance.errors.join('\n'),
+      );
+      if (scenario !== 'reviewed') {
+        assert.match(governance.errors.join('\n'), error, scenario);
+      }
+      const result = runGovernanceCli({
+        rootDir: fixture.rootDir,
+        mergeBase,
+        headRef: recordedHead,
+      });
+      assert.equal(
+        result.status,
+        scenario === 'reviewed' ? 0 : 1,
+        `${result.stdout}\n${result.stderr}`,
+      );
+    } finally {
+      cleanup(fixture.rootDir);
+    }
+  }
+});
+
 test('reviewed growth writer accepts large patches only with ledger evidence and preserves rejected snapshots', () => {
   for (const ledgerChanged of [false, true]) {
     const baseContents = replacementLines(32);

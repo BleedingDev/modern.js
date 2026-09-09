@@ -56,6 +56,14 @@
       },
       "import": "./dist/esm/runtimeLifecycle.mjs",
       "default": "./dist/esm/runtimeLifecycle.mjs"
+    },
+    "./static-serving/node": {
+      "types": "./dist/types/static-serving/plugin.d.ts",
+      "node": {
+        "modern:source": "./src/static-serving/plugin.ts",
+        "import": "./dist/esm-node/static-serving/plugin.mjs",
+        "require": "./dist/cjs/static-serving/plugin.js"
+      }
     }
   },
   "typesVersions": {
@@ -75,6 +83,10 @@
       "runtime-lifecycle": [
         "./dist/types/runtimeLifecycle.d.ts",
         "./src/runtimeLifecycle.ts"
+      ],
+      "static-serving/node": [
+        "./dist/types/static-serving/plugin.d.ts",
+        "./src/static-serving/plugin.ts"
       ]
     }
   },

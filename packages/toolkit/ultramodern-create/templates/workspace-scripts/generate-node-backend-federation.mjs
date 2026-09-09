@@ -12,7 +12,7 @@ const workspaceRoot = path.resolve(
 const configPath = path.join(workspaceRoot, '.modernjs/ultramodern.json');
 const { build } = createRequire(import.meta.url)('esbuild');
 // Keep these constants/checks in sync with
-// @modern-js/utils/universal backend-federation-contract. Generated workspace
+// @modern-js/backend-federation-contracts backend-federation-contract. Generated workspace
 // scripts do not currently import @modern-js/utils directly.
 const contractVersion = 'microvertical-server-effect-v1';
 const nodeAdapterVersion = 'backend-mf-effect-v1';

@@ -32,7 +32,9 @@ export function isDeferredDataLike(v: unknown): v is DeferredDataLike {
 }
 
 export function isPromiseLike(value: unknown): value is Promise<unknown> {
-  return !!value && typeof (value as { then?: unknown }).then === 'function';
+  return (
+    Boolean(value) && typeof (value as { then?: unknown }).then === 'function'
+  );
 }
 
 export function toErrorInfo(error: unknown): {
@@ -43,7 +45,7 @@ export function toErrorInfo(error: unknown): {
     return { message: 'Unexpected Server Error' };
   }
 
-  if (error && typeof error === 'object') {
+  if (error !== null && typeof error === 'object') {
     const maybeMsg = (error as { message?: unknown }).message;
     const maybeStack = (error as { stack?: string }).stack;
     return {
@@ -61,7 +63,8 @@ export function buildDeferredDataScript(
 ): string {
   const payload = JSON.stringify(args);
   const escaped = escapeAttr(payload);
-  const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
+  const nonceAttr =
+    nonce !== undefined && nonce !== '' ? ` nonce="${nonce}"` : '';
   return `<script async${nonceAttr} data-fn-name="r" data-script-src="modern-run-router-data-fn" data-fn-args='${escaped}' suppressHydrationWarning>${runRouterDataFnStr}</script>`;
 }
 

@@ -1,3 +1,35 @@
+import { createHash } from 'node:crypto';
+import { parse } from '@babel/parser';
+
+/** Whole released program identity; formatting is ignored, authored comments are retained. */
+export function apiArtifactSyntaxHash(source: string): string | undefined {
+  try {
+    const parsed = parse(source, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    });
+    return createHash('sha256')
+      .update(
+        JSON.stringify(parsed, (key, value) =>
+          [
+            'start',
+            'end',
+            'loc',
+            'extra',
+            'leadingComments',
+            'trailingComments',
+            'innerComments',
+          ].includes(key)
+            ? undefined
+            : value,
+        ),
+      )
+      .digest('hex');
+  } catch {
+    return undefined;
+  }
+}
+
 // Released template fingerprints: raw source and canonical Oxfmt output.
 export default {
   'packages/shared-contracts/src/microvertical-api-baseline.ts': [
@@ -94,3 +126,62 @@ export const historicalValidatorHashes = [
     sha256: 'd922fb39b37b6ee1e88ff851ece6615f7f4ebcdfb7b96ecef58b4d11425f4739',
   },
 ];
+
+// Frozen syntax fingerprints from the same reviewed template refs above, raw and
+// Ultracite-formatted. No consumer-provided ownership metadata is trusted.
+export const historicalApiSyntaxHashes: Record<
+  string,
+  readonly { sha256: string; ref: string }[]
+> = {
+  'packages/shared-contracts/src/microvertical-api-baseline.ts': [
+    {
+      sha256:
+        '590e63c98c9d6d92b13ae2b76a2dfa45b5b6a49ed5fb310ccb6db731c297c794',
+      ref: '68465b0bf02054ef92a9ac9411c4cd5d74f4c1a9',
+    },
+  ],
+  'scripts/microvertical-api-baseline-boundary.mts': [
+    {
+      sha256:
+        'e8ea9a8665f7b90a626dc729a11b30c095945f17f368b898ef1f0eafd2792a24',
+      ref: '6c071b02c98e700e97f89c45bc8d56fb8b31d157',
+    },
+    {
+      sha256:
+        '1a626f0bdab477a423b77e6c01d42526ce1be50f7003178ff1414819f8160f43',
+      ref: 'e9f855db7ee1e0447e8bb0e8fb85c76371f7ffea',
+    },
+    {
+      sha256:
+        'ead993e593c37112dbad8f34b07eda926a2a5ec0616e998d077d35e54a0bd680',
+      ref: '68465b0bf02054ef92a9ac9411c4cd5d74f4c1a9',
+    },
+  ],
+  'scripts/check-ultramodern-api-boundaries.mts': [
+    {
+      sha256:
+        'eaf78b679dfc4d4fea28449ead13b64a67931b893885fb5df2a625fbb53b07bc',
+      ref: 'e9f855db7ee1e0447e8bb0e8fb85c76371f7ffea',
+    },
+    {
+      sha256:
+        'daa90f784b5471b5dd0792841b6f9d2b6464d908bc0ae0e1423a688bbfc0220c',
+      ref: 'e9f855db7ee1e0447e8bb0e8fb85c76371f7ffea',
+    },
+    {
+      sha256:
+        '796d0c995cc94e7843ac3544e65988ceb3a2d7216fc5a22c27f1f2382bd3ae36',
+      ref: '68465b0bf02054ef92a9ac9411c4cd5d74f4c1a9',
+    },
+    {
+      sha256:
+        'f1355a5d63e3b3973a7444bca8272d1d1e4b1fe913aa09a54332a255112a62d9',
+      ref: '68465b0bf02054ef92a9ac9411c4cd5d74f4c1a9',
+    },
+    {
+      sha256:
+        '379a812c78ed5bf603ad05cd62df70c109d902512c1274865137b72d9716a114',
+      ref: 'b6794e933d0bce99eb5c9324b0dc38b721ff2435',
+    },
+  ],
+};

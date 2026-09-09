@@ -7,7 +7,7 @@ import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-s
 import { updateGeneratedPackageScripts } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
 import { preserveConsumerWorkspaceArtifacts } from '../src/ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
 import { generateUltramodernWorkspace } from '../src/ultramodern-workspace';
-import { createWorkspaceValidationScript } from '../src/ultramodern-workspace/workspace-scripts';
+import { createPackagedWorkspaceValidationScript } from '../src/ultramodern-workspace/workspace-scripts';
 
 const bootstrap = 'node ./scripts/bootstrap-agent-skills.mts --postinstall';
 
@@ -170,7 +170,12 @@ test('historical postinstall assertions migrate only in otherwise canonical vali
     const relativePath = 'scripts/validate-ultramodern-workspace.mts';
     const filePath = path.join(root, relativePath);
     fs.mkdirSync(path.dirname(filePath));
-    const current = createWorkspaceValidationScript('postinstall-owned', true);
+    // Historical ownership compares validator implementations; current generated
+    // workspace entrypoints only delegate to the installed package.
+    const current = createPackagedWorkspaceValidationScript(
+      'postinstall-owned',
+      true,
+    );
     const start = current.indexOf(
       'const postinstall = rootPackage.scripts?.postinstall;',
     );

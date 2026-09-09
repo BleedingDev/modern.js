@@ -49,12 +49,28 @@ export type PickContextFn<RuntimeContext> = (
   context: RuntimeContext,
 ) => RuntimeContext;
 
+export type RuntimeContextProjection<RuntimeContext> = {
+  internalContext: RuntimeContext;
+  publicContext: RuntimeContext;
+};
+
+export type TransformRuntimeContextFn<RuntimeContext> = (
+  projection: RuntimeContextProjection<RuntimeContext>,
+  options: {
+    /** Original request context, unchanged across callbacks in the pipeline. */
+    context: RuntimeContext;
+    /** Whether the application's RSC mode is enabled. */
+    isRsc: boolean;
+  },
+) => RuntimeContextProjection<RuntimeContext>;
+
 export type ConfigFn<RuntimeConfig> = () => RuntimeConfig;
 
 export type Hooks<RuntimeConfig, RuntimeContext> = {
   onBeforeRender: AsyncInterruptHook<OnBeforeRenderFn<RuntimeContext>>;
   wrapRoot: SyncHook<WrapRootFn>;
   pickContext: SyncHook<PickContextFn<RuntimeContext>>;
+  transformRuntimeContext: SyncHook<TransformRuntimeContextFn<RuntimeContext>>;
   config: CollectSyncHook<ConfigFn<RuntimeConfig>>;
   extendStringSSRCollectors: CollectSyncHook<
     ExtendStringSSRCollectorsFn<StringSSRCollectorsInfo>

@@ -498,6 +498,124 @@ test('built CLI scaffolds an existing empty current directory', () => {
   }
 });
 
+function crashFreshCli(workspaceRoot: string, parent: string) {
+  const preload = path.join(parent, 'crash-fresh.mjs');
+  const transactionUrl = pathToFileURL(
+    path.join(
+      packageRoot,
+      'dist/esm-node/ultramodern-workspace/add-vertical/transaction.js',
+    ),
+  ).href;
+  fs.writeFileSync(
+    preload,
+    `
+    import { __transactionTestHooks } from ${JSON.stringify(transactionUrl)};
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+    __transactionTestHooks.beforeFreshPublish = () => Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
+    __transactionTestHooks.beforePublish = () => Object.defineProperty(process, 'platform', platform);
+    __transactionTestHooks.afterPublishPath = ({ relativePath }) => {
+      if (relativePath.includes('/')) process.kill(process.pid, 'SIGKILL');
+    };
+  `,
+  );
+  const result = spawnSync(
+    process.execPath,
+    ['--import', pathToFileURL(preload).href, builtCliPath, '--workspace'],
+    {
+      cwd: workspaceRoot,
+      encoding: 'utf8',
+      env: hermeticEnv,
+    },
+  );
+  assert.equal(
+    result.status,
+    process.platform === 'win32' ? 1 : null,
+    result.stderr,
+  );
+  assert.equal(
+    result.signal,
+    process.platform === 'win32' ? null : 'SIGKILL',
+    result.stderr,
+  );
+  const receiptPath = path.join(
+    parent,
+    fs.readdirSync(parent).find(entry => entry.endsWith('.receipt.json'))!,
+  );
+  assert.ok(fs.existsSync(receiptPath));
+  return receiptPath;
+}
+
+test('built CLI retries an interrupted fresh cwd before prompting or rejecting nested partial output', () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-crash-'));
+  const root = path.join(parent, 'workspace');
+  fs.mkdirSync(root);
+  try {
+    crashFreshCli(root, parent);
+    assert.ok(fs.readdirSync(root).length > 0);
+    const retry = spawnSync(process.execPath, [builtCliPath, '--workspace'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: hermeticEnv,
+      timeout: 30_000,
+    });
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.ok(fs.existsSync(path.join(root, 'package.json')));
+    assert.ok(fs.existsSync(path.join(root, '.modernjs/ultramodern.json')));
+    assert.deepEqual(fs.readdirSync(parent).sort(), [
+      'crash-fresh.mjs',
+      'workspace',
+    ]);
+  } finally {
+    fs.rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('built CLI preserves consumer bytes and recovery evidence after a fresh publication crash', () => {
+  const parent = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'modern-create-crash-conflict-'),
+  );
+  const root = path.join(parent, 'workspace');
+  fs.mkdirSync(root);
+  try {
+    const receiptPath = crashFreshCli(root, parent);
+    const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+    const published = receipt.changes.find((change: { relativePath: string }) =>
+      fs.existsSync(path.join(root, change.relativePath)),
+    );
+    assert.ok(published);
+    fs.writeFileSync(
+      path.join(root, published.relativePath),
+      'consumer after crash',
+    );
+    const snapshot = () =>
+      fs
+        .readdirSync(parent, { recursive: true, withFileTypes: true })
+        .filter(entry => entry.isFile())
+        .map(entry => {
+          const filePath = path.join(entry.parentPath, entry.name);
+          return [filePath, fs.readFileSync(filePath).toString('base64')];
+        })
+        .sort();
+    const before = snapshot();
+    const retry = spawnSync(
+      process.execPath,
+      [builtCliPath, '.', '--workspace'],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: hermeticEnv,
+        timeout: 30_000,
+      },
+    );
+    assert.equal(retry.status, 1, retry.stderr);
+    assert.match(retry.stderr, /newer consumer bytes/);
+    assert.deepEqual(snapshot(), before);
+    assert.ok(fs.existsSync(receiptPath));
+  } finally {
+    fs.rmSync(parent, { recursive: true, force: true });
+  }
+});
+
 test('--workspace forces workspace protocol dependencies without registry access', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
   const fakeBinDir = path.join(tmpDir, 'fake-bin');
@@ -579,7 +697,7 @@ test('local source initializes Git and leaves the first commit to the user', () 
     path.join(hooksDir, 'pre-commit'),
     '#!/bin/sh\n: > "$ULTRAMODERN_TEST_HOOK_MARKER"\n',
   );
-  const gitConfig = `[core]\n\thooksPath = ${hooksDir}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`;
+  const gitConfig = `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`;
   fs.writeFileSync(isolatedGitConfig, gitConfig);
   const env = {
     ...hermeticEnv,
@@ -656,7 +774,7 @@ test('a rejecting hook runs only when the user explicitly commits the scaffold',
   );
   fs.writeFileSync(
     isolatedGitConfig,
-    `[core]\n\thooksPath = ${hooksDir}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`,
+    `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`,
   );
   const env = {
     ...hermeticEnv,
@@ -705,7 +823,7 @@ test('creation inside a repository preserves its HEAD and staged changes', () =>
   );
   fs.writeFileSync(
     isolatedGitConfig,
-    `[core]\n\thooksPath = ${hooksDir}\n[user]\n\tname = Parent Test\n\temail = parent@example.test\n[commit]\n\tgpgsign = false\n`,
+    `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n[user]\n\tname = Parent Test\n\temail = parent@example.test\n[commit]\n\tgpgsign = false\n`,
   );
   const env = {
     ...hermeticEnv,

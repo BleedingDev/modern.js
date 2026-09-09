@@ -987,7 +987,52 @@ const assertCompilerArchitecture = () => {
     });
     const moduleFederationAppPath =
       moduleFederationConfigAppPaths.get(absolutePath);
+    const tailwindFactories = new Set();
+    const presetFactories = new Set();
+    for (const statement of sourceFile.statements) {
+      if (!typescript.isImportDeclaration(statement) ||
+          !typescript.isStringLiteralLikeNode(statement.moduleSpecifier) ||
+          statement.importClause?.isTypeOnly) continue;
+      const bindings = statement.importClause?.namedBindings;
+      if (bindings === undefined || !typescript.isNamedImports(bindings)) continue;
+      for (const binding of bindings.elements) {
+        if (binding.isTypeOnly) continue;
+        const imported = (binding.propertyName ?? binding.name).text;
+        if (statement.moduleSpecifier.text === '@rsbuild/plugin-tailwindcss' &&
+            imported === 'pluginTailwindcss') tailwindFactories.add(binding.name.text);
+        if (statement.moduleSpecifier.text === '@modern-js/ultramodern-app-tools' &&
+            imported === 'presetUltramodern') presetFactories.add(binding.name.text);
+      }
+    }
+    const modernConfigApp = workspaceValidationContract.topology.compactConfig.apps.find(
+      app => absolutePath === path.join(root, app.path, 'modern.config.ts'),
+    );
+    let insideDefaultExport = false;
     const visit = node => {
+      const previousDefaultExport = insideDefaultExport;
+      if (typescript.isExportAssignment(node) && !node.isExportEquals) {
+        insideDefaultExport = true;
+      }
+      if (insideDefaultExport && modernConfigApp !== undefined &&
+          isCallNamed(node, presetFactories) &&
+          node.arguments[0] !== undefined &&
+          typescript.isObjectLiteralExpression(node.arguments[0])) {
+        const builderPlugins = objectLiteralProperty(node.arguments[0], 'builderPlugins');
+        const usesTailwind = builderPlugins !== undefined &&
+          typescript.isArrayLiteralExpression(builderPlugins.initializer) &&
+          builderPlugins.initializer.elements.some(plugin => isCallNamed(plugin, tailwindFactories));
+        const emitsUi = modernConfigApp.kind === 'shell' ||
+          fullStackVerticals.some(vertical => vertical.id === modernConfigApp.id && vertical.emitsUi);
+        if (usesTailwind !== (tailwindEnabled && emitsUi)) {
+          compilerFailure(
+            sourceFile,
+            builderPlugins ?? node,
+            `${compactConfigPath} policy.features.tailwind`,
+            `Tailwind feature flag is ${tailwindEnabled}, but ${modernConfigApp.id} exported config ${usesTailwind ? 'enables' : 'does not enable'} the Tailwind builder plugin.`,
+            'keep the Tailwind feature flag and active app builder configuration consistent',
+          );
+        }
+      }
       if (
         typescript.isImportDeclaration(node) &&
         typescript.isStringLiteralLikeNode(node.moduleSpecifier) &&
@@ -1088,6 +1133,7 @@ const assertCompilerArchitecture = () => {
         }
       }
       node.forEachChild(visit);
+      insideDefaultExport = previousDefaultExport;
     };
     visit(sourceFile);
     if (moduleFederationAppPath !== undefined) {

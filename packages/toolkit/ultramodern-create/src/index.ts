@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { runAgentsMd } from './agents-md';
 import {
   CODESMITH_OVERLAY_FLAG,
+  collectPositionalArgs,
   DRY_RUN_FLAG,
   detectApiProtocolFlag,
   detectBffRuntime,
@@ -35,6 +36,7 @@ import {
   generateUltramodernWorkspace,
   planUltramodernVertical,
 } from './ultramodern-workspace';
+import { recoverFreshWorkspaceTransactions } from './ultramodern-workspace/add-vertical/transaction';
 import { hasUltramodernBridgeCliOptions } from './ultramodern-workspace/bridge-config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -158,6 +160,8 @@ async function main() {
     return;
   }
 
+  if (collectPositionalArgs(args).length === 0)
+    recoverFreshWorkspaceTransactions(process.cwd());
   const { name: projectName, useCurrentDir } = await getProjectName();
   const targetDir = useCurrentDir
     ? process.cwd()
@@ -169,6 +173,7 @@ async function main() {
       ? path.basename(targetDir)
       : projectName;
 
+  recoverFreshWorkspaceTransactions(targetDir);
   if (fs.existsSync(targetDir)) {
     const files = fs.readdirSync(targetDir);
     if (files.length > 0) {

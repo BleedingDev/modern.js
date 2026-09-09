@@ -11,13 +11,9 @@ const formatDependencyNodeModules = path.dirname(
 );
 const oxfmtCliPath = path.join(formatDependencyNodeModules, 'oxfmt/bin/oxfmt');
 
-function createFormatHarness(tempRoot: string, workspaceDir: string) {
-  const formatHarnessDir = path.join(tempRoot, 'format-harness');
-  fs.mkdirSync(formatHarnessDir, { recursive: true });
-  fs.symlinkSync(
-    formatDependencyNodeModules,
-    path.join(formatHarnessDir, 'node_modules'),
-    process.platform === 'win32' ? 'junction' : 'dir',
+function createFormatHarness(workspaceDir: string) {
+  const formatHarnessDir = fs.mkdtempSync(
+    path.join(packageRoot, '.format-harness-'),
   );
   const configPath = path.join(formatHarnessDir, 'oxfmt.config.ts');
   fs.copyFileSync(path.join(workspaceDir, 'oxfmt.config.ts'), configPath);
@@ -68,7 +64,7 @@ test('generated formatter composes Ultracite during preformat and workspace chec
   const { tempRoot, workspaceDir } = createWorkspace('generated-format', {
     tempPrefix: 'um-generated-format-',
   });
-  const configPath = createFormatHarness(tempRoot, workspaceDir);
+  const configPath = createFormatHarness(workspaceDir);
   const relativePath = path.join('packages', 'format-probe.tsx');
   const probePath = path.join(workspaceDir, relativePath);
   const firstArgument = 'a'.repeat(40);
@@ -119,6 +115,7 @@ test('generated formatter composes Ultracite during preformat and workspace chec
       'generation preformat compatibility check',
     );
   } finally {
+    fs.rmSync(path.dirname(configPath), { recursive: true, force: true });
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });

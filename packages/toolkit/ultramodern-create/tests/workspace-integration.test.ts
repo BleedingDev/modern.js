@@ -33,6 +33,14 @@ const hermeticEnv = {
 
 const generatedConfigRuntimePackages = {
   'app-tools': path.resolve(packageRoot, '../../solutions/app-tools'),
+  'app-tools-extensions': path.resolve(
+    packageRoot,
+    '../../solutions/app-tools-extensions',
+  ),
+  'ultramodern-app-tools': path.resolve(
+    packageRoot,
+    '../../solutions/ultramodern-app-tools',
+  ),
   'plugin-i18n': path.resolve(packageRoot, '../../runtime/plugin-i18n'),
   'plugin-tanstack': path.resolve(packageRoot, '../../runtime/plugin-tanstack'),
 };
@@ -1733,7 +1741,7 @@ test('generated MicroVertical self-check names corrupted contracts and fix areas
         );
       },
       expectedContract:
-        /MicroVertical contract self-check failed: \.modernjs\/ultramodern\.json topology\.apps\.catalog\.deliveryUnit\./,
+        /MicroVertical contract self-check failed: \.modernjs\/ultramodern\.json topology\.apps\.catalog\.backendFederation\.deliveryUnit\./,
       expectedFixArea:
         /Fix area: regenerate vertical identity from delivery-unit record; do not hand-edit surface markers\./,
     },

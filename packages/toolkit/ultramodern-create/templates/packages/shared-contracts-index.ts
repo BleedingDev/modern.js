@@ -1,4 +1,5 @@
 import type { UltramodernPerformanceReadinessSignalId } from '@modern-js/runtime-extensions/workspace-events';
+
 export * from '@modern-js/runtime-extensions/workspace-events';
 
 export type UltramodernPublicSitemapChangeFrequency =

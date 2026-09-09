@@ -1,5 +1,5 @@
 import { appTools, defineConfig } from '@modern-js/app-tools';
-import { getBuildConfigEnvironment } from '@modern-js/app-tools/config';
+import { getBuildConfigEnvironment } from '@modern-js/app-tools-extensions/config';
 import { bffPlugin } from '@modern-js/plugin-bff';
 import { tanstackRouterPlugin } from '@modern-js/plugin-tanstack';
 import { moduleFederationPlugin } from '@module-federation/modern-js-v3';

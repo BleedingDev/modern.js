@@ -64,9 +64,18 @@ export const __transactionTestHooks: {
 } = {};
 
 function isIgnoredRelativePath(relativePath: string): boolean {
-  return normalizePath(relativePath)
-    .split('/')
-    .some(segment => ignoredSnapshotDirectories.has(segment));
+  const segments = normalizePath(relativePath).split('/');
+  return segments.some((segment, index) => {
+    // These names are valid workspace packages, not generated output. Keep
+    // matching MigrationIo's stage so dry-run and publication see the same tree.
+    if (
+      index === 1 &&
+      ['apps', 'verticals', 'packages'].includes(segments[0]) &&
+      ['dist', 'coverage'].includes(segment)
+    )
+      return false;
+    return ignoredSnapshotDirectories.has(segment);
+  });
 }
 
 function walkWorkspaceFiles(
@@ -752,6 +761,13 @@ function publishChange(root: string, change: PreparedChange): void {
 
 const receiptSuffix = '.receipt.json';
 
+type FreshDirectory = {
+  relativePath: string;
+  temporaryPath: string;
+  dev: number;
+  ino: number;
+};
+
 type TransactionReceipt = {
   schema: 'ultramodern-workspace-transaction-v1';
   root: string;
@@ -759,6 +775,8 @@ type TransactionReceipt = {
   stagingIdentity: { dev: number; ino: number };
   pid: number;
   state: 'publishing' | 'committed';
+  purpose?: 'fresh-empty';
+  directories?: FreshDirectory[];
   changes: Array<
     Omit<PreparedChange, 'before' | 'after'> & {
       before?: { content: string; mode: number; symlink?: true };
@@ -777,6 +795,11 @@ function persistReceipt(receiptPath: string, receipt: TransactionReceipt) {
     fs.closeSync(fd);
   }
   fs.renameSync(temporary, receiptPath);
+  // Windows libuv fsync calls FlushFileBuffers, which requires a writable
+  // handle. Node's read-only directory handle cannot provide a directory
+  // durability barrier there. Keep the receipt file flush and atomic rename;
+  // Windows recovery does not promise the receipt rename survives power loss.
+  if (process.platform === 'win32') return;
   const directory = fs.openSync(path.dirname(receiptPath), 'r');
   try {
     fs.fsyncSync(directory);
@@ -789,6 +812,7 @@ function encodedReceipt(
   root: string,
   stagingRoot: string,
   changes: PreparedChange[],
+  directories?: FreshDirectory[],
 ): TransactionReceipt {
   const encode = (file: WorkspaceFile | undefined) =>
     file
@@ -808,6 +832,7 @@ function encodedReceipt(
     stagingIdentity: identity(stagingRoot),
     pid: process.pid,
     state: 'publishing',
+    ...(directories ? { purpose: 'fresh-empty' as const, directories } : {}),
     changes: changes.map(change => ({
       ...change,
       before: encode(change.before),
@@ -908,11 +933,241 @@ function decodeReceipt(
       published: false,
     };
   });
+  if (receipt.purpose !== undefined && receipt.purpose !== 'fresh-empty') {
+    throw new WorkspaceTransactionConflictError(
+      `Unknown transaction purpose: ${receiptPath}`,
+    );
+  }
+  if (receipt.purpose === 'fresh-empty') {
+    const expected = freshParentPaths(changes);
+    if (
+      !Array.isArray(receipt.directories) ||
+      receipt.directories.length !== expected.length ||
+      changes.some(
+        change => change.before !== undefined || change.after === undefined,
+      ) ||
+      receipt.directories.some(
+        (directory, index) =>
+          !directory ||
+          directory.relativePath !== expected[index] ||
+          typeof directory.temporaryPath !== 'string' ||
+          path.dirname(directory.temporaryPath) !== stagingRoot ||
+          !/^\.ultramodern-directory-[\da-f-]+\.tmp$/u.test(
+            path.basename(directory.temporaryPath),
+          ) ||
+          !Number.isInteger(directory.dev) ||
+          !Number.isInteger(directory.ino),
+      ) ||
+      new Set(receipt.directories.map(directory => directory.temporaryPath))
+        .size !== expected.length
+    ) {
+      throw new WorkspaceTransactionConflictError(
+        `Unsafe fresh transaction directories: ${receiptPath}`,
+      );
+    }
+  } else if (receipt.directories !== undefined) {
+    throw new WorkspaceTransactionConflictError(
+      `Unexpected transaction directories: ${receiptPath}`,
+    );
+  }
   return { receipt, changes };
 }
 
+function freshParentPaths(changes: WorkspaceChange[]): string[] {
+  const parents = new Set<string>();
+  for (const change of changes) {
+    const segments = change.relativePath.split('/');
+    for (let length = 1; length < segments.length; length++)
+      parents.add(segments.slice(0, length).join('/'));
+  }
+  return [...parents].sort(
+    (left, right) =>
+      left.split('/').length - right.split('/').length ||
+      left.localeCompare(right),
+  );
+}
+
+function stageFreshDirectories(
+  stagingRoot: string,
+  changes: WorkspaceChange[],
+): FreshDirectory[] {
+  return freshParentPaths(changes).map(relativePath => {
+    const temporaryPath = path.join(
+      stagingRoot,
+      `.ultramodern-directory-${randomUUID()}.tmp`,
+    );
+    fs.mkdirSync(temporaryPath, {
+      mode: fs.statSync(path.join(stagingRoot, relativePath)).mode & 0o777,
+    });
+    const { dev, ino } = fs.lstatSync(temporaryPath);
+    return { relativePath, temporaryPath, dev, ino };
+  });
+}
+
+function assertFreshDirectoryAncestors(
+  root: string,
+  receipt: TransactionReceipt,
+  relativePath: string,
+): void {
+  const ancestors = relativePath.split('/').slice(0, -1);
+  for (let length = 0; length <= ancestors.length; length++) {
+    const relative = ancestors.slice(0, length).join('/');
+    const expected =
+      length === 0
+        ? receipt.rootIdentity
+        : receipt.directories!.find(
+            directory => directory.relativePath === relative,
+          )!;
+    const candidate = path.join(root, relative);
+    const stat = fs.lstatSync(candidate);
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      !sameIdentity(stat, expected)
+    )
+      throw new WorkspaceTransactionConflictError(
+        `Fresh transaction parent changed; preserved at ${candidate}`,
+      );
+  }
+}
+
+function publishFreshDirectory(
+  root: string,
+  receipt: TransactionReceipt,
+  directory: FreshDirectory,
+): void {
+  const target = path.join(root, directory.relativePath);
+  assertFreshDirectoryAncestors(root, receipt, directory.relativePath);
+  const staged = fs.lstatSync(directory.temporaryPath);
+  const stagingRoot = path.dirname(directory.temporaryPath);
+  if (
+    !staged.isDirectory() ||
+    staged.isSymbolicLink() ||
+    !sameIdentity(staged, directory) ||
+    !sameIdentity(fs.lstatSync(stagingRoot), receipt.stagingIdentity)
+  )
+    throw new WorkspaceTransactionConflictError(
+      `Fresh transaction staged directory changed: ${directory.temporaryPath}`,
+    );
+  if (fs.existsSync(target))
+    throw new WorkspaceTransactionConflictError(
+      `Fresh transaction directory appeared: ${target}`,
+    );
+  fs.renameSync(directory.temporaryPath, target);
+  try {
+    assertFreshDirectoryAncestors(root, receipt, directory.relativePath);
+    const published = fs.lstatSync(target);
+    if (
+      !published.isDirectory() ||
+      published.isSymbolicLink() ||
+      !sameIdentity(published, directory)
+    )
+      throw new WorkspaceTransactionConflictError(
+        `Fresh transaction directory changed; preserved at ${target}`,
+      );
+  } catch (error) {
+    // Node has no portable directory-relative no-follow rename. An ancestor
+    // replacement during the syscall may leave a newly created empty directory
+    // outside the root. Never reclaim through that now-untrusted path: another
+    // checked-then-rename could relocate foreign consumer data. Retain evidence.
+    throw new WorkspaceTransactionConflictError(
+      `Fresh directory publication could not validate ownership at ${target}; no cleanup attempted through this path`,
+      { cause: error },
+    );
+  }
+}
+
+function validateFreshDirectories(
+  root: string,
+  receipt: TransactionReceipt,
+  changes: PreparedChange[],
+): void {
+  const directories = receipt.directories!;
+  const allowed = new Set(
+    directories.map(directory => path.join(root, directory.relativePath)),
+  );
+  for (const change of changes) {
+    allowed.add(path.join(root, change.relativePath));
+    if (change.publishPath) allowed.add(change.publishPath);
+  }
+  const liveDirectories = [root];
+  for (const directory of directories) {
+    for (const candidate of [
+      path.join(root, directory.relativePath),
+      directory.temporaryPath,
+    ]) {
+      let stat: fs.Stats;
+      try {
+        stat = fs.lstatSync(candidate);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw error;
+      }
+      if (
+        !stat.isDirectory() ||
+        stat.isSymbolicLink() ||
+        !sameIdentity(stat, directory)
+      )
+        throw new WorkspaceTransactionConflictError(
+          `Fresh transaction directory changed; preserved at ${candidate}`,
+        );
+      if (candidate !== directory.temporaryPath)
+        liveDirectories.push(candidate);
+    }
+  }
+  if (receipt.state === 'committed') return;
+  for (const directory of liveDirectories) {
+    for (const entry of fs.readdirSync(directory)) {
+      if (!allowed.has(path.join(directory, entry)))
+        throw new WorkspaceTransactionConflictError(
+          `Fresh transaction conflicts with newer consumer path: ${path.join(directory, entry)}`,
+        );
+    }
+  }
+}
+
+function removeFreshDirectories(
+  root: string,
+  directories: FreshDirectory[],
+): void {
+  for (const directory of [...directories].reverse()) {
+    const target = path.join(root, directory.relativePath);
+    let stat: fs.Stats;
+    try {
+      stat = fs.lstatSync(target);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      !sameIdentity(stat, directory)
+    )
+      throw new WorkspaceTransactionConflictError(
+        `Fresh transaction directory changed; preserved at ${target}`,
+      );
+    fs.rmdirSync(target);
+  }
+}
+
+/** Creation only recovers receipts from an interrupted empty-target creation. */
+export function recoverFreshWorkspaceTransactions(root: string): void {
+  try {
+    const stat = fs.lstatSync(root);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  recoverWorkspaceTransactions(root, 'fresh-empty');
+}
+
 /** Recover only our validated durable publication receipts, never unknown stages. */
-export function recoverWorkspaceTransactions(root: string): void {
+export function recoverWorkspaceTransactions(
+  root: string,
+  purpose: 'update' | 'fresh-empty' = 'update',
+): void {
   const workspaceRoot = fs.realpathSync.native(root);
   const parent = path.dirname(workspaceRoot);
   const prefix = `.${path.basename(workspaceRoot)}.ultramodern-stage-`;
@@ -920,6 +1175,7 @@ export function recoverWorkspaceTransactions(root: string): void {
     if (!entry.startsWith(prefix) || !entry.endsWith(receiptSuffix)) continue;
     const receiptPath = path.join(parent, entry);
     const { receipt, changes } = decodeReceipt(receiptPath, workspaceRoot);
+    if ((receipt.purpose ?? 'update') !== purpose) continue;
     try {
       process.kill(receipt.pid, 0);
       throw new WorkspaceTransactionConflictError(
@@ -928,9 +1184,12 @@ export function recoverWorkspaceTransactions(root: string): void {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
     }
+    if (receipt.purpose === 'fresh-empty')
+      validateFreshDirectories(workspaceRoot, receipt, changes);
     // Validate every target and owned temporary before restoring any path.
     for (const change of changes) {
-      ensureOwnedParentDirectories(workspaceRoot, change.relativePath, []);
+      if (receipt.purpose !== 'fresh-empty')
+        ensureOwnedParentDirectories(workspaceRoot, change.relativePath, []);
       for (const [temporary, expected] of [
         [change.publishPath, change.after],
         [change.rollbackPath, change.before],
@@ -983,6 +1242,8 @@ export function recoverWorkspaceTransactions(root: string): void {
     if (receipt.state === 'publishing')
       rollbackPublishedChanges(workspaceRoot, changes);
     cleanupPreparedChanges(changes, []);
+    if (receipt.purpose === 'fresh-empty' && receipt.state === 'publishing')
+      removeFreshDirectories(workspaceRoot, receipt.directories!);
     removeOwnedTemporaryDirectory(
       receiptPath.slice(0, -receiptSuffix.length),
       receipt.stagingIdentity,
@@ -995,12 +1256,14 @@ function publishChangePlan(
   root: string,
   stagingRoot: string,
   changes: WorkspaceChange[],
+  emptyTarget?: FreshWorkspaceTarget,
 ) {
   __transactionTestHooks.beforePublish?.({
     workspaceRoot: root,
     stagingRoot,
     changedPaths: changes.map(change => change.relativePath),
   });
+  if (emptyTarget) assertFreshTarget(root, emptyTarget);
   for (const change of changes) assertPreimage(root, change);
   if (changes.length === 0) return;
   const createdDirectories: string[] = [];
@@ -1021,9 +1284,19 @@ function publishChangePlan(
       : {}),
   }));
   const receiptPath = `${stagingRoot}${receiptSuffix}`;
-  const receipt = encodedReceipt(root, stagingRoot, preparedChanges);
+  const directories = emptyTarget
+    ? stageFreshDirectories(stagingRoot, changes)
+    : undefined;
+  const receipt = encodedReceipt(
+    root,
+    stagingRoot,
+    preparedChanges,
+    directories,
+  );
   persistReceipt(receiptPath, receipt);
   try {
+    for (const directory of directories ?? [])
+      publishFreshDirectory(root, receipt, directory);
     prepareChanges(root, preparedChanges, createdDirectories);
     for (const change of preparedChanges) assertPreimage(root, change);
     preparedChanges.forEach((change, index) => {
@@ -1042,11 +1315,23 @@ function publishChangePlan(
     persistReceipt(receiptPath, { ...receipt, state: 'committed' });
   } catch (error) {
     try {
+      if (directories) validateFreshDirectories(root, receipt, preparedChanges);
       rollbackPublishedChanges(root, preparedChanges);
+      if (directories) {
+        cleanupPreparedChanges(preparedChanges, []);
+        removeFreshDirectories(root, directories);
+      }
     } catch (rollbackError) {
       throw new WorkspaceTransactionConflictError(
         `Workspace transaction failed and concurrent target changes prevented a safe rollback; recovery receipt ${receiptPath}.`,
-        { cause: rollbackError },
+        {
+          cause: directories
+            ? new AggregateError(
+                [error, rollbackError],
+                'Fresh publication and rollback conflicts',
+              )
+            : rollbackError,
+        },
       );
     }
     cleanPreparedChanges(preparedChanges, createdDirectories);
@@ -1188,6 +1473,21 @@ function publishFreshWorkspace(
     return;
   }
 
+  if (process.platform === 'win32' && currentDirectoryIs(workspaceRoot)) {
+    // The calling shell can retain its own cwd handle, so moving our process
+    // cwd cannot make a directory swap reliable. Preserve this root's inode
+    // and use the existing recoverable, per-file publisher after full staging.
+    // This has the updater's multi-file publication semantics, not an atomic
+    // whole-directory rename or a Windows power-loss durability guarantee.
+    publishChangePlan(
+      fs.realpathSync.native(workspaceRoot),
+      stagingRoot,
+      buildChangePlan(new Map(), captureWorkspace(stagingRoot, workspaceRoot)),
+      target,
+    );
+    return;
+  }
+
   const rollbackPath = path.join(
     path.dirname(workspaceRoot),
     `.${path.basename(workspaceRoot)}.ultramodern-empty-${randomUUID()}.tmp`,
@@ -1239,17 +1539,18 @@ function publishFreshWorkspace(
 
 /**
  * Fully stage a fresh workspace beside its resolved target and publish the
- * complete tree with one directory rename. An already-empty target needs a
- * narrow empty-directory swap (the canonical path is briefly absent) so CLI
- * generation in an empty cwd retains its contract without exposing a partial
- * tree. Node has no portable no-replace directory rename, so an external
- * process can still win the narrow final preflight-to-rename race.
+ * complete tree with one directory rename, except for an empty Windows cwd,
+ * whose held directory is retained by the recoverable per-file publisher.
+ * Other already-empty targets use a narrow empty-directory swap (the canonical
+ * path is briefly absent). Node has no portable no-replace directory rename,
+ * so an external process can still win the final preflight-to-rename race.
  */
 export function runFreshWorkspaceTransaction<T>(
   targetDir: string,
   generate: (stagingRoot: string) => T,
 ): T {
   const workspaceRoot = path.resolve(targetDir);
+  recoverFreshWorkspaceTransactions(workspaceRoot);
   const target = inspectFreshTarget(workspaceRoot);
   const stagingRoot = createTemporarySibling(workspaceRoot);
   const stagingIdentity = fs.lstatSync(stagingRoot);
@@ -1263,6 +1564,8 @@ export function runFreshWorkspaceTransaction<T>(
     publishFreshWorkspace(stagingRoot, workspaceRoot, target);
     return result;
   } finally {
-    cleanOwnedTemporaryDirectory(stagingRoot, stagingIdentity);
+    if (!fs.existsSync(`${stagingRoot}${receiptSuffix}`)) {
+      cleanOwnedTemporaryDirectory(stagingRoot, stagingIdentity);
+    }
   }
 }

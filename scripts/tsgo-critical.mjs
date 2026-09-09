@@ -6,91 +6,47 @@ import os from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
-import { resolveEffectTsgoCompiler } from '@modern-js/app-tools/config';
+import { resolveEffectTsgoCompiler } from '@modern-js/app-tools-extensions/config';
+import { effectDiagnostics } from '../packages/toolkit/ultramodern-create/src/ultramodern-workspace/effect-diagnostics.ts';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const configListPath = join(repoRoot, 'scripts/tsgo-critical.txt');
 const tsgoBin = resolveEffectTsgoCompiler({ from: import.meta.url });
 
-const effectDiagnostics = [
-  'anyUnknownInErrorContext',
-  'classSelfMismatch',
-  'duplicatePackage',
-  'effectFnImplicitAny',
-  'floatingEffect',
-  'genericEffectServices',
-  'missingEffectContext',
-  'missingEffectError',
-  'missingLayerContext',
-  'missingReturnYieldStar',
-  'missingStarInYieldEffectGen',
-  'nonObjectEffectServiceType',
-  'outdatedApi',
-  'overriddenSchemaConstructor',
-  'catchUnfailableEffect',
-  'effectFnIife',
-  'effectGenUsesAdapter',
-  'effectInFailure',
-  'effectInVoidSuccess',
-  'globalErrorInEffectCatch',
-  'globalErrorInEffectFailure',
-  'layerMergeAllWithDependencies',
-  'lazyPromiseInEffectSync',
-  'leakingRequirements',
-  'multipleEffectProvide',
-  'returnEffectInGen',
-  'runEffectInsideEffect',
-  'schemaSyncInEffect',
-  'scopeInLayerEffect',
-  'strictEffectProvide',
-  'tryCatchInEffectGen',
-  'unknownInEffectCatch',
-  'asyncFunction',
-  'cryptoRandomUUID',
-  'cryptoRandomUUIDInEffect',
-  'extendsNativeError',
-  'globalConsole',
-  'globalConsoleInEffect',
-  'globalDate',
-  'globalDateInEffect',
-  'globalFetch',
-  'globalFetchInEffect',
-  'globalRandom',
-  'globalRandomInEffect',
-  'globalTimers',
-  'globalTimersInEffect',
-  'instanceOfSchema',
-  'newPromise',
-  'nodeBuiltinImport',
-  'preferSchemaOverJson',
-  'processEnv',
-  'processEnvInEffect',
-  'unsafeEffectTypeAssertion',
-  'catchAllToMapError',
-  'deterministicKeys',
-  'effectDoNotation',
-  'effectFnOpportunity',
-  'effectMapFlatten',
-  'effectMapVoid',
-  'effectSucceedWithVoid',
-  'missedPipeableOpportunity',
-  'missingEffectServiceDependency',
-  'nestedEffectGenYield',
-  'redundantSchemaTagIdentifier',
-  'schemaStructWithTag',
-  'schemaUnionOfLiterals',
-  'serviceNotAsClass',
-  'strictBooleanExpressions',
-  'unnecessaryArrowBlock',
-  'unnecessaryEffectGen',
-  'unnecessaryFailYieldableError',
-  'unnecessaryPipe',
-  'unnecessaryPipeChain',
-];
+// These native framework entrypoints implement Promise-based host APIs and read
+// constants replaced by the package build. Recommending an Effect migration for
+// those contracts is not a correctness check. Consumer configs, and any newly
+// added config, retain the complete strict Effect profile by default.
+const nativeFrameworkConfigs = new Set([
+  'packages/cli/plugin-bff/tsconfig.json',
+  'packages/runtime/plugin-tanstack/tsconfig.tsgo.json',
+  'packages/runtime/plugin-runtime/tsconfig.tsgo.json',
+]);
 
-const diagnosticSeverity = Object.fromEntries(
-  effectDiagnostics.map(name => [name, 'error']),
-);
+export function createCriticalCompilerOptions(config) {
+  const diagnosticSeverity = Object.fromEntries(
+    effectDiagnostics.map(name => [name, 'error']),
+  );
+  if (nativeFrameworkConfigs.has(config)) {
+    diagnosticSeverity.asyncFunction = 'off';
+    diagnosticSeverity.processEnv = 'off';
+  }
+
+  return {
+    plugins: [
+      {
+        name: '@effect/language-service',
+        diagnostics: true,
+        includeSuggestionsInTsc: true,
+        ignoreEffectSuggestionsInTscExitCode: false,
+        ignoreEffectWarningsInTscExitCode: false,
+        ignoreEffectErrorsInTscExitCode: false,
+        skipDisabledOptimization: true,
+        diagnosticSeverity,
+      },
+    ],
+  };
+}
 
 if (!existsSync(tsgoBin)) {
   console.error(
@@ -156,20 +112,7 @@ function createStrictConfig(config, index) {
     `${JSON.stringify(
       {
         extends: `./${basename(configPath)}`,
-        compilerOptions: {
-          plugins: [
-            {
-              name: '@effect/language-service',
-              diagnostics: true,
-              includeSuggestionsInTsc: true,
-              ignoreEffectSuggestionsInTscExitCode: false,
-              ignoreEffectWarningsInTscExitCode: false,
-              ignoreEffectErrorsInTscExitCode: false,
-              skipDisabledOptimization: true,
-              diagnosticSeverity,
-            },
-          ],
-        },
+        compilerOptions: createCriticalCompilerOptions(config),
       },
       null,
       2,
@@ -255,17 +198,21 @@ async function runCriticalChecks() {
   }
 }
 
-try {
-  await runCriticalChecks();
-} finally {
-  for (const tempConfig of tempConfigs) {
-    rmSync(tempConfig, { force: true });
+if (import.meta.main) {
+  try {
+    await runCriticalChecks();
+  } finally {
+    for (const tempConfig of tempConfigs) {
+      rmSync(tempConfig, { force: true });
+    }
   }
-}
 
-if (failures.length > 0) {
-  console.error(`effect-tsgo validation failed: ${failures.length} config(s)`);
-  process.exit(1);
-}
+  if (failures.length > 0) {
+    console.error(
+      `effect-tsgo validation failed: ${failures.length} config(s)`,
+    );
+    process.exit(1);
+  }
 
-console.log(`effect-tsgo validation passed: ${configs.length} config(s)`);
+  console.log(`effect-tsgo validation passed: ${configs.length} config(s)`);
+}

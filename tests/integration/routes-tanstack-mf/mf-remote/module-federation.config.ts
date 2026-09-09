@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { getBuildConfigEnvironment } from '@modern-js/app-tools/config';
+import { getBuildConfigEnvironment } from '@modern-js/app-tools-extensions/config';
 import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
 import { dependencies } from './package.json';
 

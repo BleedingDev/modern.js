@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import execa from '@modern-js/utils/execa';
 
 const workspaceRoot = path.resolve(
   process.env.ULTRAMODERN_WORKSPACE_ROOT ?? process.cwd(),
@@ -54,21 +54,22 @@ function writeJson(filePath, value) {
 }
 
 function run(command, commandArgs, options = {}) {
-  const result = spawnSync(command, commandArgs, {
+  const result = execa.sync(command, commandArgs, {
     cwd: options.cwd ?? workspaceRoot,
     env: {
       ...process.env,
       MODERNJS_DEPLOY: 'node',
     },
     stdio: 'inherit',
+    reject: false,
   });
 
-  if (result.error) {
-    fail(result.error.message);
+  if (result.failed && result.exitCode === undefined) {
+    fail(result.shortMessage ?? result.message);
   }
 
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+  if (result.exitCode !== 0) {
+    process.exit(result.exitCode ?? 1);
   }
 }
 
@@ -162,7 +163,7 @@ assertInsideWorkspace('runtime directory', runtimeDir);
 
 const sourceSnapshot = snapshotWorkspaceSourceFiles();
 try {
-  run(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', [
+  run('pnpm', [
     '--filter',
     packageName,
     'run',
@@ -271,7 +272,7 @@ function installRuntimeDependencies(runtimePackage) {
 
     writeJson(path.join(installDir, 'package.json'), installPackage);
     run(
-      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      'npm',
       [
         'install',
         '--omit=dev',

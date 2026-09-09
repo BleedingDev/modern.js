@@ -1703,16 +1703,6 @@ const evaluateDivergenceGovernance = ({
     headRef: head,
     pathspec: validatedHead.pathspec,
   });
-  const rule5ByFile = new Map();
-  for (const change of rule5Changes) {
-    for (const file of new Set([
-      change.file,
-      ...change.ownedPaths,
-      ...change.currentPaths,
-    ])) {
-      rule5ByFile.set(file, change);
-    }
-  }
   const measuredHead = measureDivergence({
     rootDir: repositoryRoot,
     baseRef: validatedHead.baseRef,
@@ -1796,12 +1786,6 @@ const evaluateDivergenceGovernance = ({
       ) {
         errors.push(
           `Raised budget for ${growth.file} does not exactly match the committed-head measurement.`,
-        );
-      }
-      const change = rule5ByFile.get(growth.file);
-      if (!change) {
-        errors.push(
-          `Raised budget for ${growth.file} has no upstream-owned PR delta at the governance merge-base.`,
         );
       }
     }

@@ -22,6 +22,10 @@ import {
   TelemetryHealthMonitor,
   TelemetryRegistry,
 } from '../telemetryCore';
+import {
+  createTelemetryCanaryCompatibility,
+  type TelemetryCanaryCompatibility,
+} from './canaryCompatibility';
 
 type SetupTelemetryHealthMonitoringOptions = {
   registry: TelemetryRegistry;
@@ -31,6 +35,7 @@ type SetupTelemetryHealthMonitoringOptions = {
 
 type SetupTelemetryHealthMonitoringResult = {
   healthMonitor?: TelemetryHealthMonitor;
+  canaryCompatibility?: TelemetryCanaryCompatibility;
   gateSnapshotStorePromise?: Promise<ContractGateSnapshotStore>;
   runtimeFallbackSignalConfig?: RuntimeFallbackSignalConfig;
   runtimeStatusAuthConfig?: RuntimeFallbackSignalAuthConfig;
@@ -69,6 +74,7 @@ export const setupTelemetryHealthMonitoring = ({
     | Record<string, boolean | { passed: boolean; reason?: string }>
     | undefined;
 
+  const canaryCompatibility = createTelemetryCanaryCompatibility(registry);
   const healthMonitor = new TelemetryHealthMonitor({
     registry,
     evaluationIntervalMs: legacyHealthConfig.evaluationIntervalMs,
@@ -84,6 +90,7 @@ export const setupTelemetryHealthMonitoring = ({
     requiredContractGates: Object.keys(contractGates || {}),
     onTransition: evaluation => {
       emitHealthTransitionMetric(registry, evaluation);
+      canaryCompatibility.observe(evaluation);
     },
   });
 
@@ -150,6 +157,7 @@ export const setupTelemetryHealthMonitoring = ({
 
   return {
     healthMonitor,
+    canaryCompatibility,
     gateSnapshotStorePromise,
     runtimeFallbackSignalConfig,
     runtimeStatusAuthConfig,

@@ -1,6 +1,7 @@
 import { createApiClient } from '../src/ultramodern-workspace/api/client';
 import { createApiServiceEntry } from '../src/ultramodern-workspace/api/service';
 import { createSharedApi } from '../src/ultramodern-workspace/api/shared';
+import { readFileTemplate } from '../src/ultramodern-workspace/fs-io';
 import {
   createSharedContractsIndex,
   createSharedPackage,
@@ -67,7 +68,9 @@ describe('scope-aware native API scaffolding', () => {
         './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
       },
       dependencies: {
+        '@modern-js/bff-effect': '3.9.0',
         '@modern-js/plugin-bff': '3.9.0',
+        '@modern-js/runtime-extensions': '3.9.0',
         effect: '4.0.0-rc.112',
       },
     });
@@ -75,8 +78,15 @@ describe('scope-aware native API scaffolding', () => {
       'MicroVerticalReadinessSchema',
     );
     expect(createSharedContractsIndex()).not.toContain("from 'effect'");
-    expect(createSharedContractsIndex()).not.toContain('export *');
+    expect(createSharedContractsIndex()).toContain(
+      "export * from '@modern-js/runtime-extensions/workspace-events';",
+    );
+    expect(createSharedContractsIndex()).not.toContain('@modern-js/bff-effect');
     expect(createSharedContractsIndex()).not.toContain('defineEffectBff');
+    expect(readFileTemplate('packages/effect-bff-runtime.ts')).toBe(
+      "export { assembleEffectBffRuntime } from '@modern-js/bff-effect/assembly';\n" +
+        "export type { EffectBffRuntimeAssembly } from '@modern-js/bff-effect/assembly';\n",
+    );
   });
   test('migration emits the owning AST helper rather than a consumer customization', () => {
     const artifacts = migratedWorkspaceScriptArtifacts({

@@ -23,6 +23,7 @@ import {
   injectModuleFederationCssPlugin,
   injectTelemetryPlugin,
 } from '@modern-js/server-runtime-extensions';
+import { injectStaticServingPlugin } from '@modern-js/server-runtime-extensions/static-serving/node';
 import { createLogger, isProd, logger } from '@modern-js/utils';
 import type { ProdServerOptions } from './types';
 
@@ -106,6 +107,7 @@ export async function applyPlugins(
     injectModuleFederationCssPlugin(),
     injectMfAssetCacheHeadersPlugin(),
     injectRscManifestPlugin(enableRsc),
+    injectStaticServingPlugin(),
     serverStaticPlugin(),
     faviconPlugin(),
     renderPlugin(),

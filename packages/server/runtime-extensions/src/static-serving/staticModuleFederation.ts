@@ -1,7 +1,7 @@
 import { fileReader } from '@modern-js/runtime-utils/fileReader';
+import type { Middleware } from '@modern-js/server-core';
 import { fs } from '@modern-js/utils';
 import path from 'path';
-import type { Middleware } from '../../../types';
 
 export const MODULE_FEDERATION_MANIFEST_FILE = 'mf-manifest.json';
 const BACKEND_MODULE_FEDERATION_MANIFEST_FILE = 'backend-mf-manifest.json';

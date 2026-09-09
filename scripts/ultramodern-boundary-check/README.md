@@ -167,6 +167,13 @@ allowlists with `git show`, re-measures the head, reconstructs rename ownership,
 and re-derives the same PR delta and ledger evidence. Editing the baseline alone
 cannot sanction growth.
 
+Reviewed growth can reconcile inherited source that is unchanged in the PR.
+Each raised or new budget still needs its own new or semantically changed
+strict ledger row and must exactly match the committed measurement. A source
+edit is not required merely to record that review. Unchanged historical rows
+and review of another file do not authorize the increase. Fork subsystem
+ownership requirements still apply.
+
 ### Scope migration
 
 A real scope transition is not an ordinary budget update. It requires the

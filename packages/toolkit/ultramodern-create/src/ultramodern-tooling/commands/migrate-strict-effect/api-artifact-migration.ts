@@ -8,7 +8,10 @@ import {
   normalizeRelativePath,
 } from '../../../ultramodern-workspace/mf-validation/path-utils';
 import type { ResolvedPackageSource } from '../../../ultramodern-workspace/types';
-import hashes from './api-artifact-hashes';
+import hashes, {
+  apiArtifactSyntaxHash,
+  historicalApiSyntaxHashes,
+} from './api-artifact-hashes';
 import { type MigrationIo, readJsonFile } from './io';
 import { parsePnpmWorkspaceYaml } from './pnpm-yaml';
 
@@ -227,10 +230,17 @@ export function migratePackageOwnedApiArtifacts(
     if (!stat) continue;
     if (!stat.isFile() || stat.isSymbolicLink())
       conflict(artifact.relativePath, 'generated ownership cannot be proven');
-    const digest = createHash('sha256')
-      .update(fs.readFileSync(file))
-      .digest('hex');
-    if (!artifact.hashes.includes(digest))
+    const source = fs.readFileSync(file, 'utf8');
+    const digest = createHash('sha256').update(source).digest('hex');
+    const syntaxDigest = apiArtifactSyntaxHash(source);
+    const syntaxVersions =
+      historicalApiSyntaxHashes[
+        artifact.relativePath.replace(/\.mjs$/u, '.mts')
+      ];
+    if (
+      !artifact.hashes.includes(digest) &&
+      !syntaxVersions?.some(version => version.sha256 === syntaxDigest)
+    )
       conflict(
         artifact.relativePath,
         'customized framework copy has no known released hash',

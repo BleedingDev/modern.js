@@ -2,9 +2,10 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
+import { compatPlugin, createServerBase } from '@modern-js/server-core';
+import { serverStaticPlugin } from '@modern-js/server-core/node';
 import type { ServerRoute } from '@modern-js/types';
-import { compatPlugin, createServerBase } from '../../src';
-import { serverStaticPlugin } from '../../src/adapters/node/plugins';
+import staticServingExtensionsPlugin from '../../src/static-serving/plugin';
 import { getDefaultAppContext, getDefaultConfig } from '../helpers';
 
 const tempDirs: string[] = [];
@@ -30,7 +31,11 @@ const createStaticServer = async (
     appContext: getDefaultAppContext(),
   });
 
-  server.addPlugins([compatPlugin(), serverStaticPlugin()]);
+  server.addPlugins([
+    compatPlugin(),
+    staticServingExtensionsPlugin(),
+    serverStaticPlugin(),
+  ]);
   await server.init();
 
   return server;

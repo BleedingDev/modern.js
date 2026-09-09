@@ -683,7 +683,9 @@ export const layer = HttpApiBuilder.layer(api).pipe(
         requestId,
         source,
       });
-      expect(loaderDependencies).toContain(producerPackageJson);
+      expect(
+        loaderDependencies.map(dependency => path.normalize(dependency)),
+      ).toContain(producerPackageJson);
       const dispatcher = await runtime.__modern_create_effect_bff_dispatcher({
         prefix: '/catalog-api',
         crossProjectPolicy: {

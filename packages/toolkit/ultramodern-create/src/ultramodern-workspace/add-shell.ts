@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMigrationIo } from '../ultramodern-tooling/commands/migrate-strict-effect/io';
 import { preserveConsumerWorkspaceArtifacts } from '../ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
+import { normalizeWorkspaceInputs } from '../ultramodern-tooling/config';
 import {
   DEVELOPMENT_OVERLAY_PATH,
   TOPOLOGY_PATH,
@@ -274,6 +275,9 @@ function executeAddUltramodernShell(
     ...existingVerticals,
     ...existingAdditionalShells,
   ];
+  const compactWorkspace = normalizeWorkspaceInputs(options.workspaceRoot, {
+    config,
+  });
   const previousDevPorts =
     existingAdditionalShells.length > 0
       ? previousApps
@@ -310,6 +314,10 @@ function executeAddUltramodernShell(
         content: `${createZeropsYaml(scope, previousApps)}\n`,
       },
       {
+        relativePath: 'zerops.yaml',
+        content: `${createZeropsYaml(scope, compactWorkspace.apps)}\n`,
+      },
+      {
         relativePath: 'tsconfig.json',
         content: `${JSON.stringify(createRootTsConfig(previousApps), null, 2)}\n`,
       },
@@ -323,6 +331,22 @@ function executeAddUltramodernShell(
             : existingVerticals,
           enableTailwind,
           previousDevPorts,
+        ),
+      })),
+      ...compactWorkspace.apps.map(app => ({
+        relativePath: `${app.directory}/modern.config.ts`,
+        content: createAppModernConfig(
+          scope,
+          app,
+          app.kind === 'shell'
+            ? resolveRemoteRefs(app, compactWorkspace.verticals)
+            : compactWorkspace.verticals,
+          enableTailwind,
+          existingAdditionalShells.length > 0
+            ? compactWorkspace.apps
+                .map(app => app.port)
+                .toSorted((left, right) => left - right)
+            : undefined,
         ),
       })),
     ],

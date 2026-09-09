@@ -69,7 +69,7 @@ const verifierRequire = createRequire(path.join(workspaceRoot, 'package.json'));
 const {
   verifyCloudflareOutput,
   verifyCloudflareOutputMutationPolicy,
-} = verifierRequire('@modern-js/app-tools/cloudflare-output-verifier');
+} = verifierRequire('@modern-js/app-tools-extensions/cloudflare-output-verifier');
 
 let failed = false;
 for (const target of targets) {

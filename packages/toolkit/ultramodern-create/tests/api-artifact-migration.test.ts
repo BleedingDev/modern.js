@@ -153,6 +153,7 @@ test('formatted released copies and named public root imports migrate without to
 test.each([
   'baseline',
   'checker',
+  'comment',
   'export',
   'dynamic',
   'namespace',
@@ -160,6 +161,8 @@ test.each([
 ])('custom %s conflict leaves every byte untouched', kind => {
   if (kind === 'baseline')
     write(baseline, `${read(baseline)}\nexport const custom = true;`);
+  if (kind === 'comment')
+    write(baseline, `${read(baseline)}\n// Consumer acceptance note.\n`);
   if (kind === 'checker')
     write('scripts/check-ultramodern-api-boundaries.mts', '// custom checker');
   if (kind === 'export')

@@ -1,4 +1,4 @@
-import { resolveEffectTsgoCompiler } from '@modern-js/app-tools/config';
+import { resolveEffectTsgoCompiler } from '@modern-js/app-tools-extensions/config';
 import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
 import { dependencies } from './package.json';
 
