@@ -149,6 +149,13 @@ this record does not claim that audit passed.
 | --- | --- | --- | --- |
 | `packages/cli/plugin-bff/src/loader.ts` | bleedingdev | Delegate the worker API implementation graph to the fork-owned source bundler so imported server helpers do not pass through client API generation. | capped-patch |
 
+### Localized server loader identity (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-data-loader/src/runtime/index.ts` | bleedingdev | Delegate canonical loader-ID resolution to the fork-owned runtime helper only after the router has matched the requested localized URL; retain cross-route rejection and deferred-data identity. | capped-patch |
+| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Declare the runtime-extensions dependency that owns localized loader identity mapping without coupling CLI builds to the React/i18n runtime. | capped-patch |
+
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
