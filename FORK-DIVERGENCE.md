@@ -131,6 +131,25 @@ raised. Runtime, type, security, immutable release, and downstream acceptance
 checks remain mandatory. Ownership/budget reconciliation remains outstanding;
 this record does not claim that audit passed.
 
+### One-release compatibility exception for `.4` (2026-09-09)
+
+The repository owner explicitly authorized publication of
+`3.9.0-ultramodern.4` with 790 cumulative fork-audit violations, followed by
+updating OntOS and Tractor to the published cohort. This exception applies only
+to this compatibility release; it is not a general policy change.
+
+The accepted immutable bundle was produced from
+`ef99279246046685f1684c59ca145f2a6a3f9d53` by workflow run `34328906405`,
+attempt `1`. Source qualification, publish security, exact-tarball validation,
+ERP-10, Tractor, and OntOS acceptance passed before authorization. Publication
+must reuse that bundle and complete the published-registry acceptance checks.
+
+No divergence budgets, audited base, reviewed provenance, or canonical scope
+were reset or raised. Runtime, type, security, immutable release, and downstream
+acceptance checks remain mandatory. Ownership/budget reconciliation and broader
+repository CI debt remain outstanding; this record does not claim that the
+fork audit passed. Owner: `bleedingdev`.
+
 ### Native build boundaries (2026-09-09)
 
 | Upstream-owned path | Owner | Reason | Disposition |
