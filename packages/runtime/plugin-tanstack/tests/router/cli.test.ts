@@ -624,7 +624,9 @@ describe('tanstack router cli plugin', () => {
     // the old `.replace('cjs', 'esm')` never matched the bundled dist/esm
     // runtime when the CLI was loaded through the ESM condition.
     expect(stringEntries[0]).toBe(path.resolve(__dirname, '..', '..'));
-    expect(stringEntries[0]).not.toContain('esm');
+    expect(stringEntries[0]).not.toMatch(
+      /[\\/]dist[\\/]esm(?:-node)?(?:[\\/]|$)/,
+    );
   });
 
   test('emits the plugin-i18n augmentation only when plugin-i18n is registered', async () => {

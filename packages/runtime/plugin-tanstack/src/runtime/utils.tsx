@@ -54,6 +54,7 @@ function toTanstackRouteObject(
 ): RouteObject | null {
   if (route.type === 'nested') {
     return {
+      modernLocalisedRoute: Reflect.get(route, 'modernLocalisedRoute'),
       path: route.path,
       id: route.id,
       loader: route.loader,
@@ -91,9 +92,10 @@ function toTanstackRouteObject(
     globalApp,
   );
   return {
+    modernLocalisedRoute: Reflect.get(route, 'modernLocalisedRoute'),
     path: route.path,
     element: React.createElement(LayoutComponent),
-  };
+  } as ModernRouteObject;
 }
 
 export function createTanstackRouteObjectsFromConfig({

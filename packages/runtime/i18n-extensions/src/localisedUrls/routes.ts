@@ -291,6 +291,16 @@ const transformLocalisedRoute = (
 
   const baseRoute = {
     ...route,
+    ...(!isFrameworkInternalRoutePath(canonicalPath)
+      ? {
+          modernLocalisedRoute: {
+            id: route.id,
+            path: route.path,
+            canonicalPath,
+            paths: localisedUrlEntry,
+          },
+        }
+      : {}),
     ...(children ? { children } : {}),
   } as LocalisedRoute;
 

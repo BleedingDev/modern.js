@@ -1,5 +1,6 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off
 
+import { canonicaliseLocalisedRoutes } from '@modern-js/i18n-runtime-extensions';
 import { DefaultNotFound } from '@modern-js/runtime/context';
 import type { RouteObject } from '@modern-js/runtime-utils/router';
 import type { AnyRoute, AnyRouter } from '@tanstack/react-router';
@@ -121,6 +122,7 @@ export function createRouteTreeFromRouteObjects(
   routes: RouteObject[],
   options: RouteTreeOptions = {},
 ): ModernTanstackRootRoute {
+  routes = canonicaliseLocalisedRoutes(routes);
   const rootLikeRoute = getRootLikeRouteObject(routes) as
     | ModernRouteObject
     | undefined;

@@ -5,6 +5,7 @@ import type {
   AppTools,
   AppToolsContext,
 } from '@modern-js/app-tools';
+import { canonicaliseLocalisedRoutes } from '@modern-js/i18n-runtime-extensions';
 import { makeLegalIdentifier } from '@modern-js/runtime/cli';
 import type { NestedRouteForCli, PageRoute } from '@modern-js/types';
 import { upath as path } from '@modern-js/utils';
@@ -45,8 +46,9 @@ export async function generateTanstackRouterTypesSourceForEntry(opts: {
     appContext,
     entryName,
     generatedDirName = 'modern-tanstack',
-    routes,
+    routes: rawRoutes,
   } = opts;
+  const routes: RouteForCli[] = canonicaliseLocalisedRoutes(rawRoutes);
   const outDir = path.join(
     appContext.srcDirectory,
     generatedDirName,
