@@ -764,6 +764,27 @@ describe('Cloudflare output verifier', () => {
         "require('node:tls');",
         "require('node:util/types');",
         "require('node:zlib');",
+        "require('node:assert');",
+        "require('node:assert/strict');",
+        "require('node:child_process');",
+        "require('node:dgram');",
+        "require('node:domain');",
+        "require('node:inspector');",
+        "require('node:readline');",
+        "require('node:readline/promises');",
+        "require('node:repl');",
+        "require('node:sqlite');",
+        "require('node:stream/consumers');",
+        "require('node:stream/promises');",
+        "require('node:stream/web');",
+        "require('node:timers');",
+        "require('node:timers/promises');",
+        "require('node:trace_events');",
+        "require('node:tty');",
+        "require('node:v8');",
+        "require('node:vm');",
+        "require('node:wasi');",
+        "require('node:worker_threads');",
         "require('cloudflare:sockets');",
         'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
         'module.exports = { __modern_create_effect_bff_dispatcher };',
@@ -778,14 +799,14 @@ describe('Cloudflare output verifier', () => {
   it('rejects unsupported node: builtins even when package metadata declares them', async () => {
     const { outputDirectory } = await createOutputFixture({
       bffWorkerSource: [
-        "require('node:child_process');",
+        "require('node:not_a_worker_builtin');",
         'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
         'module.exports = { __modern_create_effect_bff_dispatcher };',
       ].join('\n'),
     });
     await writeJson(path.join(outputDirectory, 'worker/package.json'), {
       dependencies: {
-        'node:child_process': '1.0.0',
+        'node:not_a_worker_builtin': '1.0.0',
       },
       type: 'commonjs',
     });
@@ -800,7 +821,7 @@ describe('Cloudflare output verifier', () => {
       expect.objectContaining({
         code: 'invalid-worker-bundle',
         message:
-          'Cloudflare worker bundle import "node:child_process" is not a supported Worker node: builtin.',
+          'Cloudflare worker bundle import "node:not_a_worker_builtin" is not a supported Worker node: builtin.',
       }),
     );
   });
@@ -1150,7 +1171,7 @@ describe('Cloudflare output verifier', () => {
   it('validates static ambient module.require calls as module edges', async () => {
     const { outputDirectory } = await createOutputFixture({
       bffWorkerSource: [
-        "module.require('node:child_process');",
+        "module.require('node:not_a_worker_builtin');",
         'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
         'module.exports = { __modern_create_effect_bff_dispatcher };',
       ].join('\n'),
@@ -1166,7 +1187,7 @@ describe('Cloudflare output verifier', () => {
       expect.objectContaining({
         code: 'invalid-worker-bundle',
         message:
-          'Cloudflare worker bundle import "node:child_process" is not a supported Worker node: builtin.',
+          'Cloudflare worker bundle import "node:not_a_worker_builtin" is not a supported Worker node: builtin.',
       }),
     );
   });
