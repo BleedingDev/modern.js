@@ -6,7 +6,7 @@
   u: chunkId => String(chunkId),
 };
 
-import { applyRouterRuntimeState } from '../../../src/core/context';
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import type {
   RedirectContext,
   ResponseProxy,

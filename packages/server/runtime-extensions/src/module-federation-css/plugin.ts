@@ -29,14 +29,15 @@ export type ModuleFederationCssPluginOptions = {
  * being pinned at boot: remote manifests change on every remote redeploy, and
  * fetch failures must not pin an empty/partial list for the process lifetime.
  *
- * This plugin must be registered after `injectResourcePlugin()` (which sets
- * `serverManifest` on the request context). @modern-js/prod-server wires it
- * into its plugin assembly for both production and dev servers.
+ * Existing plugin ordering places this after the native resource plugin
+ * (which sets `serverManifest`) and before the native RSC manifest plugin.
  */
 export const injectModuleFederationCssPlugin = (
   options: ModuleFederationCssPluginOptions = {},
 ): ServerPlugin => ({
   name: '@modern-js/inject-module-federation-css',
+  pre: ['@modern-js/plugin-inject-resource'],
+  post: ['@modern-js/plugin-inject-rsc-manifest'],
 
   setup(api) {
     api.onPrepare(() => {

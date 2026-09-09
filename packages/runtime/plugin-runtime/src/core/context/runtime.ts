@@ -5,6 +5,7 @@ import type {
 } from '@modern-js/runtime-utils/router';
 import type { BaseSSRServerContext } from '@modern-js/types';
 import { createContext, useContext } from 'react';
+import type { LinkPrefetchPolicy } from '../../router/runtime/PrefetchLink';
 import type { RouteManifest } from '../../router/runtime/types';
 import type { RequestContext } from '../types';
 
@@ -49,6 +50,7 @@ function getRuntimeReactContext<T>(
  */
 export interface TInternalRuntimeContext extends TRuntimeContext {
   routeManifest?: RouteManifest;
+  linkPrefetchPolicy?: LinkPrefetchPolicy;
   routes?: RouteObject[];
   routerContext?: StaticHandlerContext;
   unstable_getBlockNavState?: () => boolean;

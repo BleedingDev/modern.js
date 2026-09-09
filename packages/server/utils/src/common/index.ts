@@ -21,6 +21,8 @@ export interface IConfig {
 export interface CompileOptions {
   sourceDirs: string[];
   distDir: string;
+  /** Absolute files excluded as roots; imported dependencies remain checked. */
+  excludeFiles?: string[];
   tsconfigPath?: string;
   moduleType?: 'module' | 'commonjs';
   throwErrorInsteadOfExit?: boolean;
@@ -54,12 +56,21 @@ export const compile: CompileFunc = async (
   modernConfig,
   compileOptions,
 ) => {
-  const { sourceDirs, distDir, tsconfigPath } = compileOptions;
+  const {
+    sourceDirs,
+    distDir,
+    excludeFiles = [],
+    tsconfigPath,
+  } = compileOptions;
   validateAbsolutePaths(
     sourceDirs,
     dir => `source dir ${dir} is not an absolute path.`,
   );
   validateAbsolutePath(distDir, `dist dir ${distDir} is not an absolute path.`);
+  validateAbsolutePaths(
+    excludeFiles,
+    file => `excluded file ${file} is not an absolute path.`,
+  );
 
   const { compileByTs } = await import('../compilers/typescript');
   await compileByTs(appDirectory, modernConfig, compileOptions);

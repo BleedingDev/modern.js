@@ -15,6 +15,8 @@ import { projectRuntimeContext } from '@modern-js/runtime-extensions/context-pro
 import { createHeadRuntime } from '@modern-js/runtime-extensions/head-runtime';
 import { ensureHelmetContext } from '@modern-js/runtime-extensions/helmet-context';
 import React from 'react';
+import { createAssetPolicy } from './assetPolicy';
+import { createTemplatePolicy } from './templatePolicy';
 
 export type RendererHeadPluginOptions = {
   processNodeStream?: (
@@ -73,6 +75,8 @@ export function createRendererHeadPlugin(
         const state = createState(render.runtimeContext);
         return {
           ...state.lifecycle,
+          ...createAssetPolicy(render),
+          ...createTemplatePolicy(render),
           collect: state.wrap,
           effect() {},
         };
@@ -88,6 +92,8 @@ export function createRendererHeadPlugin(
         const state = createState(runtimeContext);
         return {
           ...state.lifecycle,
+          ...createAssetPolicy(info),
+          ...createTemplatePolicy(info),
           modifyRootElement: state.wrap,
           streamPhase: 'body',
           processStream:

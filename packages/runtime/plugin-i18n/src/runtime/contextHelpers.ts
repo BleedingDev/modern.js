@@ -1,5 +1,5 @@
-import type { LocalisedUrlsOption } from '@modern-js/i18n-runtime-extensions';
 import { isBrowser } from '@modern-js/runtime';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
 import type { I18nInstance } from './i18n';
 import type { SdkBackend } from './i18n/backend/sdk-backend';
 import { cacheUserLanguage } from './i18n/detection';
@@ -66,7 +66,7 @@ interface ChangeModernI18nLanguageOptions {
   updateLanguage?: (newLang: string) => void;
   localePathRedirect?: boolean;
   ignoreRedirectRoutes?: string[] | ((pathname: string) => boolean);
-  localisedUrls?: LocalisedUrlsOption;
+  urlStrategy?: I18nUrlStrategy;
   languages?: string[];
   hasRouter: boolean;
   navigate?: Navigate | null;
@@ -82,7 +82,7 @@ export async function changeModernI18nLanguage(
     updateLanguage,
     localePathRedirect,
     ignoreRedirectRoutes,
-    localisedUrls,
+    urlStrategy,
     languages,
     hasRouter,
     navigate,
@@ -123,13 +123,14 @@ export async function changeModernI18nLanguage(
           relativePath,
           languages || [],
           ignoreRedirectRoutes,
+          urlStrategy,
         )
       ) {
         const newPath = buildLocalizedUrl(
           relativePath,
           newLang,
           languages || [],
-          localisedUrls,
+          urlStrategy,
         );
         const newUrl = entryPath + newPath + location.search + location.hash;
 
@@ -155,13 +156,14 @@ export async function changeModernI18nLanguage(
           relativePath,
           languages || [],
           ignoreRedirectRoutes,
+          urlStrategy,
         )
       ) {
         const newPath = buildLocalizedUrl(
           relativePath,
           newLang,
           languages || [],
-          localisedUrls,
+          urlStrategy,
         );
         const newUrl =
           entryPath + newPath + window.location.search + window.location.hash;

@@ -1,0 +1,403 @@
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import type { BffGeneratedEntries, BffGeneration } from '@modern-js/app-tools';
+import { bffPlugin as nativeBffPlugin } from '../../plugin-bff/src/cli';
+import { createBffGenerator } from '../../plugin-bff/src/cli/generator';
+import type { APILoaderOptions } from '../../plugin-bff/src/utils/clientGenerator';
+import writeRuntime from '../../plugin-bff/src/utils/runtimeGenerator';
+import { createProducerClient } from '../../plugin-bff-extensions/src/cross-project-policy/producer-runtime';
+import {
+  type BffGenerationMetadata,
+  registerBffClientArtifacts,
+} from '../src/client-artifacts';
+import { registerBffGeneratedEntries } from '../src/generated-entries';
+
+const require = createRequire(import.meta.url);
+
+async function render(
+  appDirectory: string,
+  moduleType: 'commonjs' | 'module' = 'commonjs',
+  runtimeCreateRequest?: string,
+) {
+  const hooks = nativeBffPlugin().registryHooks!;
+  const generation: BffGeneration = {
+    appDirectory,
+    apiDirectory: path.join(appDirectory, 'api'),
+    lambdaDirectory: path.join(appDirectory, 'api/lambda'),
+    existLambda: false,
+    apiFiles: [],
+    relativeDistPath: 'dist',
+    prefix: '/api',
+    requestId: 'runtime-app',
+  };
+  const metadata = new WeakMap<BffGeneration, BffGenerationMetadata>();
+  metadata.set(generation, {
+    runtimeFramework: 'hono',
+    relativeEffectEntry: '',
+    operationContracts: {
+      'GET:/api/ping': { schemaHash: 'generated', operationVersion: 1 },
+    },
+  });
+  registerBffGeneratedEntries(
+    {
+      getAppContext: () => ({ moduleType }),
+      getNormalizedConfig: () => ({ bff: { runtimeCreateRequest } }),
+      modifyBffGeneratedEntries: hooks.modifyBffGeneratedEntries.tap,
+    } as never,
+    metadata,
+  );
+  return hooks.modifyBffGeneratedEntries.call({
+    generation,
+    plugin: { code: '', declaration: '' },
+    runtime: { code: '', declaration: '' },
+    packageDependencies: {},
+  }) as Promise<BffGeneratedEntries>;
+}
+
+async function clientGenerator(
+  options: APILoaderOptions & { bffRuntimeFramework: 'effect' },
+) {
+  const hooks = nativeBffPlugin().registryHooks!;
+  const api = {
+    getHooks: () => hooks,
+    getAppContext: () => ({
+      appDirectory: options.appDir,
+      apiDirectory: options.apiDir,
+      lambdaDirectory: options.lambdaDir,
+      port: options.port,
+      bffRuntimeFramework: 'effect',
+    }),
+    getNormalizedConfig: () => ({
+      bff: { runtimeFramework: 'effect' },
+      output: { distPath: { root: options.relativeDistPath } },
+    }),
+    modifyBffClientArtifacts: hooks.modifyBffClientArtifacts.tap,
+    modifyBffGeneratedEntries: hooks.modifyBffGeneratedEntries.tap,
+  };
+  const metadata = new WeakMap<BffGeneration, BffGenerationMetadata>();
+  registerBffClientArtifacts(api as never, metadata);
+  registerBffGeneratedEntries(api as never, metadata);
+  await createBffGenerator(api as never).generate();
+}
+
+async function runtimeGenerator(options: {
+  runtime: string;
+  appDirectory: string;
+  relativeDistPath: string;
+}) {
+  const entries = await render(
+    options.appDirectory,
+    'commonjs',
+    options.runtime,
+  );
+  await writeRuntime(options, entries.runtime);
+  // Use the actual installed lower package, keeping generated imports intact.
+  const target = path.join(
+    options.appDirectory,
+    options.relativeDistPath,
+    'node_modules/@modern-js/plugin-bff-extensions',
+  );
+  await fs.promises.mkdir(path.dirname(target), { recursive: true });
+  await fs.promises.symlink(
+    path.resolve(__dirname, '../../plugin-bff-extensions'),
+    target,
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
+}
+
+describe('fork producer generated entries', () => {
+  test('client generator marks generated client output as ESM', async () => {
+    const appDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'modern-plugin-bff-client-module-'),
+    );
+    const previousCwd = process.cwd();
+
+    try {
+      const apiDir = path.join(appDir, 'api');
+      const lambdaDir = path.join(apiDir, 'lambda');
+      await fs.promises.mkdir(apiDir, { recursive: true });
+      await fs.promises.writeFile(
+        path.join(appDir, 'package.json'),
+        JSON.stringify({ name: 'module-app', version: '1.0.0' }, null, 2),
+      );
+      await fs.promises.writeFile(
+        path.join(apiDir, 'index.js'),
+        `const {
+          HttpApi,
+          HttpApiEndpoint,
+          HttpApiGroup,
+          Layer,
+          Schema,
+        } = require('@modern-js/bff-effect/effect-client');
+
+const api = HttpApi.make('ModuleApi').add(
+  HttpApiGroup.make('greetings').add(
+    HttpApiEndpoint.get('ping', '/ping', {
+      success: Schema.Struct({
+        ok: Schema.Boolean,
+      }),
+    }),
+  ),
+);
+
+        module.exports = { api, layer: Layer.empty };
+        `,
+      );
+
+      process.chdir(appDir);
+      await clientGenerator({
+        prefix: '/api',
+        appDir,
+        apiDir,
+        lambdaDir,
+        existLambda: false,
+        port: 8080,
+        relativeDistPath: '.modern-js',
+        relativeApiPath: './api',
+        apiFiles: [],
+        bffRuntimeFramework: 'effect',
+      });
+
+      const clientPackageJson = JSON.parse(
+        await fs.promises.readFile(
+          path.join(appDir, '.modern-js', 'client', 'package.json'),
+          'utf8',
+        ),
+      );
+      expect(clientPackageJson).toEqual({
+        private: true,
+        name: 'module-app-bff-client',
+        type: 'module',
+      });
+      await expect(
+        fs.promises.stat(path.join(appDir, '.modern-js', 'client', 'index.js')),
+      ).resolves.toBeDefined();
+    } finally {
+      process.chdir(previousCwd);
+      await fs.promises.rm(appDir, { recursive: true, force: true });
+    }
+  });
+
+  test('runtime generator exposes initProducerClient alias', async () => {
+    const appDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'modern-plugin-bff-runtime-'),
+    );
+
+    try {
+      await fs.promises.writeFile(
+        path.join(appDir, 'package.json'),
+        JSON.stringify({ name: 'runtime-app', version: '1.0.0' }, null, 2),
+      );
+      await runtimeGenerator({
+        runtime: '@modern-js/plugin-bff/client',
+        appDirectory: appDir,
+        relativeDistPath: '.modern-js',
+      });
+
+      const generatedRuntimeDirectory = path.join(
+        appDir,
+        '.modern-js',
+        'runtime',
+      );
+      const requestRuntimeDirectory = path.join(
+        appDir,
+        '.modern-js',
+        'node_modules',
+        '@modern-js',
+        'plugin-bff',
+      );
+      await fs.promises.mkdir(requestRuntimeDirectory, { recursive: true });
+      await fs.promises.writeFile(
+        path.join(requestRuntimeDirectory, 'package.json'),
+        JSON.stringify({
+          exports: { './client': './client.js' },
+          name: '@modern-js/plugin-bff',
+        }),
+      );
+      await fs.promises.writeFile(
+        path.join(requestRuntimeDirectory, 'client.js'),
+        'exports.configure = options => options;',
+      );
+      const generatedRequire = createRequire(
+        path.join(generatedRuntimeDirectory, 'index.js'),
+      );
+      const generatedRuntime = generatedRequire('./index.js') as {
+        configure: (options?: Record<string, unknown>) => unknown;
+        initProducerClient: (options?: Record<string, unknown>) => unknown;
+      };
+      const expectedDefaults = {
+        requestId: 'runtime-app',
+        requireEnvelope: true,
+        identityBinding: { enabled: true, strict: true },
+        operationContract: {
+          enabled: true,
+          strict: true,
+          requireSchemaHash: true,
+          requireOperationVersion: true,
+        },
+      };
+
+      expect(generatedRuntime.initProducerClient()).toEqual(expectedDefaults);
+      expect(generatedRuntime.configure()).toEqual(expectedDefaults);
+    } finally {
+      await fs.promises.rm(appDir, { recursive: true, force: true });
+    }
+  });
+
+  test('emitted bootstrap invokes the owning defaults helper and preserves nested overrides', async () => {
+    const appDirectory = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'bff-render-'),
+    );
+    try {
+      await fs.promises.writeFile(
+        path.join(appDirectory, 'package.json'),
+        JSON.stringify({
+          name: 'runtime-app',
+          devDependencies: {
+            '@modern-js/plugin-bff-build-extensions': '3.8.3',
+            '@modern-js/plugin-bff-extensions': '3.8.3',
+          },
+        }),
+      );
+      const entries = await render(
+        appDirectory,
+        'commonjs',
+        '@fixture/request',
+      );
+      const imported: string[] = [];
+      const exports: Record<string, any> = {};
+      const load = (name: string) => {
+        imported.push(name);
+        if (name === '@fixture/request')
+          return { configure: (options: unknown) => options };
+        if (name === '@modern-js/plugin-bff-extensions/producer-runtime')
+          return { createProducerClient };
+        throw new Error(`Unexpected generated import ${name}`);
+      };
+      new Function('require', 'exports', entries.runtime.code)(load, exports);
+      expect(imported).toEqual([
+        '@fixture/request',
+        '@modern-js/plugin-bff-extensions/producer-runtime',
+      ]);
+      expect(exports.configure).toBe(exports.initProducerClient);
+      expect(
+        exports.configure({
+          requestId: 'override',
+          identityBinding: { strict: false },
+          operationContract: { requireSchemaHash: false },
+        }),
+      ).toEqual({
+        requestId: 'override',
+        requireEnvelope: true,
+        identityBinding: { enabled: true, strict: false },
+        operationContract: {
+          enabled: true,
+          strict: true,
+          requireSchemaHash: false,
+          requireOperationVersion: true,
+        },
+      });
+      expect(entries.packageDependencies).toEqual({
+        '@modern-js/plugin-bff-build-extensions': '3.8.3',
+        '@modern-js/plugin-bff-extensions': '3.8.3',
+      });
+      expect(entries.plugin.code).not.toContain('crossProjectPolicy');
+    } finally {
+      await fs.promises.rm(appDirectory, { recursive: true, force: true });
+    }
+  });
+
+  test('default creator and bootstrap use the canonical request policy entry with a direct SDK dependency', async () => {
+    const appDirectory = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'bff-canonical-runtime-'),
+    );
+    try {
+      await fs.promises.writeFile(
+        path.join(appDirectory, 'package.json'),
+        JSON.stringify({
+          name: 'runtime-app',
+          dependencies: {
+            '@modern-js/plugin-bff-build-extensions': '3.8.3',
+            '@modern-js/plugin-bff-extensions': '3.8.3',
+            '@modern-js/runtime-extensions': '3.8.3',
+          },
+        }),
+      );
+      const entries = await render(appDirectory);
+      expect(entries.runtime.code).toContain(
+        '"@modern-js/runtime-extensions/request-policy"',
+      );
+      expect(entries.runtime.declaration).toContain(
+        '"@modern-js/runtime-extensions/request-policy"',
+      );
+      expect(entries.packageDependencies['@modern-js/runtime-extensions']).toBe(
+        '3.8.3',
+      );
+      expect(entries.runtime.code).not.toContain(
+        '@modern-js/plugin-bff/client',
+      );
+    } finally {
+      await fs.promises.rm(appDirectory, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    'commonjs',
+    'module',
+  ] as const)('published %s producer modules load with actual package exports', async moduleType => {
+    const appDirectory = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'bff-published-'),
+    );
+    try {
+      await fs.promises.writeFile(
+        path.join(appDirectory, 'package.json'),
+        JSON.stringify({ name: 'runtime-app', type: moduleType }),
+      );
+      for (const name of [
+        'plugin-bff-build-extensions',
+        'plugin-bff-extensions',
+      ]) {
+        const target = path.join(appDirectory, 'node_modules/@modern-js', name);
+        await fs.promises.mkdir(path.dirname(target), { recursive: true });
+        await fs.promises.symlink(
+          path.resolve(__dirname, '../..', name),
+          target,
+          process.platform === 'win32' ? 'junction' : 'dir',
+        );
+      }
+      const requestModule = path.join(appDirectory, 'request.mjs');
+      await fs.promises.writeFile(
+        requestModule,
+        'export const configure = options => options;',
+      );
+      const entries = await render(appDirectory, moduleType, requestModule);
+      if (moduleType === 'module')
+        expect(entries.runtime.code).toContain(
+          JSON.stringify(pathToFileURL(requestModule).href),
+        );
+      const runtimeFile = path.join(appDirectory, 'runtime.js');
+      const pluginFile = path.join(appDirectory, 'plugin.js');
+      await fs.promises.writeFile(runtimeFile, entries.runtime.code);
+      await fs.promises.writeFile(pluginFile, entries.plugin.code);
+      const runtime = await import(
+        /* webpackIgnore: true */ pathToFileURL(runtimeFile).href
+      );
+      const plugin = await import(
+        /* webpackIgnore: true */ pathToFileURL(pluginFile).href
+      );
+      expect(runtime.configure).toBe(runtime.initProducerClient);
+      expect(runtime.configure()).toMatchObject({
+        requestId: 'runtime-app',
+        requireEnvelope: true,
+      });
+      expect(plugin.crossProjectApiPlugin().name).toBe(
+        '@modern-js/plugin-independent-bff',
+      );
+    } finally {
+      await fs.promises.rm(appDirectory, { recursive: true, force: true });
+    }
+  });
+});

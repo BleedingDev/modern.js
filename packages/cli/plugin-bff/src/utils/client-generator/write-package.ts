@@ -44,10 +44,30 @@ export async function setPackage(
   }[],
   appDirectory: string,
   relativeDistPath: string,
+  packageDependencies: Record<string, string> = {},
 ) {
   const packagePath = path.resolve(appDirectory, './package.json');
   const packageContent = await fs.readFile(packagePath, 'utf8');
-  const packageJson = JSON.parse(packageContent) as PackageJsonLike;
+  const packageJson = JSON.parse(packageContent) as PackageJsonLike & {
+    dependencies?: Record<string, string>;
+  };
+  for (const [name, specifier] of Object.entries(packageDependencies)) {
+    if (!name || typeof specifier !== 'string' || !specifier.trim()) {
+      throw new Error(`Invalid BFF SDK dependency: ${name}`);
+    }
+    const existing = packageJson.dependencies?.[name];
+    if (existing !== undefined && existing !== specifier) {
+      throw new Error(
+        `package.json dependency conflict for ${name}: ${existing} versus ${specifier}`,
+      );
+    }
+  }
+  if (Object.keys(packageDependencies).length > 0) {
+    packageJson.dependencies = {
+      ...packageJson.dependencies,
+      ...packageDependencies,
+    };
+  }
   const sortedFiles = [...files].sort((a, b) =>
     a.exportKey.localeCompare(b.exportKey),
   );

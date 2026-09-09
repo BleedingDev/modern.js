@@ -1,3 +1,4 @@
+import { runtime } from '@modern-js/plugin/runtime';
 import {
   applyRouterRuntimeState,
   applyRouterServerPrepareResult,
@@ -9,8 +10,9 @@ import {
   getRouterRuntimeState,
   getRouterServerSnapshot,
 } from '@modern-js/runtime-extensions/router-state';
+import { createRouterStatePlugin } from '@modern-js/runtime-extensions/router-state-plugin';
 import * as contextAPI from '../../src/core/context';
-import { getInitialContext } from '../../src/core/context';
+import { getInitialContext, setGlobalContext } from '../../src/core/context';
 import {
   modifyRoutes,
   onAfterCreateRouter,
@@ -18,27 +20,101 @@ import {
   onBeforeCreateRouter,
   onBeforeCreateRoutes,
   onBeforeHydrateRouter,
+  routerProviderRegistryHooks,
 } from '../../src/router/runtime/hooks';
 
 describe('router lifecycle seams', () => {
-  it('preserves the public context helpers as the shared fork primitives', () => {
-    expect(contextAPI.applyRouterRuntimeState).toBe(applyRouterRuntimeState);
-    expect(contextAPI.applyRouterServerPrepareResult).toBe(
-      applyRouterServerPrepareResult,
+  it('keeps native hooks public and fork state helpers at their owning package', () => {
+    expect(contextAPI.routerProviderRegistryHooks).toBe(
+      routerProviderRegistryHooks,
     );
-    expect(contextAPI.cleanupRouterRuntimeState).toBe(
-      cleanupRouterRuntimeState,
+    for (const name of [
+      'applyRouterRuntimeState',
+      'createRouterRuntimeState',
+      'getRouterRuntimeState',
+      'createRouterServerSnapshot',
+      'getRouterServerSnapshot',
+    ]) {
+      expect(name in contextAPI).toBe(false);
+    }
+  });
+
+  it('projects real native SSR events before later taps and excludes redirected or failed requests', async () => {
+    setGlobalContext({ enableRsc: false });
+    (globalThis as any).__webpack_require__ = {
+      u: (id: unknown) => String(id),
+    };
+    const { routerPlugin } = await import(
+      '../../src/router/runtime/plugin.node'
     );
-    expect(contextAPI.createRouterRuntimeState).toBe(createRouterRuntimeState);
-    expect(contextAPI.createRouterServerSnapshot).toBe(
-      createRouterServerSnapshot,
+    let outcome: 'success' | 'redirect' | 'failure' = 'success';
+    const observed: unknown[] = [];
+    const { runtimeContext: manager } = runtime.run({
+      config: {},
+      plugins: [
+        createRouterStatePlugin({ registryHooks: routerProviderRegistryHooks }),
+        routerPlugin({
+          createRoutes: () => [
+            {
+              id: 'root',
+              path: '/',
+              loader: () => {
+                if (outcome === 'redirect')
+                  return new Response(null, {
+                    status: 302,
+                    headers: { Location: '/next' },
+                  });
+                if (outcome === 'failure') throw new Error('loader failed');
+                return { result: 'native loader' };
+              },
+            },
+          ],
+        }),
+        {
+          name: 'observe-native-router',
+          setup(api: any) {
+            api.onAfterCreateRouter((event: any) =>
+              observed.push(getRouterRuntimeState(event.runtimeContext)),
+            );
+          },
+        },
+      ] as any,
+    });
+    const createContext = () =>
+      Object.assign(getInitialContext(false), {
+        ssrContext: {
+          request: { raw: new Request('http://localhost/'), pathname: '/' },
+          response: { setHeader() {}, status() {}, locals: {} },
+          baseUrl: '/',
+          mode: 'string',
+          loaderFailureMode: 'clientRender',
+        },
+      });
+    const context = createContext();
+    await manager.hooks.onBeforeRender.call(context);
+    expect(observed).toHaveLength(1);
+    expect(observed[0]).toBe(getRouterRuntimeState(context));
+    expect(getRouterServerSnapshot(context)).toMatchObject({
+      framework: 'react-router',
+      statusCode: 200,
+      matchedRouteIds: ['root'],
+      routerData: { loaderData: { root: { result: 'native loader' } } },
+    });
+    expect(context.linkPrefetchPolicy).toBeDefined();
+
+    outcome = 'redirect';
+    const redirected = createContext();
+    const response = await manager.hooks.onBeforeRender.call(redirected);
+    expect(response).toBeInstanceOf(Response);
+    expect(getRouterRuntimeState(redirected)).toBeUndefined();
+
+    outcome = 'failure';
+    const failed = createContext();
+    await expect(manager.hooks.onBeforeRender.call(failed)).rejects.toThrow(
+      'loader failed',
     );
-    expect(contextAPI.getRouterHydrationScripts).toBe(
-      getRouterHydrationScripts,
-    );
-    expect(contextAPI.getRouterMatchedRouteIds).toBe(getRouterMatchedRouteIds);
-    expect(contextAPI.getRouterRuntimeState).toBe(getRouterRuntimeState);
-    expect(contextAPI.getRouterServerSnapshot).toBe(getRouterServerSnapshot);
+    expect(getRouterRuntimeState(failed)).toBeUndefined();
+    expect(observed).toHaveLength(1);
   });
 
   it('should expose generic router runtime state helpers', () => {

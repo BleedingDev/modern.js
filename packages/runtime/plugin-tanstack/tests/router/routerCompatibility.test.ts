@@ -27,6 +27,8 @@ type LegacyRuntimeRouterModule = {
 
 type CompatibilityGraph = {
   factory: (...args: any[]) => any;
+  Link: unknown;
+  hooks: Record<string, unknown>;
   legacyRuntimeRouter: LegacyRuntimeRouterModule;
   resolveRouterProvider: (
     framework?: string,
@@ -45,14 +47,39 @@ async function loadCompatibilityGraph(): Promise<CompatibilityGraph> {
   const { tanstackRouterProviderFactory } = await import(
     '../../src/runtime/register'
   );
-  const { resolveRouterProvider } = await import('@modern-js/runtime/context');
+  const { resolveRouterProvider } = await import(
+    '@modern-js/runtime-extensions/router-provider'
+  );
+  const { routerProviderRegistryHooks } = await import(
+    '../../src/runtime/hooks'
+  );
+  const { Link } = await import('../../src/runtime/prefetchLink');
 
   return {
     factory: tanstackRouterProviderFactory,
+    Link,
+    hooks: routerProviderRegistryHooks,
     legacyRuntimeRouter,
     resolveRouterProvider,
     routerPlugin,
   };
+}
+
+function initializeRouter(graph: CompatibilityGraph) {
+  const beforeRender: ((context: any, interrupt: () => void) => unknown)[] = [];
+  const plugin = graph.routerPlugin({ framework: 'tanstack' });
+  plugin.setup({
+    getHooks: () => graph.hooks,
+    getRuntimeConfig: () => ({ router: { framework: 'tanstack' } }),
+    onAfterCreateRouter: () => undefined,
+    onBeforeRender: (
+      callback: (context: any, interrupt: () => void) => unknown,
+    ) => beforeRender.push(callback),
+    wrapRoot: () => undefined,
+  });
+  const context: any = {};
+  for (const callback of beforeRender) callback(context, () => {});
+  return context.router as { Link: unknown };
 }
 
 function resolveTsgoBin(): string {
@@ -103,10 +130,7 @@ describe('runtime router compatibility', () => {
     const graph = await loadCompatibilityGraph();
 
     expect('createRouterPlugin' in graph.legacyRuntimeRouter).toBe(false);
-    expect(graph.routerPlugin).toBe(graph.factory);
-    expect(graph.routerPlugin({ framework: 'tanstack' })).toMatchObject({
-      name: '@modern-js/plugin-router-tanstack',
-    });
+    expect(initializeRouter(graph).Link).toBe(graph.Link);
     expect(
       graph.legacyRuntimeRouter.getLegacyRouterPluginInvocationCount(),
     ).toBe(0);
@@ -117,11 +141,10 @@ describe('runtime router compatibility', () => {
     const graphB = await loadCompatibilityGraph();
 
     expect(graphB.factory).not.toBe(graphA.factory);
-    expect(graphB.routerPlugin).toBe(graphB.factory);
+    expect(graphB.routerPlugin).not.toBe(graphA.routerPlugin);
     expect(graphB.resolveRouterProvider('tanstack')).toBe(graphA.factory);
-    expect(graphB.routerPlugin({ framework: 'tanstack' })).toMatchObject({
-      name: '@modern-js/plugin-router-tanstack',
-    });
+    expect(initializeRouter(graphA).Link).toBe(graphA.Link);
+    expect(initializeRouter(graphB).Link).toBe(graphB.Link);
     expect(
       graphA.legacyRuntimeRouter.getLegacyRouterPluginInvocationCount(),
     ).toBe(0);

@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { createOperationContractHash } from '@modern-js/bff-core';
 import { generateEffectClient } from '@modern-js/plugin-bff-extensions/client-generator';
+import { createOperationContractHash } from '@modern-js/server-runtime-extensions/bff-policy/node';
 import { build } from 'esbuild';
 
 const execFileAsync = promisify(execFile);

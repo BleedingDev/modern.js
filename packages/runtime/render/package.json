@@ -27,7 +27,6 @@
     "test": "tsgo --noEmit -p tsconfig.json && rstest --passWithNoTests"
   },
   "dependencies": {
-    "@modern-js/runtime-extensions": "workspace:*",
     "@modern-js/types": "workspace:*",
     "@modern-js/utils": "workspace:*",
     "@swc/helpers": "^0.5.23"

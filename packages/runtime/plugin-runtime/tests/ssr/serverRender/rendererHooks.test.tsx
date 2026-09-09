@@ -65,6 +65,8 @@ test('string lifecycle receives original context and completes body before head/
   hooks.extendStringSSRCollectors.tap(({ render }) => {
     expect(render.runtimeContext).toBe(options.runtimeContext);
     expect(render.request).toBe(request);
+    expect(render.resource).toBe(options.resource);
+    expect(render.config).toBe(options.config);
     expect(render).toMatchObject({ mode: 'string', isRsc: false });
     order.push('factory');
     return {
@@ -168,6 +170,12 @@ test('effect rejection is a terminal error after successful React output', async
 
 test('Node processes legacy transforms before body transforms and completes delivered output', async () => {
   const hooks = installHooks();
+  const options = createOptions();
+  hooks.extendStreamSSR.tap(info => {
+    expect(info.resource).toBe(options.resource);
+    expect(info.config).toBe(options.config);
+    return {};
+  });
   const order: string[] = [];
   const terminal = rs.fn();
   hooks.extendStreamSSR.tap(() => ({
@@ -187,7 +195,7 @@ test('Node processes legacy transforms before body transforms and completes deli
   const stream = await renderStreaming(
     new Request('http://localhost/'),
     <p>α🌐body</p>,
-    createOptions(),
+    options,
   );
   expect(terminal).not.toHaveBeenCalled();
   expect(await new Response(stream).text()).toBe(

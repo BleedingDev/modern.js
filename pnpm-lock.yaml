@@ -982,9 +982,6 @@ importers:
       '@jridgewell/trace-mapping':
         specifier: ^0.3.31
         version: 0.3.31
-      '@modern-js/runtime-extensions':
-        specifier: workspace:*
-        version: link:../../runtime/runtime-extensions
       '@modern-js/utils':
         specifier: workspace:*
         version: link:../../toolkit/utils
@@ -1124,15 +1121,9 @@ importers:
       '@modern-js/bff-core':
         specifier: workspace:*
         version: link:../../server/bff-core
-      '@modern-js/bff-effect':
-        specifier: workspace:*
-        version: link:../../server/bff-effect
       '@modern-js/create-request':
         specifier: workspace:*
         version: link:../../server/create-request
-      '@modern-js/plugin-bff-extensions':
-        specifier: workspace:*
-        version: link:../plugin-bff-extensions
       '@modern-js/server-core':
         specifier: workspace:*
         version: link:../../server/core
@@ -1152,9 +1143,6 @@ importers:
         specifier: ^2.1.0
         version: 2.1.0
     devDependencies:
-      '@effect/opentelemetry':
-        specifier: 4.0.0-rc.112
-        version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../solutions/app-tools
@@ -1197,9 +1185,6 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
-      effect:
-        specifier: 4.0.0-rc.112
-        version: 4.0.0-rc.112
       esbuild:
         specifier: '>=0.28.1'
         version: 0.28.1
@@ -1209,6 +1194,82 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4(patch_hash=30612645af6a21cba7258bc2be3b51d9bfc0841b78dc581a56a4283c3bb142b6)
+
+  packages/cli/plugin-bff-build-extensions:
+    dependencies:
+      '@modern-js/bff-core':
+        specifier: workspace:*
+        version: link:../../server/bff-core
+      '@modern-js/plugin':
+        specifier: workspace:*
+        version: link:../../toolkit/plugin
+      '@modern-js/plugin-bff':
+        specifier: workspace:*
+        version: link:../plugin-bff
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../plugin-bff-extensions
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/runtime-extensions
+      '@modern-js/server-runtime-extensions':
+        specifier: workspace:*
+        version: link:../../server/runtime-extensions
+      '@modern-js/utils':
+        specifier: workspace:*
+        version: link:../../toolkit/utils
+      '@swc/core':
+        specifier: 1.16.2
+        version: 1.16.2(@swc/helpers@0.5.23)
+    devDependencies:
+      '@effect/opentelemetry':
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/app-tools':
+        specifier: workspace:*
+        version: link:../../solutions/app-tools
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../server/bff-effect
+      '@modern-js/builder':
+        specifier: workspace:*
+        version: link:../builder
+      '@modern-js/rslib':
+        specifier: workspace:*
+        version: link:../../../scripts/rslib
+      '@modern-js/server-core':
+        specifier: workspace:*
+        version: link:../../server/core
+      '@modern-js/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
+      '@modern-js/types':
+        specifier: workspace:*
+        version: link:../../toolkit/types
+      '@rsbuild/core':
+        specifier: 2.2.3
+        version: 2.2.3(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)
+      '@rslib/core':
+        specifier: 1.0.0
+        version: 1.0.0(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)(typescript@7.0.2)
+      '@scripts/rstest-config':
+        specifier: workspace:*
+        version: link:../../../scripts/rstest-config
+      '@types/node':
+        specifier: ^26.4.1
+        version: 26.4.1
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260707.2
+        version: 7.0.0-dev.20260707.2
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      esbuild:
+        specifier: '>=0.28.1'
+        version: 0.28.1
       zod:
         specifier: ^4.5.4
         version: 4.5.4(patch_hash=30612645af6a21cba7258bc2be3b51d9bfc0841b78dc581a56a4283c3bb142b6)
@@ -1242,6 +1303,9 @@ importers:
       '@module-federation/runtime':
         specifier: 2.9.0
         version: 2.9.0
+      '@swc/core':
+        specifier: 1.16.2
+        version: 1.16.2(@swc/helpers@0.5.23)
       esbuild:
         specifier: '>=0.28.1'
         version: 0.28.1
@@ -1279,9 +1343,6 @@ importers:
 
   packages/cli/plugin-data-loader:
     dependencies:
-      '@modern-js/runtime-extensions':
-        specifier: workspace:*
-        version: link:../../runtime/runtime-extensions
       '@modern-js/runtime-utils':
         specifier: workspace:*
         version: link:../../toolkit/runtime-utils
@@ -1598,6 +1659,9 @@ importers:
 
   packages/runtime/i18n-extensions:
     dependencies:
+      '@modern-js/runtime-utils':
+        specifier: workspace:*
+        version: link:../../toolkit/runtime-utils
       i18next-browser-languagedetector:
         specifier: ^8.2.1
         version: 8.2.1
@@ -1627,11 +1691,81 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
 
-  packages/runtime/plugin-i18n:
+  packages/runtime/i18n-integration:
     dependencies:
       '@modern-js/i18n-runtime-extensions':
         specifier: workspace:*
         version: link:../i18n-extensions
+      '@modern-js/plugin':
+        specifier: workspace:*
+        version: link:../../toolkit/plugin
+      '@modern-js/plugin-i18n':
+        specifier: workspace:*
+        version: link:../plugin-i18n
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../runtime-extensions
+      '@modern-js/server-runtime':
+        specifier: workspace:*
+        version: link:../../server/server-runtime
+      '@modern-js/types':
+        specifier: workspace:*
+        version: link:../../toolkit/types
+    devDependencies:
+      '@modern-js/app-tools':
+        specifier: workspace:*
+        version: link:../../solutions/app-tools
+      '@modern-js/rslib':
+        specifier: workspace:*
+        version: link:../../../scripts/rslib
+      '@modern-js/runtime':
+        specifier: workspace:*
+        version: link:../plugin-runtime
+      '@modern-js/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
+      '@rslib/core':
+        specifier: 1.0.0
+        version: 1.0.0(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)(typescript@7.0.2)
+      '@rstest/core':
+        specifier: 0.11.12
+        version: 0.11.12(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)(happy-dom@20.14.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@25.0.1(bufferutil@4.1.0)(supports-color@10.2.2)(utf-8-validate@5.0.10))
+      '@scripts/rstest-config':
+        specifier: workspace:*
+        version: link:../../../scripts/rstest-config
+      '@types/node':
+        specifier: ^26.4.1
+        version: 26.4.1
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.7
+        version: 19.2.7(@types/react@19.2.18)
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20260707.2
+        version: 7.0.0-dev.20260707.2
+      esbuild:
+        specifier: '>=0.28.1'
+        version: 0.28.1
+      i18next:
+        specifier: 26.4.2
+        version: 26.4.2(typescript@7.0.2)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      react-i18next:
+        specifier: 17.0.13
+        version: 17.0.13(i18next@26.4.2(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/runtime/plugin-i18n:
+    dependencies:
       '@modern-js/plugin':
         specifier: workspace:*
         version: link:../../toolkit/plugin
@@ -1909,6 +2043,9 @@ importers:
       '@modern-js/runtime':
         specifier: workspace:*
         version: link:../plugin-runtime
+      '@modern-js/server-utils':
+        specifier: workspace:*
+        version: link:../../server/utils
       '@rslib/core':
         specifier: 1.0.0
         version: 1.0.0(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)(typescript@7.0.2)
@@ -1948,9 +2085,6 @@ importers:
 
   packages/runtime/render:
     dependencies:
-      '@modern-js/runtime-extensions':
-        specifier: workspace:*
-        version: link:../runtime-extensions
       '@modern-js/types':
         specifier: workspace:*
         version: link:../../toolkit/types
@@ -2061,6 +2195,12 @@ importers:
 
   packages/runtime/runtime-extensions:
     dependencies:
+      '@modern-js/create-request':
+        specifier: workspace:*
+        version: link:../../server/create-request
+      '@modern-js/runtime-utils':
+        specifier: workspace:*
+        version: link:../../toolkit/runtime-utils
       react-helmet-async:
         specifier: 3.0.0
         version: 3.0.0(react@19.2.8)
@@ -2104,6 +2244,9 @@ importers:
       esbuild:
         specifier: '>=0.28.1'
         version: 0.28.1
+      nock:
+        specifier: ^14.0.17
+        version: 14.0.17
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -2138,6 +2281,9 @@ importers:
       '@modern-js/rslib':
         specifier: workspace:*
         version: link:../../../scripts/rslib
+      '@modern-js/server-runtime-extensions':
+        specifier: workspace:*
+        version: link:../runtime-extensions
       '@modern-js/types':
         specifier: workspace:*
         version: link:../../toolkit/types
@@ -2177,6 +2323,9 @@ importers:
       '@modern-js/runtime-extensions':
         specifier: workspace:*
         version: link:../../runtime/runtime-extensions
+      '@modern-js/server-runtime-extensions':
+        specifier: workspace:*
+        version: link:../runtime-extensions
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
@@ -2266,9 +2415,6 @@ importers:
       '@modern-js/plugin':
         specifier: workspace:*
         version: link:../../toolkit/plugin
-      '@modern-js/runtime-extensions':
-        specifier: workspace:*
-        version: link:../../runtime/runtime-extensions
       '@modern-js/runtime-utils':
         specifier: workspace:*
         version: link:../../toolkit/runtime-utils
@@ -2434,9 +2580,6 @@ importers:
       '@modern-js/server-core':
         specifier: workspace:*
         version: link:../core
-      '@modern-js/server-runtime-extensions':
-        specifier: workspace:*
-        version: link:../runtime-extensions
       '@modern-js/utils':
         specifier: workspace:*
         version: link:../../toolkit/utils
@@ -2474,6 +2617,15 @@ importers:
       '@modern-js/create-request':
         specifier: workspace:*
         version: link:../create-request
+      '@modern-js/plugin':
+        specifier: workspace:*
+        version: link:../../toolkit/plugin
+      '@modern-js/plugin-data-loader':
+        specifier: workspace:*
+        version: link:../../cli/plugin-data-loader
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/runtime-extensions
       '@modern-js/runtime-utils':
         specifier: workspace:*
         version: link:../../toolkit/runtime-utils
@@ -2486,7 +2638,13 @@ importers:
       '@swc/helpers':
         specifier: ^0.5.23
         version: 0.5.23
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
     devDependencies:
+      '@modern-js/prod-server':
+        specifier: workspace:*
+        version: link:../prod-server
       '@modern-js/rslib':
         specifier: workspace:*
         version: link:../../../scripts/rslib
@@ -2505,6 +2663,12 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
+      esbuild:
+        specifier: '>=0.28.1'
+        version: 0.28.1
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4(patch_hash=30612645af6a21cba7258bc2be3b51d9bfc0841b78dc581a56a4283c3bb142b6)
 
   packages/server/server:
     dependencies:
@@ -2514,9 +2678,6 @@ importers:
       '@modern-js/server-core':
         specifier: workspace:*
         version: link:../core
-      '@modern-js/server-runtime-extensions':
-        specifier: workspace:*
-        version: link:../runtime-extensions
       '@modern-js/server-utils':
         specifier: workspace:*
         version: link:../utils
@@ -2843,15 +3004,27 @@ importers:
       '@modern-js/app-tools-extensions':
         specifier: workspace:*
         version: link:../app-tools-extensions
+      '@modern-js/i18n-integration':
+        specifier: workspace:*
+        version: link:../../runtime/i18n-integration
       '@modern-js/plugin':
         specifier: workspace:*
         version: link:../../toolkit/plugin
+      '@modern-js/runtime':
+        specifier: workspace:*
+        version: link:../../runtime/plugin-runtime
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/runtime-extensions
       '@modern-js/runtime-renderer-extensions':
         specifier: workspace:*
         version: link:../../runtime/renderer-extensions
       '@modern-js/server-core':
         specifier: workspace:*
         version: link:../../server/core
+      '@modern-js/server-runtime-extensions':
+        specifier: workspace:*
+        version: link:../../server/runtime-extensions
       '@rsbuild/core':
         specifier: 2.2.3
         version: 2.2.3(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)
@@ -2865,9 +3038,18 @@ importers:
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../cli/plugin-bff
+      '@modern-js/plugin-tanstack':
+        specifier: workspace:*
+        version: link:../../runtime/plugin-tanstack
+      '@modern-js/prod-server':
+        specifier: workspace:*
+        version: link:../../server/prod-server
       '@modern-js/rslib':
         specifier: workspace:*
         version: link:../../../scripts/rslib
+      '@modern-js/server':
+        specifier: workspace:*
+        version: link:../../server/server
       '@modern-js/tsconfig':
         specifier: workspace:*
         version: link:../../tsconfig
@@ -3227,6 +3409,15 @@ importers:
         specifier: 7.11.0
         version: 7.11.0(@biomejs/biome@2.5.3)(oxfmt@0.66.0)(oxlint@1.81.0)(prettier@3.9.4)
     devDependencies:
+      '@modern-js/i18n-integration':
+        specifier: workspace:*
+        version: link:../../runtime/i18n-integration
+      '@modern-js/i18n-runtime-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/i18n-extensions
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../cli/plugin-bff-build-extensions
       '@modern-js/rslib':
         specifier: workspace:*
         version: link:../../../scripts/rslib
@@ -3988,9 +4179,15 @@ importers:
       '@effect/opentelemetry':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../packages/server/bff-effect
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-extensions
       '@modern-js/runtime':
         specifier: workspace:*
         version: link:../../../../packages/runtime/plugin-runtime
@@ -4025,6 +4222,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../packages/solutions/app-tools
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -4083,6 +4283,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../packages/solutions/app-tools
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -4144,6 +4347,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../packages/solutions/app-tools
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -4171,12 +4377,21 @@ importers:
       '@effect/opentelemetry':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../packages/server/bff-effect
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../../../packages/cli/plugin-bff-extensions
       '@modern-js/runtime':
         specifier: workspace:*
         version: link:../../../packages/runtime/plugin-runtime
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../../../packages/runtime/runtime-extensions
       '@modern-js/server-runtime':
         specifier: workspace:*
         version: link:../../../packages/server/server-runtime
@@ -4193,6 +4408,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../packages/solutions/app-tools
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../packages/cli/plugin-bff-build-extensions
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
@@ -4934,6 +5152,9 @@ importers:
       '@modern-js/plugin-ssg':
         specifier: workspace:*
         version: link:../../../../../packages/cli/plugin-ssg
+      '@modern-js/ultramodern-app-tools':
+        specifier: workspace:*
+        version: link:../../../../../packages/solutions/ultramodern-app-tools
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
@@ -4971,6 +5192,9 @@ importers:
       '@modern-js/plugin-ssg':
         specifier: workspace:*
         version: link:../../../../../packages/cli/plugin-ssg
+      '@modern-js/ultramodern-app-tools':
+        specifier: workspace:*
+        version: link:../../../../../packages/solutions/ultramodern-app-tools
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
@@ -5008,6 +5232,9 @@ importers:
       '@modern-js/plugin-ssg':
         specifier: workspace:*
         version: link:../../../../../packages/cli/plugin-ssg
+      '@modern-js/ultramodern-app-tools':
+        specifier: workspace:*
+        version: link:../../../../../packages/solutions/ultramodern-app-tools
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
@@ -5045,9 +5272,15 @@ importers:
       '@effect/opentelemetry':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../packages/server/bff-effect
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-extensions
       '@modern-js/plugin-i18n':
         specifier: workspace:*
         version: link:../../../../packages/runtime/plugin-i18n
@@ -5070,6 +5303,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../packages/solutions/app-tools
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
@@ -5544,15 +5780,24 @@ importers:
       '@effect/opentelemetry':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../packages/server/bff-effect
       '@modern-js/federation-runtime':
         specifier: workspace:*
         version: link:../../../../packages/runtime/federation-runtime
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-extensions
       '@modern-js/plugin-tanstack':
         specifier: workspace:*
         version: link:../../../../packages/runtime/plugin-tanstack
       '@modern-js/runtime':
         specifier: workspace:*
         version: link:../../../../packages/runtime/plugin-runtime
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/runtime/runtime-extensions
       '@module-federation/modern-js-v3':
         specifier: 2.9.0
         version: 2.9.0(patch_hash=ba5049c43645a4337e1a74857b2dcef5f5330692cc5d2186bcef236dc122dae8)(@rsbuild/core@2.2.3(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0))(@rspack/core@2.2.2(@module-federation/runtime-tools@2.9.0)(@swc/helpers@0.5.23))(bufferutil@4.1.0)(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-router@7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(typescript@7.0.2)(utf-8-validate@5.0.10)
@@ -5578,6 +5823,12 @@ importers:
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
+      '@modern-js/ultramodern-app-tools':
+        specifier: workspace:*
+        version: link:../../../../packages/solutions/ultramodern-app-tools
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
@@ -5585,13 +5836,26 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  tests/integration/routes-tanstack-mf/mf-host/shared/effect: {}
+  tests/integration/routes-tanstack-mf/mf-host/shared/effect:
+    dependencies:
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../../../packages/server/bff-effect
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
 
   tests/integration/routes-tanstack-mf/mf-remote:
     dependencies:
       '@effect/opentelemetry':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../packages/server/bff-effect
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-extensions
       '@modern-js/plugin-tanstack':
         specifier: workspace:*
         version: link:../../../../packages/runtime/plugin-tanstack
@@ -5626,6 +5890,12 @@ importers:
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
+      '@modern-js/ultramodern-app-tools':
+        specifier: workspace:*
+        version: link:../../../../packages/solutions/ultramodern-app-tools
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
@@ -5638,6 +5908,12 @@ importers:
       '@effect/opentelemetry':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../packages/server/bff-effect
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-extensions
       '@modern-js/plugin-tanstack':
         specifier: workspace:*
         version: link:../../../../packages/runtime/plugin-tanstack
@@ -5669,6 +5945,12 @@ importers:
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
+      '@modern-js/ultramodern-app-tools':
+        specifier: workspace:*
+        version: link:../../../../packages/solutions/ultramodern-app-tools
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
@@ -5676,9 +5958,23 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  tests/integration/routes-tanstack-mf/mf-remote-2/shared/effect: {}
+  tests/integration/routes-tanstack-mf/mf-remote-2/shared/effect:
+    dependencies:
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../../../packages/server/bff-effect
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
 
-  tests/integration/routes-tanstack-mf/mf-remote/shared/effect: {}
+  tests/integration/routes-tanstack-mf/mf-remote/shared/effect:
+    dependencies:
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../../../packages/server/bff-effect
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
 
   tests/integration/routes-tanstack-rsc:
     dependencies:
@@ -6935,9 +7231,15 @@ importers:
       '@effect/opentelemetry':
         specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(@opentelemetry/api-logs@0.222.0)(@opentelemetry/api@1.9.1)(@opentelemetry/resources@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-node@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-web@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-rc.112)
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../packages/server/bff-effect
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-extensions':
+        specifier: workspace:*
+        version: link:../../../packages/cli/plugin-bff-extensions
       '@modern-js/plugin-tanstack':
         specifier: workspace:*
         version: link:../../../packages/runtime/plugin-tanstack
@@ -6960,6 +7262,9 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../packages/solutions/app-tools
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../packages/cli/plugin-bff-build-extensions
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0

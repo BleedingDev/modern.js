@@ -1,4 +1,4 @@
-import { resolveRouterProvider } from '@modern-js/runtime/context';
+import { resolveRouterProvider } from '@modern-js/runtime-extensions/router-provider';
 import '../../src/runtime/register';
 
 describe("'@modern-js/plugin-tanstack/runtime' import side effects", () => {

@@ -52,6 +52,8 @@ describe('telemetry plugin lifecycle', () => {
   test('wires server.telemetry.slo through to alert emission', async () => {
     const warnSpy = rs.spyOn(logger, 'warn').mockImplementation(() => {});
 
+    let server: ReturnType<typeof createServerBase> | undefined;
+
     try {
       const config = getDefaultConfig();
       config.server = {
@@ -68,7 +70,7 @@ describe('telemetry plugin lifecycle', () => {
         },
       } as any;
 
-      const server = createServerBase({
+      server = createServerBase({
         config,
         pwd: process.cwd(),
         appContext: getDefaultAppContext(),
@@ -95,6 +97,7 @@ describe('telemetry plugin lifecycle', () => {
         sloWarnings.some(call => String(call[0]).includes('queue.drop')),
       ).toBe(true);
     } finally {
+      await server?.dispose();
       warnSpy.mockRestore();
     }
   });
@@ -131,6 +134,8 @@ describe('telemetry plugin lifecycle', () => {
         api.updateServerContext({ nodeServer: nodeServerStub } as any);
       },
     };
+
+    let server: ReturnType<typeof createServerBase> | undefined;
 
     try {
       fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
@@ -204,7 +209,7 @@ describe('telemetry plugin lifecycle', () => {
         },
       } as any;
 
-      const server = createServerBase({
+      server = createServerBase({
         config,
         pwd: tempDir,
         appContext: getDefaultAppContext(),
@@ -227,7 +232,7 @@ describe('telemetry plugin lifecycle', () => {
       let statusPayload: any;
 
       await waitFor(async () => {
-        const status = await server.request(
+        const status = await server!.request(
           '/_modern/runtime/status',
           {
             method: 'GET',
@@ -285,7 +290,7 @@ describe('telemetry plugin lifecycle', () => {
       );
 
       await waitFor(async () => {
-        const status = await server.request(
+        const status = await server!.request(
           '/_modern/runtime/status',
           {
             method: 'GET',
@@ -326,7 +331,7 @@ describe('telemetry plugin lifecycle', () => {
         ),
       ).toBe(true);
 
-      nodeServerStub.emit('close');
+      await server?.dispose();
 
       await waitFor(() =>
         fetchCalls.some(call =>
@@ -337,14 +342,14 @@ describe('telemetry plugin lifecycle', () => {
       expect(exportedBodies).toContain('telemetry.canary.rollback');
       expect(exportedBodies).toContain('canary-request-0');
     } finally {
-      nodeServerStub.emit('close');
+      await server?.dispose();
       globalThis.fetch = originalFetch;
       warnSpy.mockRestore();
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
-  test('flushes pending envelopes when the node server closes', async () => {
+  test('flushes pending envelopes when the native runtime is disposed', async () => {
     const fetchCalls: Array<{ url: string; body: string }> = [];
     const fetchMock = rs.fn(async (url: any, init?: any) => {
       fetchCalls.push({ url: String(url), body: String(init?.body ?? '') });
@@ -361,12 +366,14 @@ describe('telemetry plugin lifecycle', () => {
       },
     };
 
+    let server: ReturnType<typeof createServerBase> | undefined;
+
     try {
       const config = getDefaultConfig();
       config.server = {
         telemetry: {
           enabled: true,
-          // make sure nothing flushes before the close event:
+          // make sure nothing flushes before native disposal:
           flushIntervalMs: 60_000,
           maxBatchSize: 500,
           exporters: {
@@ -378,7 +385,7 @@ describe('telemetry plugin lifecycle', () => {
         },
       } as any;
 
-      const server = createServerBase({
+      server = createServerBase({
         config,
         pwd: process.cwd(),
         appContext: getDefaultAppContext(),
@@ -407,12 +414,13 @@ describe('telemetry plugin lifecycle', () => {
         fetchCalls.some(call => call.body.includes('close-flush-probe')),
       ).toBe(false);
 
-      nodeServerStub.emit('close');
+      await server?.dispose();
 
       await waitFor(() =>
         fetchCalls.some(call => call.body.includes('close-flush-probe')),
       );
     } finally {
+      await server?.dispose();
       globalThis.fetch = originalFetch;
     }
   });

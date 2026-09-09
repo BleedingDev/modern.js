@@ -23,6 +23,11 @@ const options = () =>
       ssrContext: { request: { headers: {} }, reporter: {} },
     }),
     htmlTemplate: '<html><head></head><body><!--<?- html ?>--></body></html>',
+    resource: {
+      entryName: 'main',
+      htmlTemplate: '<html></html>',
+      routeManifest: {},
+    },
     config: {},
     ssrConfig: {},
     entryName: 'main',
@@ -42,6 +47,8 @@ test('worker orders transforms and preserves split UTF-8 shell/tail until delive
   const opts = options();
   hooks.extendStreamSSR.tap(info => {
     expect(info.runtimeContext).toBe(opts.runtimeContext);
+    expect(info.resource).toBe(opts.resource);
+    expect(info.config).toBe(opts.config);
     expect(info.platform).toBe('web');
     return {
       streamPhase: 'body',

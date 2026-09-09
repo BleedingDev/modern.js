@@ -87,15 +87,22 @@ shows a standalone native route tree; generated file-route applications retain
 their existing route registration.
 
 Effect REST contracts use `HttpApi`, `HttpApiGroup`, `HttpApiEndpoint` and
-`Schema` from `@modern-js/plugin-bff/effect-client`. Server handlers use
+`Schema` from `@modern-js/bff-effect/effect-client`. Server handlers use
 `Effect`, `HttpApiBuilder.group`, `Layer` and `defineEffectBff` from
-`@modern-js/plugin-bff/effect-edge`. Compose the handler layer with
+`@modern-js/bff-effect/effect-edge`. Compose the handler layer with
 `HttpApiBuilder.layer(api).pipe(Layer.provide(handlers))` and pass it to
 `defineEffectBff({ api, layer })`. Keep the server module out of browser imports.
 The [native API fixture](../packages/toolkit/ultramodern-create/tests/fixtures/native-workflows/native-api.ts)
 shows this composition without a local runtime adapter. Common readiness and
 error contracts come from `@modern-js/bff-effect/microvertical-api`; business
 schemas and handlers remain application code.
+
+For Node-specific API modules, import `defineEffectBff` and framework context
+helpers from `@modern-js/bff-effect/effect`. Import `Effect` and `Layer` as
+namespaces from `effect/Effect` and `effect/Layer`, and `HttpApiBuilder` from
+`effect/unstable/httpapi`. Keep worker handlers and worker context on
+`@modern-js/bff-effect/effect-edge`. Native `@modern-js/plugin-bff/server`
+exports Hono APIs.
 
 ## Check and build
 

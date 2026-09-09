@@ -33,11 +33,13 @@ const DEFAULT_DIVERGENCE_ALLOWLIST_PATH = path.join(
 );
 const DEFAULT_PATHSPEC = Object.freeze(['packages']);
 const FORK_OWNED_PACKAGE_ROOTS = Object.freeze([
+  'packages/cli/plugin-bff-build-extensions',
   'packages/cli/plugin-bff-extensions',
   'packages/document/ultramodern-preset',
   'packages/runtime/boundary-debugger',
   'packages/runtime/federation-runtime',
   'packages/runtime/i18n-extensions',
+  'packages/runtime/i18n-integration',
   'packages/runtime/plugin-tanstack',
   'packages/runtime/renderer-extensions',
   'packages/runtime/runtime-extensions',

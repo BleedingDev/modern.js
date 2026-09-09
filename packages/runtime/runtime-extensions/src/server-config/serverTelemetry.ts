@@ -257,6 +257,10 @@ export interface ServerTelemetryCanaryUserConfig {
   autopilot?: ServerTelemetryCanaryAutopilotUserConfig;
 }
 
+export interface ServerTelemetryConfigExtension {
+  telemetry?: ServerTelemetryUserConfig;
+}
+
 export interface ServerTelemetryUserConfig {
   /**
    * Enable framework telemetry envelope emission.

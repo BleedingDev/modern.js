@@ -1,4 +1,3 @@
-import { resolveCrossProjectPolicy } from '@modern-js/bff-core';
 import {
   collectEffectEndpoints,
   createEffectEndpointContractHash,
@@ -9,6 +8,7 @@ import {
   resolveEffectBffModuleHandler,
   toOperationContractSources,
 } from '@modern-js/bff-effect/effect';
+import { resolveCrossProjectPolicy } from '@modern-js/server-runtime-extensions/bff-policy/node';
 import * as Effect from 'effect/Effect';
 import * as Layer from 'effect/Layer';
 import * as Schema from 'effect/Schema';

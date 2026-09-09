@@ -73,6 +73,7 @@ export default (): CliPlugin<AppTools> => ({
             distDir,
             tsconfigPath,
             moduleType,
+            excludeFiles: api.getAppContext().serverCompileExcludedFiles,
           },
         );
       }

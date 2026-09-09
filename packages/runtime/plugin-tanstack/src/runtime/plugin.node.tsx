@@ -1,10 +1,10 @@
 // @effect-diagnostics asyncFunction:off newPromise:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import {
   getGlobalEnableRsc,
-  type InternalRouterServerSnapshot,
   InternalRuntimeContext,
   type TInternalRuntimeContext,
 } from '@modern-js/runtime/context';
+import type { InternalRouterServerSnapshot } from '@modern-js/runtime-extensions/router-state';
 import {
   createRequestContext,
   type RequestContext,

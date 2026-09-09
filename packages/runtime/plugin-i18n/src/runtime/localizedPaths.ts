@@ -1,20 +1,17 @@
-import {
-  canonicalTargetPathname,
-  type LocalisedUrlsOption,
-} from '@modern-js/i18n-runtime-extensions';
 import { useMemo } from 'react';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
 import { useModernI18n } from './context';
 import { useI18nRouterAdapter } from './routerAdapter';
 import { buildLocalizedUrl, splitUrlTarget } from './utils';
 
 export interface LocalizedPathsConfig {
   languages: string[];
-  localisedUrls?: LocalisedUrlsOption;
+  urlStrategy?: I18nUrlStrategy;
 }
 
 /**
  * Localize a canonical, language-agnostic target for the given language:
- * adds the language prefix and applies `localisedUrls` pattern mapping.
+ * adds the language prefix and applies the configured URL strategy.
  * `?search`/`#hash` suffixes are preserved verbatim.
  */
 export const localizePath = (
@@ -22,7 +19,7 @@ export const localizePath = (
   language: string,
   config: LocalizedPathsConfig,
 ): string =>
-  buildLocalizedUrl(pathname, language, config.languages, config.localisedUrls);
+  buildLocalizedUrl(pathname, language, config.languages, config.urlStrategy);
 
 /**
  * Reverse of {@link localizePath}: strip the language prefix and map localized
@@ -34,11 +31,19 @@ export const canonicalPath = (
   config: LocalizedPathsConfig,
 ): string => {
   const { pathname, search, hash } = splitUrlTarget(target);
-  const resolvedPath = canonicalTargetPathname(
-    pathname,
-    config.languages,
-    config.localisedUrls,
-  );
+  if (config.urlStrategy) {
+    return `${config.urlStrategy.canonicalPathname(pathname, config.languages)}${search}${hash}`;
+  }
+  const segments = pathname.split('/').filter(Boolean);
+  if (
+    segments[0] &&
+    config.languages.some(
+      language => language.toLowerCase() === segments[0].toLowerCase(),
+    )
+  ) {
+    segments.shift();
+  }
+  const resolvedPath = `/${segments.join('/')}`;
 
   return `${resolvedPath}${search}${hash}`;
 };
@@ -50,16 +55,16 @@ export interface UseLocalizedPathsReturn {
 
 /**
  * Context-bound versions of {@link localizePath} and {@link canonicalPath} —
- * the plugin configuration (languages, localisedUrls) is read from the i18n
+ * the languages and URL strategy are read from the i18n
  * provider, so apps never copy pattern-matching helpers again.
  */
 export const useLocalizedPaths = (): UseLocalizedPathsReturn => {
-  const { supportedLanguages, localisedUrls } = useModernI18n();
+  const { supportedLanguages, urlStrategy } = useModernI18n();
 
   return useMemo(() => {
     const config: LocalizedPathsConfig = {
       languages: supportedLanguages,
-      localisedUrls,
+      urlStrategy,
     };
 
     return {
@@ -67,7 +72,7 @@ export const useLocalizedPaths = (): UseLocalizedPathsReturn => {
         localizePath(pathname, language, config),
       canonicalPath: (pathname: string) => canonicalPath(pathname, config),
     };
-  }, [supportedLanguages, localisedUrls]);
+  }, [supportedLanguages, urlStrategy]);
 };
 
 export interface UseLocalizedLocationReturn {
@@ -83,7 +88,7 @@ export interface UseLocalizedLocationReturn {
  * language switchers. SSR-safe: the location comes from the router adapter.
  */
 export const useLocalizedLocation = (): UseLocalizedLocationReturn => {
-  const { language, supportedLanguages, localisedUrls } = useModernI18n();
+  const { language, supportedLanguages, urlStrategy } = useModernI18n();
   const { location } = useI18nRouterAdapter();
   const pathname = location?.pathname ?? '/';
   const search = location?.search ?? '';
@@ -92,7 +97,7 @@ export const useLocalizedLocation = (): UseLocalizedLocationReturn => {
   return useMemo(() => {
     const config: LocalizedPathsConfig = {
       languages: supportedLanguages,
-      localisedUrls,
+      urlStrategy,
     };
     const alternates: Record<string, string> = {};
     for (const supportedLanguage of supportedLanguages) {
@@ -105,5 +110,5 @@ export const useLocalizedLocation = (): UseLocalizedLocationReturn => {
       canonical: canonicalPath(pathname, config),
       alternates,
     };
-  }, [language, supportedLanguages, localisedUrls, pathname, search, hash]);
+  }, [language, supportedLanguages, urlStrategy, pathname, search, hash]);
 };

@@ -47,20 +47,32 @@ import EnableBFFCaution from "@site-docs-en/components/enable-bff-caution";
 
 :::caution Install the Effect peers yourself
 `effect` and `@effect/opentelemetry` are **optional exact peer dependencies** of
-`@modern-js/plugin-bff`, not dependencies. The plugin no longer bundles a copy —
-Effect 4 derives `Context` / `Service` keys per module instance, so a bundled copy
-would give your app a second Effect identity. Before setting
-`runtimeFramework: 'effect'` or importing `@modern-js/plugin-bff/effect`,
-`/effect-server`, `/effect-edge` or `/effect-client`, install the exact cohort:
+`@modern-js/bff-effect`. Install them in the application so its API modules and
+the framework use the same Effect instance. Before setting
+`runtimeFramework: 'effect'` or importing `@modern-js/bff-effect/effect`,
+`/effect-edge` or `/effect-client`, install the exact cohort:
 
 ```bash
 pnpm add effect@4.0.0-rc.112 @effect/opentelemetry@4.0.0-rc.112
 ```
 
 The pin is exact because UltraModern ships Effect as one lockstep cohort. Apps
-using only `runtimeFramework: 'hono'` or the `./data-platform` lane need neither
-package.
+using only native `runtimeFramework: 'hono'` or
+`@modern-js/bff-effect/data-platform` need neither package.
 :::
+
+Use `bffPlugin` from `@modern-js/plugin-bff-build-extensions` to register the
+Effect runtime. It composes the native BFF plugin. Install
+`@modern-js/bff-effect` and `@modern-js/plugin-bff-extensions` from the same
+framework cohort as application production dependencies, so the adapter remains
+available after development dependencies are removed. The build plugin can be a
+development dependency. See the [runtime configuration example](/guides/advanced-features/bff/frameworks).
+
+Native `@modern-js/plugin-bff/server` exports Hono APIs. For Node Effect APIs,
+import framework helpers such as `defineEffectBff` from
+`@modern-js/bff-effect/effect` and namespaces from the corresponding `effect/*`
+modules. Worker handlers and worker request context use
+`@modern-js/bff-effect/effect-edge`.
 
 Generated UltraModern workspaces use this runtime as the only generated HTTP API
 path. The API contract lives at `shared/api.ts`, the server runtime lives at
@@ -244,7 +256,7 @@ Strict Effect APIs should test the declared `HttpApi` contract, not a raw
 request handler. Edge-compatible tests can use the framework helper:
 
 ```ts
-import { createEffectBffTestHandler } from '@modern-js/plugin-bff/effect-edge';
+import { createEffectBffTestHandler } from '@modern-js/bff-effect/effect-edge';
 import apiModule from '../api/index';
 
 const testApi = await createEffectBffTestHandler({
@@ -259,12 +271,9 @@ If you manually compose an Effect web handler in a low-level proof, provide the
 platform services explicitly:
 
 ```ts
-import {
-  HttpApiBuilder,
-  HttpRouter,
-  HttpServer,
-  Layer,
-} from '@modern-js/plugin-bff/effect-server';
+import * as Layer from 'effect/Layer';
+import { HttpRouter, HttpServer } from 'effect/unstable/http';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 
 const handler = HttpRouter.toWebHandler(
   HttpApiBuilder.layer(api).pipe(
@@ -284,13 +293,10 @@ current Effect v4 beta cohort, `HttpRouter.middleware(...)` returns a `Layer`
 directly:
 
 ```ts
-import {
-  Effect,
-  HttpApiBuilder,
-  HttpMiddleware,
-  HttpRouter,
-  Layer,
-} from '@modern-js/plugin-bff/effect-server';
+import * as Effect from 'effect/Effect';
+import * as Layer from 'effect/Layer';
+import { HttpMiddleware, HttpRouter } from 'effect/unstable/http';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 
 const corsLayer = HttpRouter.middleware(
   Effect.succeed(

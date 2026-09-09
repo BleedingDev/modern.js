@@ -1,20 +1,5 @@
-import type { ServerTelemetryUserConfig } from '@modern-js/runtime-extensions/server-config';
 import type { SSRMode } from '@modern-js/types';
 import type { WatchOptions } from '@modern-js/utils';
-
-export type {
-  ServerTelemetryCanaryAutopilotStateStoreUserConfig,
-  ServerTelemetryCanaryAutopilotUserConfig,
-  ServerTelemetryCanaryContractGateUserConfig,
-  ServerTelemetryCanaryRuntimeFallbackSignalAuthUserConfig,
-  ServerTelemetryCanaryRuntimeFallbackSignalTrustPolicyUserConfig,
-  ServerTelemetryCanaryRuntimeFallbackSignalUserConfig,
-  ServerTelemetryCanaryUserConfig,
-  ServerTelemetryExporterOptions,
-  ServerTelemetrySloUserConfig,
-  ServerTelemetryUserConfig,
-  ServerTelemetryVictoriaMetricsOptions,
-} from '@modern-js/runtime-extensions/server-config';
 
 type Route =
   | string
@@ -73,7 +58,6 @@ export interface ServerUserConfig {
    */
   useJsonScript?: boolean;
   logger?: boolean | Record<string, unknown>;
-  telemetry?: ServerTelemetryUserConfig;
   /**
    * @description disable hook middleware for performance
    * @default false

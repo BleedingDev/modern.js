@@ -9,9 +9,15 @@ UltraModern 工作区已使用 Effect 合同和处理器。新增 API delivery u
 `--vertical --preset api-only`；已有 vertical 的业务接口直接扩展
 `HttpApi` / `HttpApiGroup` / `HttpApiEndpoint` / `Schema` 合同，并通过
 `HttpApiBuilder.group` 实现 handler。合同从
-`@modern-js/plugin-bff/effect-client` 导入，server 的 `Effect`、`Layer`、
-`HttpApiBuilder`、`defineEffectBff` 从 `@modern-js/plugin-bff/effect-edge` 导入。
+`@modern-js/bff-effect/effect-client` 导入，server 的 `Effect`、`Layer`、
+`HttpApiBuilder`、`defineEffectBff` 从 `@modern-js/bff-effect/effect-edge` 导入。
 浏览器不得导入 server 实现。`pnpm check` 已包含 API 文件与合同检查。
+
+Node 专用 API 从 `@modern-js/bff-effect/effect` 导入 `defineEffectBff` 和框架
+上下文 helper；`Effect`、`Layer` 分别使用 `effect/Effect`、`effect/Layer` 的
+namespace import，`HttpApiBuilder` 从 `effect/unstable/httpapi` 导入。Worker
+handler 与 Worker 上下文保留在 `@modern-js/bff-effect/effect-edge`。
+原生 `@modern-js/plugin-bff/server` 只提供 Hono API。
 
 具体命令和原生示例见
 [UltraModern workflows](../../../docs/ultramodern-native-workflows.md)。

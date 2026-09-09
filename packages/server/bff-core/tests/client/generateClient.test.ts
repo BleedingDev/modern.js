@@ -1,8 +1,12 @@
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import { fs } from '@modern-js/utils';
 import { build } from 'esbuild';
 import path from 'path';
-import { generateClient } from '../../src/client/generateClient';
+import {
+  ClientCodegenError,
+  generateClient,
+} from '../../src/client/generateClient';
 
 const PWD = path.resolve(__dirname, '../fixtures/function');
 const fixtureRequire = createRequire(import.meta.url);
@@ -62,6 +66,7 @@ type FixtureClientOptions = {
   domain?: string;
   fetcher?: string;
   requestCreator?: string;
+  clientCodegenPlugin?: string;
 };
 
 async function generateFixtureSource(options: FixtureClientOptions) {
@@ -74,7 +79,7 @@ async function generateFixtureSource(options: FixtureClientOptions) {
     source,
     apiDir: PWD,
     lambdaDir: path.join(PWD, './lambda'),
-    requireResolve: ((input: any) => input) as any,
+    clientCodegenPlugin: options.clientCodegenPlugin,
     ...(options.target ? { target: options.target } : {}),
     ...(options.requestId ? { requestId: options.requestId } : {}),
     ...(options.domain ? { domain: options.domain } : {}),
@@ -112,15 +117,10 @@ describe('client', () => {
       method: 'GET',
       port: 3000,
       httpMethodDecider: 'functionName',
-      operationContext: expect.objectContaining({
-        method: 'GET',
-        operationId: 'get',
-        routePath: '/api/:id/origin/foo',
-        operationVersion: 1,
-      }),
     });
     expect(client.post.args[0].method).toBe('POST');
-    expect(client.operationManifest.operations).toHaveLength(2);
+    expect(client).not.toHaveProperty('operationManifest');
+    expect(client.get.args[0]).not.toHaveProperty('operationContext');
   });
 
   test('passes a single options object to a custom request creator', async () => {
@@ -253,50 +253,6 @@ describe('client', () => {
       path: '/put-repo',
       method: 'PUT',
     });
-    expect(
-      client.operationManifest.operations.map((entry: any) => entry.name),
-    ).toEqual(['DELETE', 'default', 'putRepo']);
-  });
-
-  test('executes cross-project client manifests and secure bootstrap', async () => {
-    const resourcePath = path.resolve(
-      __dirname,
-      '../fixtures/function/lambda/normal/origin/index.ts',
-    );
-    const client = await generateFixtureClient({
-      prefix: '/',
-      resourcePath,
-      target: 'bundle',
-      requestId: 'producer-app',
-    });
-
-    expect(client.operationVersion).toBe(1);
-    expect(client.operationSchemaHash).toHaveLength(64);
-    expect(client.operationManifest).toMatchObject({
-      operationVersion: 1,
-      schemaHash: client.operationSchemaHash,
-      operations: expect.arrayContaining([
-        expect.objectContaining({
-          httpMethod: 'GET',
-          name: 'default',
-          routePath: '/normal/origin',
-        }),
-      ]),
-    });
-    expect(client.initProducerClient()).toEqual({
-      requestId: 'producer-app',
-      requireEnvelope: true,
-      identityBinding: {
-        enabled: true,
-        strict: true,
-      },
-      operationContract: {
-        enabled: true,
-        strict: true,
-        requireSchemaHash: true,
-        requireOperationVersion: true,
-      },
-    });
   });
 
   describe('upload operators', () => {
@@ -313,7 +269,6 @@ describe('client', () => {
         source,
         apiDir: UPLOAD_PWD,
         lambdaDir: path.join(UPLOAD_PWD, 'lambda'),
-        requireResolve: ((input: any) => input) as any,
         ...(requestId ? { target: 'bundle', requestId } : {}),
       });
       if (!result.isOk) {
@@ -332,26 +287,89 @@ describe('client', () => {
       expect(client.get.kind).toBe('request');
       expect(client.get.args[0]).toMatchObject({ path: '/api', method: 'GET' });
     });
+  });
+});
 
-    test('executes producer upload clients with operation context', async () => {
-      const client = await generateUploadClient('producer-app');
+describe('neutral client code-generation plugins', () => {
+  const resourcePath = path.resolve(
+    __dirname,
+    '../fixtures/function/lambda/[id]/origin/foo.ts',
+  );
+  const plugin = './fixtures/neutral-codegen.cjs';
 
-      expect(client.upload).toMatchObject({
-        kind: 'uploader',
-        options: {
-          path: '/api/upload',
-          requestId: 'producer-app',
-          operationContext: {
-            operationId: 'upload',
-            routePath: '/api/upload',
-            method: 'POST',
-            operationVersion: 1,
-          },
-        },
-      });
-      expect(client.upload.options.operationContext.schemaHash).toHaveLength(
-        64,
-      );
+  test('awaits one transform with native handler identity and renders its structured module choice', async () => {
+    const source = await generateFixtureSource({
+      prefix: '/api',
+      resourcePath,
+      clientCodegenPlugin: plugin,
     });
+    expect(source).toContain('from "neutral-request-runtime"');
+    const client = await executeGeneratedClient(source);
+    expect(client.extensionReport).toEqual({ count: 2, resourcePath });
+    expect(client.get.args[0]).toMatchObject({
+      path: '/api/:id/origin/foo',
+      method: 'GET',
+      extensionValue: 42,
+    });
+    expect(client.post.args[0].extensionValue).toBe(42);
+    expect(client).not.toHaveProperty('operationManifest');
+    expect(client).not.toHaveProperty('initProducerClient');
+  });
+
+  test('preserves explicitly configured request creators through the transform', async () => {
+    const source = await generateFixtureSource({
+      prefix: '/api',
+      resourcePath,
+      requestCreator: 'configured-request-runtime',
+      clientCodegenPlugin: plugin,
+    });
+    expect(source).toContain('from "configured-request-runtime"');
+    expect(source).not.toContain('from "neutral-request-runtime"');
+  });
+
+  test('propagates transform errors with their original cause', async () => {
+    const result = generateFixtureSource({
+      prefix: '/api',
+      resourcePath,
+      requestId: 'reject-transform',
+      clientCodegenPlugin: plugin,
+    });
+    await expect(result).rejects.toBeInstanceOf(ClientCodegenError);
+    await expect(result).rejects.toMatchObject({
+      cause: expect.objectContaining({ message: 'neutral transform rejected' }),
+    });
+  });
+
+  test('loads absolute ESM plugin filenames with spaces and rejects non-callable exports', async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bff codegen '));
+    try {
+      const valid = path.join(directory, 'valid plugin.mjs');
+      await fs.writeFile(
+        valid,
+        'export async function modifyClient(draft) { await Promise.resolve(); draft.statements.push("export const esmPlugin = true;"); }',
+      );
+      const client = await generateFixtureClient({
+        prefix: '/api',
+        resourcePath,
+        clientCodegenPlugin: valid,
+      });
+      expect(client.esmPlugin).toBe(true);
+      const invalid = path.join(directory, 'invalid plugin.mjs');
+      await fs.writeFile(invalid, 'export const modifyClient = false;');
+      await expect(
+        generateFixtureSource({
+          prefix: '/api',
+          resourcePath,
+          clientCodegenPlugin: invalid,
+        }),
+      ).rejects.toMatchObject({
+        name: 'ClientCodegenError',
+        cause: expect.objectContaining({
+          message: 'The module must export a modifyClient function.',
+        }),
+      });
+    } finally {
+      await fs.remove(directory);
+    }
   });
 });

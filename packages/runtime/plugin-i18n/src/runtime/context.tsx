@@ -1,4 +1,4 @@
-import type { LocalisedUrlsOption } from '@modern-js/i18n-runtime-extensions';
+import { RuntimeComponentResolverContext } from '@modern-js/runtime/context';
 import type { ComponentType, FC, ReactNode } from 'react';
 import {
   createContext,
@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
 } from 'react';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
 import {
   changeModernI18nLanguage,
   getPathLanguage,
@@ -16,10 +17,12 @@ import {
 } from './contextHelpers';
 import type { I18nInstance } from './i18n';
 import type { Resources } from './i18n/instance';
-import { getActualI18nextInstance } from './i18n/instance';
+
 import { useI18nRouterAdapter } from './routerAdapter';
 
-interface ModernI18nContextValue {
+export { getActualI18nextInstance } from './i18n/instance';
+
+export interface ModernI18nContextValue {
   language: string;
   i18nInstance: I18nInstance;
   // Plugin configuration for useModernI18n hook
@@ -27,7 +30,7 @@ interface ModernI18nContextValue {
   languages?: string[];
   localePathRedirect?: boolean;
   ignoreRedirectRoutes?: string[] | ((pathname: string) => boolean);
-  localisedUrls?: LocalisedUrlsOption;
+  urlStrategy?: I18nUrlStrategy;
   // Callback to update language in context
   updateLanguage?: (newLang: string) => void;
   synchronizeLanguage?: (newLang: string) => void;
@@ -50,16 +53,15 @@ const getGlobalContext = <T,>(key: symbol, defaultValue: T) => {
   return globalStore[key];
 };
 
-const ModernI18nContext = getGlobalContext<ModernI18nContextValue | null>(
-  modernI18nContextKey,
-  null,
-);
-const ReactI18nextProviderContext = getGlobalContext<ComponentType<any> | null>(
-  reactI18nextProviderContextKey,
-  null,
-);
+export const ModernI18nContext =
+  getGlobalContext<ModernI18nContextValue | null>(modernI18nContextKey, null);
+export const ReactI18nextProviderContext =
+  getGlobalContext<ComponentType<any> | null>(
+    reactI18nextProviderContextKey,
+    null,
+  );
 
-interface ModernI18nProviderProps {
+export interface ModernI18nProviderProps {
   children: ReactNode;
   i18nextProvider?: ComponentType<any> | null;
   value: ModernI18nContextValue;
@@ -92,123 +94,22 @@ export interface FederatedI18nBoundaryProps {
   supportedLanguages?: string[];
 }
 
-/**
- * Keeps a federated surface's translation resources inside its delivery unit.
- * The host supplies only the active language; the remote owns and versions the
- * resources used below this boundary.
- */
-export const FederatedI18nBoundary: FC<FederatedI18nBoundaryProps> = ({
-  children,
-  defaultNamespace,
-  fallbackLanguage,
-  resources,
-  supportedLanguages,
-}) => {
-  const parent = useContext(ModernI18nContext);
-  const I18nextProvider = useContext(ReactI18nextProviderContext);
-  if (!parent) {
-    throw new Error(
-      'FederatedI18nBoundary must be used within ModernI18nProvider',
-    );
+const MissingFederatedI18nBoundary: FC<FederatedI18nBoundaryProps> = () => {
+  throw new Error(
+    'FederatedI18nBoundary requires the @modern-js/i18n-integration runtime plugin',
+  );
+};
+
+export const FederatedI18nBoundary: FC<FederatedI18nBoundaryProps> = props => {
+  const resolveComponent = useContext(RuntimeComponentResolverContext);
+  const Boundary =
+    resolveComponent?.(MissingFederatedI18nBoundary, {
+      name: 'i18n.FederatedI18nBoundary',
+    }) ?? MissingFederatedI18nBoundary;
+  if (Boundary === FederatedI18nBoundary) {
+    throw new Error('FederatedI18nBoundary resolver returned its own wrapper');
   }
-
-  const languages =
-    supportedLanguages ?? parent.languages ?? Object.keys(resources);
-  const scopedInstance = useMemo(() => {
-    const parentInstance = getActualI18nextInstance(parent.i18nInstance);
-    const clone = parentInstance.cloneInstance?.({
-      defaultNS: defaultNamespace,
-      fallbackLng: fallbackLanguage ?? languages[0] ?? parent.language,
-      forkResourceStore: true,
-      initImmediate: false,
-      lng: parent.language,
-      ns: [defaultNamespace],
-      resources,
-      supportedLngs: languages,
-    });
-    if (!clone) {
-      throw new Error(
-        'FederatedI18nBoundary requires an i18n instance with cloneInstance support',
-      );
-    }
-    const resourceStore = clone.store;
-    const parentResourceStore = parentInstance.store;
-    const sharesNestedResourceState = Object.entries(
-      resourceStore?.data ?? {},
-    ).some(([language, namespaces]) => {
-      const parentNamespaces = parentResourceStore?.data?.[language];
-      return (
-        namespaces === parentNamespaces ||
-        Object.entries(namespaces).some(
-          ([namespace, resource]) =>
-            resource !== null &&
-            typeof resource === 'object' &&
-            resource === parentNamespaces?.[namespace],
-        )
-      );
-    });
-    if (
-      clone === parentInstance ||
-      resourceStore === parentResourceStore ||
-      resourceStore?.data === parentResourceStore?.data ||
-      sharesNestedResourceState
-    ) {
-      throw new Error(
-        'FederatedI18nBoundary cloneInstance did not isolate the host resource store',
-      );
-    }
-    if (
-      !resourceStore?.addResourceBundle ||
-      !clone.removeResourceBundle ||
-      !resourceStore.data
-    ) {
-      throw new Error(
-        'FederatedI18nBoundary requires an isolated mutable i18n resource store',
-      );
-    }
-    for (const [language, namespaces] of Object.entries(resourceStore.data)) {
-      for (const namespace of Object.keys(namespaces)) {
-        clone.removeResourceBundle(language, namespace);
-      }
-    }
-    for (const [language, namespaces] of Object.entries(resources)) {
-      for (const [namespace, resource] of Object.entries(namespaces)) {
-        resourceStore.addResourceBundle(
-          language,
-          namespace,
-          resource as Record<string, string>,
-          true,
-          true,
-        );
-      }
-    }
-    return clone;
-  }, [
-    defaultNamespace,
-    fallbackLanguage,
-    languages,
-    parent.i18nInstance,
-    parent.language,
-    resources,
-  ]);
-  const value = useMemo(
-    () => ({
-      ...parent,
-      i18nInstance: scopedInstance,
-      language: parent.language,
-      languages,
-    }),
-    [languages, parent, scopedInstance],
-  );
-
-  const scopedContent = (
-    <ModernI18nProvider value={value}>{children}</ModernI18nProvider>
-  );
-  return I18nextProvider ? (
-    <I18nextProvider i18n={scopedInstance}>{scopedContent}</I18nextProvider>
-  ) : (
-    scopedContent
-  );
+  return <Boundary {...props} />;
 };
 
 export interface UseModernI18nReturn<
@@ -219,7 +120,7 @@ export interface UseModernI18nReturn<
   t: (key: string | string[], ...args: any[]) => string;
   i18nInstance: TInstance;
   supportedLanguages: string[];
-  localisedUrls?: LocalisedUrlsOption;
+  urlStrategy?: I18nUrlStrategy;
   isLanguageSupported: (lang: string) => boolean;
   // Indicates whether translation resources for current language are ready
   isResourcesReady: boolean;
@@ -258,7 +159,7 @@ export const useModernI18n = <
     languages,
     localePathRedirect,
     ignoreRedirectRoutes,
-    localisedUrls,
+    urlStrategy,
     updateLanguage,
     synchronizeLanguage,
   } = context;
@@ -295,7 +196,7 @@ export const useModernI18n = <
         updateLanguage,
         localePathRedirect,
         ignoreRedirectRoutes,
-        localisedUrls,
+        urlStrategy,
         languages,
         hasRouter,
         navigate,
@@ -306,7 +207,7 @@ export const useModernI18n = <
       updateLanguage,
       localePathRedirect,
       ignoreRedirectRoutes,
-      localisedUrls,
+      urlStrategy,
       languages,
       hasRouter,
       navigate,
@@ -341,7 +242,7 @@ export const useModernI18n = <
     // narrows to the concrete instance type via the TInstance type argument.
     i18nInstance: i18nInstance as TInstance,
     supportedLanguages: languages || [],
-    localisedUrls,
+    urlStrategy,
     isLanguageSupported,
     isResourcesReady,
   };

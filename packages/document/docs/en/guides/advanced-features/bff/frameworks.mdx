@@ -5,10 +5,10 @@ title: Runtime Framework
 
 # Runtime Framework
 
-Modern.js supports two BFF runtime frameworks:
+Modern.js and the UltraModern BFF extension provide two runtime frameworks:
 
-- `effect` (default): use [Effect HttpApi](https://effect.website/) runtime from `api/index`.
-- `hono`: use file-convention BFF handlers from `api/lambda/**`.
+- `hono` is the native plugin default and uses file-convention handlers from `api/lambda/**`.
+- `effect` is the UltraModern extension default and uses [Effect HttpApi](https://effect.website/) from `api/index`.
 
 `effect` and `hono` are strict runtime modes. There is no automatic fallback between them.
 
@@ -19,12 +19,18 @@ Generated UltraModern workspaces use strict Effect APIs: author HTTP APIs in
 
 ## Switch to Effect runtime
 
+Use the fork build plugin below. It includes the native BFF plugin and registers
+the Effect adapter. The application needs `@modern-js/bff-effect` and
+`@modern-js/plugin-bff-extensions` as production dependencies from the same
+framework cohort. Install the exact Effect peers described in
+[`bff.effect`](/configure/app/bff/effect).
+
 ```ts title="modern.config.ts"
-import { bffPlugin } from '@modern-js/plugin-bff';
-import { defineConfig } from '@modern-js/app-tools';
+import { bffPlugin } from '@modern-js/plugin-bff-build-extensions';
+import { appTools, defineConfig } from '@modern-js/app-tools';
 
 export default defineConfig({
-  plugins: [bffPlugin()],
+  plugins: [appTools(), bffPlugin()],
   bff: {
     runtimeFramework: 'effect',
     effect: {
@@ -46,7 +52,7 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   Schema,
-} from '@modern-js/plugin-bff/effect-client';
+} from '@modern-js/bff-effect/effect-client';
 
 export const bffApi = HttpApi.make('MyApi').add(
   HttpApiGroup.make('hello').add(
@@ -60,14 +66,12 @@ export const bffApi = HttpApi.make('MyApi').add(
 Implement your Effect API entry at `api/index.ts`:
 
 ```ts title="api/index.ts"
-import {
-  Schema,
-  Effect,
-  HttpApiBuilder,
-  defineEffectBff,
-  Layer,
-  ServiceMap,
-} from '@modern-js/plugin-bff/effect-server';
+import { defineEffectBff } from '@modern-js/bff-effect/effect';
+import * as Context from 'effect/Context';
+import * as Effect from 'effect/Effect';
+import * as Layer from 'effect/Layer';
+import * as Schema from 'effect/Schema';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 import { bffApi } from '../shared/api';
 
 class GreetingUnavailableError extends Schema.TaggedError<GreetingUnavailableError>()(
@@ -77,7 +81,7 @@ class GreetingUnavailableError extends Schema.TaggedError<GreetingUnavailableErr
   },
 ) {}
 
-class GreetingService extends ServiceMap.Service<GreetingService>()('GreetingService', {
+class GreetingService extends Context.Service<GreetingService>()('GreetingService', {
   make: Effect.succeed({
     hello: Effect.fn('GreetingService.hello')(function* () {
       if (Date.now() < 0) {
@@ -124,7 +128,10 @@ The `api.client.*` surface is materialized by the BFF loader for `@api/index` im
 
 For UltraModern, Effect `HttpApi` plus Effect BFF is the single blessed authored HTTP path. Use `HttpApi` endpoints with `query`, `params`, `payload`, `success`, and declared errors such as `HttpApiSchema.status(...)`; implement them with `HttpApiBuilder.group(...).handle(...)` and `HttpApiBuilder.layer(...).pipe(Layer.provide(...))`, then default-export the entry as `defineEffectBff({ api, layer })`. See `packages/server/bff-effect/tests/effect-edge-runtime.test.ts` for the live runtime shape.
 
-Hono and `api/lambda/**` are internal compatibility only and feature-frozen.
+Native Hono applications import operators from `@modern-js/plugin-bff/server`.
+UltraModern-generated applications keep their strict Effect API model. Worker
+handlers use `@modern-js/bff-effect/effect-edge`, including its worker request
+context exports; Node handlers use the Effect entry shown above.
 
 import Hono from '@site-docs-en/components/hono';
 

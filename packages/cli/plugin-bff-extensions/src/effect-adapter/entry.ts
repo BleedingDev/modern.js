@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off strictBooleanExpressions:off
 
 import path from 'node:path';
+import '@modern-js/server-runtime-extensions/server-config';
 import type { ServerPluginAPI } from '@modern-js/server-core';
 import { API_DIR, findExists, fs, isProd } from '@modern-js/utils';
 

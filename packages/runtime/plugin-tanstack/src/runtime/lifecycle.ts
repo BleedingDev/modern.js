@@ -5,7 +5,17 @@
  * writes to the exact same runtime-context extension slot.
  */
 
-export type { RouterLifecycleContext } from '@modern-js/runtime/context';
+import type { RouterLifecycleContext as NativeRouterLifecycleContext } from '@modern-js/runtime/context';
+import type {
+  InternalRouterServerSnapshot,
+  RouterRouteMatchSnapshot,
+} from '@modern-js/runtime-extensions/router-state';
+
+export type RouterLifecycleContext = NativeRouterLifecycleContext & {
+  matches?: RouterRouteMatchSnapshot[];
+  cleanup?: () => void | Promise<void>;
+  serverSnapshot?: InternalRouterServerSnapshot;
+};
 export {
   applyRouterRuntimeState,
   applyRouterServerPrepareResult,

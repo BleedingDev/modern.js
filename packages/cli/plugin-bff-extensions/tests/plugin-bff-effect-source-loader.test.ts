@@ -3,17 +3,19 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { generateEffectClient } from '@modern-js/plugin-bff-extensions/client-generator';
+import { bundleEffectEntryForNode } from '@modern-js/plugin-bff-extensions/effect-source-loader';
 import {
   createOperationContractHash,
   type ResolvedCrossProjectPolicy,
-} from '@modern-js/bff-core';
-import { generateEffectClient } from '@modern-js/plugin-bff-extensions/client-generator';
-import { bundleEffectEntryForNode } from '@modern-js/plugin-bff-extensions/effect-source-loader';
-import apiLoader, { type APILoaderOptions } from '../../plugin-bff/src/loader';
+} from '@modern-js/server-runtime-extensions/bff-policy/node';
 import {
   loadEffectBuiltModule,
   loadEffectSourceModule,
 } from '../src/effect-source-loader/loader';
+import apiLoader, {
+  type EffectBffLoaderOptions as APILoaderOptions,
+} from '../src/effect-source-loader/rspack-loader';
 
 const pluginBffRoot = path.resolve(__dirname, '../../plugin-bff');
 const require = createRequire(path.join(pluginBffRoot, 'package.json'));
@@ -110,15 +112,13 @@ const buildEffectWorkerRuntimeModule = async ({
   source: string;
 }) => {
   await linkFixturePackage(appDir, '@modern-js/plugin-bff');
+  await linkFixturePackage(appDir, '@modern-js/bff-effect');
   const wrapperSource = await runApiLoader({
     onDependency: onLoaderDependency,
     options: {
       apiDir,
       appDir,
-      bffRuntimeFramework: 'effect',
       effectEntry: entryFile,
-      existLambda: false,
-      lambdaDir: path.join(apiDir, 'lambda'),
       port: 8080,
       prefix,
       requestId,
@@ -135,6 +135,10 @@ const buildEffectWorkerRuntimeModule = async ({
   const { build } = await import('esbuild');
   const result = await build({
     alias: {
+      '@modern-js/bff-effect/effect-edge': path.resolve(
+        pluginBffRoot,
+        '../../server/bff-effect/src/effect/edge.ts',
+      ),
       '@modern-js/plugin-bff/effect-edge': path.resolve(
         pluginBffRoot,
         'src/runtime/effect/edge.ts',
@@ -342,28 +346,6 @@ exports.default = {
     }
   });
 
-  test('emits an executable diagnostic module for platform-native paths', async () => {
-    const resourcePath = String.raw`D:\a\ultramodern.js\app\api\effect\index.ts`;
-    const code = await runApiLoader({
-      options: {
-        apiDir: String.raw`D:\a\ultramodern.js\app\api`,
-        appDir: String.raw`D:\a\ultramodern.js\app`,
-        existLambda: false,
-        lambdaDir: String.raw`D:\a\ultramodern.js\app\api\lambda`,
-        port: 8080,
-        prefix: '/api',
-        target: 'web',
-      },
-      resourcePath,
-      resourceQuery: '',
-      source: 'export const invalid = true;',
-    });
-
-    expect(() => Function(code)()).toThrow(
-      `The file ${resourcePath} is not allowed to be imported in src directory, only API definition files are allowed.`,
-    );
-  });
-
   test('forwards the configured request id into Effect client generation', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-effect-client-request-id-'),
@@ -390,10 +372,7 @@ module.exports = { api, layer: Layer.empty };`;
         options: {
           apiDir,
           appDir,
-          bffRuntimeFramework: 'effect',
           effectEntry: entryFile,
-          existLambda: false,
-          lambdaDir: path.join(apiDir, 'lambda'),
           port: 8080,
           prefix: '/catalog-api',
           requestId: 'configured-catalog-service',
@@ -427,10 +406,7 @@ module.exports = { api, layer: Layer.empty };`;
           options: {
             apiDir,
             appDir,
-            bffRuntimeFramework: 'effect',
             effectEntry: entryFile,
-            existLambda: false,
-            lambdaDir: path.join(apiDir, 'lambda'),
             port: 8080,
             prefix: '/api',
             target: 'web',
@@ -505,10 +481,7 @@ module.exports = { api, layer: Layer.empty };`;
         options: {
           apiDir,
           appDir,
-          bffRuntimeFramework: 'effect',
           effectEntry: entryFile,
-          existLambda: false,
-          lambdaDir: path.join(apiDir, 'lambda'),
           port: 8080,
           prefix: '/catalog-api',
           target: 'web',
@@ -1299,10 +1272,7 @@ export const layer = Layer.empty;`,
       const options: APILoaderOptions = {
         apiDir,
         appDir,
-        bffRuntimeFramework: 'effect',
         effectEntry: entryFile,
-        existLambda: false,
-        lambdaDir: path.join(apiDir, 'lambda'),
         port: 8080,
         prefix: '/api',
         target: 'web',

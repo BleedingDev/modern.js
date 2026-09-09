@@ -294,7 +294,7 @@ function check(
           `${file}: must default-export ${defaultExport}`,
         );
     };
-    const effect = '@modern-js/plugin-bff/effect-client';
+    const effect = '@modern-js/bff-effect/effect-client';
     const appDirectories = [
       ...new Set([
         ...directories('apps'),
@@ -323,7 +323,7 @@ function check(
         const source = read(file);
         const patterns: [RegExp, string][] = [
           [
-            /@modern-js\/plugin-bff\/hono-server/u,
+            /@modern-js\/plugin-bff\/(?:server|hono-server)(?![\w-])/u,
             'use Effect HttpApi instead of Hono helpers',
           ],
           [
@@ -420,7 +420,7 @@ function check(
             entry,
             [
               [
-                '@modern-js/plugin-bff/effect-edge',
+                '@modern-js/bff-effect/effect-edge',
                 ['defineEffectBff', 'Effect', 'HttpApi', 'Layer'],
               ],
               ['../shared/rpc.ts', []],

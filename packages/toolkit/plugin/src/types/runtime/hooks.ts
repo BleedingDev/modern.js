@@ -12,6 +12,9 @@ export type SSRRenderInfo<RuntimeContext = object> = {
   platform: 'node' | 'web';
   mode: 'string' | 'stream';
   isRsc: boolean;
+  /** Original renderer resource and configuration; interpreted by extensions. */
+  resource?: object;
+  config?: object;
 };
 
 export type SSRHeadPart = { toString(): string };
@@ -34,7 +37,53 @@ export type SSRRenderTerminal =
   | { status: 'error'; error: unknown }
   | { status: 'cancelled'; reason: unknown };
 
+export type SSRRenderAsset = { url?: string; filename?: string };
+
+export type SSRAssetGroup<T extends SSRRenderAsset> = {
+  name: string;
+  assets: readonly T[];
+};
+
+export type SSRAssetTransformInfo<T extends SSRRenderAsset> = {
+  kind: 'style' | 'script';
+  source: 'loadable' | 'template';
+  template: string;
+  groups: readonly SSRAssetGroup<T>[];
+  createAsset: (url: string) => T;
+};
+
+export type SSRTemplateChunk = {
+  name: 'styles' | 'scripts' | 'data';
+  template: string;
+  placeholder: string;
+  content: string;
+  emittedAssets?: readonly string[];
+  attributes?: Readonly<Record<string, unknown>>;
+};
+
+export type SSRHtmlFormatting = {
+  attributesToString: (attributes: Record<string, unknown>) => string;
+  hasStylesheetLink: (template: string, href: string) => boolean | undefined;
+};
+
+export type SSRRouterData = {
+  loaderData?: unknown;
+  errors?: Record<string, unknown> | null;
+};
+
 export interface SSRRenderLifecycle {
+  /** Native asset objects keep their identity and are formatted after this hook. */
+  transformAssets?: <T extends SSRRenderAsset>(
+    assets: readonly T[],
+    info: SSRAssetTransformInfo<T>,
+  ) => readonly T[];
+  /** Runs on each prepared chunk before native placeholder substitution. */
+  transformTemplateChunk?: (
+    chunk: SSRTemplateChunk,
+    formatting: SSRHtmlFormatting,
+  ) => SSRTemplateChunk;
+  /** Raw router data is serialized by the native renderer; undefined uses its fallback. */
+  getRouterData?: () => SSRRouterData | undefined;
   beforeReact?: () => void;
   /** Runs before the completed body or shell's head data is read. */
   completedBody?: (

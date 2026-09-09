@@ -7,13 +7,14 @@ import { build } from 'esbuild';
 
 type ExportConditions = {
   types: string;
-  'modern:source': string;
+  'modern:source'?: string;
   node: {
+    'modern:source'?: string;
     import: string;
     require: string;
   };
   import?: string;
-  default: string;
+  default?: string;
 };
 
 type PackageManifest = {
@@ -92,6 +93,18 @@ const sourceLoaders = {
     target: './src/backend-federation-manifest/node.ts',
     load: () => import('../src/backend-federation-manifest/node'),
   },
+  './effect-source-loader/rspack-loader': {
+    target: './src/effect-source-loader/rspack-loader.ts',
+    load: () => import('../src/effect-source-loader/rspack-loader'),
+  },
+  './producer-runtime': {
+    target: './src/cross-project-policy/producer-runtime.ts',
+    load: () => import('../src/cross-project-policy/producer-runtime'),
+  },
+  './hono/node': {
+    target: './src/hono/node.ts',
+    load: () => import('../src/hono/node'),
+  },
 } as const;
 
 const publicSubpaths = Object.keys(sourceLoaders) as Array<
@@ -101,6 +114,7 @@ const webSubpaths = new Set<keyof typeof sourceLoaders>([
   './hono',
   './backend-federation',
   './backend-federation/edge',
+  './producer-runtime',
 ]);
 
 function conditionsFor(subpath: keyof typeof sourceLoaders) {
@@ -162,6 +176,7 @@ describe('@modern-js/plugin-bff-extensions package surface', () => {
         '@modern-js/types',
         '@modern-js/utils',
         '@module-federation/runtime',
+        '@swc/core',
         'esbuild',
       ].sort(),
     );
@@ -246,14 +261,21 @@ describe('@modern-js/plugin-bff-extensions package surface', () => {
     for (const subpath of publicSubpaths) {
       const conditions = conditionsFor(subpath);
       const source = sourceLoaders[subpath];
-      expect(conditions['modern:source']).toBe(source.target);
+      const sourceTarget =
+        conditions['modern:source'] ?? conditions.node['modern:source'];
+      expect(sourceTarget).toBe(source.target);
+      if (subpath === './hono/node') {
+        expect(conditions['modern:source']).toBeUndefined();
+        expect(conditions.default).toBeUndefined();
+        expect(conditions.node['modern:source']).toBe('./src/hono/node.ts');
+      }
       expect(existsSync(path.resolve(packageRoot, conditions.types))).toBe(
         true,
       );
       const typeVersionKey = subpath === '.' ? '.' : subpath.slice(2);
       expect(packageManifest.typesVersions['*'][typeVersionKey]).toEqual([
         conditions.types,
-        conditions['modern:source'],
+        sourceTarget,
       ]);
       expect(conditions.import !== undefined).toBe(webSubpaths.has(subpath));
 
@@ -280,6 +302,29 @@ describe('@modern-js/plugin-bff-extensions package surface', () => {
           `${subpath} web ESM export`,
         );
       }
+    }
+  });
+
+  test('rejects the Node-only Hono factory under browser source and runtime conditions', async () => {
+    for (const conditions of [[], ['modern:source']]) {
+      await expect(
+        build({
+          absWorkingDir: packageRoot,
+          bundle: true,
+          conditions,
+          format: 'esm',
+          logLevel: 'silent',
+          platform: 'browser',
+          stdin: {
+            contents:
+              "export * from '@modern-js/plugin-bff-extensions/hono/node';",
+            resolveDir: packageRoot,
+          },
+          write: false,
+        }),
+      ).rejects.toThrow(
+        'Could not resolve "@modern-js/plugin-bff-extensions/hono/node"',
+      );
     }
   });
 

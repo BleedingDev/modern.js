@@ -11,7 +11,7 @@ import type {
   AfterRenderContext,
   AfterStreamingRenderContext,
 } from '@modern-js/types';
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import type { ServerStaticPluginOptions } from '../../adapters/node/plugins/static';
 import type {
   APIServerStartInput,
@@ -33,8 +33,23 @@ export type AfterStreamingRenderContextFn = (
   ctx: AfterStreamingRenderContext,
 ) => Promise<AfterStreamingRenderContext>;
 
+export interface HandleErrorInput {
+  error: Error;
+  context: Context;
+  response?: Response;
+}
+
+export type HandleErrorFn = (
+  input: HandleErrorInput,
+  next?: (input: HandleErrorInput) => void,
+) => Promise<HandleErrorInput>;
+
 export interface ServerPluginExtends extends BaseServerPluginExtends {
   config: ServerConfig;
+  extendApi: {
+    /** Release an instance resource on shutdown or failed initialization. */
+    onDispose: (disposer: () => void | Promise<void>) => () => void;
+  };
   extendContext: {
     /** Node static response extensions registered during plugin setup. */
     staticAssetResponders?: ServerStaticPluginOptions;
@@ -43,6 +58,7 @@ export interface ServerPluginExtends extends BaseServerPluginExtends {
     [key: string]: any;
   };
   extendHooks: {
+    handleError: AsyncPipelineHook<HandleErrorFn>;
     prepareWebServer: AsyncPipelineHook<PrepareWebServerFn>;
     prepareApiServer: AsyncPipelineHook<PrepareApiServerFn>;
     afterMatch: AsyncPipelineHook<AfterMatchFn>;

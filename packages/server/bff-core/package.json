@@ -27,15 +27,6 @@
         "require": "./dist/cjs/index.js"
       },
       "default": "./dist/cjs/index.js"
-    },
-    "./security/cross-project-policy": {
-      "types": "./dist/types/security/crossProjectPolicy.d.ts",
-      "modern:source": "./src/security/crossProjectPolicy.ts",
-      "node": {
-        "import": "./dist/esm-node/security/crossProjectPolicy.mjs",
-        "require": "./dist/cjs/security/crossProjectPolicy.js"
-      },
-      "default": "./dist/esm/security/crossProjectPolicy.mjs"
     }
   },
   "scripts": {
@@ -62,7 +53,8 @@
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "esbuild": "^0.28.2",
     "tsconfig-paths": "^4.2.0",
-    "zod": "^4.5.4"
+    "zod": "^4.5.4",
+    "@modern-js/server-runtime-extensions": "workspace:*"
   },
   "peerDependencies": {
     "tsconfig-paths": "^4.2.0",

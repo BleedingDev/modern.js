@@ -14,10 +14,13 @@
     "effect": "4.0.0-rc.112",
     "i18next": "26.4.2",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "@modern-js/bff-effect": "workspace:*",
+    "@modern-js/plugin-bff-extensions": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/app-tools": "workspace:*",
+    "@modern-js/plugin-bff-build-extensions": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260707.2"
   }
 }

@@ -4,7 +4,6 @@ import { build } from 'esbuild';
 describe('zod stays an optional peer', () => {
   test.each([
     'src/index.ts',
-    'src/security/operationContracts.ts',
   ])('%s bundles without an eager zod dependency', async entry => {
     await expect(
       build({

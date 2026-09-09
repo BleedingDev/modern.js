@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { buildOperationContractMap } from '@modern-js/bff-core';
+import type { MiddlewareHandler } from '@modern-js/server-core';
 import {
   compatPlugin,
   createServerBase,
@@ -81,6 +81,68 @@ describe('HonoAdapter.registerMiddleware (dev/prod unified path)', () => {
     ]);
   });
 
+  it('uses native Hono when the runtime selector is omitted', async () => {
+    const middlewares: any[] = [];
+    const api = createMockApi({ middlewares });
+    delete api.getServerContext().bffRuntimeFramework;
+    await new HonoAdapter(api).registerMiddleware();
+    expect(middlewares.map(middleware => middleware.path)).toEqual([
+      '/api/foo',
+      '/api/bar',
+    ]);
+  });
+
+  it('prepares a route binder once for each fresh handler set and preserves native route order', async () => {
+    const middlewares: any[] = [];
+    const api = createMockApi({ middlewares });
+    const beforeHandler: MiddlewareHandler = async (_context, next) => next();
+    const infos = [
+      {
+        handler: () => ({ ok: true }),
+        routePath: '/custom/one',
+        httpMethod: 'GET',
+      },
+    ];
+    Reflect.defineMetadata('middleware', [beforeHandler], infos[0]!.handler);
+    api.getServerContext().apiHandlerInfos = infos;
+    const bind = rstest.fn(
+      ({
+        handler,
+      }: {
+        handler: MiddlewareHandler | MiddlewareHandler[];
+        routePath: string;
+      }) => handler,
+    );
+    const factory = rstest.fn(() => bind);
+    const adapter = new HonoAdapter(api, factory);
+    await adapter.registerMiddleware();
+    expect(factory).toHaveBeenCalledExactlyOnceWith(api, infos);
+    expect(bind).toHaveBeenCalledTimes(1);
+    expect(bind.mock.calls[0]![0].routePath).toBe('/custom/one');
+    expect(Array.isArray(bind.mock.calls[0]![0].handler)).toBe(true);
+    expect((bind.mock.calls[0]![0].handler as MiddlewareHandler[])[0]).toBe(
+      beforeHandler,
+    );
+    expect(adapter.apiMiddleware[0]!.handler).toBe(bind.mock.results[0]!.value);
+    api.getServerContext().apiHandlerInfos = [];
+    await adapter.setHandlers();
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(factory).toHaveBeenLastCalledWith(api, []);
+    expect(adapter.apiMiddleware).toEqual([]);
+  });
+
+  it('rejects an invalid route binder result before registering routes', async () => {
+    const middlewares: any[] = [];
+    const adapter = new HonoAdapter(
+      createMockApi({ middlewares }),
+      () => null as never,
+    );
+    await expect(adapter.registerMiddleware()).rejects.toThrow(
+      'Hono route binder factory must return a function',
+    );
+    expect(middlewares).toEqual([]);
+  });
+
   it('registers nothing when the BFF runtime framework is not hono', async () => {
     const middlewares: any[] = [];
     const adapter = new HonoAdapter(
@@ -91,66 +153,6 @@ describe('HonoAdapter.registerMiddleware (dev/prod unified path)', () => {
 
     expect(adapter.isHono).toBe(false);
     expect(middlewares).toHaveLength(0);
-  });
-
-  it('binds cross-project policy to the Hono route that actually matched', async () => {
-    const requestId = 'crm.producer-a';
-    const contracts = buildOperationContractMap({
-      handlers: sampleApiHandlerInfos,
-      requestId,
-    });
-    const forgedContract = contracts['POST:/api/bar']!;
-    const headers = {
-      'x-modernjs-bff-envelope': JSON.stringify({ requestId }),
-      'x-operation-id': forgedContract.operationId,
-      'x-modernjs-bff-operation-context': JSON.stringify({
-        requestId,
-        operationId: forgedContract.operationId,
-        method: forgedContract.method,
-        routePath: forgedContract.routePath,
-        schemaHash: forgedContract.schemaHash,
-        operationVersion: forgedContract.operationVersion,
-      }),
-    };
-    const middlewares: any[] = [];
-    const adapter = new HonoAdapter(
-      createMockApi({
-        middlewares,
-        bff: {
-          requestId,
-          crossProjectPolicy: { enabled: true },
-        },
-      }),
-    );
-
-    await adapter.registerMiddleware();
-
-    expect(middlewares.map(middleware => middleware.name)).toEqual([
-      'hono-bff-api',
-      'hono-bff-api',
-    ]);
-    const getCustomerMiddleware = middlewares.find(
-      middleware => middleware.path === '/api/foo',
-    );
-    expect(getCustomerMiddleware).toBeDefined();
-    const handlers = Array.isArray(getCustomerMiddleware.handler)
-      ? getCustomerMiddleware.handler
-      : [getCustomerMiddleware.handler];
-    const response = await handlers[0](
-      {
-        req: {
-          method: 'GET',
-          header: () => headers,
-        },
-      },
-      async () => undefined,
-    );
-
-    expect(response).toBeInstanceOf(Response);
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toMatchObject({
-      reason: 'operation_context_mismatch',
-    });
   });
 });
 

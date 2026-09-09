@@ -12,7 +12,7 @@ import {
 
 const baseline = '@modern-js/bff-effect/microvertical-api';
 const exportsSource = `export const MicroVerticalBuildMarkerSchema = {}; export const MicroVerticalReadinessSchema = {}; export const createMicroVerticalOperationContext = input => input;`;
-const contract = `import { HttpApi, HttpApiEndpoint, HttpApiGroup, Schema } from '@modern-js/plugin-bff/effect-client';
+const contract = `import { HttpApi, HttpApiEndpoint, HttpApiGroup, Schema } from '@modern-js/bff-effect/effect-client';
 import { MicroVerticalBuildMarkerSchema, MicroVerticalReadinessSchema, createMicroVerticalOperationContext } from '${baseline}';
 export const catalogMarkerSchema = MicroVerticalBuildMarkerSchema;
 export const catalogReadinessSchema = MicroVerticalReadinessSchema;
@@ -20,7 +20,7 @@ export const catalogFoundationApi = HttpApi.make('CatalogFoundationApi').add(Htt
 export const catalogApi = HttpApi.make('CatalogApi').addHttpApi(catalogFoundationApi);
 export const catalogOperationContexts = { readiness: createMicroVerticalOperationContext({method: 'GET', operationId: 'CatalogApi:/catalog/readiness', routePath: '/catalog/readiness'}) } as const;
 export const catalogApiContract = { apiPrefix: '/catalog-api', basePath: '/catalog-api/catalog', ownerId: 'catalog', readinessPath: '/catalog-api/catalog/readiness' } as const;`;
-const entry = `import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/plugin-bff/effect-edge'; import { catalogApi } from '../shared/api.ts'; const handlers = HttpApiBuilder.group(catalogApi, 'foundation', h => h.handle('readiness', () => undefined)); const layer = HttpApiBuilder.layer(catalogApi).pipe(Layer.provide(handlers)); export default defineEffectBff({api: catalogApi, layer});`;
+const entry = `import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge'; import { catalogApi } from '../shared/api.ts'; const handlers = HttpApiBuilder.group(catalogApi, 'foundation', h => h.handle('readiness', () => undefined)); const layer = HttpApiBuilder.layer(catalogApi).pipe(Layer.provide(handlers)); export default defineEffectBff({api: catalogApi, layer});`;
 let root: string;
 let owner: string;
 let file: string;
@@ -67,7 +67,7 @@ beforeEach(() => {
   write(path.join(root, 'verticals/catalog/api/index.ts'), entry);
   write(
     path.join(root, 'verticals/catalog/src/api/catalog-client.ts'),
-    `import { Effect, makeEffectHttpApiClient } from '@modern-js/plugin-bff/effect-client'; import { catalogApi } from '../../shared/api'; export const client = makeEffectHttpApiClient(catalogApi);`,
+    `import { Effect, makeEffectHttpApiClient } from '@modern-js/bff-effect/effect-client'; import { catalogApi } from '../../shared/api'; export const client = makeEffectHttpApiClient(catalogApi);`,
   );
   expectation = {
     additionalPaths: {},
@@ -75,7 +75,7 @@ beforeEach(() => {
     basePath: '/catalog-api/catalog',
     ownerId: 'catalog',
     readinessPath: '/catalog-api/catalog/readiness',
-    effectClientPackage: '@modern-js/plugin-bff/effect-client',
+    effectClientPackage: '@modern-js/bff-effect/effect-client',
     baselinePackage: baseline,
     baselinePackageDirectory: owner,
   };
@@ -336,15 +336,15 @@ test('classifies RPC surfaces and validates native RPC topology', () => {
   fs.rmSync(path.join(root, 'verticals/catalog/src/api/catalog-client.ts'));
   write(
     path.join(root, 'verticals/catalog/shared/rpc.ts'),
-    `import { Rpc, RpcGroup } from 'effect/unstable/rpc'; import { Schema } from '@modern-js/plugin-bff/effect-client'; export const CatalogRpcGroup = RpcGroup.make(Rpc.make('ping', { success: Schema.Struct({}) }));`,
+    `import { Rpc, RpcGroup } from 'effect/unstable/rpc'; import { Schema } from '@modern-js/bff-effect/effect-client'; export const CatalogRpcGroup = RpcGroup.make(Rpc.make('ping', { success: Schema.Struct({}) }));`,
   );
   write(
     path.join(root, 'verticals/catalog/src/api/catalog-rpc-client.ts'),
-    `import { Effect, makeEffectRpcClient } from '@modern-js/plugin-bff/effect-client'; import { CatalogRpcGroup } from '../../shared/rpc.ts'; export const client = makeEffectRpcClient(CatalogRpcGroup);`,
+    `import { Effect, makeEffectRpcClient } from '@modern-js/bff-effect/effect-client'; import { CatalogRpcGroup } from '../../shared/rpc.ts'; export const client = makeEffectRpcClient(CatalogRpcGroup);`,
   );
   write(
     path.join(root, 'verticals/catalog/api/index.ts'),
-    `import { defineEffectBff, Effect, HttpApi, Layer } from '@modern-js/plugin-bff/effect-edge'; import { CatalogRpcGroup } from '../shared/rpc.ts'; const CatalogRpcLayer = CatalogRpcGroup.toLayer(CatalogRpcGroup.of({ ping: () => undefined })); const apiRuntime = defineEffectBff({api: HttpApi.make('CatalogRpcApi'), layer: Layer.empty, rpc: { group: CatalogRpcGroup, layer: CatalogRpcLayer, path: '/rpc', serialization: 'json' }}); export default apiRuntime;`,
+    `import { defineEffectBff, Effect, HttpApi, Layer } from '@modern-js/bff-effect/effect-edge'; import { CatalogRpcGroup } from '../shared/rpc.ts'; const CatalogRpcLayer = CatalogRpcGroup.toLayer(CatalogRpcGroup.of({ ping: () => undefined })); const apiRuntime = defineEffectBff({api: HttpApi.make('CatalogRpcApi'), layer: Layer.empty, rpc: { group: CatalogRpcGroup, layer: CatalogRpcLayer, path: '/rpc', serialization: 'json' }}); export default apiRuntime;`,
   );
   const result = checkMicroVerticalApiBoundaries({
     workspaceRoot: root,

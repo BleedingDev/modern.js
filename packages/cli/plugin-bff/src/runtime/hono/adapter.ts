@@ -1,18 +1,32 @@
 import type { APIHandlerInfo } from '@modern-js/bff-core';
-import { resolveAdapterCrossProjectPolicy } from '@modern-js/plugin-bff-extensions/cross-project-policy';
-import { bindHonoRouteHandlers } from '@modern-js/plugin-bff-extensions/hono';
-import type { ServerMiddleware, ServerPluginAPI } from '@modern-js/server-core';
-import { logger } from '@modern-js/utils';
+import type {
+  MiddlewareHandler,
+  ServerMiddleware,
+  ServerPluginAPI,
+} from '@modern-js/server-core';
 
 import createHonoRoutes from '../../utils/createHonoRoutes';
 
 const before = ['custom-server-hook', 'custom-server-middleware', 'render'];
 
+export type HonoRouteBinder = (options: {
+  handler: MiddlewareHandler | MiddlewareHandler[];
+  routePath: string;
+}) => MiddlewareHandler | MiddlewareHandler[];
+
+export type HonoRouteBinderFactory = (
+  api: ServerPluginAPI,
+  handlers: APIHandlerInfo[],
+) => HonoRouteBinder;
+
 export class HonoAdapter {
   apiMiddleware: ServerMiddleware[] = [];
   api: ServerPluginAPI;
   isHono = true;
-  constructor(api: ServerPluginAPI) {
+  constructor(
+    api: ServerPluginAPI,
+    private readonly createRouteBinder?: HonoRouteBinderFactory,
+  ) {
     this.api = api;
   }
 
@@ -24,18 +38,15 @@ export class HonoAdapter {
     const handlers = (apiHandlerInfos ?? []) as APIHandlerInfo[];
 
     const honoHandlers = createHonoRoutes(handlers);
-    const policy = resolveAdapterCrossProjectPolicy(this.api, handlers);
+    const bindRoute = this.createRouteBinder?.(this.api, handlers);
+    if (this.createRouteBinder && typeof bindRoute !== 'function') {
+      throw new TypeError('Hono route binder factory must return a function.');
+    }
     this.apiMiddleware = honoHandlers.map(({ path, method, handler }) => ({
       name: 'hono-bff-api',
       path,
       method,
-      handler: bindHonoRouteHandlers({
-        handler,
-        policy,
-        routePath: path,
-        onError: this.api.getServerConfig()?.onError,
-        reportError: error => logger.error(error),
-      }),
+      handler: bindRoute ? bindRoute({ handler, routePath: path }) : handler,
       order: 'post',
       before,
     }));
@@ -53,7 +64,7 @@ export class HonoAdapter {
   registerMiddleware = async (_options?: unknown) => {
     const { bffRuntimeFramework } = this.api.getServerContext();
 
-    if (bffRuntimeFramework !== 'hono') {
+    if (bffRuntimeFramework !== undefined && bffRuntimeFramework !== 'hono') {
       this.isHono = false;
       return;
     }

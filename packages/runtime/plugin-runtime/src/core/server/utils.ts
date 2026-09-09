@@ -1,10 +1,6 @@
 // @effect-diagnostics processEnv:off strictBooleanExpressions:off
 
 import type { ServerUserConfig } from '@modern-js/app-tools';
-import {
-  escapeHtmlAttribute,
-  isSafeHtmlAttributeName,
-} from '@modern-js/runtime-extensions';
 import type { StaticHandlerContext } from '@modern-js/runtime-utils/router';
 import { isRouteErrorResponse } from '../../router/runtime/routerHelper';
 import type { SSRConfig } from './shared';
@@ -13,9 +9,13 @@ export function attributesToString(attributes: Record<string, any>) {
   // Iterate through the properties and convert them into a string, only including properties that are not undefined.
   return Object.entries(attributes).reduce(
     (str, [key, value]) =>
-      value === undefined || !isSafeHtmlAttributeName(key)
+      value === undefined || !/^[^\u0000-\u0020"'<>/=]+$/u.test(key)
         ? str
-        : `${str} ${key}="${escapeHtmlAttribute(value)}"`,
+        : `${str} ${key}="${String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('"', '&quot;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')}"`,
     '',
   );
 }

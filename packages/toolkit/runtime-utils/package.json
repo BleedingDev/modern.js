@@ -89,7 +89,11 @@
     "./url": {
       "types": "./dist/types/url.d.ts",
       "modern:source": "./src/url.ts",
-      "default": "./dist/esm/url.mjs"
+      "default": "./dist/esm/url.mjs",
+      "node": {
+        "import": "./dist/esm-node/url.mjs",
+        "require": "./dist/cjs/url.js"
+      }
     },
     "./merge": {
       "types": "./dist/types/merge.d.ts",

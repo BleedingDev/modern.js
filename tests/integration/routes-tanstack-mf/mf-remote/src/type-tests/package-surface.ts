@@ -1,15 +1,13 @@
+import { defineEffectBff } from '@modern-js/bff-effect/effect';
 import {
   HttpApi,
   HttpApiEndpoint,
   HttpApiGroup,
-} from '@modern-js/plugin-bff/effect-client';
-import {
-  defineEffectBff,
-  Effect,
-  HttpApiBuilder,
-  Layer,
-} from '@modern-js/plugin-bff/effect-server';
+} from '@modern-js/bff-effect/effect-client';
 import { Outlet, useFetcher } from '@modern-js/plugin-tanstack/runtime';
+import * as Effect from 'effect/Effect';
+import * as Layer from 'effect/Layer';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 
 void HttpApi;
 void HttpApiEndpoint;

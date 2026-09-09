@@ -36,7 +36,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       config,
       ssrConfig,
       entryName,
-      moduleFederationCssAssets,
+      resource,
     } = options;
     const hooks = getGlobalInternalRuntimeContext().hooks;
     const isRsc = getGlobalEnableRsc() === true;
@@ -44,6 +44,8 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       hooks.extendStreamSSR.call({
         runtimeContext,
         request,
+        resource,
+        config,
         platform: 'node',
         mode: 'stream',
         isRsc,
@@ -148,7 +150,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
         runtimeContext,
         config,
         entryName,
-        moduleFederationCssAssets,
+        lifecycle,
       });
 
       const startOutput = async () => {

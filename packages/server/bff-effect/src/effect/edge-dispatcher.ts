@@ -3,7 +3,7 @@ import {
   evaluateCrossProjectPolicy,
   type NormalizedCrossProjectPolicy,
   resolveCrossProjectRequestObservation,
-} from '@modern-js/bff-core/security/cross-project-policy';
+} from '@modern-js/server-runtime-extensions/bff-policy';
 import { toHeaderRecord } from '../headers';
 import {
   type DispatchEffectBffRequestOptions,

@@ -37,6 +37,7 @@ const ensureWorkspacePackages = [
   '@modern-js/plugin-tanstack',
   '@modern-js/prod-server',
   '@modern-js/runtime',
+  '@modern-js/runtime-extensions',
   '@modern-js/server',
   '@modern-js/server-core',
   '@modern-js/server-utils',

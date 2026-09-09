@@ -1,107 +1,55 @@
-// @effect-diagnostics asyncFunction:off nodeBuiltinImport:off processEnv:off
-import { renderProducerRuntimeDefaults } from '@modern-js/plugin-bff-extensions/cross-project-generation';
+import { pathToFileURL } from 'node:url';
+import type { BffGeneratedModule } from '@modern-js/app-tools';
 import { fs } from '@modern-js/utils';
 import path from 'path';
 
-/**
- * Get package name from package.json file
- * @param appDirectory - Application directory path
- * @returns Package name or undefined if not found
- */
-const getPackageName = (appDirectory: string): string | undefined => {
-  try {
-    const packageJsonPath = path.resolve(appDirectory, './package.json');
-    const packageJson = require(packageJsonPath);
-    return packageJson.name;
-  } catch (error) {
-    // If package.json doesn't exist or is invalid, return undefined
-    return undefined;
-  }
-};
-
-async function runtimeGenerator({
-  runtime,
-  appDirectory,
-  relativeDistPath,
-  packageName,
-}: {
+interface RuntimeGeneratorOptions {
   runtime: string;
   appDirectory: string;
   relativeDistPath: string;
   packageName?: string;
-}) {
-  const pluginDir = path.resolve(
-    appDirectory,
-    `./${relativeDistPath}`,
-    'runtime',
-  );
-
-  const requestId =
-    packageName ||
-    getPackageName(appDirectory) ||
-    process.env.npm_package_name ||
-    'default';
-
-  const runtimeImportPath = JSON.stringify(runtime);
-  const requestIdValue = JSON.stringify(requestId);
-  const source = `'use strict'; const { configure: _configure } = require(${runtimeImportPath});
-    const defaultSecureOptions = ${renderProducerRuntimeDefaults(requestIdValue)};
-    const initProducerClient = (options) => {
-      return _configure({
-        ...defaultSecureOptions,
-        ...options,
-        identityBinding: {
-          ...defaultSecureOptions.identityBinding,
-          ...(options && options.identityBinding ? options.identityBinding : {}),
-        },
-        operationContract: {
-          ...defaultSecureOptions.operationContract,
-          ...(options && options.operationContract ? options.operationContract : {}),
-        },
-      });
-    }
-    const configure = initProducerClient;
-    Object.defineProperty(exports, '__esModule', { value: true });
-    exports.initProducerClient = initProducerClient;
-    exports.configure = configure;
-  `;
-  const pluginPath = path.join(pluginDir, 'index.js');
-  await fs.ensureFile(pluginPath);
-  await fs.writeFile(pluginPath, source);
-
-  const tsSource = `type ProducerRuntimeModule = typeof import(${runtimeImportPath});
-  type ProducerClientOptions = ProducerRuntimeModule extends {
-    configure: (options: infer TOptions) => unknown;
-  }
-    ? TOptions
-    : {
-        request?: typeof fetch;
-        interceptor?: (request: typeof fetch) => typeof fetch;
-        allowedHeaders?: string[];
-        requireEnvelope?: boolean;
-        allowCrossOriginEnvelope?: boolean;
-        identityBinding?: {
-          enabled?: boolean;
-          strict?: boolean;
-          protectedHeaders?: string[];
-        };
-        operationContract?: {
-          enabled?: boolean;
-          strict?: boolean;
-          requireSchemaHash?: boolean;
-          requireOperationVersion?: boolean;
-        };
-        setDomain?: (ops?: {
-          target: 'server' | 'browser';
-          requestId?: string;
-        }) => string;
-        requestId?: string;
-      };
-  export declare const initProducerClient: (options?: ProducerClientOptions) => ReturnType<ProducerRuntimeModule['configure']>;
-  export declare const configure: typeof initProducerClient;`;
-  const pluginTypePath = path.join(pluginDir, 'index.d.ts');
-  await fs.ensureFile(pluginTypePath);
-  await fs.writeFile(pluginTypePath, tsSource);
 }
 
-export default runtimeGenerator;
+export function renderBffRuntime(
+  options: RuntimeGeneratorOptions,
+): BffGeneratedModule {
+  const packagePath = path.resolve(options.appDirectory, 'package.json');
+  const packageJson = fs.existsSync(packagePath)
+    ? fs.readJSONSync(packagePath)
+    : {};
+  const requestId =
+    options.packageName ||
+    packageJson.name ||
+    process.env.npm_package_name ||
+    'default';
+  const runtime = JSON.stringify(options.runtime);
+  const esmRuntime = JSON.stringify(
+    path.isAbsolute(options.runtime)
+      ? pathToFileURL(options.runtime).href
+      : options.runtime,
+  );
+  return {
+    code:
+      packageJson.type === 'module'
+        ? `import { configure as _configure } from ${esmRuntime};\nexport const initProducerClient = options => _configure({ requestId: ${JSON.stringify(requestId)}, ...options });\nexport const configure = initProducerClient;\n`
+        : `'use strict';\nconst { configure: _configure } = require(${runtime});\nconst initProducerClient = options => _configure({ requestId: ${JSON.stringify(requestId)}, ...options });\nexports.initProducerClient = initProducerClient;\nexports.configure = initProducerClient;\n`,
+    declaration: `type Runtime = typeof import(${runtime});
+export declare const initProducerClient: (options?: Parameters<Runtime['configure']>[0]) => ReturnType<Runtime['configure']>;
+export declare const configure: typeof initProducerClient;
+`,
+  };
+}
+
+export default async function runtimeGenerator(
+  options: RuntimeGeneratorOptions,
+  rendered?: BffGeneratedModule,
+) {
+  const module = rendered ?? renderBffRuntime(options);
+  const directory = path.resolve(
+    options.appDirectory,
+    options.relativeDistPath,
+    'runtime',
+  );
+  await fs.outputFile(path.join(directory, 'index.js'), module.code);
+  await fs.outputFile(path.join(directory, 'index.d.ts'), module.declaration);
+}

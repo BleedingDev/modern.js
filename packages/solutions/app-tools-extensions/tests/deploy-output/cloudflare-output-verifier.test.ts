@@ -729,7 +729,7 @@ describe('Cloudflare output verifier', () => {
   it('rejects unresolved bare imports from manifest-declared worker bundles', async () => {
     const { outputDirectory } = await createOutputFixture({
       bffWorkerSource: [
-        "require('@modern-js/plugin-bff/effect-edge');",
+        "require('@modern-js/bff-effect/effect-edge');",
         'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
         'module.exports = { __modern_create_effect_bff_dispatcher };',
       ].join('\n'),
@@ -745,7 +745,7 @@ describe('Cloudflare output verifier', () => {
       expect.objectContaining({
         code: 'invalid-worker-bundle',
         message:
-          'Cloudflare worker bundle import "@modern-js/plugin-bff/effect-edge" is not provided by worker/package.json dependencies.',
+          'Cloudflare worker bundle import "@modern-js/bff-effect/effect-edge" is not provided by worker/package.json dependencies.',
       }),
     );
   });
@@ -849,8 +849,8 @@ describe('Cloudflare output verifier', () => {
   it('ignores import-like text in worker comments and strings', async () => {
     const { outputDirectory } = await createOutputFixture({
       bffWorkerSource: [
-        "// require('@modern-js/plugin-bff/effect-edge');",
-        `const documentation = "import '@modern-js/plugin-bff/effect-edge';";`,
+        "// require('@modern-js/bff-effect/effect-edge');",
+        `const documentation = "import '@modern-js/bff-effect/effect-edge';";`,
         'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response(documentation), dispose: async () => {} });',
         'module.exports = { __modern_create_effect_bff_dispatcher };',
       ].join('\n'),

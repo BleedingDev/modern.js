@@ -132,6 +132,16 @@ export function tanstackRouterPlugin(
     name: '@modern-js/plugin-tanstack',
     required: ['@modern-js/runtime'],
     setup: api => {
+      const { srcDirectory, serverCompileExcludedFiles = [] } =
+        api.getAppContext();
+      api.updateAppContext({
+        serverCompileExcludedFiles: [
+          ...new Set([
+            ...serverCompileExcludedFiles,
+            path.join(srcDirectory, generatedDirName, 'register.gen.d.ts'),
+          ]),
+        ],
+      });
       const nestedRoutesForServer: Record<string, unknown> = {};
 
       const isTanstackEntrypoint = (entrypoint: Entrypoint) => {

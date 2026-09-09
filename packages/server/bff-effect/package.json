@@ -166,7 +166,8 @@
     "@opentelemetry/sdk-trace-base": "2.11.0",
     "@opentelemetry/sdk-trace-node": "2.11.0",
     "@opentelemetry/sdk-trace-web": "2.11.0",
-    "@opentelemetry/semantic-conventions": "1.43.0"
+    "@opentelemetry/semantic-conventions": "1.43.0",
+    "@modern-js/server-runtime-extensions": "workspace:*"
   },
   "peerDependencies": {
     "@effect/opentelemetry": "4.0.0-rc.112",

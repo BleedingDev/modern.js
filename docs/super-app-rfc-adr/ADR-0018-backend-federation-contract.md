@@ -161,6 +161,13 @@ deployment metadata.
 
 ## 5. Node Surface
 
+The type below records the original proposed package name. After retirement of
+the native BFF Effect facades, current Node API modules import framework APIs
+from `@modern-js/bff-effect/effect` and Effect namespaces from their `effect/*`
+modules. Backend federation loaders use
+`@modern-js/plugin-bff-extensions/backend-federation/node`; the historical
+`@modern-js/plugin-bff/effect` entry is no longer exported.
+
 Node is modeled as a platform adapter that can use Module Federation runtime
 loading:
 

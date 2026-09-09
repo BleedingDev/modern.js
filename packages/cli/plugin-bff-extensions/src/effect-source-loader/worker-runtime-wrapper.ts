@@ -46,36 +46,8 @@ export async function generateEffectWorkerRuntimeWrapper(
   const operationContracts = artifacts?.operationContracts ?? {};
 
   return `import * as effectBffModule from ${JSON.stringify(sourceRequest)};
-import { createEffectBffEdgeDispatcher } from '@modern-js/plugin-bff/effect-edge/dispatcher';
-
-const __generatedOperationContracts = ${JSON.stringify(operationContracts)};
-
-const __mergeGeneratedOperationContracts = policy => {
-  if (
-    !policy ||
-    !policy.expectedOperationContracts ||
-    typeof policy.expectedOperationContracts !== 'object' ||
-    Array.isArray(policy.expectedOperationContracts)
-  ) {
-    return policy;
-  }
-  return {
-    ...policy,
-    expectedOperationContracts: {
-      ...policy.expectedOperationContracts,
-      ...__generatedOperationContracts,
-    },
-  };
-};
-
-export const __modern_create_effect_bff_dispatcher = options =>
-  createEffectBffEdgeDispatcher({
-    ...options,
-    crossProjectPolicy: __mergeGeneratedOperationContracts(
-      options?.crossProjectPolicy,
-    ),
-    module: effectBffModule,
-  });
+import { createEffectBffEdgeDispatcherFactory } from '@modern-js/bff-effect/effect-edge';
+export const __modern_create_effect_bff_dispatcher = createEffectBffEdgeDispatcherFactory(effectBffModule, ${JSON.stringify(operationContracts)});
 `;
 }
 

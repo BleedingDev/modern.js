@@ -46,10 +46,9 @@ import EnableBFFCaution from "@site-docs/components/enable-bff-caution";
 仅当 `bff.runtimeFramework` 设置为 `'effect'` 时，`bff.effect` 才会生效。
 
 :::caution 需要自行安装 Effect peer 依赖
-`effect` 与 `@effect/opentelemetry` 是 `@modern-js/plugin-bff` 的**可选精确 peer
-依赖**，而不是直接依赖。插件不再自带副本——Effect 4 的 `Context` / `Service` 键按模块
-实例生成，自带副本会让应用出现第二份 Effect 身份。在设置 `runtimeFramework: 'effect'`
-或引入 `@modern-js/plugin-bff/effect`、`/effect-server`、`/effect-edge`、
+`effect` 与 `@effect/opentelemetry` 是 `@modern-js/bff-effect` 的**可选精确 peer
+依赖**。应用必须安装这些依赖，让 API 模块与框架使用同一个 Effect 实例。在设置
+`runtimeFramework: 'effect'` 或引入 `@modern-js/bff-effect/effect`、`/effect-edge`、
 `/effect-client` 之前，请安装精确版本的依赖组：
 
 ```bash
@@ -57,8 +56,18 @@ pnpm add effect@4.0.0-rc.112 @effect/opentelemetry@4.0.0-rc.112
 ```
 
 采用精确版本是因为 UltraModern 以锁步依赖组的方式发布 Effect。只使用
-`runtimeFramework: 'hono'` 或 `./data-platform` 通道的应用无需安装这两个包。
+原生 `runtimeFramework: 'hono'` 或 `@modern-js/bff-effect/data-platform` 的应用无需安装这两个包。
 :::
+
+使用 `@modern-js/plugin-bff-build-extensions` 导出的 `bffPlugin` 注册 Effect
+运行时，它会组合原生 BFF 插件。将同一框架版本组中的 `@modern-js/bff-effect` 和
+`@modern-js/plugin-bff-extensions` 安装为应用的生产依赖，保证移除开发依赖后仍能加载
+运行时适配器。构建插件可以作为开发依赖。参见[运行时配置示例](/guides/advanced-features/bff/frameworks)。
+
+原生 `@modern-js/plugin-bff/server` 导出 Hono API。Node Effect API 从
+`@modern-js/bff-effect/effect` 导入 `defineEffectBff` 等框架 helper，命名空间从对应的
+`effect/*` 模块导入。Worker handler 和 Worker 请求上下文使用
+`@modern-js/bff-effect/effect-edge`。
 
 生成的 UltraModern workspace 只把这个运行时作为生成 HTTP API 路径。API 契约固定在
 `shared/api.ts`，服务端运行时固定在 `api/index.ts`，客户端固定在
@@ -237,7 +246,7 @@ attestation 的迁移，并不等同于 release-age 审批。
 Edge 兼容测试可以使用框架 helper：
 
 ```ts
-import { createEffectBffTestHandler } from '@modern-js/plugin-bff/effect-edge';
+import { createEffectBffTestHandler } from '@modern-js/bff-effect/effect-edge';
 import apiModule from '../api/index';
 
 const testApi = await createEffectBffTestHandler({
@@ -252,12 +261,9 @@ const response = await testApi.handler(new Request('http://localhost/api/ping'))
 `HttpServer.layerServices`：
 
 ```ts
-import {
-  HttpApiBuilder,
-  HttpRouter,
-  HttpServer,
-  Layer,
-} from '@modern-js/plugin-bff/effect-server';
+import * as Layer from 'effect/Layer';
+import { HttpRouter, HttpServer } from 'effect/unstable/http';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 
 const handler = HttpRouter.toWebHandler(
   HttpApiBuilder.layer(api).pipe(
@@ -275,13 +281,10 @@ const handler = HttpRouter.toWebHandler(
 Effect v4 beta 版本组中，`HttpRouter.middleware(...)` 直接返回 `Layer`：
 
 ```ts
-import {
-  Effect,
-  HttpApiBuilder,
-  HttpMiddleware,
-  HttpRouter,
-  Layer,
-} from '@modern-js/plugin-bff/effect-server';
+import * as Effect from 'effect/Effect';
+import * as Layer from 'effect/Layer';
+import { HttpMiddleware, HttpRouter } from 'effect/unstable/http';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 
 const corsLayer = HttpRouter.middleware(
   Effect.succeed(

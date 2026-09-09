@@ -46,7 +46,7 @@ export function createAppModernConfig(
   const deliveryUnit = createDeliveryUnitRecord(scope, app);
   const emitsUi = appEmitsBrowserUi(app);
   const bffImport = appHasApi(app)
-    ? "import { bffPlugin } from '@modern-js/plugin-bff';\n"
+    ? "import { bffPlugin } from '@modern-js/plugin-bff-build-extensions';\n"
     : '';
   // A headless (api-only) unit has no browser MF surface, no Zephyr build and
   // no generated route metadata — its config must not import or register them.

@@ -3,7 +3,6 @@ import type { Http2SecureServer } from 'node:http2';
 import {
   createDefaultPlugins,
   createErrorHtml,
-  createSafeJsonFailureResponse,
   ErrorDigest,
   faviconPlugin,
   injectConfigMiddlewarePlugin,
@@ -18,12 +17,6 @@ import {
   loadCacheConfig,
   serverStaticPlugin,
 } from '@modern-js/server-core/node';
-import {
-  injectMfAssetCacheHeadersPlugin,
-  injectModuleFederationCssPlugin,
-  injectTelemetryPlugin,
-} from '@modern-js/server-runtime-extensions';
-import { injectStaticServingPlugin } from '@modern-js/server-runtime-extensions/static-serving/node';
 import { createLogger, isProd, logger } from '@modern-js/utils';
 import type { ProdServerOptions } from './types';
 
@@ -73,6 +66,17 @@ export async function applyPlugins(
         logger.error(`Error in serverConfig.onError handler: ${configError}`);
       }
     }
+    try {
+      const result = await serverBase.hooks.handleError.call({
+        error: err,
+        context: c,
+      });
+      if (result.response instanceof Response) {
+        return result.response;
+      }
+    } catch (pluginError) {
+      logger.error('Error in server handleError hook', pluginError);
+    }
     const bffPrefix = config.bff?.prefix || '/api';
     const bffPrefixList = Array.isArray(bffPrefix) ? bffPrefix : [bffPrefix];
     const isApiPath = bffPrefixList.some(prefix =>
@@ -80,7 +84,7 @@ export async function applyPlugins(
     );
 
     if (isApiPath) {
-      return createSafeJsonFailureResponse(err);
+      return c.json({ message: '[BFF] Internal Server Error' }, 500);
     } else {
       return c.html(createErrorHtml(500), 500);
     }
@@ -97,17 +101,10 @@ export async function applyPlugins(
       logger:
         loggerOptions === false ? false : optLogger || getLogger(loggerOptions),
     }),
-    // ultramodern.js fork plugins live in @modern-js/server-runtime-extensions
-    // and are registered here (instead of inside server-core) for both the
-    // production server and the dev server, which share this plugin assembly.
-    injectTelemetryPlugin(),
     injectConfigMiddlewarePlugin(middlewares, renderMiddlewares),
     ...(options.plugins || []),
     injectResourcePlugin(),
-    injectModuleFederationCssPlugin(),
-    injectMfAssetCacheHeadersPlugin(),
     injectRscManifestPlugin(enableRsc),
-    injectStaticServingPlugin(),
     serverStaticPlugin(),
     faviconPlugin(),
     renderPlugin(),

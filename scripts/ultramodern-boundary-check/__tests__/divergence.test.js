@@ -1368,8 +1368,10 @@ test('added production source inside an explicit fork-owned package passes', () 
 });
 
 const relocatedForkPackageRoots = [
+  'packages/cli/plugin-bff-build-extensions',
   'packages/runtime/boundary-debugger',
   'packages/runtime/federation-runtime',
+  'packages/runtime/i18n-integration',
   'packages/runtime/renderer-extensions',
   'packages/solutions/ultramodern-app-tools',
   'packages/toolkit/backend-federation-contracts',

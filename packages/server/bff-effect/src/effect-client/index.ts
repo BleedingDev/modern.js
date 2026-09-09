@@ -2,7 +2,7 @@
 import {
   createRequestContextHeaders,
   type RequestContextInput,
-} from '@modern-js/create-request';
+} from '@modern-js/runtime-extensions/request-context';
 import * as Data from 'effect/Data';
 import * as Effect from 'effect/Effect';
 import * as Exit from 'effect/Exit';

@@ -1,6 +1,6 @@
 // @effect-diagnostics asyncFunction:off globalFetch:off
 import api from '@api/index';
-import { configure } from '@modern-js/plugin-bff/client';
+import { configure } from '@modern-js/runtime-extensions/request-policy';
 import { useEffect, useState } from 'react';
 
 configure({

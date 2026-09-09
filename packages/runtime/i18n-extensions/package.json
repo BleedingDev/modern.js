@@ -29,13 +29,25 @@
       },
       "default": "./dist/esm/index.mjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./paths": {
+      "types": "./dist/types/paths.d.ts",
+      "modern:source": "./src/paths.ts",
+      "node": {
+        "import": "./dist/esm-node/paths.mjs",
+        "require": "./dist/cjs/paths.js"
+      },
+      "default": "./dist/esm/paths.mjs"
+    }
   },
   "typesVersions": {
     "*": {
       ".": [
         "./dist/types/index.d.ts",
         "./src/index.ts"
+      ],
+      "paths": [
+        "./dist/types/paths.d.ts"
       ]
     }
   },
@@ -49,7 +61,8 @@
     "node": ">=26.7.0"
   },
   "dependencies": {
-    "i18next-browser-languagedetector": "^8.2.1"
+    "i18next-browser-languagedetector": "^8.2.1",
+    "@modern-js/runtime-utils": "workspace:*"
   },
   "peerDependencies": {
     "@modern-js/runtime": "workspace:^3.9.0",

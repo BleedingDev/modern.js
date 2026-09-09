@@ -1,93 +1,87 @@
-import {
-  crossProjectApiPlugin,
-  PREFIX,
-  RUNTIME_FRAMEWORK,
-} from '../src/utils/crossProjectApiPlugin';
+import path from 'node:path';
+import { createCrossProjectApiPlugin } from '../src/utils/crossProjectApiPlugin';
 
-function runWithConfig(
+const nativeOptions = {
+  packageName: '@fixture/producer',
+  prefix: '/producer',
+  relativeDistPath: 'output',
+  relativeApiPath: 'api',
+  relativeLambdaPath: 'api/lambda',
+};
+
+async function runWithConfig(
   config: Record<string, any>,
-  initialResolvedConfig: Record<string, any> = {
-    bff: {
-      prefix: '/api',
-      runtimeFramework: 'hono' as 'hono' | 'effect',
-      isCrossProjectServer: false,
-    },
-  },
+  initialResolvedConfig: Record<string, any> = {},
 ) {
-  const plugin = crossProjectApiPlugin();
-  const resolvedConfig = initialResolvedConfig;
-  let nextAppContext: Record<string, unknown> = {};
-
-  plugin.setup({
-    getAppContext() {
-      return {
-        appDirectory: '/consumer-app',
-      };
+  let modify: (config: never) => Promise<unknown>;
+  const nextAppContext: Record<string, unknown> = {};
+  const plugin = createCrossProjectApiPlugin(nativeOptions);
+  await plugin.setup!({
+    getAppContext: () => ({ appDirectory: path.resolve('consumer-app') }),
+    updateAppContext: (update: Record<string, unknown>) =>
+      Object.assign(nextAppContext, update),
+    getConfig: () => config,
+    modifyResolvedConfig: (modifier: typeof modify) => {
+      modify = modifier;
     },
-    updateAppContext(partial) {
-      nextAppContext = partial as Record<string, unknown>;
-    },
-    getConfig() {
-      return config;
-    },
-    modifyResolvedConfig(modifier) {
-      modifier(resolvedConfig as any);
-    },
-  } as any);
-
-  return {
-    resolvedConfig,
-    nextAppContext,
-  };
+  } as never);
+  await modify!(initialResolvedConfig as never);
+  return { resolvedConfig: initialResolvedConfig, nextAppContext };
 }
 
-describe('crossProjectApiPlugin', () => {
-  test('throws when consumer bff.prefix conflicts with producer prefix', () => {
-    expect(() =>
-      runWithConfig({
-        bff: {
-          prefix: '/custom-prefix',
-        },
-      }),
-    ).toThrow(/Invalid bff\.prefix/);
+test('rejects conflicting prefixes and accepts the exact one-element prefix array', async () => {
+  await expect(
+    runWithConfig({ bff: { prefix: '/custom-prefix' } }),
+  ).rejects.toThrow('Invalid bff.prefix');
+  await expect(
+    runWithConfig({ bff: { prefix: ['/producer', '/extra'] } }),
+  ).rejects.toThrow('Invalid bff.prefix');
+  const { resolvedConfig } = await runWithConfig({
+    bff: { prefix: ['/producer'] },
   });
+  expect(resolvedConfig.bff.prefix).toBe('/producer');
+});
 
-  test('throws when consumer runtime framework conflicts with producer', () => {
-    const conflictRuntime = RUNTIME_FRAMEWORK === 'hono' ? 'effect' : 'hono';
-    expect(() =>
-      runWithConfig({
-        bff: {
-          runtimeFramework: conflictRuntime,
-        },
-      }),
-    ).toThrow(/Runtime framework mismatch/);
+test('initializes native SDK directories and config without introducing runtime policy', async () => {
+  const { resolvedConfig, nextAppContext } = await runWithConfig({});
+  expect(resolvedConfig.bff).toEqual({
+    prefix: '/producer',
+    isCrossProjectServer: true,
   });
-
-  test('accepts matching producer config and injects cross-project settings', () => {
-    const { resolvedConfig, nextAppContext } = runWithConfig({
-      bff: {
-        prefix: PREFIX,
-        runtimeFramework: RUNTIME_FRAMEWORK,
-      },
-    });
-
-    expect(resolvedConfig.bff.prefix).toBe(PREFIX);
-    expect(resolvedConfig.bff.runtimeFramework).toBe(RUNTIME_FRAMEWORK);
-    expect(resolvedConfig.bff.isCrossProjectServer).toBe(true);
-    expect(nextAppContext.bffRuntimeFramework).toBe(RUNTIME_FRAMEWORK);
+  expect(nextAppContext).toEqual({
+    apiDirectory: path.resolve(
+      'consumer-app/node_modules/@fixture/producer/output/api',
+    ),
+    lambdaDirectory: path.resolve(
+      'consumer-app/node_modules/@fixture/producer/output/api/lambda',
+    ),
   });
+});
 
-  test('initializes BFF config for consumers without a local BFF block', () => {
-    const { resolvedConfig } = runWithConfig({}, {});
-
-    expect(resolvedConfig.bff).toMatchObject({
-      prefix: PREFIX,
-      runtimeFramework: RUNTIME_FRAMEWORK,
-      isCrossProjectServer: true,
-      crossProjectPolicy: {
-        enabled: true,
-        requireEnvelope: true,
-      },
-    });
+test('the extension callback receives validated native paths and its returned config is used', async () => {
+  let modifier: (config: never) => Promise<unknown>;
+  const callback = rstest.fn((config, context) => ({
+    ...config,
+    source: { sdk: context.sdkDistDirectory },
+  }));
+  const plugin = createCrossProjectApiPlugin({
+    ...nativeOptions,
+    modifyResolvedConfig: callback,
+  });
+  await plugin.setup!({
+    getAppContext: () => ({ appDirectory: path.resolve('consumer-app') }),
+    getConfig: () => ({}),
+    updateAppContext: () => {},
+    modifyResolvedConfig: (fn: typeof modifier) => {
+      modifier = fn;
+    },
+  } as never);
+  const result = await modifier!({} as never);
+  expect(callback).toHaveBeenCalledTimes(1);
+  expect(result).toMatchObject({
+    bff: { prefix: '/producer', isCrossProjectServer: true },
+    source: {
+      sdk: path.resolve('consumer-app/node_modules/@fixture/producer/output'),
+    },
   });
 });

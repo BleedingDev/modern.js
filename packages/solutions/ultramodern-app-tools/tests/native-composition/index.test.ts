@@ -199,6 +199,7 @@ describe('native UltraModern composition', () => {
       '@modern-js/cloudflare-builder',
       '@modern-js/deploy-output-aliases',
       '@modern-js/ultramodern-release-envelope',
+      '@modern-js/ultramodern-ssr-integration',
       ...(native.usePlugins ?? []).map(plugin => plugin.name),
     ]) {
       expect(plugins.filter(plugin => plugin.name === name)).toHaveLength(1);

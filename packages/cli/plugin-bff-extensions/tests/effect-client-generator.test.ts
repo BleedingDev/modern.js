@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { createOperationContractHash } from '@modern-js/bff-core';
+import { createOperationContractHash } from '@modern-js/server-runtime-extensions/bff-policy/node';
 import { build } from 'esbuild';
 import * as clientGeneratorSurface from '../src/client-generator';
 import {
@@ -212,16 +212,15 @@ describe('Effect client generation', () => {
         resourcePath,
       );
 
-      expect(wrapper).toContain(
-        `from '@modern-js/plugin-bff/effect-edge/dispatcher'`,
-      );
+      expect(wrapper).toContain(`from '@modern-js/bff-effect/effect-edge'`);
       expect(wrapper).toContain(
         JSON.stringify(`${resourcePath}?modern-bff-runtime-source`),
       );
       expect(wrapper).toContain(
-        '...policy.expectedOperationContracts,\n      ...__generatedOperationContracts',
+        'createEffectBffEdgeDispatcherFactory(effectBffModule, ',
       );
-      expect(wrapper).not.toContain('@modern-js/bff-effect');
+      expect(wrapper).not.toContain('__mergeGeneratedOperationContracts');
+      expect(wrapper).toContain('"GET:/api/ping"');
       expect(
         dependencies.map(dependency => path.normalize(dependency)),
       ).toContain(path.join(appDir, 'package.json'));

@@ -4,7 +4,7 @@ import path from 'node:path';
 import {
   buildOperationContractMap,
   resolveCrossProjectPolicy,
-} from '@modern-js/bff-core';
+} from '@modern-js/server-runtime-extensions/bff-policy/node';
 
 import { createHonoCrossProjectPolicyMiddleware } from '../src/hono/cross-project-policy';
 

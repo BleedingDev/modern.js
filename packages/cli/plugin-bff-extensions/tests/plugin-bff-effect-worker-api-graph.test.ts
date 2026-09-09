@@ -38,7 +38,27 @@ test('worker API helpers execute while browser imports remain blocked', async ()
       module: {
         rules: [
           {
+            test: resource => path.resolve(resource) === path.resolve(entry),
+            use: [
+              {
+                loader: path.resolve(
+                  __dirname,
+                  '../dist/cjs/effect-source-loader/rspack-loader.js',
+                ),
+                options: {
+                  apiDir,
+                  appDir: root,
+                  effectEntry: entry,
+                  port: 8080,
+                  prefix: '/api',
+                  target: 'web',
+                },
+              },
+            ],
+          },
+          {
             test: /\.ts$/,
+            exclude: resource => path.resolve(resource) === path.resolve(entry),
             use: [
               {
                 loader: path.resolve(
@@ -48,8 +68,6 @@ test('worker API helpers execute while browser imports remain blocked', async ()
                 options: {
                   apiDir,
                   appDir: root,
-                  bffRuntimeFramework: 'effect',
-                  effectEntry: entry,
                   existLambda: false,
                   lambdaDir: path.join(apiDir, 'lambda'),
                   port: 8080,

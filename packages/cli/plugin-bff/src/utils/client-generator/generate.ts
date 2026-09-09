@@ -1,5 +1,10 @@
 // @effect-diagnostics asyncFunction:off nodeBuiltinImport:off processEnv:off strictBooleanExpressions:off
-import { type GenClientOptions, generateClient } from '@modern-js/bff-core';
+import type { BffClientArtifacts, BffGeneration } from '@modern-js/app-tools';
+import {
+  ClientCodegenError,
+  type GenClientOptions,
+  generateClient,
+} from '@modern-js/bff-core';
 import type { HttpMethodDecider } from '@modern-js/types';
 import { fs, logger } from '@modern-js/utils';
 import path from 'path';
@@ -27,6 +32,7 @@ export type APILoaderOptions = {
   existLambda: boolean;
   port?: number;
   requestCreator?: string;
+  clientCodegenPlugin?: string;
   httpMethodDecider?: HttpMethodDecider;
   relativeDistPath: string;
   relativeApiPath: string;
@@ -39,20 +45,18 @@ export type APILoaderOptions = {
    * private files) never reach `generateClient`.
    */
   apiFiles: string[];
-  bffRuntimeFramework?: 'hono' | 'effect';
-  effectEntry?: string;
-  effectDataPlatformBatch?: {
-    enabled?: boolean;
-    endpoint?: string;
-    flushIntervalMs?: number;
-    maxBatchSize?: number;
-    maxBatchBytes?: number;
-    requestTimeoutMs?: number;
-    allowedMethods?: string[];
-  };
 };
 
-export async function clientGenerator(draftOptions: APILoaderOptions) {
+export interface ClientGenerationIntegration {
+  generation: BffGeneration;
+  modifyArtifacts: (context: BffClientArtifacts) => Promise<BffClientArtifacts>;
+  beforePublish: () => Promise<Record<string, string> | void>;
+}
+
+export async function clientGenerator(
+  draftOptions: APILoaderOptions,
+  integration?: ClientGenerationIntegration,
+) {
   const generatedClientDir = path.resolve(
     draftOptions.appDir,
     draftOptions.relativeDistPath,
@@ -60,7 +64,9 @@ export async function clientGenerator(draftOptions: APILoaderOptions) {
   );
   await fs.remove(generatedClientDir);
   const requestId =
-    getPackageName(draftOptions.appDir) || process.env.npm_package_name;
+    draftOptions.requestId ||
+    getPackageName(draftOptions.appDir) ||
+    process.env.npm_package_name;
 
   const lambdaSourceList = draftOptions.existLambda
     ? await readDirectoryFiles(
@@ -71,12 +77,6 @@ export async function clientGenerator(draftOptions: APILoaderOptions) {
       )
     : [];
   const generatedSourceList = [...lambdaSourceList];
-  let generatedEffectClient = null as Awaited<
-    ReturnType<
-      typeof import('@modern-js/plugin-bff-extensions/client-generator')['generateEffectClient']
-    >
-  >;
-
   const getClitentCode = async (resourcePath: string, source: string) => {
     const warning = `The file ${resourcePath} is not allowed to be imported in src directory, only API definition files are allowed.`;
 
@@ -98,6 +98,7 @@ export async function clientGenerator(draftOptions: APILoaderOptions) {
       target: 'bundle',
       httpMethodDecider: draftOptions.httpMethodDecider,
       requestCreator: draftOptions.requestCreator,
+      clientCodegenPlugin: draftOptions.clientCodegenPlugin,
       requestId,
     };
 
@@ -122,19 +123,23 @@ export async function clientGenerator(draftOptions: APILoaderOptions) {
     source: FileDetails,
     clientCode: string,
   ) => {
-    if (!(await fs.pathExists(path.resolve(source.relativeTargetDistDir)))) {
+    if (
+      !(await fs.pathExists(
+        path.resolve(draftOptions.appDir, source.relativeTargetDistDir),
+      ))
+    ) {
       throw createMissingClientDeclarationError(
         source.resourcePath,
-        source.relativeTargetDistDir,
+        path.resolve(draftOptions.appDir, source.relativeTargetDistDir),
       );
     }
 
-    const clientTypesFile = source.targetDir.replace(/\.js$/, '.d.ts');
+    const clientTypesFile = source.absTargetDir.replace(/\.js$/, '.d.ts');
     await writeTargetFile(
       path.resolve(clientTypesFile),
       buildClientTypeFacade(
         clientTypesFile,
-        source.relativeTargetDistDir,
+        path.resolve(draftOptions.appDir, source.relativeTargetDistDir),
         DEFAULT_EXPORT_RE.test(clientCode),
         true,
       ),
@@ -150,69 +155,83 @@ export async function clientGenerator(draftOptions: APILoaderOptions) {
       }
     }
 
-    if (draftOptions.bffRuntimeFramework === 'effect') {
-      const { generateEffectClient, resolveEffectEntryFile } = await import(
-        '@modern-js/plugin-bff-extensions/client-generator'
-      );
-      const effectEntryFile = resolveEffectEntryFile({
-        appDir: draftOptions.appDir,
-        apiDir: draftOptions.apiDir,
-        effectEntry: draftOptions.effectEntry,
-      });
-
-      if (effectEntryFile) {
-        const effectSource = await fs.readFile(effectEntryFile, 'utf8');
-        const effectFileDetails = createFileDetails({
-          appDirectory: draftOptions.appDir,
-          baseDirectory: draftOptions.apiDir,
-          resourcePath: effectEntryFile,
-          source: effectSource,
-          relativeDistPath: draftOptions.relativeDistPath,
-        });
-
-        generatedEffectClient = await generateEffectClient({
-          appDir: draftOptions.appDir,
-          apiDir: draftOptions.apiDir,
-          resourcePath: effectEntryFile,
-          prefix: (Array.isArray(draftOptions.prefix)
-            ? draftOptions.prefix[0]
-            : draftOptions.prefix) as string,
-          port: Number(draftOptions.port),
-          target: 'bundle',
-          requestId: draftOptions.requestId,
-          requestCreator: draftOptions.requestCreator,
-          httpMethodDecider: draftOptions.httpMethodDecider,
-          dataPlatformBatch: draftOptions.effectDataPlatformBatch,
-        });
-
-        if (generatedEffectClient) {
-          const targetTypeFile = effectFileDetails.targetDir.replace(
-            /\.js$/,
-            '.d.ts',
-          );
-
-          await writeTargetFile(
-            effectFileDetails.absTargetDir,
-            generatedEffectClient.code,
-          );
-          await writeTargetFile(
-            path.resolve(targetTypeFile),
-            generatedEffectClient.declaration,
-          );
-          generatedSourceList.push(effectFileDetails);
-        }
-      }
-    }
-
     logger.info(`Client bundle generate succeed`);
   } catch (error) {
     // A missing handler declaration silently published a broken type surface,
     // which is exactly the defect this generator now guards; it must not be
     // downgraded to a log line by the surrounding best-effort handler.
-    if (isMissingClientDeclarationError(error)) {
+    if (
+      isMissingClientDeclarationError(error) ||
+      error instanceof ClientCodegenError
+    ) {
       throw error;
     }
     logger.error(`Client bundle generate failed: ${error}`);
+  }
+
+  let packageDependencies: Record<string, string> | undefined;
+  if (integration) {
+    const artifacts = await integration.modifyArtifacts({
+      generation: integration.generation,
+      additionalArtifacts: [],
+    });
+    if (artifacts.generation !== integration.generation) {
+      throw new Error('BFF artifacts must preserve generation identity.');
+    }
+    const sourcePaths = new Set(
+      generatedSourceList.map(file => path.resolve(file.resourcePath)),
+    );
+    const exportKeys = new Set(generatedSourceList.map(file => file.exportKey));
+    const outputPaths = new Set(
+      generatedSourceList.map(file => path.resolve(file.absTargetDir)),
+    );
+    const additionalFiles = artifacts.additionalArtifacts.map(artifact => {
+      const relative = artifact.sourcePath;
+      const resourcePath = path.resolve(draftOptions.apiDir, relative);
+      if (
+        !relative ||
+        path.isAbsolute(relative) ||
+        relative.includes('\\') ||
+        path
+          .relative(draftOptions.apiDir, resourcePath)
+          .split(path.sep)
+          .includes('..') ||
+        path
+          .relative(draftOptions.apiDir, resourcePath)
+          .split(path.sep)
+          .join('/') !== relative ||
+        !/\.[cm]?[jt]sx?$/.test(relative)
+      ) {
+        throw new Error(`Invalid BFF client artifact source path: ${relative}`);
+      }
+      const file = createFileDetails({
+        appDirectory: draftOptions.appDir,
+        baseDirectory: draftOptions.apiDir,
+        resourcePath,
+        source: '',
+        relativeDistPath: draftOptions.relativeDistPath,
+      });
+      if (
+        sourcePaths.has(resourcePath) ||
+        exportKeys.has(file.exportKey) ||
+        outputPaths.has(path.resolve(file.absTargetDir))
+      ) {
+        throw new Error(`BFF client artifact collision: ${relative}`);
+      }
+      sourcePaths.add(resourcePath);
+      exportKeys.add(file.exportKey);
+      outputPaths.add(path.resolve(file.absTargetDir));
+      return { file, artifact };
+    });
+    for (const { file, artifact } of additionalFiles) {
+      await writeTargetFile(file.absTargetDir, artifact.code);
+      await writeTargetFile(
+        file.absTargetDir.replace(/\.js$/, '.d.ts'),
+        artifact.declaration,
+      );
+      generatedSourceList.push(file);
+    }
+    packageDependencies = (await integration.beforePublish()) || undefined;
   }
 
   if (generatedSourceList.length > 0) {
@@ -226,9 +245,10 @@ export async function clientGenerator(draftOptions: APILoaderOptions) {
     generatedSourceList,
     draftOptions.appDir,
     draftOptions.relativeDistPath,
+    packageDependencies,
   );
 
-  return generatedEffectClient;
+  return null;
 }
 
 export default clientGenerator;

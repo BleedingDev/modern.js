@@ -11,6 +11,53 @@ export type ReloadableHandle = ((
   dispose?: () => void | Promise<void>;
 };
 
+/**
+ * Retire a request handle before waiting for its active handler promises.
+ * This preserves handler completion semantics; response streams are not drained.
+ */
+export function createDrainingHandle(
+  handle: ReloadableHandle,
+  dispose: () => void | Promise<void>,
+): ReloadableHandle & { dispose: () => Promise<void> } {
+  let activeRequests = 0;
+  let retired = false;
+  let resolveDrained: (() => void) | undefined;
+  let disposePromise: Promise<void> | undefined;
+
+  return Object.assign(
+    async (request: Request, ...args: any[]) => {
+      if (retired) {
+        throw new Error('Cannot dispatch through a retired server runtime.');
+      }
+      activeRequests += 1;
+      try {
+        return await handle(request, ...args);
+      } finally {
+        activeRequests -= 1;
+        if (activeRequests === 0) {
+          resolveDrained?.();
+        }
+      }
+    },
+    {
+      dispose: () => {
+        if (!disposePromise) {
+          retired = true;
+          disposePromise = Promise.resolve().then(async () => {
+            if (activeRequests > 0) {
+              await new Promise<void>(resolve => {
+                resolveDrained = resolve;
+              });
+            }
+            await dispose();
+          });
+        }
+        return disposePromise;
+      },
+    },
+  );
+}
+
 export interface ReloadManagerOptions {
   /**
    * The handle used before the first successful build. Optional: when omitted
@@ -194,11 +241,15 @@ export class ReloadManager {
       const previous = this.#current;
       this.#current = next; // atomic swap: a single field assignment
       try {
-        this.#onReload?.(next);
-      } catch (callbackError) {
-        this.#reportReloadCallbackError(callbackError);
+        try {
+          this.#onReload?.(next);
+        } catch (callbackError) {
+          this.#reportReloadCallbackError(callbackError);
+        }
+      } finally {
+        // A throwing error reporter cannot abandon the retired runtime.
+        await this.#dispose(previous);
       }
-      await this.#dispose(previous);
     } while (this.#pending && !this.#closed);
   }
 

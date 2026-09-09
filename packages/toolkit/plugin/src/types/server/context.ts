@@ -1,4 +1,5 @@
 import type { ServerRoute } from '@modern-js/types';
+import type { BffRuntimeFramework } from '../../server/run/types';
 import type { ServerPluginAPI } from './api';
 import type { Hooks } from './hooks';
 import type { ServerPlugin, ServerPluginExtends } from './plugin';
@@ -13,6 +14,7 @@ export type ServerContext<Extends extends ServerPluginExtends> = {
   appDirectory: string;
   apiDirectory?: string;
   lambdaDirectory?: string;
+  bffRuntimeFramework?: BffRuntimeFramework;
   internalDirectory?: string;
   sharedDirectory?: string;
   distDirectory?: string;

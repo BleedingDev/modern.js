@@ -3,7 +3,7 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   Schema,
-} from '@modern-js/plugin-bff/effect-client';
+} from '@modern-js/bff-effect/effect-client';
 import { SUPERAPP_WORKLOAD_CHAOS_FAILURE_IDS } from './workload-chaos-failure-taxonomy';
 import {
   SUPERAPP_CHAOS_TOGGLE_ENDPOINTS,

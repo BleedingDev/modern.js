@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-
+import '@modern-js/server-runtime-extensions/server-config';
+import type { ServerPluginAPI } from '@modern-js/server-core';
 import {
   deriveOperationVersion,
   type OperationContractSource,
   resolveCrossProjectPolicy,
-} from '@modern-js/bff-core';
-import type { ServerPluginAPI } from '@modern-js/server-core';
+} from '@modern-js/server-runtime-extensions/bff-policy/node';
 
 import type { ResolvedCrossProjectPolicy } from './evaluation';
 

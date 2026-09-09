@@ -1755,3 +1755,212 @@ module.exports = {
     });
   });
 });
+
+describe('caller-pinned backend federation regressions', () => {
+  const createPinnedBackendRuntime = ({
+    entryExports,
+    module,
+    remoteName = 'verticalExploreBackend',
+    scheme = 'static',
+  }: {
+    entryExports?: BackendFederationEntryExports;
+    module?: unknown;
+    remoteName?: string;
+    scheme?: 'service' | 'static';
+  }) => {
+    const remote: BackendFederationRemote = {
+      name: remoteName,
+      type: 'module',
+      entry: `${scheme}:${remoteName}`,
+    };
+    const runtime = createBackendFederationRuntime({
+      hostName: 'proofHost',
+      remote,
+      plugins: [
+        createBackendFederationLoadEntryPlugin({
+          resolveEntry: () =>
+            entryExports ?? {
+              get(id) {
+                if (id !== './effect-api') {
+                  throw new Error(`unexpected expose ${id}`);
+                }
+                return async () => module;
+              },
+            },
+        }),
+      ],
+    });
+    return { remote, runtime };
+  };
+
+  const strictEffectApiModule = (remoteName = 'verticalExploreBackend') => ({
+    backendFederationContract: {
+      name: remoteName,
+      runtimeFramework: 'effect',
+      strictEffectApproach: true,
+    },
+    api: { id: 'api' },
+    runtime: { id: 'runtime' },
+  });
+
+  test('backend federation runtime loads caller-pinned Tractor proof-shaped strict Effect API exposes', async () => {
+    const entryExports: BackendFederationEntryExports = {
+      init(...args) {
+        const [scope] = args as [{ hostName: string }];
+        globalThis.__modernBackendHostName = scope.hostName;
+      },
+      get(id) {
+        if (id !== './effect-api') {
+          throw new Error(`unexpected expose ${id}`);
+        }
+        return async () => strictEffectApiModule();
+      },
+    };
+    const { remote, runtime } = createPinnedBackendRuntime({ entryExports });
+
+    const loaded = await loadBackendFederatedEffectApi({ runtime, remote });
+
+    expect(globalThis.__modernBackendHostName).toBe('proofHost');
+    expect(loaded.backendFederationContract?.name).toBe(
+      'verticalExploreBackend',
+    );
+    expect(loaded.api).toEqual({ id: 'api' });
+    expect(loaded.runtime).toEqual({ id: 'runtime' });
+  });
+
+  test('backend federation runtime supports caller-pinned service-binding remotes', async () => {
+    const entryExports: BackendFederationEntryExports = {
+      init(...args) {
+        const [scope] = args as [{ hostName: string }];
+        globalThis.__modernBackendServiceBindingHostName = scope.hostName;
+      },
+      get(id) {
+        if (id !== './effect-api') {
+          throw new Error(`unexpected expose ${id}`);
+        }
+        return async () => strictEffectApiModule();
+      },
+    };
+    const { remote, runtime } = createPinnedBackendRuntime({
+      entryExports,
+      scheme: 'service',
+    });
+
+    const loaded = await loadBackendFederatedEffectApi({ runtime, remote });
+
+    expect(globalThis.__modernBackendServiceBindingHostName).toBe('proofHost');
+    expect(loaded.api).toEqual({ id: 'api' });
+  });
+
+  test('backend federation runtime rejects network entries before custom runtime or fetch execution', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchCalls: string[] = [];
+    globalThis.fetch = async input => {
+      fetchCalls.push(String(input));
+      return new Response('untrusted network entry', { status: 200 });
+    };
+    try {
+      const remote = {
+        name: 'verticalExploreBackend',
+        type: 'commonjs-module' as const,
+        entry: 'https://cdn.example.test/backendRemoteEntry.js',
+      };
+      const runtime = createBackendFederationRuntime({
+        hostName: 'proofHost',
+        remote,
+      });
+
+      await expect(
+        loadBackendFederatedEffectApi({ runtime, remote }),
+      ).rejects.toThrow('cannot execute network backend federation entries');
+      expect(fetchCalls).toEqual([]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('backend federation runtime rejects missing strict Effect metadata', async () => {
+    const { remote, runtime } = createPinnedBackendRuntime({
+      module: {
+        backendFederationContract: {
+          name: 'verticalExploreBackend',
+          runtimeFramework: 'hono',
+          strictEffectApproach: false,
+        },
+        api: {},
+        runtime: {},
+      },
+    });
+
+    await expect(
+      loadBackendFederatedEffectApi({ runtime, remote }),
+    ).rejects.toThrow('must expose strict Effect metadata');
+  });
+
+  test('backend federation runtime rejects mismatched remote metadata names', async () => {
+    const { remote, runtime } = createPinnedBackendRuntime({
+      module: strictEffectApiModule('verticalDecideBackend'),
+    });
+
+    await expect(
+      loadBackendFederatedEffectApi({ runtime, remote }),
+    ).rejects.toThrow('metadata name mismatch');
+  });
+
+  test('backend federation runtime rejects exposes missing runtime', async () => {
+    const { remote, runtime } = createPinnedBackendRuntime({
+      module: {
+        backendFederationContract: {
+          name: 'verticalExploreBackend',
+          runtimeFramework: 'effect',
+          strictEffectApproach: true,
+        },
+        api: {},
+      },
+    });
+
+    await expect(
+      loadBackendFederatedEffectApi({ runtime, remote }),
+    ).rejects.toThrow('must expose runtime');
+  });
+
+  test('backend federation runtime rejects exposes that load non-object modules', async () => {
+    const { remote, runtime } = createPinnedBackendRuntime({ module: null });
+
+    await expect(
+      loadBackendFederatedEffectApi({ runtime, remote }),
+    ).rejects.toThrow('must load an object module');
+  });
+
+  test('backend federation runtime rejects unknown remote names', async () => {
+    const runtime = createBackendFederationRuntime({
+      hostName: 'proofHost',
+      remotes: [],
+    });
+    const remote: BackendFederationRemote = {
+      entry: 'static:verticalExploreBackend',
+      name: 'verticalExploreBackend',
+    };
+
+    await expect(
+      loadBackendFederatedEffectApi({
+        remote,
+        runtime,
+      }),
+    ).rejects.toThrow('Missing backend federation remote');
+  });
+
+  test('backend federation runtime propagates wrong expose errors', async () => {
+    const { remote, runtime } = createPinnedBackendRuntime({
+      module: strictEffectApiModule(),
+    });
+
+    await expect(
+      loadBackendFederatedEffectApi({
+        runtime,
+        remote,
+        expose: './wrong',
+      }),
+    ).rejects.toThrow('unexpected expose ./wrong');
+  });
+});

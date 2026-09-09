@@ -1,7 +1,7 @@
-import type { LocalisedUrlsOption } from '@modern-js/i18n-runtime-extensions';
 import { isBrowser } from '@modern-js/runtime';
 import type React from 'react';
 import { useCallback, useEffect, useRef } from 'react';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
 import {
   cacheI18nLanguage,
   changeI18nInstanceLanguage,
@@ -54,9 +54,8 @@ export function createContextValue(
   languages: string[],
   localePathRedirect: boolean,
   ignoreRedirectRoutes: string[] | ((pathname: string) => boolean) | undefined,
-  localisedUrls: LocalisedUrlsOption | undefined,
   setLang: (lang: string) => void,
-  synchronizeLanguage: (lang: string) => void,
+  urlStrategy?: I18nUrlStrategy,
 ) {
   const instance = i18nInstance || createMinimalI18nInstance(lang);
   return {
@@ -66,9 +65,8 @@ export function createContextValue(
     languages,
     localePathRedirect,
     ignoreRedirectRoutes,
-    localisedUrls,
+    urlStrategy,
     updateLanguage: setLang,
-    synchronizeLanguage,
   };
 }
 
@@ -179,7 +177,7 @@ export function useClientSideRedirect(
   languages: string[],
   fallbackLanguage: string,
   ignoreRedirectRoutes?: string[] | ((pathname: string) => boolean),
-  localisedUrls?: LocalisedUrlsOption,
+  urlStrategy?: I18nUrlStrategy,
 ) {
   const urlRef = useRef('');
   const { navigate, location, hasRouter } = useI18nRouterAdapter();
@@ -220,7 +218,14 @@ export function useClientSideRedirect(
     const entryPath = getEntryPath();
     const relativePath = currentPathname.replace(entryPath, '');
 
-    if (shouldIgnoreRedirect(relativePath, languages, ignoreRedirectRoutes)) {
+    if (
+      shouldIgnoreRedirect(
+        relativePath,
+        languages,
+        ignoreRedirectRoutes,
+        urlStrategy,
+      )
+    ) {
       return;
     }
 
@@ -241,7 +246,7 @@ export function useClientSideRedirect(
       relativePath,
       targetLanguage,
       languages,
-      localisedUrls,
+      urlStrategy,
     );
     const newUrl = entryPath + newPath + currentSearch + currentHash;
 
@@ -265,7 +270,7 @@ export function useClientSideRedirect(
     languages,
     fallbackLanguage,
     ignoreRedirectRoutes,
-    localisedUrls,
+    urlStrategy,
   ]);
 }
 

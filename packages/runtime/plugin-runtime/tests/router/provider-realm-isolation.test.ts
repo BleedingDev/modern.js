@@ -1,7 +1,8 @@
+import type { RouterProviderFactory } from '@modern-js/runtime-extensions/router-provider';
 import { rstest } from '@rstest/core';
-import type { RouterProviderFactory } from '../../src/router/runtime/provider';
 
-type ProviderRuntime = typeof import('../../src/router/runtime/provider');
+type ProviderRuntime =
+  typeof import('@modern-js/runtime-extensions/router-provider');
 
 const V2_REGISTRY_SLOT: unique symbol = Symbol.for(
   '@modern-js/runtime:router-providers:v2',
@@ -60,7 +61,7 @@ function installCompatibilityProvider(
 
 async function loadVerticalRuntime(): Promise<ProviderRuntime> {
   rstest.resetModules();
-  return import('../../src/router/runtime/provider');
+  return import('@modern-js/runtime-extensions/router-provider');
 }
 
 function createVerticalRealm(

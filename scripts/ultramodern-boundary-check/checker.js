@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { parseSync, types: babelTypes } = require('@babel/core');
 
 const { extractImportSpecifiers } = require('../boundary-guards/validator');
 const { createProcessEnv, runCommand } = require('../lib/process-kit');
@@ -124,6 +125,455 @@ const findDenylistMatches = ({ specifier, denylist = DEFAULT_DENYLIST }) => {
   );
 };
 
+const NATIVE_REQUEST_PACKAGE = 'packages/server/create-request';
+const NATIVE_REQUEST_SPECIFIER = '@modern-js/create-request';
+const NATIVE_REQUEST_BINDINGS = new Set([
+  'configure',
+  'createRequest',
+  'createUploader',
+]);
+// Six audited native files plus the reviewed native factory/header extraction.
+// This is classification evidence, not a divergence budget or semantic proof.
+const NATIVE_REQUEST_SOURCE_FILES = new Set([
+  'browser.ts',
+  'node.ts',
+  'types.ts',
+  'handleRes.ts',
+  'utiles.ts',
+  'qs.ts',
+  'headers.ts',
+  'requestFactory.ts',
+]);
+const NATIVE_REQUEST_DEPENDENCIES = new Set([
+  '@modern-js/runtime-utils',
+  '@modern-js/types',
+  '@modern-js/utils',
+  '@swc/helpers',
+  'encoding',
+  'path-to-regexp',
+  'qs',
+]);
+const NATIVE_REQUEST_TYPES = new Set([
+  'RequestOptions',
+  'UploadOptions',
+  'BFFRequestPayload',
+  'Sender',
+  'HttpMethodDecider',
+  'RequestTarget',
+  'RequestHeaders',
+  'RequestFetcher',
+  'RequestStartContext',
+  'RequestHeadersContext',
+  'RequestDispatchContext',
+  'RequestHooks',
+  'RequestCreatorOptions',
+  'RequestCreator',
+  'UploadCreatorOptions',
+  'UploadCreator',
+  'IOptions',
+  'RequestClient',
+]);
+const RETIRED_REQUEST_POLICY_NAMES = new Set([
+  'BFF_ENVELOPE_HEADER',
+  'BFF_OPERATION_CONTEXT_HEADER',
+  'BFF_OPERATION_CONTEXT_DETAIL_HEADER',
+  'BFF_DEFAULT_PROTECTED_IDENTITY_HEADERS',
+  'ResolveHeadersOptions',
+  'ResolveHeaders',
+  'AllowCrossOriginEnvelopeOptions',
+  'AllowCrossOriginEnvelope',
+  'TransportTarget',
+  'RetryDecisionContext',
+  'RetryBackoffOptions',
+  'DegradedModeReason',
+  'DegradedModeEvent',
+  'TransportResilienceOptions',
+  'IdentityBindingViolationReason',
+  'IdentityBindingViolation',
+  'DeriveIdentityHeadersOptions',
+  'IdentityBindingOptions',
+  'OperationContractViolationReason',
+  'OperationContractViolation',
+  'CrossProjectOperationContract',
+  'CrossProjectPolicyViolationReason',
+  'CrossProjectPolicyViolation',
+  'OperationContractOptions',
+  'OperationContextSource',
+  'OperationContext',
+  'CrossOriginEnvelopePolicyError',
+  'IdentityBindingViolationError',
+  'OperationContractViolationError',
+  'ProducerClientNotInitializedError',
+  'ProducerDomainNotConfiguredError',
+  'requireEnvelope',
+  'allowCrossOriginEnvelope',
+  'resolveHeaders',
+  'transport',
+  'identityBinding',
+  'operationContract',
+  'operationContext',
+  'traceparent',
+  'policyCore',
+  'requestContext',
+]);
+
+const parseSourceAst = (content, file) => {
+  try {
+    return parseSync(content, {
+      filename: file,
+      babelrc: false,
+      configFile: false,
+      sourceType: 'unambiguous',
+      parserOpts: {
+        plugins: ['typescript', ...(file.endsWith('x') ? ['jsx'] : [])],
+      },
+    });
+  } catch {
+    return null;
+  }
+};
+
+const astName = node =>
+  node?.type === 'Identifier'
+    ? node.name
+    : node?.type === 'StringLiteral'
+      ? node.value
+      : null;
+
+const collectModuleReferences = ast => {
+  const references = [];
+  babelTypes.traverseFast(ast, node => {
+    let source;
+    if (
+      node.type === 'ImportDeclaration' ||
+      node.type === 'ExportNamedDeclaration' ||
+      node.type === 'ExportAllDeclaration'
+    ) {
+      if (!node.source) return;
+      source = node.source;
+    } else if (node.type === 'ImportExpression') {
+      source = node.source;
+    } else if (node.type === 'TSImportType') {
+      source = node.argument;
+    } else if (
+      node.type === 'TSImportEqualsDeclaration' &&
+      node.moduleReference.type === 'TSExternalModuleReference'
+    ) {
+      source = node.moduleReference.expression;
+    } else if (
+      node.type === 'CallExpression' &&
+      (node.callee.type === 'Import' ||
+        (node.callee.type === 'Identifier' && node.callee.name === 'require'))
+    ) {
+      source = node.arguments[0];
+    } else {
+      return;
+    }
+    references.push({
+      node,
+      specifier: source?.type === 'StringLiteral' ? source.value : null,
+    });
+  });
+  return references;
+};
+
+const hasOnlyNativeRequestBindings = (content, file = 'index.ts') => {
+  const ast = parseSourceAst(content, file);
+  if (!ast) return false;
+  const references = collectModuleReferences(ast).filter(
+    reference => reference.specifier === NATIVE_REQUEST_SPECIFIER,
+  );
+  return (
+    references.length > 0 &&
+    references.every(({ node }) => {
+      if (node.type === 'ImportDeclaration') {
+        return (
+          node.specifiers.length > 0 &&
+          node.specifiers.every(
+            specifier =>
+              specifier.type === 'ImportSpecifier' &&
+              NATIVE_REQUEST_BINDINGS.has(astName(specifier.imported)),
+          )
+        );
+      }
+      return (
+        node.type === 'ExportNamedDeclaration' &&
+        node.specifiers.length > 0 &&
+        node.specifiers.every(
+          specifier =>
+            specifier.type === 'ExportSpecifier' &&
+            NATIVE_REQUEST_BINDINGS.has(astName(specifier.local)),
+        )
+      );
+    })
+  );
+};
+
+const publicBindings = ast => {
+  const bindings = [];
+  const wildcardSources = [];
+  for (const node of ast.program.body) {
+    if (
+      node.type === 'ExportDefaultDeclaration' ||
+      node.type === 'TSExportAssignment'
+    ) {
+      return null;
+    }
+    if (node.type === 'ExportAllDeclaration') {
+      wildcardSources.push(astName(node.source));
+    }
+    if (node.type !== 'ExportNamedDeclaration') continue;
+    if (node.declaration) {
+      const declaration = node.declaration;
+      const typeOnly =
+        declaration.type === 'TSTypeAliasDeclaration' ||
+        declaration.type === 'TSInterfaceDeclaration';
+      const names = typeOnly
+        ? [declaration.id.name]
+        : Object.keys(babelTypes.getBindingIdentifiers(declaration));
+      if (names.length === 0) return null;
+      bindings.push(...names.map(name => ({ name, typeOnly })));
+    }
+    for (const specifier of node.specifiers) {
+      if (specifier.type !== 'ExportSpecifier') return null;
+      bindings.push({
+        name: astName(specifier.exported),
+        typeOnly: node.exportKind === 'type' || specifier.exportKind === 'type',
+      });
+    }
+  }
+  return { bindings, wildcardSources };
+};
+
+const containsRetiredRequestPolicy = ast => {
+  let found = false;
+  babelTypes.traverseFast(ast, node => {
+    if (
+      node.type === 'Identifier' &&
+      RETIRED_REQUEST_POLICY_NAMES.has(node.name)
+    ) {
+      found = true;
+    }
+    // Quoted/computed property keys are code, unlike unrelated string values.
+    if (
+      RETIRED_REQUEST_POLICY_NAMES.has(astName(node.key)) ||
+      ((node.type === 'MemberExpression' ||
+        node.type === 'OptionalMemberExpression') &&
+        RETIRED_REQUEST_POLICY_NAMES.has(astName(node.property)))
+    ) {
+      found = true;
+    }
+  });
+  return found;
+};
+
+const isRecord = value =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const stringLeaves = value => {
+  if (typeof value === 'string') return [value];
+  if (!isRecord(value) && !Array.isArray(value)) return [null];
+  const children = Object.values(value);
+  return children.length > 0 ? children.flatMap(stringLeaves) : [null];
+};
+
+const isNativeCreateRequestSurface = ({ manifest, sources }) => {
+  if (!isRecord(manifest) || manifest.name !== NATIVE_REQUEST_SPECIFIER) {
+    return false;
+  }
+  if (
+    !isRecord(manifest.exports) ||
+    JSON.stringify(Object.keys(manifest.exports).sort()) !==
+      JSON.stringify(['.', './client', './server'])
+  ) {
+    return false;
+  }
+  if (
+    !isRecord(manifest.typesVersions) ||
+    Object.keys(manifest.typesVersions).length !== 1 ||
+    !isRecord(manifest.typesVersions['*']) ||
+    JSON.stringify(Object.keys(manifest.typesVersions['*']).sort()) !==
+      JSON.stringify(['.', 'client', 'server'])
+  ) {
+    return false;
+  }
+  const targets = [
+    manifest.main,
+    manifest.types,
+    manifest['modern:source'],
+    ...stringLeaves(manifest.exports),
+    ...stringLeaves(manifest.typesVersions),
+  ];
+  if (
+    targets.some(
+      target =>
+        typeof target !== 'string' ||
+        !/^\.\/(?:src\/(?:node|browser)\.ts|dist\/(?:types\/(?:node|browser)\.d\.ts|(?:cjs|esm|esm-node)\/(?:node|browser)\.(?:js|mjs)))$/.test(
+          target,
+        ),
+    )
+  ) {
+    return false;
+  }
+  for (const field of [
+    'dependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ]) {
+    if (
+      manifest[field] !== undefined &&
+      (!isRecord(manifest[field]) ||
+        Object.entries(manifest[field]).some(
+          ([name, range]) =>
+            !NATIVE_REQUEST_DEPENDENCIES.has(name) ||
+            typeof range !== 'string' ||
+            (range.includes(':') && !range.startsWith('workspace:')),
+        ))
+    ) {
+      return false;
+    }
+  }
+  if (
+    !isRecord(sources) ||
+    !['node.ts', 'browser.ts', 'types.ts'].every(file =>
+      Object.hasOwn(sources, file),
+    ) ||
+    Object.keys(sources).some(file => !NATIVE_REQUEST_SOURCE_FILES.has(file))
+  ) {
+    return false;
+  }
+  for (const [file, content] of Object.entries(sources)) {
+    const ast = parseSourceAst(content, file);
+    if (!ast || containsRetiredRequestPolicy(ast)) return false;
+    for (const { specifier } of collectModuleReferences(ast)) {
+      if (specifier === null) return false;
+      if (findDenylistMatches({ specifier }).length > 0) return false;
+      if (specifier.startsWith('.')) {
+        const resolved = path.posix.normalize(
+          path.posix.join(path.posix.dirname(file), specifier),
+        );
+        if (
+          !Object.hasOwn(sources, resolved) &&
+          !Object.hasOwn(sources, `${resolved}.ts`)
+        ) {
+          return false;
+        }
+      } else {
+        const dependency = specifier.startsWith('@')
+          ? specifier.split('/').slice(0, 2).join('/')
+          : specifier.split('/')[0];
+        if (
+          !NATIVE_REQUEST_DEPENDENCIES.has(dependency) &&
+          specifier !== 'http' &&
+          specifier !== 'node:http'
+        ) {
+          return false;
+        }
+      }
+    }
+    if (file === 'node.ts' || file === 'browser.ts') {
+      const exports = publicBindings(ast);
+      if (
+        !exports ||
+        exports.bindings.some(
+          binding =>
+            !NATIVE_REQUEST_BINDINGS.has(binding.name) &&
+            binding.name !== 'createClient',
+        ) ||
+        [...NATIVE_REQUEST_BINDINGS].some(
+          name =>
+            !exports.bindings.some(
+              binding => binding.name === name && !binding.typeOnly,
+            ),
+        ) ||
+        exports.wildcardSources.some(source => source !== './types')
+      ) {
+        return false;
+      }
+    }
+    if (file === 'types.ts') {
+      const exports = publicBindings(ast);
+      if (
+        !exports ||
+        exports.wildcardSources.length > 0 ||
+        exports.bindings.some(
+          binding =>
+            !binding.typeOnly || !NATIVE_REQUEST_TYPES.has(binding.name),
+        )
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+const readNativeRequestTarget = ({ rootDir, headRef }) => {
+  const read = file =>
+    headRef
+      ? runGit({ rootDir, args: ['show', `${headRef}:${file}`] }).stdout
+      : fs.readFileSync(path.join(rootDir, file), 'utf8');
+  const manifest = JSON.parse(read(`${NATIVE_REQUEST_PACKAGE}/package.json`));
+  const prefix = `${NATIVE_REQUEST_PACKAGE}/src/`;
+  let files;
+  if (headRef) {
+    const tree = runGit({
+      rootDir,
+      args: ['ls-tree', '-r', '-z', headRef, '--', prefix],
+    }).stdout;
+    files = tree
+      .split('\0')
+      .filter(Boolean)
+      .map(record => {
+        const [metadata, file] = record.split('\t');
+        if (
+          !metadata.startsWith('100644 ') &&
+          !metadata.startsWith('100755 ')
+        ) {
+          throw new Error('Native request source must be an ordinary file.');
+        }
+        return file;
+      });
+  } else {
+    files = fs
+      .readdirSync(path.join(rootDir, prefix), { recursive: true })
+      .map(file => `${prefix}${toPosixPath(file)}`)
+      .filter(file => {
+        const stat = fs.lstatSync(path.join(rootDir, file));
+        if (stat.isSymbolicLink()) {
+          throw new Error('Native request source must not follow symlinks.');
+        }
+        return !stat.isDirectory();
+      });
+  }
+  return {
+    manifest,
+    sources: Object.fromEntries(
+      files.map(file => [file.slice(prefix.length), read(file)]),
+    ),
+  };
+};
+
+const isNativeCreateRequestPackage = ({ rootDir, baseRef, headRef }) => {
+  try {
+    const baseManifest = JSON.parse(
+      runGit({
+        rootDir,
+        args: ['show', `${baseRef}:${NATIVE_REQUEST_PACKAGE}/package.json`],
+      }).stdout,
+    );
+    return (
+      baseManifest.name === NATIVE_REQUEST_SPECIFIER &&
+      isNativeCreateRequestSurface(
+        readNativeRequestTarget({ rootDir, headRef }),
+      )
+    );
+  } catch {
+    // Incomplete, malformed or unreviewed targets retain the original marker.
+    return false;
+  }
+};
+
 const scanUpstreamOwnedForkImports = ({
   rootDir = process.cwd(),
   baseRef = DEFAULT_BASE_REF,
@@ -156,6 +606,7 @@ const scanUpstreamOwnedForkImports = ({
     headRef: headRef === undefined ? undefined : resolvedHead,
   });
   const violations = [];
+  let nativeRequestPackage;
 
   upstreamOwnedFiles.forEach(file => {
     const content =
@@ -165,7 +616,21 @@ const scanUpstreamOwnedForkImports = ({
     const specifiers = [...new Set(extractImportSpecifiers(content))];
 
     specifiers.forEach(specifier => {
-      const markers = findDenylistMatches({ specifier, denylist });
+      let markers = findDenylistMatches({ specifier, denylist });
+      if (
+        specifier === NATIVE_REQUEST_SPECIFIER &&
+        markers.includes('create-request') &&
+        hasOnlyNativeRequestBindings(content, file)
+      ) {
+        nativeRequestPackage ??= isNativeCreateRequestPackage({
+          rootDir,
+          baseRef: resolvedBase,
+          headRef: headRef === undefined ? undefined : resolvedHead,
+        });
+        if (nativeRequestPackage) {
+          markers = markers.filter(marker => marker !== 'create-request');
+        }
+      }
       if (markers.length === 0) {
         return;
       }
@@ -373,10 +838,13 @@ module.exports = {
   createAllowlistSnapshot,
   diffViolations,
   findDenylistMatches,
+  hasOnlyNativeRequestBindings,
   formatBoundaryReport,
   formatViolation,
   listPackageSourceFiles,
   listUpstreamOwnedPackageSourceFiles,
+  isNativeCreateRequestPackage,
+  isNativeCreateRequestSurface,
   pathExistsAtRef,
   readAllowlist,
   scanUpstreamOwnedForkImports,

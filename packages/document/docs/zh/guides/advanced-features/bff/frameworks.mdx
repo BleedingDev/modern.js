@@ -5,10 +5,10 @@ title: 运行时框架
 
 # 运行时框架
 
-Modern.js 目前支持两种 BFF 运行时框架：
+Modern.js 与 UltraModern BFF 扩展提供两种运行时框架：
 
-- `effect`（默认）：使用 `api/index` 的 [Effect HttpApi](https://effect.website/) 运行时。
-- `hono`：使用 `api/lambda/**` 的文件约定 BFF 处理函数。
+- `hono` 是原生插件的默认运行时，使用 `api/lambda/**` 的文件约定处理函数。
+- `effect` 是 UltraModern 扩展的默认运行时，使用 `api/index` 的 [Effect HttpApi](https://effect.website/) 运行时。
 
 `effect` 与 `hono` 为严格模式，两者之间不会自动回退。
 
@@ -22,12 +22,16 @@ workspace 中加入 Hono/file-convention handler、原始 request parsing 或手
 
 ## 切换到 Effect 运行时
 
+使用下面的 fork 构建插件，它会包含原生 BFF 插件并注册 Effect 适配器。应用需要将
+同一框架版本组中的 `@modern-js/bff-effect` 和 `@modern-js/plugin-bff-extensions`
+安装为生产依赖。Effect 的精确 peer 版本见 [`bff.effect`](/configure/app/bff/effect)。
+
 ```ts title="modern.config.ts"
-import { bffPlugin } from '@modern-js/plugin-bff';
-import { defineConfig } from '@modern-js/app-tools';
+import { bffPlugin } from '@modern-js/plugin-bff-build-extensions';
+import { appTools, defineConfig } from '@modern-js/app-tools';
 
 export default defineConfig({
-  plugins: [bffPlugin()],
+  plugins: [appTools(), bffPlugin()],
   bff: {
     runtimeFramework: 'effect',
     effect: {
@@ -49,7 +53,7 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   Schema,
-} from '@modern-js/plugin-bff/effect-client';
+} from '@modern-js/bff-effect/effect-client';
 
 export const bffApi = HttpApi.make('MyApi').add(
   HttpApiGroup.make('hello').add(
@@ -63,14 +67,12 @@ export const bffApi = HttpApi.make('MyApi').add(
 然后在 `api/index.ts` 中实现 Effect BFF 入口：
 
 ```ts title="api/index.ts"
-import {
-  Schema,
-  Effect,
-  HttpApiBuilder,
-  defineEffectBff,
-  Layer,
-  ServiceMap,
-} from '@modern-js/plugin-bff/effect-server';
+import { defineEffectBff } from '@modern-js/bff-effect/effect';
+import * as Context from 'effect/Context';
+import * as Effect from 'effect/Effect';
+import * as Layer from 'effect/Layer';
+import * as Schema from 'effect/Schema';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 import { bffApi } from '../shared/api';
 
 class GreetingUnavailableError extends Schema.TaggedError<GreetingUnavailableError>()(
@@ -80,7 +82,7 @@ class GreetingUnavailableError extends Schema.TaggedError<GreetingUnavailableErr
   },
 ) {}
 
-class GreetingService extends ServiceMap.Service<GreetingService>()('GreetingService', {
+class GreetingService extends Context.Service<GreetingService>()('GreetingService', {
   make: Effect.succeed({
     hello: Effect.fn('GreetingService.hello')(function* () {
       if (Date.now() < 0) {
@@ -124,6 +126,10 @@ const response = await api.client.hello.ping({});
 ```
 
 `api.client.*` 由 BFF loader 针对 `@api/index` 导入物化生成。不要直接导入 `api/index` 并期望在服务端代码、脚本或测试中运行 `client`；直接导入入口时拿到的是服务端运行时定义，其中的 `client` 只是类型占位。
+
+原生 Hono 应用从 `@modern-js/plugin-bff/server` 导入操作符。生成的 UltraModern
+应用继续使用严格 Effect API。Worker handler 及其请求上下文使用
+`@modern-js/bff-effect/effect-edge`；Node handler 使用上面示例中的 Effect 入口。
 
 import Hono from '@site-docs/components/hono';
 

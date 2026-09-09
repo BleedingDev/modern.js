@@ -15,10 +15,13 @@
     "@modern-js/server-runtime": "workspace:*",
     "effect": "4.0.0-rc.112",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "@modern-js/bff-effect": "workspace:*",
+    "@modern-js/plugin-bff-extensions": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/app-tools": "workspace:*",
+    "@modern-js/plugin-bff-build-extensions": "workspace:*",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",

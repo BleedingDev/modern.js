@@ -1,4 +1,4 @@
-import type { RouterProviderFactory } from '@modern-js/runtime/context';
+import type { RouterProviderFactory } from '@modern-js/runtime-extensions/router-provider';
 import { rstest } from '@rstest/core';
 import type { RouterExtendsHooks } from '../src/runtime/hooks';
 
@@ -12,6 +12,7 @@ type RouterModule = typeof import('../src/runtime/router');
 
 type Vertical = {
   context: RuntimeContextModule;
+  providers: typeof import('@modern-js/runtime-extensions/router-provider');
   factory: RouterProviderFactory;
   hooks: RouterExtendsHooks;
   Link: unknown;
@@ -32,8 +33,12 @@ async function loadVertical(): Promise<Vertical> {
   const { Link } = await import('../src/runtime/prefetchLink');
   const { useMatches } = await import('../src/runtime/routeHooks');
 
+  const providers = await import(
+    '@modern-js/runtime-extensions/router-provider'
+  );
   return {
     context,
+    providers,
     factory: tanstackRouterProviderFactory,
     hooks: routerProviderRegistryHooks,
     Link,
@@ -50,6 +55,7 @@ function setupRouterWrapper(vertical: Vertical) {
   const plugin = vertical.routerPlugin({ framework: 'tanstack' });
   plugin.setup?.({
     getHooks: () => vertical.hooks,
+    onAfterCreateRouter: () => undefined,
     getRuntimeConfig: () => ({ router: { framework: 'tanstack' } }),
     onBeforeRender: listener => {
       onBeforeRender = listener;
@@ -101,7 +107,7 @@ describe('TanStack provider runtime-realm isolation', () => {
 
       // Mixed-version callers that do not supply a realm still see the shared
       // keep-first fallback, but production wrappers no longer consume it.
-      expect(verticalB.context.resolveRouterProvider('tanstack')).toBe(
+      expect(verticalB.providers.resolveRouterProvider('tanstack')).toBe(
         verticalA.factory,
       );
       expect(warnSpy).toHaveBeenCalledWith(

@@ -1,10 +1,16 @@
 import type { ServerUserConfig } from '@modern-js/app-tools';
 import type {
+  SSRAssetGroup,
+  SSRAssetTransformInfo,
+  SSRRenderAsset,
   SSRRenderLifecycle,
   SSRRenderTerminal,
+  SSRRouterData,
+  SSRTemplateChunk,
   StreamSSRExtender,
 } from '@modern-js/plugin/runtime';
 import type { HandleRequestOptions } from './requestHandler';
+import { attributesToString, hasStylesheetLink, safeReplace } from './utils';
 
 export type RenderOptions = HandleRequestOptions;
 
@@ -34,6 +40,33 @@ export function buildHtml(template: string, callbacks: BuildHtmlCb[]) {
 export function createSSRRenderLifecycle(observers: SSRRenderLifecycle[]) {
   let terminal: SSRRenderTerminal | undefined;
   return {
+    transformAssets<T extends SSRRenderAsset>(
+      groups: readonly SSRAssetGroup<T>[],
+      info: Omit<SSRAssetTransformInfo<T>, 'groups'>,
+    ): readonly T[] {
+      let assets: readonly T[] = groups.flatMap(group => group.assets);
+      for (const observer of observers) {
+        assets =
+          observer.transformAssets?.(assets, { ...info, groups }) ?? assets;
+      }
+      return assets;
+    },
+    transformTemplateChunk(chunk: SSRTemplateChunk): SSRTemplateChunk {
+      for (const observer of observers) {
+        chunk =
+          observer.transformTemplateChunk?.(chunk, {
+            attributesToString,
+            hasStylesheetLink,
+          }) ?? chunk;
+      }
+      return chunk;
+    },
+    getRouterData(): SSRRouterData | undefined {
+      let data: SSRRouterData | undefined;
+      for (const observer of observers)
+        data = observer.getRouterData?.() ?? data;
+      return data;
+    },
     get terminal() {
       return terminal;
     },
@@ -58,6 +91,17 @@ export function createSSRRenderLifecycle(observers: SSRRenderLifecycle[]) {
       }
     },
   };
+}
+
+export function replaceSSRTemplateChunk(
+  chunk: SSRTemplateChunk,
+  lifecycle?: ReturnType<typeof createSSRRenderLifecycle>,
+  options: { preserveEmpty?: boolean } = {},
+): string {
+  const result = lifecycle?.transformTemplateChunk(chunk) ?? chunk;
+  if (options.preserveEmpty === true && result.content === '')
+    return result.template;
+  return safeReplace(result.template, result.placeholder, result.content);
 }
 
 export function orderSSRStreamTransforms(extenders: StreamSSRExtender[]) {

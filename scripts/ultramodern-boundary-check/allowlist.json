@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "baseRef": "8a744c1b",
+  "baseRef": "8a744c1b3178d1e85d4113f29e8837ff94079fb3",
   "migrationGoal": "Shrink this list as UltraModern-only imports move out of upstream-owned files.",
   "denylist": [
     "@modern-js/plugin-tanstack",
@@ -14,42 +14,5 @@
     "superapp",
     "delivery-unit"
   ],
-  "violations": [
-    {
-      "file": "packages/cli/plugin-bff/src/runtime/create-request/index.ts",
-      "specifier": "@modern-js/create-request"
-    },
-    {
-      "file": "packages/server/prod-server/src/apply.ts",
-      "specifier": "@modern-js/server-runtime-extensions"
-    },
-    {
-      "file": "packages/server/prod-server/src/index.ts",
-      "specifier": "@modern-js/server-runtime-extensions"
-    },
-    {
-      "file": "packages/solutions/app-tools/src/index.ts",
-      "specifier": "./plugins/ultramodernReleaseEnvelope"
-    },
-    {
-      "file": "packages/solutions/app-tools/src/index.ts",
-      "specifier": "./presetUltramodern"
-    },
-    {
-      "file": "packages/toolkit/create/src/index.ts",
-      "specifier": "./ultramodern-tooling/commands"
-    },
-    {
-      "file": "packages/toolkit/create/src/index.ts",
-      "specifier": "./ultramodern-workspace"
-    },
-    {
-      "file": "packages/toolkit/create/src/index.ts",
-      "specifier": "./ultramodern-workspace/bridge-config"
-    },
-    {
-      "file": "packages/toolkit/utils/src/universal/index.ts",
-      "specifier": "./backend-federation-contract"
-    }
-  ]
+  "violations": []
 }

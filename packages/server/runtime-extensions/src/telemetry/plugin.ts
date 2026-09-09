@@ -1,10 +1,10 @@
-import { parseTraceparent } from '@modern-js/create-request/server';
+import { parseTraceparent } from '@modern-js/runtime-extensions/request-context';
+import type { ServerTelemetryUserConfig } from '@modern-js/runtime-extensions/server-config';
 import type {
   Context,
   Next,
   ServerEnv,
   ServerPlugin,
-  ServerTelemetryUserConfig,
 } from '@modern-js/server-core';
 import type { CoreMonitor } from '@modern-js/types';
 import { logger } from '@modern-js/utils';
@@ -98,6 +98,8 @@ export const resolveTelemetrySloOptions = (
 
 export const injectTelemetryPlugin = (): ServerPlugin => ({
   name: '@modern-js/inject-telemetry',
+  pre: ['@modern-js/plugin-inject-route'],
+  post: ['@modern-js/plugin-inject-config-middleware'],
   setup(api) {
     const serverConfig = api.getServerConfig();
     const telemetryConfig = serverConfig?.server?.telemetry;

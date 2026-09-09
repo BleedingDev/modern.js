@@ -25,26 +25,7 @@ type InternalRuntimeContextLike = {
   [key: string]: any;
 };
 
-export {
-  createRuntimeContextExtension,
-  type RuntimeContextExtension,
-} from '@modern-js/runtime-extensions/context-extensions';
-export {
-  applyRouterRuntimeState,
-  applyRouterServerPrepareResult,
-  cleanupRouterRuntimeState,
-  createRouterRuntimeState,
-  createRouterServerSnapshot,
-  getRouterHydrationScripts,
-  getRouterMatchedRouteIds,
-  getRouterRuntimeState,
-  getRouterServerSnapshot,
-  type RouterLifecyclePhase,
-} from '@modern-js/runtime-extensions/router-state';
-// Router runtime state shared between router providers (react-router,
-// @modern-js/plugin-tanstack, ...) and the SSR pipeline. Exported from the
-// `/context` subpath so router plugins can use it without pulling the
-// react-router based runtime in.
+// Native router hooks and context identities are shared across router plugins.
 export { DefaultNotFound } from '../../router/runtime/DefaultNotFound';
 export {
   modifyRoutes,
@@ -55,27 +36,13 @@ export {
   onBeforeHydrateRouter,
   type RouterExtendsHooks,
   type RouterLifecycleContext,
-} from '../../router/runtime/hooks';
-export {
-  createRouterProviderRealm,
-  type RouterProviderFactory,
-  type RouterProviderPlugin,
-  type RouterProviderRealm,
-  type RouterProviderRegistration,
-  registerRouterProvider,
-  resolveRouterProvider,
   routerProviderRegistryHooks,
-} from '../../router/runtime/provider';
+} from '../../router/runtime/hooks';
+export type { LinkPrefetchPolicy } from '../../router/runtime/PrefetchLink';
 export type {
-  BuiltInRouterFramework,
-  InternalRouterRuntimeState,
-  InternalRouterServerSnapshot,
   LoaderFunction,
   LoaderFunctionArgs,
   ModernRoute,
-  RouterFramework,
-  RouterRouteMatchSnapshot,
-  RouterServerPrepareResult,
 } from '../../router/runtime/types';
 export {
   getInitialContext,

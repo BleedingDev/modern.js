@@ -6,26 +6,11 @@ import {
   loadServerPlugins,
   loadServerRuntimeConfig,
 } from '@modern-js/server-core/node';
-import { disposeServerRuntime } from '@modern-js/server-runtime-extensions/runtime-lifecycle';
 import { logger } from '@modern-js/utils';
 import { applyPlugins } from './apply';
 import type { BaseEnv, ProdServerOptions } from './types';
 
 export type { ServerPlugin } from '@modern-js/server-core';
-export type {
-  TelemetryHealthEvaluation,
-  TelemetryQueueStats,
-  TelemetrySloAlert,
-} from '@modern-js/server-runtime-extensions';
-export {
-  createOtlpTelemetryExporter,
-  createTelemetryAwareMetrics,
-  createVictoriaMetricsTelemetryExporter,
-  hasEnabledTelemetryExporters,
-  TelemetryHealthMonitor,
-  TelemetryRegistry,
-  TelemetryStartupHealthError,
-} from '@modern-js/server-runtime-extensions';
 export { type ApplyPlugins, applyPlugins } from './apply';
 export type { BaseEnv, ProdServerOptions } from './types';
 export { loadServerPlugins };
@@ -64,17 +49,17 @@ export const createProdServer = async (
 
   // load env file.
   const nodeServer = await createNodeServer(server.handle.bind(server));
+  let disposePromise: Promise<void> | undefined;
+  const dispose = () => (disposePromise ??= server.dispose());
   nodeServer.once('close', () => {
-    void disposeServerRuntime(server).catch((error: unknown) =>
-      logger.error(error),
-    );
+    void dispose().catch((error: unknown) => logger.error(error));
   });
 
   try {
     await applyPlugins(server, options, nodeServer);
     await server.init();
   } catch (error) {
-    await disposeServerRuntime(server).catch((disposeError: unknown) =>
+    await dispose().catch((disposeError: unknown) =>
       logger.error(disposeError),
     );
     throw error;

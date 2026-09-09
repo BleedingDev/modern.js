@@ -8,3 +8,4 @@ export {
   type OnResetFn,
 } from './hooks';
 export { createServer, type ServerCreateOptions, server } from './run';
+export type { BffRuntimeFramework, BffRuntimeRegistry } from './run/types';

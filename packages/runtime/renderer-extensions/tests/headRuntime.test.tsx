@@ -1,13 +1,15 @@
 import { getHelmetContext } from '@modern-js/runtime-extensions/helmet-context';
+import {
+  applyRouterRuntimeState,
+  getRouterRuntimeState,
+  getRouterServerSnapshot,
+} from '@modern-js/runtime-extensions/router-state';
 import React, { useContext } from 'react';
 import { renderToReadableStream, renderToString } from 'react-dom/server';
 import {
-  applyRouterRuntimeState,
   getGlobalEnableRsc,
   getGlobalInternalRuntimeContext,
   getInitialContext,
-  getRouterRuntimeState,
-  getRouterServerSnapshot,
   InternalRuntimeContext,
   RuntimeContext,
   setGlobalContext,

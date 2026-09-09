@@ -27,6 +27,7 @@ const ensureWorkspacePackages = [
   '@modern-js/prod-server',
   '@modern-js/app-tools',
   '@modern-js/create-request',
+  '@modern-js/runtime-extensions',
   '@modern-js/bff-core',
   '@modern-js/runtime',
   '@modern-js/plugin-bff',

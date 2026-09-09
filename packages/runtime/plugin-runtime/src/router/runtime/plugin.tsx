@@ -1,6 +1,5 @@
 // @effect-diagnostics globalConsole:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type { RuntimePluginAPI } from '@modern-js/plugin/runtime';
-import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import { merge } from '@modern-js/runtime-utils/merge';
 import type { RouterSubscriber } from '@modern-js/runtime-utils/router';
 import {
@@ -30,8 +29,8 @@ import {
 } from '../../core/context';
 import type { TInternalRuntimeContext } from '../../core/context/runtime';
 import type { RouterExtendsHooks, RouterLifecycleContext } from './hooks';
+import { routerProviderRegistryHooks } from './hooks';
 import { Link as PrefetchLink } from './PrefetchLink';
-import { routerProviderRegistryHooks } from './provider';
 import { createClientRouterFromPayload } from './rsc-router';
 import type { ModernRoute, RouterConfig, Routes } from './types';
 import {
@@ -348,11 +347,6 @@ function useRouterCreation(props: any, options: UseRouterCreationOptions) {
           basename: _basename,
           hydrationData,
         });
-    applyRouterRuntimeState(runtimeContext, {
-      framework: 'react-router',
-      basename: _basename,
-      instance: router,
-    });
     hooks.onAfterCreateRouter.call({
       ...routerLifecycleContext,
       router,

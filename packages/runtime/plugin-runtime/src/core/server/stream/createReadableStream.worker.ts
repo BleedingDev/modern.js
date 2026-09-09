@@ -34,7 +34,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       config,
       ssrConfig,
       entryName,
-      moduleFederationCssAssets,
+      resource,
       rscManifest,
       rscRoot,
     } = options;
@@ -44,6 +44,8 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       hooks.extendStreamSSR.call({
         runtimeContext,
         request,
+        resource,
+        config,
         platform: 'web',
         mode: 'stream',
         isRsc,
@@ -67,7 +69,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       request,
       config,
       entryName,
-      moduleFederationCssAssets,
+      lifecycle,
     };
     try {
       request.signal.throwIfAborted();

@@ -1,18 +1,8 @@
 // @effect-diagnostics asyncFunction:off nodeBuiltinImport:off strictBooleanExpressions:off
 import { type GenClientOptions, generateClient } from '@modern-js/bff-core';
-import {
-  bundleEffectWorkerRuntimeSource,
-  generateEffectClientCode,
-  resolveEffectEntryFile,
-  generateEffectWorkerRuntimeWrapper as workerWrapper,
-} from '@modern-js/plugin-bff-extensions/effect-source-loader';
 import type { HttpMethodDecider } from '@modern-js/types';
 import { logger } from '@modern-js/utils';
 import type { Rspack } from '@rsbuild/core';
-import path from 'path';
-
-const EFFECT_BFF_WORKER_RUNTIME_QUERY = 'modern-bff-runtime';
-const EFFECT_BFF_WORKER_RUNTIME_SOURCE_QUERY = 'modern-bff-runtime-source';
 
 const createErrorModule = (message: string) =>
   `throw new Error(${JSON.stringify(message)});`;
@@ -26,41 +16,11 @@ export type APILoaderOptions = {
   port: number;
   fetcher?: string;
   requestCreator?: string;
+  clientCodegenPlugin?: string;
   requestId?: string;
   target: string;
   httpMethodDecider?: HttpMethodDecider;
-  bffRuntimeFramework?: 'hono' | 'effect';
-  effectEntry?: string;
-  effectDataPlatformBatch?: {
-    enabled?: boolean;
-    endpoint?: string;
-    flushIntervalMs?: number;
-    maxBatchSize?: number;
-    maxBatchBytes?: number;
-    requestTimeoutMs?: number;
-    allowedMethods?: string[];
-  };
 };
-
-async function transformEffectRuntimeSource(source: string, filename: string) {
-  const swc = await import('@swc/core');
-  const result = await swc.transform(source, {
-    filename,
-    sourceMaps: false,
-    jsc: {
-      parser: {
-        syntax: 'typescript',
-        tsx: filename.endsWith('.tsx') || filename.endsWith('.jsx'),
-      },
-      target: 'es2024',
-    },
-    module: {
-      type: 'es6',
-    },
-  });
-
-  return result.code;
-}
 
 async function loader(
   this: Rspack.LoaderContext<APILoaderOptions>,
@@ -75,68 +35,6 @@ async function loader(
   const callback = this.async();
 
   const draftOptions = this.getOptions();
-  const resourceQueries = new URLSearchParams(this.resourceQuery);
-  const effectEntryFile = resolveEffectEntryFile({
-    appDir: draftOptions.appDir,
-    apiDir: draftOptions.apiDir,
-    effectEntry: draftOptions.effectEntry,
-  });
-
-  if (
-    draftOptions.bffRuntimeFramework === 'effect' &&
-    effectEntryFile &&
-    path.resolve(effectEntryFile) === path.resolve(resourcePath) &&
-    resourceQueries.has(EFFECT_BFF_WORKER_RUNTIME_SOURCE_QUERY)
-  ) {
-    const code = await bundleEffectWorkerRuntimeSource(
-      await transformEffectRuntimeSource(source, resourcePath),
-      resourcePath,
-      this,
-    );
-    callback(undefined, code);
-    return;
-  }
-
-  if (
-    draftOptions.bffRuntimeFramework === 'effect' &&
-    effectEntryFile &&
-    path.resolve(effectEntryFile) === path.resolve(resourcePath) &&
-    resourceQueries.has(EFFECT_BFF_WORKER_RUNTIME_QUERY)
-  ) {
-    callback(undefined, await workerWrapper(this, draftOptions, resourcePath));
-    return;
-  }
-
-  if (
-    draftOptions.bffRuntimeFramework === 'effect' &&
-    effectEntryFile &&
-    path.resolve(effectEntryFile) === path.resolve(resourcePath)
-  ) {
-    const code = await generateEffectClientCode({
-      appDir: draftOptions.appDir,
-      apiDir: draftOptions.apiDir,
-      resourcePath,
-      prefix: (Array.isArray(draftOptions.prefix)
-        ? draftOptions.prefix[0]
-        : draftOptions.prefix) as string,
-      port: Number(draftOptions.port),
-      target: draftOptions.target,
-      requestId: draftOptions.requestId,
-      requestCreator: draftOptions.requestCreator,
-      httpMethodDecider: draftOptions.httpMethodDecider,
-      dataPlatformBatch: draftOptions.effectDataPlatformBatch,
-      onDependency: dependency => this.addDependency(dependency),
-    });
-
-    if (code) {
-      callback(undefined, code);
-      return;
-    }
-
-    callback(new Error(`Failed to generate Effect client for ${resourcePath}`));
-    return;
-  }
-
   const warning = `The file ${resourcePath} is not allowed to be imported in src directory, only API definition files are allowed.`;
 
   if (!draftOptions.existLambda) {
@@ -157,6 +55,8 @@ async function loader(
     source,
     resourcePath,
     httpMethodDecider: draftOptions.httpMethodDecider,
+    clientCodegenPlugin: draftOptions.clientCodegenPlugin,
+    requestId: draftOptions.requestId,
   };
 
   const { lambdaDir } = draftOptions;
@@ -176,12 +76,15 @@ async function loader(
 
   options.requireResolve = require.resolve;
 
-  const result = await generateClient(options);
-
-  if (result.isOk) {
-    callback(undefined, result.value);
-  } else {
-    callback(undefined, createErrorModule(result.value));
+  try {
+    const result = await generateClient(options);
+    if (result.isOk) {
+      callback(undefined, result.value);
+    } else {
+      callback(undefined, createErrorModule(result.value));
+    }
+  } catch (error) {
+    callback(error instanceof Error ? error : new Error(String(error)));
   }
 }
 

@@ -81,12 +81,13 @@ export function resolveMfAssetCacheHeaders(
  * - `remoteEntry*.js` revalidates unless explicitly version-pinned via a
  *   `mfv`/`v`/`version` query parameter, in which case it is immutable.
  *
- * Registered by @modern-js/prod-server next to the other fork plugins; the
- * middleware runs in the `pre` phase so it wraps the static-file middleware
- * that actually serves these assets.
+ * Composed with the other fork server plugins. The middleware runs in the
+ * `pre` phase so it wraps the static-file middleware serving these assets.
  */
 export const injectMfAssetCacheHeadersPlugin = (): ServerPlugin => ({
   name: '@modern-js/inject-mf-asset-cache-headers',
+  pre: ['@modern-js/inject-module-federation-css'],
+  post: ['@modern-js/plugin-inject-rsc-manifest'],
 
   setup(api) {
     api.onPrepare(() => {

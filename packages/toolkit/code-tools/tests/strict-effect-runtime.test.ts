@@ -2,7 +2,7 @@ import { strictEffectRuntimeTopologyViolation as violation } from '../src/strict
 
 const imports = `
 import { assembleEffectBffRuntime } from '@fixture/shared-contracts/server/effect-bff-runtime';
-import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/plugin-bff/effect-edge';
+import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';
 import { fixtureApi } from '../shared/api.ts';
 `;
 const group = `const group = HttpApiBuilder.group(fixtureApi, 'fixture', h => h.handle('get', () => undefined));
@@ -129,7 +129,7 @@ defineEffectBff({api: fixtureApi, layer: fixtureLayer});`,
     // TypeScript parsing permits this import/value collision; scope crawling
     // reports it through Babel's Hub, not BABEL_PARSER_SYNTAX_ERROR.
     const duplicate = `import { assembleEffectBffRuntime } from '@fixture/shared-contracts/server/effect-bff-runtime';
-import { HttpApiBuilder, Layer } from '@modern-js/plugin-bff/effect-edge';
+import { HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';
 import { Layer as GovernedReadLayer } from 'effect';
 import { fixtureApi, governedHttpApi } from '../shared/api.ts';
 const group = HttpApiBuilder.group(governedHttpApi, 'fixture', (handlers) => handlers.handle('reachable', () => undefined));
@@ -139,7 +139,7 @@ export default assembleEffectBffRuntime({ api: fixtureApi, handlers: handlers })
   });
 
   test('accepts native RPC composition and rejects transport or handler substitution', () => {
-    const source = `import { defineEffectBff, HttpApi, Layer } from '@modern-js/plugin-bff/effect-edge';
+    const source = `import { defineEffectBff, HttpApi, Layer } from '@modern-js/bff-effect/effect-edge';
 import { fixtureRpcGroup } from '../shared/rpc.ts';
 const api = HttpApi.make('transport'); const layer = Layer.empty;
 const handlers = fixtureRpcGroup.toLayer(fixtureRpcGroup.of({ get: () => undefined }));
@@ -177,5 +177,42 @@ export default defineEffectBff({ api, layer, rpc: { group: fixtureRpcGroup, laye
     };
     expect(violation(source, resolve(false))).toBeUndefined();
     expect(violation(source, resolve(true))).toBeDefined();
+  });
+});
+
+describe('canonical Effect package provenance', () => {
+  const node = direct.replace(
+    "import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';",
+    "import { defineEffectBff } from '@modern-js/bff-effect/effect';\nimport { HttpApiBuilder } from 'effect/unstable/httpapi';\nimport * as Layer from 'effect/Layer';",
+  );
+  test('accepts Node runtime imports split by owning module and preserves namespace aliases', () => {
+    expect(violation(node)).toBeUndefined();
+    const aliased = node
+      .replace('defineEffectBff }', 'defineEffectBff as createRuntime }')
+      .replace(
+        'export default defineEffectBff(',
+        'export default createRuntime(',
+      )
+      .replace('HttpApiBuilder }', 'HttpApiBuilder as Builder }')
+      .replaceAll('HttpApiBuilder.', 'Builder.')
+      .replace('import * as Layer', 'import * as RuntimeLayer')
+      .replaceAll('Layer.', 'RuntimeLayer.');
+    expect(violation(aliased)).toBeUndefined();
+  });
+  test.each([
+    node.replace('import * as Layer', 'import type * as Layer'),
+    node.replace('import * as Layer', "import { '*' as Layer }"),
+    node.replace('import * as Layer', 'import { Layer }'),
+    node.replace("'effect/Layer'", "'effect/Option'"),
+    node.replace("'effect/unstable/httpapi'", "'@foreign/httpapi'"),
+    node.replace(
+      "'@modern-js/bff-effect/effect'",
+      "'@modern-js/plugin-bff/server'",
+    ),
+    node.replace('HttpApiBuilder }', 'fake as HttpApiBuilder }'),
+    `${node}\nLayer.mergeAll = () => undefined;`,
+    node.replace('const handlers', 'const Layer = fake; const handlers'),
+  ])('rejects non-executable or foreign Node bindings', source => {
+    expect(violation(source)).toBeDefined();
   });
 });

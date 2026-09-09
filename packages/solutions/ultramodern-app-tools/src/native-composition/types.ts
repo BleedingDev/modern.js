@@ -1,7 +1,10 @@
 import type { AppUserConfig as NativeAppUserConfig } from '@modern-js/app-tools';
 import type { PrecompressConfig } from '@modern-js/app-tools-extensions/build-config/precompress/plugin';
 import type { CloudflareDeployConfig } from '@modern-js/app-tools-extensions/config';
-import type { ServerTelemetryUserConfig } from '@modern-js/server-core';
+import type {
+  BffRuntimeUserConfig,
+  ServerTelemetryUserConfig,
+} from '@modern-js/runtime-extensions/server-config';
 
 type NativeServerConfig = NonNullable<NativeAppUserConfig['server']>;
 type NativeSSRConfig = Exclude<NativeServerConfig['ssr'], boolean | undefined>;
@@ -18,7 +21,11 @@ export type UltramodernAppUserConfig = Omit<
     ssr?: boolean | (NativeSSRConfig & { moduleFederationAppSSR?: boolean });
     telemetry?: ServerTelemetryUserConfig;
   };
-  bff?: NonNullable<NativeAppUserConfig['bff']> & { requestId?: string };
+  bff?: Omit<
+    NonNullable<NativeAppUserConfig['bff']>,
+    keyof BffRuntimeUserConfig
+  > &
+    BffRuntimeUserConfig & { requestId?: string };
   deploy?: NonNullable<NativeAppUserConfig['deploy']> & CloudflareDeployConfig;
 };
 

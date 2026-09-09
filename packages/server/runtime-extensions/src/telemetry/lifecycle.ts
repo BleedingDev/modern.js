@@ -1,4 +1,5 @@
-import type { ServerTelemetryUserConfig } from '@modern-js/server-core';
+import type { ServerTelemetryUserConfig } from '@modern-js/runtime-extensions/server-config';
+import { logger } from '@modern-js/utils';
 import {
   type ContractGateSnapshotStore,
   resolveContractGateSnapshotPath,
@@ -13,7 +14,7 @@ import {
 } from '../telemetryCore';
 
 type TelemetryLifecycleApi = {
-  getServerContext: () => unknown;
+  onDispose: (disposer: () => Promise<void>) => () => void;
   onPrepare: (prepare: () => Promise<void>) => void;
 };
 
@@ -41,7 +42,7 @@ const ensureTelemetryBeforeExitHook = () => {
   telemetryBeforeExitHookInstalled = true;
   process.on('beforeExit', () => {
     for (const close of [...activeTelemetryLaneClosers]) {
-      void close();
+      void close().catch((error: unknown) => logger.error(error));
     }
   });
 };
@@ -56,42 +57,29 @@ export const registerTelemetryLifecycle = ({
   appDirectory,
 }: RegisterTelemetryLifecycleOptions) => {
   let contractGateSnapshotObserver: ContractGateSnapshotObserver | undefined;
-  let telemetryLaneClosed = false;
-  const closeTelemetryLane = async () => {
-    if (telemetryLaneClosed) {
-      return;
-    }
-    telemetryLaneClosed = true;
-    activeTelemetryLaneClosers.delete(closeTelemetryLane);
-    contractGateSnapshotObserver?.stop();
-    healthMonitor?.stop();
-    await registry.shutdown();
+  let closePromise: Promise<void> | undefined;
+  const closeTelemetryLane = () => {
+    closePromise ??= Promise.resolve().then(async () => {
+      activeTelemetryLaneClosers.delete(closeTelemetryLane);
+      contractGateSnapshotObserver?.stop();
+      healthMonitor?.stop();
+      await registry.shutdown();
+    });
+    return closePromise;
   };
+
+  // Registration precedes exporter startup and any later plugin failure.
+  // Native prod/dev shutdown and runtime retirement share this disposal path.
+  api.onDispose(closeTelemetryLane);
+  activeTelemetryLaneClosers.add(closeTelemetryLane);
+  ensureTelemetryBeforeExitHook();
 
   let prepared = false;
   api.onPrepare(async () => {
-    if (prepared) {
+    if (prepared || closePromise) {
       return;
     }
     prepared = true;
-
-    // Shutdown path for the telemetry lane: flush pending envelopes and
-    // stop health/snapshot pollers when the node server closes (this also
-    // covers dev-server restarts, which close the previous node server
-    // before assembling a new one), with process beforeExit as the
-    // final-flush floor when no node server handle exists.
-    const { nodeServer } = api.getServerContext() as {
-      nodeServer?: {
-        once?: (event: string, listener: () => void) => unknown;
-      };
-    };
-    if (nodeServer && typeof nodeServer.once === 'function') {
-      nodeServer.once('close', () => {
-        void closeTelemetryLane();
-      });
-    }
-    activeTelemetryLaneClosers.add(closeTelemetryLane);
-    ensureTelemetryBeforeExitHook();
 
     if (telemetryConfig.exporters?.otlp?.enabled) {
       maybeWarnLegacyOtlpEndpoint(telemetryConfig.exporters.otlp.endpoint);

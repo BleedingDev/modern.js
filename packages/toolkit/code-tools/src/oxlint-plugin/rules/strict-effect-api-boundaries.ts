@@ -42,8 +42,8 @@ export const createStrictEffectApiBoundariesRule = (): Rule => ({
           context,
           node,
           source,
-          /@modern-js\/plugin-bff\/hono-server/u,
-          'UltraModern API workspaces must not import Hono server helpers; use @modern-js/plugin-bff/effect-edge and HttpApi.',
+          /@modern-js\/plugin-bff\/(?:server|hono-server)(?![\w-])/u,
+          'UltraModern API workspaces must not import Hono server helpers; use @modern-js/bff-effect/effect-edge and HttpApi.',
         );
         reportProgramPattern(
           context,

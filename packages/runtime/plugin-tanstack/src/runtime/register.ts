@@ -10,7 +10,7 @@ import {
   type RouterProviderFactory,
   type RouterProviderPlugin,
   registerRouterProvider,
-} from '@modern-js/runtime/context';
+} from '@modern-js/runtime-extensions/router-provider';
 import { tanstackRouterPlugin } from './plugin';
 
 // TanStack runtime plugin types its API against its own hook registry,

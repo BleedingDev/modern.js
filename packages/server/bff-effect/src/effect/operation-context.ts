@@ -6,7 +6,7 @@ import {
   BFF_TRACEPARENT_HEADER,
   type OperationContext,
   parseTraceparent,
-} from '@modern-js/create-request';
+} from '@modern-js/runtime-extensions/request-context';
 
 export type EffectContext = {
   request: Request;

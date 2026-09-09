@@ -67,6 +67,7 @@ export const createResolvedTsgoConfig = async (
   sourceDirs: string[],
   moduleType: 'module' | 'commonjs' | undefined,
   tsgoBinPath: string,
+  excludeFiles: string[] = [],
 ) => {
   const tsconfigDir = path.dirname(tsconfigPath);
   const output = await runTsgo(
@@ -98,7 +99,12 @@ export const createResolvedTsgoConfig = async (
     config.compilerOptions.rewriteRelativeImportExtensions = true;
   }
   // `--showConfig` emits `files` relative to the tsconfig directory.
-  config.files = filterSourceFiles(tsconfigDir, sourceDirs, config.files);
+  config.files = filterSourceFiles(
+    tsconfigDir,
+    sourceDirs,
+    config.files,
+    excludeFiles,
+  );
   delete config.include;
   // This config is a one-shot server emit, not a composite project build.
   // Keeping the app's project references makes TS-Go require declaration
@@ -153,9 +159,15 @@ const filterSourceFiles = (
   tsconfigDir: string,
   sourceDirs: string[],
   files: string[] = [],
+  excludeFiles: string[] = [],
 ) => {
   const sourcePosixPaths = sourceDirs.map(sourceDir =>
     sourceDir.split(path.sep).join(path.posix.sep),
+  );
+  const excludedPaths = new Set(
+    excludeFiles.map(file =>
+      path.normalize(file).split(path.sep).join(path.posix.sep),
+    ),
   );
 
   return files.filter(fileName => {
@@ -164,7 +176,7 @@ const filterSourceFiles = (
       .split(path.sep)
       .join(path.posix.sep);
 
-    if (isAppRouterGeneratedDeclaration(absoluteFileName)) {
+    if (excludedPaths.has(absoluteFileName)) {
       return false;
     }
     return (
@@ -173,9 +185,6 @@ const filterSourceFiles = (
     );
   });
 };
-
-const isAppRouterGeneratedDeclaration = (absoluteFileName: string) =>
-  /\/src\/modern-tanstack\/.*\.gen\.d\.ts$/u.test(absoluteFileName);
 
 const runTsgo = (
   tsgoBinPath: string,
@@ -395,6 +404,7 @@ export const compileByTs: CompileFunc = async (
       sourceDirs,
       compileOptions.moduleType,
       tsgoBinPath,
+      compileOptions.excludeFiles,
     );
 
   let result;

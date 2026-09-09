@@ -3,6 +3,7 @@ import type {
   AfterMatchFn,
   AfterRenderFn,
   AfterStreamingRenderContextFn,
+  HandleErrorFn,
   PrepareApiServerFn,
   PrepareWebServerFn,
   ServerPlugin,
@@ -13,6 +14,7 @@ export { handleSetupResult } from './hooks';
 export const compatPlugin = (): ServerPlugin => ({
   name: '@modern-js/server-compat',
   registryHooks: {
+    handleError: createAsyncPipelineHook<HandleErrorFn>(),
     prepareWebServer: createAsyncPipelineHook<PrepareWebServerFn>(),
     prepareApiServer: createAsyncPipelineHook<PrepareApiServerFn>(),
     afterMatch: createAsyncPipelineHook<AfterMatchFn>(),

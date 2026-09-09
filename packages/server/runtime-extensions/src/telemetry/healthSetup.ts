@@ -1,4 +1,4 @@
-import type { ServerTelemetryUserConfig } from '@modern-js/server-core';
+import type { ServerTelemetryUserConfig } from '@modern-js/runtime-extensions/server-config';
 import {
   type ContractGateSnapshotStore,
   DEFAULT_CONTRACT_GATE_SNAPSHOT_PATH,

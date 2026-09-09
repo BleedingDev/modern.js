@@ -26,13 +26,31 @@ of the target. Import verification rejects `--root`, `--base-ref`, `--allowlist`
 `--base`, `--pathspec`, and `--divergence-allowlist`; inherited Git repository
 context variables are removed before Git runs.
 
-The classifier remains the existing literal import-specifier marker scan over
+The classifier uses the existing literal import-specifier marker scan over
 `packages/**/src` files present at the import ownership base. Literal dynamic
 imports, requires, type imports and direct re-exports are covered. This check
 does not yet prove alias resolution, transitive barrel resolution, renamed
 source identity, or imports in later upstream-added source. Strict success is
 therefore evidence about the existing governed inventory, not a substitute for
 those remaining final-gate proofs.
+
+One exact native dependency has a target-aware exception: named imports or
+re-exports of `configure`, `createRequest` and `createUploader` from the bare
+`@modern-js/create-request` package. Babel AST inspection checks source bindings
+(including aliases and type-only references), never comments or string text.
+Namespace, default, dynamic and CommonJS references do not qualify.
+
+The exception applies only when that measured target retains the native package
+identity, native node/browser export targets, reviewed native dependencies and
+the recorded eight native source identities. AST checks validate local imports,
+public value/type bindings and absence of retired policy identifiers/property
+keys. Unknown files, fork policy modules/imports, new export surfaces, malformed
+source or metadata, and source symlinks revoke eligibility. Committed targets
+read their own tree; worktree checks include untracked package source files.
+The source inventory records six audited files and the reviewed native factory
+and header extraction. It is structural classification evidence, not a semantic
+proof against arbitrarily rewritten policy. No other marker, allowance,
+ownership base or divergence budget changes when the native edge qualifies.
 
 ```bash
 node scripts/ultramodern-boundary-check/check-fork-import-boundary.js --mode imports
@@ -70,8 +88,10 @@ stored budgets. An upstream-owned identity moved into any of these roots
 remains governed, and a listed package present in reviewed upstream is not
 exempt.
 
-The relocation inventory also includes `packages/runtime/boundary-debugger`,
-`packages/runtime/federation-runtime`, `packages/runtime/renderer-extensions`,
+The relocation inventory also includes `packages/cli/plugin-bff-build-extensions`,
+`packages/runtime/boundary-debugger`,
+`packages/runtime/federation-runtime`, `packages/runtime/i18n-integration`,
+`packages/runtime/renderer-extensions`,
 `packages/solutions/ultramodern-app-tools`,
 `packages/toolkit/backend-federation-contracts` and
 `packages/toolkit/surface-resolution`. Their entire directory trees are absent
@@ -139,7 +159,7 @@ schema migration is the exact v1 `2f4d9c4559` snapshot to v2
 `eded841256`/`2f4d9c4559`, with byte-for-byte identical scope, entries, budgets,
 and totals.
 
-### Exact Rule 5 cap and reviewed growth
+### Rule 5 evidence and reviewed growth
 
 Rule 5 separately examines the actual PR delta from its resolved merge-base to
 its committed head. Audited-base ownership follows files across renames. An

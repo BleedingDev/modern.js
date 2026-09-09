@@ -78,6 +78,15 @@
     "./i18n": {
       "types": "./dist/types/runtime/i18n/index.d.ts",
       "default": "./dist/esm/runtime/i18n/index.mjs"
+    },
+    "./config": {
+      "types": "./dist/types/shared/utils.d.ts",
+      "modern:source": "./src/shared/utils.ts",
+      "node": {
+        "import": "./dist/esm-node/shared/utils.mjs",
+        "require": "./dist/cjs/shared/utils.js"
+      },
+      "default": "./dist/esm/shared/utils.mjs"
     }
   },
   "typesVersions": {
@@ -105,6 +114,9 @@
       ],
       "i18n": [
         "./dist/types/runtime/i18n/index.d.ts"
+      ],
+      "config": [
+        "./dist/types/shared/utils.d.ts"
       ]
     }
   },
@@ -115,7 +127,6 @@
     "test": "rstest --passWithNoTests"
   },
   "dependencies": {
-    "@modern-js/i18n-runtime-extensions": "workspace:*",
     "@modern-js/plugin": "workspace:*",
     "@modern-js/runtime-utils": "workspace:*",
     "@modern-js/server-core": "workspace:*",

@@ -1,19 +1,20 @@
 // @effect-diagnostics asyncFunction:off nodeBuiltinImport:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 
-import { getRouterHydrationScripts } from '@modern-js/runtime-extensions/router-state';
 import { serializeJson } from '@modern-js/runtime-utils/node';
 import type { HeadersData } from '@modern-js/runtime-utils/universal/request';
 import type { IncomingHttpHeaders } from 'http';
 import { type RenderLevel, SSR_DATA_JSON_ID } from '../../constants';
 import type { TInternalRuntimeContext } from '../../context';
 import type { SSRContainer } from '../../types';
-import { SSR_DATA_PLACEHOLDER } from '../constants';
+import { CHUNK_JS_PLACEHOLDER, SSR_DATA_PLACEHOLDER } from '../constants';
 import type { HandleRequestConfig } from '../requestHandler';
 import {
-  createRouteHydrationScriptTags,
-  replaceChunkJsPlaceholder,
-} from '../scriptOrder';
-import { type BuildHtmlCb, buildHtml, type SSRConfig } from '../shared';
+  type BuildHtmlCb,
+  buildHtml,
+  type createSSRRenderLifecycle,
+  replaceSSRTemplateChunk,
+  type SSRConfig,
+} from '../shared';
 import { attributesToString } from '../utils';
 
 export type BuildShellAfterTemplateOptions = {
@@ -23,14 +24,22 @@ export type BuildShellAfterTemplateOptions = {
   request: Request;
   entryName: string;
   config: HandleRequestConfig;
+  lifecycle?: ReturnType<typeof createSSRRenderLifecycle>;
 };
 
 export function buildShellAfterTemplate(
   afterAppTemplate: string,
   options: BuildShellAfterTemplateOptions,
 ) {
-  const { request, config, ssrConfig, runtimeContext, renderLevel, entryName } =
-    options;
+  const {
+    request,
+    config,
+    ssrConfig,
+    runtimeContext,
+    renderLevel,
+    entryName,
+    lifecycle,
+  } = options;
 
   const callbacks: BuildHtmlCb[] = [
     template => injectJs(template, entryName, config.nonce),
@@ -41,24 +50,31 @@ export function buildShellAfterTemplate(
       useJsonScript: config.useJsonScript,
       runtimeContext,
       renderLevel,
-      entryName,
+      lifecycle,
     }),
   ];
 
   async function injectJs(template: string, entryName: string, nonce?: string) {
-    const jsChunkStr = createRouteHydrationScriptTags(
-      runtimeContext,
-      entryName,
+    const assets: string[] =
+      runtimeContext.routeManifest?.routeAssets?.[`async-${entryName}`]
+        ?.assets ?? [];
+    const jsChunkStr = assets
+      .filter(asset => asset.endsWith('.js'))
+      .map(
+        asset =>
+          `<script${attributesToString({ src: asset, nonce })}></script>`,
+      )
+      .join(' ');
+    return replaceSSRTemplateChunk(
       {
-        nonce,
+        name: 'scripts',
         template,
+        placeholder: CHUNK_JS_PLACEHOLDER,
+        content: jsChunkStr,
       },
+      lifecycle,
+      { preserveEmpty: true },
     );
-    if (!jsChunkStr) {
-      return template;
-    }
-
-    return replaceChunkJsPlaceholder(template, jsChunkStr, entryName);
   }
 
   return buildHtml(afterAppTemplate, callbacks);
@@ -71,7 +87,7 @@ function createReplaceSSRData(options: {
   nonce?: string;
   useJsonScript?: boolean;
   renderLevel: RenderLevel;
-  entryName: string;
+  lifecycle?: ReturnType<typeof createSSRRenderLifecycle>;
 }) {
   const {
     runtimeContext,
@@ -79,7 +95,7 @@ function createReplaceSSRData(options: {
     renderLevel,
     useJsonScript,
     ssrConfig,
-    entryName,
+    lifecycle,
   } = options;
 
   const { request, reporter } = runtimeContext.ssrContext!;
@@ -124,20 +140,14 @@ function createReplaceSSRData(options: {
     ? `<script type="application/json" id="${SSR_DATA_JSON_ID}">${serializeSSRData}</script>`
     : `<script${attrsStr}>window._SSR_DATA = ${serializeSSRData}</script>`;
 
-  const hydrationScripts = getRouterHydrationScripts(runtimeContext);
-  const ssrScripts = hydrationScripts.length
-    ? `${ssrDataScript}\n${hydrationScripts.join('\n')}`
-    : ssrDataScript;
-
-  return (template: string) => {
-    if (!template.includes(SSR_DATA_PLACEHOLDER)) {
-      return template;
-    }
-    return replaceChunkJsPlaceholder(
-      template,
-      ssrScripts,
-      entryName,
-      SSR_DATA_PLACEHOLDER,
+  return (template: string) =>
+    replaceSSRTemplateChunk(
+      {
+        name: 'data',
+        template,
+        placeholder: SSR_DATA_PLACEHOLDER,
+        content: ssrDataScript,
+      },
+      lifecycle,
     );
-  };
 }

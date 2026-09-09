@@ -1,6 +1,14 @@
 // @effect-diagnostics asyncFunction:off nodeBuiltinImport:off processEnv:off strictBooleanExpressions:off unnecessaryArrowBlock:off
-import type { AppTools, CliPlugin } from '@modern-js/app-tools';
+import type {
+  AfterBffCompileFn,
+  AppTools,
+  BeforeBffCompileFn,
+  CliPlugin,
+  ModifyBffClientArtifactsFn,
+  ModifyBffGeneratedEntriesFn,
+} from '@modern-js/app-tools';
 import { ApiRouter } from '@modern-js/bff-core';
+import { createAsyncHook } from '@modern-js/plugin';
 import type { ServerRoute } from '@modern-js/types';
 import { normalizeOutputPath } from '@modern-js/utils';
 import path from 'path';
@@ -11,14 +19,19 @@ import { isWatchableBffFile } from './cli/watch';
 
 export const bffPlugin = (): CliPlugin<AppTools> => ({
   name: '@modern-js/plugin-bff',
+  registryHooks: {
+    onBeforeBffCompile: createAsyncHook<BeforeBffCompileFn>(),
+    onAfterBffCompile: createAsyncHook<AfterBffCompileFn>(),
+    modifyBffClientArtifacts: createAsyncHook<ModifyBffClientArtifactsFn>(),
+    modifyBffGeneratedEntries: createAsyncHook<ModifyBffGeneratedEntriesFn>(),
+  },
   setup: api => {
     {
       const appContext = api.getAppContext();
       const userRuntimeFramework = api.getConfig()?.bff?.runtimeFramework;
       api.updateAppContext({
         ...appContext,
-        bffRuntimeFramework:
-          userRuntimeFramework === 'hono' ? 'hono' : 'effect',
+        bffRuntimeFramework: userRuntimeFramework ?? 'hono',
       });
     }
 
@@ -42,13 +55,8 @@ export const bffPlugin = (): CliPlugin<AppTools> => ({
             compress,
           },
           bundlerChain: (chain, { CHAIN_ID, isServer }) => {
-            const {
-              port,
-              appDirectory,
-              apiDirectory,
-              lambdaDirectory,
-              bffRuntimeFramework,
-            } = api.getAppContext();
+            const { port, appDirectory, apiDirectory, lambdaDirectory } =
+              api.getAppContext();
             const modernConfig = api.getNormalizedConfig();
             const { bff } = modernConfig || {};
             const prefix = getPrimaryPrefix(bff?.prefix);
@@ -91,10 +99,8 @@ export const bffPlugin = (): CliPlugin<AppTools> => ({
                 target: name,
                 // Internal field
                 requestCreator: (bff as any)?.requestCreator,
+                clientCodegenPlugin: bff?.clientCodegenPlugin,
                 httpMethodDecider,
-                bffRuntimeFramework,
-                effectEntry: bff?.effect?.entry,
-                effectDataPlatformBatch: bff?.effect?.dataPlatform?.batch,
               });
           },
         },

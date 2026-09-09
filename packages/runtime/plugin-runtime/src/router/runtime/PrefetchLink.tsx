@@ -1,10 +1,6 @@
 // @effect-diagnostics asyncFunction:off globalConsole:off globalTimers:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 'use client';
 import {
-  getNavigationWarmupCacheKey,
-  normalizePreloadBehavior as normalizeSharedPreloadBehavior,
-} from '@modern-js/runtime-extensions';
-import {
   matchRoutes,
   type Path,
   type RouteObject,
@@ -76,15 +72,9 @@ function composeEventHandlers<EventType extends React.SyntheticEvent | Event>(
  * - "viewport": Fetched when the link enters the viewport
  * - "none": Never fetched
  */
-type PrefetchBehavior = 'intent' | 'render' | 'viewport' | 'none';
+type PrefetchBehavior = NonNullable<RouterLinkProps['prefetch']>;
 type PreloadBehavior = PrefetchBehavior | false;
 const ABSOLUTE_URL_REGEX = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
-const DEFAULT_PREFETCH_BEHAVIOR: PrefetchBehavior = 'render';
-const INTENT_DELAY = 100;
-const VIEWPORT_ROOT_MARGIN = '200px';
-const MAX_CONCURRENT_WARMUPS = 4;
-const WARMUP_TTL = 30_000;
-const SLOW_EFFECTIVE_TYPES = new Set(['slow-2g', '2g']);
 
 export interface LinkProps extends RouterLinkProps {
   prefetch?: PrefetchBehavior;
@@ -95,116 +85,28 @@ export interface NavLinkProps extends RouterNavLinkProps {
   preload?: PreloadBehavior;
 }
 
-interface NetworkInformationLike {
-  saveData?: boolean;
-  effectiveType?: string;
+/** Optional scheduling capability supplied by a runtime integration. */
+export interface LinkPrefetchPolicy {
+  observe(options: {
+    element: HTMLAnchorElement | null;
+    prefetch?: PrefetchBehavior;
+    preload?: PreloadBehavior;
+    notify: (state: { code: boolean; data: boolean }) => void;
+  }): {
+    onIntent: () => void;
+    onCancel: () => void;
+    dispose: () => void;
+  };
+  schedule(options: {
+    runtimeContext: object;
+    chunkLoader: object;
+    publicPath: string;
+    key: string;
+    run: () => Promise<unknown>;
+  }): () => void;
+  canWarmup: () => boolean;
+  allowData: (route: RouteObject) => boolean;
 }
-
-interface NavigationWarmupHandle {
-  navigationWarmup?: {
-    data?: boolean;
-  };
-}
-
-type WarmupTask = {
-  key: string;
-  run: () => Promise<unknown>;
-  cancelled: boolean;
-};
-
-const warmupCache = new Map<string, number>();
-const warmupQueue: WarmupTask[] = [];
-let activeWarmups = 0;
-
-const getWarmupTimestamp = () => performance.now();
-
-const getConnection = (): NetworkInformationLike | undefined => {
-  const nav = globalThis.navigator as
-    | (Navigator & {
-        connection?: NetworkInformationLike;
-        mozConnection?: NetworkInformationLike;
-        webkitConnection?: NetworkInformationLike;
-      })
-    | undefined;
-
-  return nav?.connection || nav?.mozConnection || nav?.webkitConnection;
-};
-
-const shouldWarmupOnCurrentNetwork = () => {
-  const connection = getConnection();
-
-  if (connection?.saveData) {
-    return false;
-  }
-
-  if (
-    typeof connection?.effectiveType === 'string' &&
-    SLOW_EFFECTIVE_TYPES.has(connection.effectiveType)
-  ) {
-    return false;
-  }
-
-  return true;
-};
-
-const pruneWarmupCache = (now = getWarmupTimestamp()) => {
-  for (const [key, timestamp] of warmupCache) {
-    if (now - timestamp > WARMUP_TTL) {
-      warmupCache.delete(key);
-    }
-  }
-};
-
-const runNextWarmup = () => {
-  while (activeWarmups < MAX_CONCURRENT_WARMUPS && warmupQueue.length > 0) {
-    const task = warmupQueue.shift()!;
-
-    if (task.cancelled) {
-      continue;
-    }
-
-    activeWarmups += 1;
-    task
-      .run()
-      .catch(() => {
-        warmupCache.delete(task.key);
-      })
-      .finally(() => {
-        activeWarmups -= 1;
-        runNextWarmup();
-      });
-  }
-};
-
-const scheduleWarmup = (key: string, run: () => Promise<unknown>) => {
-  if (!shouldWarmupOnCurrentNetwork()) {
-    return () => {};
-  }
-
-  pruneWarmupCache();
-
-  if (warmupCache.has(key)) {
-    return () => {};
-  }
-
-  warmupCache.set(key, getWarmupTimestamp());
-
-  const task: WarmupTask = {
-    key,
-    run,
-    cancelled: false,
-  };
-
-  warmupQueue.push(task);
-  runNextWarmup();
-
-  return () => {
-    task.cancelled = true;
-    if (warmupQueue.includes(task)) {
-      warmupCache.delete(task.key);
-    }
-  };
-};
 
 const setRef = <T,>(ref: Ref<T> | undefined, value: T | null) => {
   if (!ref) {
@@ -223,13 +125,6 @@ const setRef = <T,>(ref: Ref<T> | undefined, value: T | null) => {
   }
 };
 
-const isDataWarmupEnabled = (route: RouteObject) => {
-  const handle = (route as RouteObject & { handle?: NavigationWarmupHandle })
-    .handle;
-
-  return handle?.navigationWarmup?.data !== false;
-};
-
 /**
  * Modified from https://github.com/remix-run/remix/blob/9a0601bd704d2f3ee622e0ddacab9b611eb0c5bc/packages/remix-react/components.tsx#L236
  *
@@ -239,104 +134,74 @@ const isDataWarmupEnabled = (route: RouteObject) => {
  * https://github.com/remix-run/remix/blob/2b5e1a72fc628d0408e27cf4d72e537762f1dc5b/LICENSE.md
  */
 function usePrefetchBehavior(
-  prefetch: PrefetchBehavior,
-  preload: PrefetchBehavior,
+  prefetch: PrefetchBehavior | undefined,
+  preload: PreloadBehavior | undefined,
   theirElementProps: PrefetchHandlers,
+  policy: LinkPrefetchPolicy | undefined,
 ): [
   boolean,
   boolean,
   Required<PrefetchHandlers>,
   (element: HTMLAnchorElement | null) => void,
 ] {
-  const [maybeWarmup, setMaybeWarmup] = React.useState(false);
-  const [shouldPrefetch, setShouldPrefetch] = React.useState(false);
-  const [shouldPreload, setShouldPreload] = React.useState(false);
-  const [viewportElement, setViewportElement] =
-    React.useState<HTMLAnchorElement | null>(null);
+  const [maybePrefetch, setMaybePrefetch] = React.useState(false);
+  const [state, setState] = React.useState({ code: false, data: false });
+  const [element, setElement] = React.useState<HTMLAnchorElement | null>(null);
+  const observerRef = React.useRef<
+    ReturnType<LinkPrefetchPolicy['observe']> | undefined
+  >(undefined);
   const { onFocus, onBlur, onMouseEnter, onMouseLeave, onTouchStart } =
     theirElementProps;
 
   React.useEffect(() => {
-    if (prefetch === 'render') {
-      setShouldPrefetch(true);
-    }
-
-    if (preload === 'render') {
-      setShouldPreload(true);
-    }
-  }, [prefetch, preload]);
-
-  const setIntent = () => {
-    if (prefetch === 'intent' || preload === 'intent') {
-      setMaybeWarmup(true);
-    }
-  };
-
-  const cancelIntent = () => {
-    if (prefetch === 'intent' || preload === 'intent') {
-      setMaybeWarmup(false);
-      setShouldPrefetch(false);
-      setShouldPreload(false);
-    }
-  };
-
-  React.useEffect(() => {
-    if (maybeWarmup) {
-      const id = setTimeout(() => {
-        if (prefetch === 'intent') {
-          setShouldPrefetch(true);
-        }
-
-        if (preload === 'intent') {
-          setShouldPreload(true);
-        }
-      }, INTENT_DELAY);
-      return () => {
-        clearTimeout(id);
-      };
-    }
-  }, [maybeWarmup, prefetch, preload]);
-
-  React.useEffect(() => {
-    if (
-      !viewportElement ||
-      (prefetch !== 'viewport' && preload !== 'viewport') ||
-      typeof IntersectionObserver === 'undefined'
-    ) {
+    if (!policy) {
+      setState({ code: prefetch === 'render', data: prefetch === 'render' });
       return;
     }
-
-    const observer = new IntersectionObserver(
-      entries => {
-        if (!entries.some(entry => entry.isIntersecting)) {
-          return;
-        }
-
-        if (prefetch === 'viewport') {
-          setShouldPrefetch(true);
-        }
-
-        if (preload === 'viewport') {
-          setShouldPreload(true);
-        }
-
-        observer.disconnect();
-      },
-      {
-        rootMargin: VIEWPORT_ROOT_MARGIN,
-      },
-    );
-
-    observer.observe(viewportElement);
-
+    const observer = policy.observe({
+      element,
+      prefetch,
+      preload,
+      notify: next =>
+        setState(previous =>
+          previous.code === next.code && previous.data === next.data
+            ? previous
+            : next,
+        ),
+    });
+    observerRef.current = observer;
     return () => {
-      observer.disconnect();
+      observerRef.current = undefined;
+      observer.dispose();
     };
-  }, [prefetch, preload, viewportElement]);
+  }, [policy, prefetch, preload, element]);
 
+  React.useEffect(() => {
+    if (policy || !maybePrefetch) {
+      return;
+    }
+    const timer = setTimeout(() => setState({ code: true, data: true }), 100);
+    return () => clearTimeout(timer);
+  }, [policy, maybePrefetch]);
+
+  const setIntent = () => {
+    if (policy) {
+      observerRef.current?.onIntent();
+    } else if (prefetch === 'intent') {
+      setMaybePrefetch(true);
+    }
+  };
+  const cancelIntent = () => {
+    if (policy) {
+      observerRef.current?.onCancel();
+    } else if (prefetch === 'intent') {
+      setMaybePrefetch(false);
+      setState({ code: false, data: false });
+    }
+  };
   return [
-    shouldPrefetch,
-    shouldPreload,
+    state.data,
+    state.code,
     {
       onFocus: composeEventHandlers(onFocus, setIntent),
       onBlur: composeEventHandlers(onBlur, cancelIntent),
@@ -344,7 +209,7 @@ function usePrefetchBehavior(
       onMouseLeave: composeEventHandlers(onMouseLeave, cancelIntent),
       onTouchStart: composeEventHandlers(onTouchStart, setIntent),
     },
-    setViewportElement,
+    setElement,
   ];
 }
 
@@ -415,7 +280,8 @@ const PrefetchPageLinks: React.FC<{ path: Path; includeData: boolean }> = ({
   const context = useContext(InternalRuntimeContext);
   const { routeManifest, routes } = context;
   const { routeAssets } = routeManifest || {};
-  const allowNetworkWarmup = shouldWarmupOnCurrentNetwork();
+  const policy = context.linkPrefetchPolicy;
+  const allowNetworkWarmup = policy?.canWarmup() ?? true;
   const matches = useMemo(
     () => (Array.isArray(routes) ? matchRoutes(routes, pathname) : []),
     [pathname, routes],
@@ -445,21 +311,24 @@ const PrefetchPageLinks: React.FC<{ path: Path; includeData: boolean }> = ({
         return () => {};
       }
 
-      return scheduleWarmup(
-        getNavigationWarmupCacheKey(
-          context,
+      const run = () => loadRouteModule(match.route, routeAssets, chunkLoader);
+      if (policy) {
+        return policy.schedule({
+          runtimeContext: context,
           chunkLoader,
-          getWebpackPublicPath(),
-          `route-module:${routeId}:${chunkIds.join(',')}`,
-        ),
-        () => loadRouteModule(match.route, routeAssets, chunkLoader),
-      );
+          publicPath: getWebpackPublicPath(),
+          key: `route-module:${routeId}:${chunkIds.join(',')}`,
+          run,
+        });
+      }
+      void run().catch(() => {});
+      return () => {};
     });
 
     return () => {
       cancellations.forEach(cancel => cancel());
     };
-  }, [allowNetworkWarmup, chunkLoader, context, routeAssetGeneration]);
+  }, [allowNetworkWarmup, chunkLoader, context, policy, routeAssetGeneration]);
 
   if (!allowNetworkWarmup || !includeData || !window._SSR_DATA) {
     return null;
@@ -480,13 +349,14 @@ const PrefetchDataLinks: React.FC<{
   routeManifest: RouteManifest;
 }> = ({ matches, path, routeManifest }) => {
   const { pathname, search, hash } = path;
+  const policy = useContext(InternalRuntimeContext).linkPrefetchPolicy;
   const currentMatches = useMatches();
   const basename = useHref('/');
   const dataHrefs = useMemo(() => {
     return matches
       ?.filter((match, index) => {
         if (
-          !isDataWarmupEnabled(match.route) ||
+          policy?.allowData(match.route) === false ||
           !match.route.loader ||
           typeof match.route.loader !== 'function' ||
           match.route.loader.length === 0
@@ -534,13 +404,6 @@ const PrefetchDataLinks: React.FC<{
   return <>{dataHrefs}</>;
 };
 
-const normalizePreloadBehavior = (
-  preload: PreloadBehavior | undefined,
-  prefetch: PrefetchBehavior,
-) => {
-  return normalizeSharedPreloadBehavior(preload, prefetch);
-};
-
 type InputLinkProps<T> = T extends typeof RouterNavLink
   ? NavLinkProps
   : T extends typeof RouterLink
@@ -551,18 +414,15 @@ const createPrefetchLink = <T extends typeof RouterLink | typeof RouterNavLink>(
   Link: T,
 ) => {
   return React.forwardRef<HTMLAnchorElement, InputLinkProps<T>>(
-    (
-      { to, prefetch = DEFAULT_PREFETCH_BEHAVIOR, preload, ...props },
-      forwardedRef,
-    ) => {
+    ({ to, prefetch, preload, ...props }, forwardedRef) => {
       const isAbsolute = typeof to === 'string' && ABSOLUTE_URL_REGEX.test(to);
-      const resolvedPreload = normalizePreloadBehavior(preload, prefetch);
+      const policy = useContext(InternalRuntimeContext).linkPrefetchPolicy;
       const [
         shouldPrefetch,
         shouldPreload,
         prefetchHandlers,
         setViewportElement,
-      ] = usePrefetchBehavior(prefetch, resolvedPreload, props);
+      ] = usePrefetchBehavior(prefetch, preload, props, policy);
       const setAnchorRef = React.useCallback(
         (element: HTMLAnchorElement | null) => {
           setViewportElement(element);

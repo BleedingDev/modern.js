@@ -1,13 +1,16 @@
 // @effect-diagnostics asyncFunction:off processEnv:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type { SSRHeadData } from '@modern-js/plugin/runtime';
-import { getRouterMatchedRouteIds } from '@modern-js/runtime-extensions/router-state';
 import type { TInternalRuntimeContext } from '../../context';
 import { CHUNK_CSS_PLACEHOLDER } from '../constants';
-import { createFederatedCssLinks } from '../federatedCss';
 import { createReplaceHelemt } from '../helmet';
 import type { HandleRequestConfig } from '../requestHandler';
-import { type BuildHtmlCb, buildHtml } from '../shared';
-import { hasStylesheetLink, safeReplace } from '../utils';
+import {
+  type BuildHtmlCb,
+  buildHtml,
+  type createSSRRenderLifecycle,
+  replaceSSRTemplateChunk,
+} from '../shared';
+import { hasStylesheetLink } from '../utils';
 
 const checkIsInline = (
   chunk: string,
@@ -30,7 +33,7 @@ export interface BuildShellBeforeTemplateOptions {
   entryName: string;
   config: HandleRequestConfig;
   styledComponentsStyleTags?: string;
-  moduleFederationCssAssets?: string[];
+  lifecycle?: ReturnType<typeof createSSRRenderLifecycle>;
   helmetData?: SSRHeadData;
 }
 
@@ -51,7 +54,7 @@ export async function buildShellBeforeTemplate(
     runtimeContext,
     styledComponentsStyleTags,
     entryName,
-    moduleFederationCssAssets,
+    lifecycle,
     helmetData,
   } = options;
 
@@ -71,13 +74,18 @@ export async function buildShellBeforeTemplate(
     if (styledComponentsStyleTags) {
       css += styledComponentsStyleTags;
     }
-    css += createFederatedCssLinks(moduleFederationCssAssets, {
-      template,
-      existingAssets: css
-        .match(/href="([^"]+)"/g)
-        ?.map(item => item.replace(/^href="/, '').replace(/"$/, '')),
-    });
-    return safeReplace(template, CHUNK_CSS_PLACEHOLDER, css);
+    return replaceSSRTemplateChunk(
+      {
+        name: 'styles',
+        template,
+        placeholder: CHUNK_CSS_PLACEHOLDER,
+        content: css,
+        emittedAssets: css
+          .match(/href="([^"]+)"/g)
+          ?.map(item => item.replace(/^href="/, '').replace(/"$/, '')),
+      },
+      lifecycle,
+    );
 
     async function getCssChunks() {
       const { routeManifest } = runtimeContext;
@@ -87,34 +95,36 @@ export async function buildShellBeforeTemplate(
         return '';
       }
 
-      let matchedRouteManifests: RouteManifest[] = [];
+      const matchedRouteManifests: RouteManifest[] = [];
 
-      const matchedRouteIds = getRouterMatchedRouteIds(runtimeContext);
-
-      if (matchedRouteIds?.length) {
-        matchedRouteManifests = matchedRouteIds
-          .map(routeId => routeAssets[routeId] as RouteManifest | undefined)
-          .filter(Boolean) as RouteManifest[];
-      }
-
-      const asyncEntry = routeAssets[`async-${entryName}`] as
-        | RouteManifest
-        | undefined;
-      if (asyncEntry) {
-        matchedRouteManifests.push(asyncEntry);
-      }
-
-      const cssChunks = matchedRouteManifests.reduce(
-        (chunks, routeManifest) => {
-          const { referenceCssAssets = [] } = routeManifest;
-          const _cssChunks = referenceCssAssets.filter(
-            (asset?: string) =>
-              asset?.endsWith('.css') && !hasStylesheetLink(template, asset),
-          );
-          return [...chunks, ..._cssChunks];
+      const createAsset = (url: string) => ({ url });
+      const groups = [
+        {
+          name: 'route',
+          assets: matchedRouteManifests
+            .flatMap(manifest => manifest.referenceCssAssets ?? [])
+            .map(createAsset),
         },
-        [] as string[],
-      );
+        {
+          name: 'async-entry',
+          assets: (
+            routeAssets[`async-${entryName}`]?.referenceCssAssets ?? []
+          ).map(createAsset),
+        },
+      ];
+      const assets =
+        lifecycle?.transformAssets(groups, {
+          kind: 'style',
+          source: 'template',
+          template,
+          createAsset,
+        }) ?? groups.flatMap(group => group.assets);
+      const cssChunks = assets
+        .map(asset => asset.url)
+        .filter(
+          asset =>
+            asset.endsWith('.css') && !hasStylesheetLink(template, asset),
+        );
 
       const { inlineStyles } = config;
 

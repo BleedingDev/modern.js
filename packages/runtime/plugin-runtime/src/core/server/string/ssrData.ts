@@ -1,9 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 
-import {
-  getRouterHydrationScripts,
-  getRouterServerSnapshot,
-} from '@modern-js/runtime-extensions/router-state';
 import { serializeJson } from '@modern-js/runtime-utils/node';
 import type { StaticHandlerContext } from '@modern-js/runtime-utils/router';
 import type { HeadersData } from '@modern-js/runtime-utils/universal/request';
@@ -11,7 +7,7 @@ import type { IncomingHttpHeaders } from 'http';
 import { ROUTER_DATA_JSON_ID, SSR_DATA_JSON_ID } from '../../constants';
 import type { TInternalRuntimeContext } from '../../context';
 import type { SSRContainer, SSRServerContext } from '../../types';
-import type { SSRConfig } from '../shared';
+import type { createSSRRenderLifecycle, SSRConfig } from '../shared';
 import { attributesToString, serializeErrors } from '../utils';
 import type { ChunkSet, Collector } from './types';
 
@@ -22,6 +18,7 @@ export interface SSRDataCreatorOptions {
   ssrContext: SSRServerContext;
   ssrConfig?: SSRConfig;
   routerContext?: StaticHandlerContext;
+  lifecycle?: ReturnType<typeof createSSRRenderLifecycle>;
   nonce?: string;
   useJsonScript?: boolean;
 }
@@ -86,21 +83,12 @@ export class SSRDataCollector implements Collector {
   }
 
   #getRouterData() {
-    const { routerContext, runtimeContext } = this.#options;
-    const snapshotRouterData =
-      getRouterServerSnapshot(runtimeContext)?.routerData;
-
-    if (snapshotRouterData) {
-      return {
-        loaderData: snapshotRouterData.loaderData,
-        errors: serializeErrors(snapshotRouterData.errors || null),
-      };
-    }
-
-    return routerContext
+    const { routerContext, lifecycle } = this.#options;
+    const data = lifecycle?.getRouterData() ?? routerContext;
+    return data
       ? {
-          loaderData: routerContext.loaderData,
-          errors: serializeErrors(routerContext.errors),
+          loaderData: data.loaderData,
+          errors: serializeErrors(data.errors || null),
         }
       : undefined;
   }
@@ -110,9 +98,6 @@ export class SSRDataCollector implements Collector {
     routerData?: Record<string, any>,
   ) {
     const { nonce, useJsonScript = false } = this.#options;
-    const hydrationScripts = getRouterHydrationScripts(
-      this.#options.runtimeContext,
-    );
     const serializeSSRData = serializeJson(ssrData);
     const attrsStr = attributesToString({ nonce });
 
@@ -125,10 +110,6 @@ export class SSRDataCollector implements Collector {
       ssrDataScripts += useJsonScript
         ? `\n<script type="application/json" id="${ROUTER_DATA_JSON_ID}">${serializedRouterData}</script>`
         : `\n<script${attrsStr}>window._ROUTER_DATA = ${serializedRouterData}</script>`;
-    }
-
-    if (hydrationScripts.length) {
-      ssrDataScripts += `\n${hydrationScripts.join('\n')}`;
     }
 
     return ssrDataScripts;

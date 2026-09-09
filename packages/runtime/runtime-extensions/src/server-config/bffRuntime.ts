@@ -1,5 +1,12 @@
 export type BffRuntimeFramework = 'hono' | 'effect';
 
+/** Fork BFF options, independent of any native server config interface. */
+export interface BffRuntimeUserConfig {
+  runtimeFramework?: BffRuntimeFramework;
+  effect?: BffEffectUserConfig;
+  crossProjectPolicy?: BffCrossProjectPolicyUserConfig;
+}
+
 export interface BffCrossProjectPolicyUserConfig {
   /**
    * Enable cross-project envelope and operation-context policy checks.

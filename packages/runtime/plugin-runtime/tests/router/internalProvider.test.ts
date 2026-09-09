@@ -1,39 +1,37 @@
+import {
+  createRouterPlugin,
+  type RouterProviderFactory,
+  registerRouterProvider,
+  resolveRouterProvider,
+  unsafe_resetRouterProvidersForTesting,
+} from '@modern-js/runtime-extensions/router-provider';
 import { rstest } from '@rstest/core';
-import type { RouterProviderFactory } from '../../src/router/runtime/provider';
+import { routerProviderRegistryHooks } from '../../src/router/runtime/hooks';
 
-/**
- * Loading the built-in router runtime plugin module must register
- * react-router as the default router provider (module-scope side effect).
- * Kept in its own test file so the registry state is untouched by other
- * suites.
- */
-describe('built-in router provider registration', () => {
-  it('registers react-router as the default provider on module load', async () => {
-    // The react-router runtime plugin references webpack globals when its
-    // module graph is evaluated outside a bundle.
-    (
-      globalThis as typeof globalThis & {
-        __webpack_require__?: { u: (chunkId: unknown) => string };
-      }
-    ).__webpack_require__ = {
-      u: chunkId => String(chunkId),
-    };
+async function nativeProvider() {
+  (globalThis as any).__webpack_require__ = {
+    u: (chunkId: unknown) => String(chunkId),
+  };
+  const { routerPlugin } = await import('../../src/router/runtime/internal');
+  return routerPlugin;
+}
 
-    const { resolveRouterProvider } = await import(
-      '../../src/router/runtime/internal'
-    );
-    const { routerPlugin: reactRouterPlugin } = await import(
-      '../../src/router/runtime/plugin'
-    );
+describe('native provider and injected fork composition', () => {
+  afterEach(() => unsafe_resetRouterProvidersForTesting());
 
-    expect(resolveRouterProvider(undefined)).toBe(reactRouterPlugin);
-    expect(resolveRouterProvider('react-router')).toBe(reactRouterPlugin);
+  it('exports the native provider directly and registers it only through explicit composition', async () => {
+    const factory = await nativeProvider();
+    const { routerPlugin } = await import('../../src/router/runtime/plugin');
+    expect(factory).toBe(routerPlugin);
+    createRouterPlugin({
+      defaultProvider: { name: 'react-router', factory },
+      registryHooks: routerProviderRegistryHooks,
+    });
+    expect(resolveRouterProvider()).toBe(factory);
   });
 
-  it('binds each router wrapper to its own local provider factory', async () => {
-    const { createRouterPlugin } = await import(
-      '../../src/router/runtime/internal'
-    );
+  it('binds each wrapper to its local provider and canonical hook registry', async () => {
+    const factory = await nativeProvider();
     const setupA = rstest.fn();
     const setupB = rstest.fn();
     const factoryA = rstest.fn(() => ({
@@ -42,53 +40,43 @@ describe('built-in router provider registration', () => {
     const factoryB = rstest.fn(() => ({
       setup: setupB,
     })) as RouterProviderFactory;
-    const wrapperA = createRouterPlugin([
-      { name: 'tanstack', factory: factoryA },
-    ]);
-    const wrapperB = createRouterPlugin([
-      { name: 'tanstack', factory: factoryB },
-    ]);
+    const wrapper = (localFactory: RouterProviderFactory) =>
+      createRouterPlugin({
+        defaultProvider: { name: 'react-router', factory },
+        registryHooks: routerProviderRegistryHooks,
+        localProviders: [{ name: 'tanstack', factory: localFactory }],
+      });
     const apiA = {
       getRuntimeConfig: () => ({ router: { framework: 'tanstack' } }),
     };
     const apiB = {
       getRuntimeConfig: () => ({ router: { framework: 'tanstack' } }),
     };
-
-    wrapperA().setup?.(apiA);
-    wrapperB().setup?.(apiB);
-
+    const pluginA = wrapper(factoryA)();
+    expect(pluginA.registryHooks).toBe(routerProviderRegistryHooks);
+    pluginA.setup(apiA);
+    wrapper(factoryB)().setup(apiB);
     expect(factoryA).toHaveBeenCalledTimes(1);
     expect(factoryB).toHaveBeenCalledTimes(1);
     expect(setupA).toHaveBeenCalledWith(apiA);
     expect(setupB).toHaveBeenCalledWith(apiB);
   });
 
-  it('does not invoke a compatibility provider missing from the wrapper realm', async () => {
-    const { createRouterPlugin, registerRouterProvider } = await import(
-      '../../src/router/runtime/internal'
-    );
-    const { unsafe_resetRouterProvidersForTesting } = await import(
-      '../../src/router/runtime/provider'
-    );
-    const foreignFactory = rstest.fn(() => {
-      throw new Error('foreign tanstack factory was invoked');
-    }) as RouterProviderFactory;
-
-    unsafe_resetRouterProvidersForTesting();
-    try {
-      registerRouterProvider('tanstack', foreignFactory);
-      const wrapper = createRouterPlugin();
-      const api = {
+  it('rejects a compatibility provider missing from the local realm', async () => {
+    const factory = await nativeProvider();
+    const foreign = rstest.fn(() => {
+      throw new Error('foreign provider invoked');
+    });
+    registerRouterProvider('tanstack', foreign);
+    const wrapper = createRouterPlugin({
+      defaultProvider: { name: 'react-router', factory },
+      registryHooks: routerProviderRegistryHooks,
+    });
+    expect(() =>
+      wrapper().setup({
         getRuntimeConfig: () => ({ router: { framework: 'tanstack' } }),
-      };
-
-      expect(() => wrapper().setup?.(api)).toThrow(
-        /not registered in the app-owned router provider realm/,
-      );
-      expect(foreignFactory).not.toHaveBeenCalled();
-    } finally {
-      unsafe_resetRouterProvidersForTesting();
-    }
+      }),
+    ).toThrow(/not registered in the app-owned router provider realm/);
+    expect(foreign).not.toHaveBeenCalled();
   });
 });

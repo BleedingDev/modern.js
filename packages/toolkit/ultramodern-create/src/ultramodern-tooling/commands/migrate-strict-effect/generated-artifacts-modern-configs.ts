@@ -26,6 +26,7 @@ import {
   allWorkspaceAppsFromToolingConfig,
   type UltramodernToolingConfig,
 } from '../../config';
+import { migrateBffBuildPluginImports } from './bff-build-plugin-migration';
 import {
   generatedUiSourceRequiresRewrite,
   writeGeneratedUiSourceIfChanged,
@@ -236,6 +237,13 @@ export function updateGeneratedModernConfigs(
       formatGeneratedModernConfigCandidates(
         currentGeneratedModernConfigs
           .flatMap(source => [source, previousNativeCompositionConfig(source)])
+          .flatMap(source => [
+            source,
+            source.replaceAll(
+              '@modern-js/plugin-bff-build-extensions',
+              '@modern-js/plugin-bff',
+            ),
+          ])
           .flatMap(source => {
             const withoutReleaseEnvelope = removeReleaseEnvelopePlugin(source);
             return [
@@ -250,13 +258,17 @@ export function updateGeneratedModernConfigs(
       io.writeGenerated(modernConfigPath, generatedModernConfig);
     } else {
       const existingModernConfig = fs.readFileSync(modernConfigPath, 'utf-8');
+      const migratedImports =
+        migrateBffBuildPluginImports(existingModernConfig);
       if (
         !generatedUiSourceRequiresRewrite(
-          existingModernConfig,
+          migratedImports,
           generatedModernConfig,
         )
       ) {
-        // Preserve existing formatting and authored comments.
+        // An import-only transition preserves existing formatting and comments.
+        if (migratedImports !== existingModernConfig)
+          io.write(modernConfigPath, migratedImports);
       } else if (
         isGeneratedModernConfig(existingModernConfig, [
           generatedModernConfig,
@@ -265,9 +277,13 @@ export function updateGeneratedModernConfigs(
       ) {
         io.writeGenerated(modernConfigPath, generatedModernConfig);
       } else {
+        if (migratedImports !== existingModernConfig)
+          io.write(modernConfigPath, migratedImports);
         io.log(
-          `${path.relative(io.workspaceRoot, modernConfigPath)} was preserved: ` +
-            'an existing Modern config is consumer-owned unless its generated ownership can be proven.',
+          `${path.relative(io.workspaceRoot, modernConfigPath)} ` +
+            (migratedImports !== existingModernConfig
+              ? 'migrated its BFF build imports; all other source was preserved because the Modern config is consumer-owned.'
+              : 'was preserved: an existing Modern config is consumer-owned unless its generated ownership can be proven.'),
         );
       }
     }

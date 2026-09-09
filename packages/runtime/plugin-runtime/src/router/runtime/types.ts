@@ -1,18 +1,8 @@
-import type { RouterFramework } from '@modern-js/runtime-extensions/router-state';
 import type {
   Params,
   RouteObject,
   RouteProps,
 } from '@modern-js/runtime-utils/router';
-
-export type {
-  BuiltInRouterFramework,
-  InternalRouterRuntimeState,
-  InternalRouterServerSnapshot,
-  RouterFramework,
-  RouterRouteMatchSnapshot,
-  RouterServerPrepareResult,
-} from '@modern-js/runtime-extensions/router-state';
 
 export type ModernRoute = {
   type: 'nested' | 'page';
@@ -41,11 +31,9 @@ export type SingleRouteConfig = RouteProps & {
 
 export type RouterConfig = {
   /**
-   * Select the router implementation used by Modern.js conventional routing.
-   * - `react-router` (default): React Router based integration
-   * - `tanstack`: TanStack Router integration
+   * Router implementation identifier for integrations that provide selection.
    */
-  framework?: RouterFramework;
+  framework?: string;
   routesConfig: {
     globalApp?: React.ComponentType<any>;
     routes?: ModernRoute[];

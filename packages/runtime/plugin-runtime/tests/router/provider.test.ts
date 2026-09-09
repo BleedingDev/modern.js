@@ -1,17 +1,21 @@
 import { createSyncHook } from '@modern-js/plugin';
-import type { RuntimePlugin } from '../../src/core';
-import * as contextSeam from '../../src/core/context';
-import type { RouterExtendsHooks } from '../../src/router/runtime/hooks';
-import * as routerHooks from '../../src/router/runtime/hooks';
 import {
   createRouterProviderRealm,
   type RouterProviderFactory,
   registerRouterProvider,
-  reportUnsupportedProviderRegistryHooks,
+  reportUnsupportedProviderRegistryHooks as reportProviderHooks,
   resolveRouterProvider,
-  routerProviderRegistryHooks,
   unsafe_resetRouterProvidersForTesting,
-} from '../../src/router/runtime/provider';
+} from '@modern-js/runtime-extensions/router-provider';
+import type { RuntimePlugin } from '../../src/core';
+import * as contextSeam from '../../src/core/context';
+import type { RouterExtendsHooks } from '../../src/router/runtime/hooks';
+import * as routerHooks from '../../src/router/runtime/hooks';
+import { routerProviderRegistryHooks } from '../../src/router/runtime/hooks';
+
+const reportUnsupportedProviderRegistryHooks = (
+  provider: Parameters<typeof reportProviderHooks>[0],
+) => reportProviderHooks(provider, routerProviderRegistryHooks);
 
 const createFactory = (name: string): RouterProviderFactory => {
   return () =>

@@ -46,7 +46,7 @@ export function createFileDetails(options: {
     parsedPath.dir,
     `${parsedPath.name}.js`,
   );
-  const absTargetDir = path.resolve(targetDir);
+  const absTargetDir = path.resolve(appDirectory, targetDir);
 
   const relativePathFromAppDirectory = path.relative(
     appDirectory,

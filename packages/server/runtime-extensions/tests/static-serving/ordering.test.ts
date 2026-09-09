@@ -3,7 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { brotliCompressSync } from 'node:zlib';
 import { compatPlugin, createServerBase } from '@modern-js/server-core';
-import { serverStaticPlugin } from '@modern-js/server-core/node';
+import {
+  loadServerPlugins,
+  serverStaticPlugin,
+} from '@modern-js/server-core/node';
 import type { ServerRoute } from '@modern-js/types';
 import { applyPlugins } from '../../../prod-server/src/apply';
 import type { ProdServerOptions } from '../../../prod-server/src/types';
@@ -149,6 +152,13 @@ it('rejects a compressed generated-public symlink escape before exposing its byt
 
 it('registers static extensions through the actual production and dev plugin assembly', async () => {
   const root = await fixture();
+  const scope = path.join(root, 'node_modules/@modern-js');
+  await mkdir(scope, { recursive: true });
+  await symlink(
+    path.resolve(__dirname, '../..'),
+    path.join(scope, 'server-runtime-extensions'),
+    'dir',
+  );
   const original = Buffer.from('production composition body');
   const compressed = brotliCompressSync(original);
   await writeFile(path.join(root, 'static/asset.txt'), original);
@@ -159,19 +169,27 @@ it('registers static extensions through the actual production and dev plugin ass
     serverConfigPath: path.join(root, 'modern.server.js'),
     appContext: { ...getDefaultAppContext(), appDirectory: root },
     config: { ...getDefaultConfig(), server: { logger: false } },
+    plugins: await loadServerPlugins(
+      [{ name: '@modern-js/server-runtime-extensions/server-plugin' }],
+      root,
+    ),
   };
   const server = createServerBase(options);
-  await applyPlugins(server, options);
-  await server.init();
-  const response = await server.request('/static/asset.txt', {
-    headers: { 'accept-encoding': 'br' },
-  });
-  expect(response.status).toBe(200);
-  expect(response.headers.get('content-encoding')).toBe('br');
-  expect(Buffer.from(await response.arrayBuffer())).toEqual(compressed);
-  expect(await (await server.request('/generated.txt')).text()).toBe(
-    'generated public',
-  );
+  try {
+    await applyPlugins(server, options);
+    await server.init();
+    const response = await server.request('/static/asset.txt', {
+      headers: { 'accept-encoding': 'br' },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-encoding')).toBe('br');
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(compressed);
+    expect(await (await server.request('/generated.txt')).text()).toBe(
+      'generated public',
+    );
+  } finally {
+    await server.dispose();
+  }
 });
 
 it('uses served byte length when a compressed static representation is a symlink', async () => {

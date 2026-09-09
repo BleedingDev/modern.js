@@ -39,9 +39,19 @@ export type AppNormalizedConfig = AppToolsNormalizedConfig;
 export type AppToolsAPI = CLIPluginAPI<AppTools>;
 
 export type {
+  AfterBffCompileFn,
   AppToolsContext,
   AppToolsExtendAPI,
   AppToolsExtendContext,
   AppToolsExtendHooks,
   AppToolsHooks as AppToolsFeatureHooks,
+  BeforeBffCompileFn,
+  BffClientArtifact,
+  BffClientArtifacts,
+  BffCompilation,
+  BffGeneratedEntries,
+  BffGeneratedModule,
+  BffGeneration,
+  ModifyBffClientArtifactsFn,
+  ModifyBffGeneratedEntriesFn,
 } from './plugin';

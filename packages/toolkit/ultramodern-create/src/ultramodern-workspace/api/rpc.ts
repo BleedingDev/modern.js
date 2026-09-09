@@ -55,7 +55,7 @@ export function createRpcContractFile(service: ApiService): string {
   const pascalStem = toPascalCase(stem);
 
   return `import { Rpc, RpcGroup } from 'effect/unstable/rpc';
-import { Schema } from '@modern-js/plugin-bff/effect-client';
+import { Schema } from '@modern-js/bff-effect/effect-client';
 
 export interface ${pascalStem}RpcItem {
   readonly id: string;
@@ -170,7 +170,7 @@ export function createRpcApiServiceEntry(service: ApiService): string {
   Effect,
   HttpApi,
   Layer,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/bff-effect/effect-edge';
 ${rpc.imports}import { ultramodernApiMarker } from '../shared/ultramodern-build.ts';
 
 const ${groupName}Items = [
@@ -212,13 +212,13 @@ export function createRpcClientFile(service: ApiService): string {
   return `import {
   Effect,
   makeEffectRpcClient,
-} from '@modern-js/plugin-bff/effect-client';
+} from '@modern-js/bff-effect/effect-client';
 import {
   ${contractExport},
   ${groupExport},
 } from '../../shared/rpc.ts';
 
-export { Effect } from '@modern-js/plugin-bff/effect-client';
+export { Effect } from '@modern-js/bff-effect/effect-client';
 
 export const ${pascalStem}RpcContract = ${contractExport};
 

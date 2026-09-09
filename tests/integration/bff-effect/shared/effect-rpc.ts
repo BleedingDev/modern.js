@@ -1,4 +1,4 @@
-import { Rpc, RpcGroup, Schema } from '@modern-js/plugin-bff/effect-client';
+import { Rpc, RpcGroup, Schema } from '@modern-js/bff-effect/effect-client';
 
 export const bffRpcPing = Rpc.make('ping', {
   payload: Schema.Struct({

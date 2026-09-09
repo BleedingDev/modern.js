@@ -59,7 +59,7 @@ export type EffectRequestContext = {
   headers: Record<string, string>;
 } & Record<string, unknown>;
 
-/** Structural slice of `@modern-js/create-request` the runtime relies on. */
+/** Structural slice of `@modern-js/runtime-extensions/request-policy` the runtime relies on. */
 export type EffectRequestRuntime = {
   createRequest: (options: {
     path: string;
