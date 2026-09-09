@@ -22,5 +22,6 @@ export const createHonoCrossProjectPolicyMiddleware = (
       return denial;
     }
 
-    return next();
+    const result: unknown = await next();
+    return result instanceof Response ? result : undefined;
   };

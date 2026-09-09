@@ -188,6 +188,50 @@ describe('Hono parity through CLI options and the native server plugin', () => {
     });
   }
 
+  test.each([
+    ['absent', undefined],
+    ['disabled', false],
+    ['enabled', true],
+  ] as const)('preserves the native Hono HTTP response for an empty handler with policy %s', async (_label, enabled) => {
+    const requestId = 'crm.producer-a';
+    const infos = createParityApiHandlerInfos();
+    const contract = buildOperationContractMap({ handlers: infos, requestId })[
+      'GET:/nothing'
+    ]!;
+    const headers = enabled
+      ? {
+          'x-modernjs-bff-envelope': JSON.stringify({ requestId }),
+          'x-operation-id': contract.operationId,
+          'x-modernjs-bff-operation-context': JSON.stringify({
+            requestId,
+            operationId: contract.operationId,
+            method: contract.method,
+            routePath: contract.routePath,
+            schemaHash: contract.schemaHash,
+            operationVersion: contract.operationVersion,
+          }),
+        }
+      : {};
+    const { app } = await createApp(
+      infos,
+      enabled === undefined
+        ? {}
+        : { requestId, crossProjectPolicy: { enabled } },
+    );
+    const response = await app.request('/nothing', { headers });
+    const control = new Hono();
+    if (enabled !== undefined) {
+      control.get('/nothing', async (_context, next) => {
+        await next();
+      });
+    }
+    control.get('/nothing', async () => undefined);
+    const expected = await control.request('/nothing');
+    expect(response).toBeInstanceOf(Response);
+    expect(response.status).toBe(expected.status);
+    await expect(response.text()).resolves.toBe(await expected.text());
+  });
+
   test('accepts policy-enabled startup before handlers are discovered', async () => {
     const { routes } = await createApp(undefined, {
       crossProjectPolicy: { enabled: true },

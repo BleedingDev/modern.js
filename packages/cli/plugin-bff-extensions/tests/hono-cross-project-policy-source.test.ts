@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { Hono } from '@modern-js/server-core';
 
 import {
   buildOperationContractMap,
@@ -84,12 +85,15 @@ describe('exact-route Hono cross-project policy', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('returns the downstream Response unchanged after an exact match', async () => {
+  it.each([
+    true,
+    false,
+  ])('returns the downstream Response unchanged when policy is enabled=%s', async enabled => {
     const customerContract =
       policy.expectedOperationContracts['GET:/api/customer']!;
     const downstream = new Response('customer');
     const middleware = createHonoCrossProjectPolicyMiddleware(
-      policy,
+      { ...policy, enabled },
       '/api/customer',
     );
 
@@ -99,5 +103,53 @@ describe('exact-route Hono cross-project policy', () => {
     );
 
     expect(result).toBe(downstream);
+  });
+
+  it('preserves the standard void next contract', async () => {
+    const customerContract =
+      policy.expectedOperationContracts['GET:/api/customer']!;
+    const next = rstest.fn(async () => undefined);
+    const middleware = createHonoCrossProjectPolicyMiddleware(
+      policy,
+      '/api/customer',
+    );
+    await expect(
+      middleware(createContext('GET', createHeaders(customerContract)), next),
+    ).resolves.toBeUndefined();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['disabled', false],
+    ['enabled', true],
+  ] as const)('preserves the native Hono empty-handler response with policy %s', async (_label, enabled) => {
+    const app = new Hono();
+    if (enabled !== undefined) {
+      app.get(
+        '/api/customer',
+        createHonoCrossProjectPolicyMiddleware(
+          { ...policy, enabled },
+          '/api/customer',
+        ),
+      );
+    }
+    app.get('/api/customer', async () => undefined);
+    const response = await app.request('/api/customer', {
+      headers: enabled
+        ? createHeaders(policy.expectedOperationContracts['GET:/api/customer']!)
+        : {},
+    });
+    const control = new Hono();
+    if (enabled !== undefined) {
+      control.get('/api/customer', async (_context, next) => {
+        await next();
+      });
+    }
+    control.get('/api/customer', async () => undefined);
+    const expected = await control.request('/api/customer');
+    expect(response).toBeInstanceOf(Response);
+    expect(response.status).toBe(expected.status);
+    await expect(response.text()).resolves.toBe(await expected.text());
   });
 });
