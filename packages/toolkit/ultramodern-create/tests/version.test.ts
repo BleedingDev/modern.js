@@ -707,15 +707,29 @@ test('local source initializes Git and leaves the first commit to the user', () 
   );
   const gitConfig = `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`;
   fs.writeFileSync(isolatedGitConfig, gitConfig);
+  const tracePath = path.join(tmpDir, 'git-trace.jsonl');
   const env = {
     ...hermeticEnv,
     GIT_CONFIG_GLOBAL: isolatedGitConfig,
+    GIT_TRACE2_EVENT: tracePath,
     PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
     ULTRAMODERN_TEST_HOOK_MARKER: hookMarker,
   };
   const workspaceDir = path.join(tmpDir, 'offline-fallback-smoke');
+  // Git commit may detach auto-maintenance even though spawnSync has returned.
+  // Keep fixture-owned maintenance in the foreground so teardown has no writer.
   const git = (args: string[]) =>
-    spawnSync('git', args, { cwd: workspaceDir, env, encoding: 'utf8' });
+    spawnSync(
+      'git',
+      [
+        '-c',
+        'maintenance.autoDetach=false',
+        '-c',
+        'gc.autoDetach=false',
+        ...args,
+      ],
+      { cwd: workspaceDir, env, encoding: 'utf8' },
+    );
 
   try {
     const result = spawnSync(
@@ -754,10 +768,45 @@ test('local source initializes Git and leaves the first commit to the user', () 
       'workspace:*',
     );
 
+    // Force automatic maintenance to write a pack during the explicit commit.
+    for (const [name, value] of [
+      ['maintenance.gc.enabled', 'false'],
+      ['maintenance.loose-objects.enabled', 'true'],
+      ['maintenance.loose-objects.auto', '1'],
+    ]) {
+      const configured = git(['config', name, value]);
+      assert.equal(configured.status, 0, configured.stderr);
+    }
     const add = git(['add', '.']);
     assert.equal(add.status, 0, add.stderr);
     const commit = git(['commit', '-m', 'test: explicitly commit scaffold']);
     assert.equal(commit.status, 0, commit.stderr);
+    const trace = fs
+      .readFileSync(tracePath, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    const maintenance = trace.filter(
+      event =>
+        event.event === 'child_start' && event.argv?.includes('maintenance'),
+    );
+    assert.ok(
+      maintenance.length > 0,
+      'the commit must exercise automatic maintenance',
+    );
+    for (const event of maintenance) {
+      assert.equal(
+        event.argv.includes('--detach'),
+        false,
+        'owned Git maintenance must finish before fixture cleanup',
+      );
+    }
+    assert.ok(
+      fs
+        .readdirSync(path.join(workspaceDir, '.git/objects/pack'))
+        .some(name => name.endsWith('.pack')),
+      'maintenance must finish writing its object pack before commit returns',
+    );
     assert.equal(fs.existsSync(hookMarker), true);
     const head = git(['rev-parse', '--verify', 'HEAD']);
     assert.equal(head.status, 0, head.stderr);
