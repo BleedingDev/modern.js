@@ -976,6 +976,9 @@ importers:
       '@jridgewell/trace-mapping':
         specifier: ^0.3.31
         version: 0.3.31
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/runtime-extensions
       '@modern-js/utils':
         specifier: workspace:*
         version: link:../../toolkit/utils

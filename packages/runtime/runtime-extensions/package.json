@@ -60,6 +60,10 @@
         "require": "./dist/cjs/buildIdentity.js"
       },
       "default": "./dist/esm/buildIdentity.mjs"
+    },
+    "./rsc-disabled/*": {
+      "types": "./dist/types/rsc-disabled/*.d.ts",
+      "default": "./dist/esm/rsc-disabled/*.mjs"
     }
   },
   "typesVersions": {

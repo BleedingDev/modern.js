@@ -1,5 +1,4 @@
 import type { RsbuildPlugin, Rspack } from '@rsbuild/core';
-import path from 'path';
 
 const disabledRuntimeModules = {
   'react-server-dom-rspack/client.browser': './rscDisabledClientBrowserRuntime',
@@ -60,20 +59,13 @@ function normalizeArrayAliases(
 }
 
 function resolveDisabledRuntimeModules() {
-  const resolvedModules = new Map<string, string>();
   return Object.fromEntries(
-    Object.entries(disabledRuntimeModules).map(([request, moduleRequest]) => {
-      let modulePath = resolvedModules.get(moduleRequest);
-      if (modulePath === undefined) {
-        try {
-          modulePath = require.resolve(moduleRequest);
-        } catch {
-          modulePath = path.resolve(__dirname, moduleRequest);
-        }
-        resolvedModules.set(moduleRequest, modulePath);
-      }
-      return [`${request}$`, modulePath];
-    }),
+    Object.entries(disabledRuntimeModules).map(([request, moduleRequest]) => [
+      `${request}$`,
+      require.resolve(
+        `@modern-js/runtime-extensions/rsc-disabled/${moduleRequest.slice(2)}`,
+      ),
+    ]),
   );
 }
 

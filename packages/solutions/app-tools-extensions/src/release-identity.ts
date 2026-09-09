@@ -15,7 +15,8 @@ const gitOutput = (
   args: string[],
 ): string | undefined => {
   try {
-    return execFileSync('git', ['-C', workspaceRoot, ...args], {
+    return execFileSync('git', args, {
+      cwd: workspaceRoot,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -84,7 +85,7 @@ export const resolveUltramodernSourceRevision = (
   const revision = gitOutput(gitRoot, ['rev-parse', 'HEAD']);
   const status = gitOutput(gitRoot, [
     'status',
-    '--porcelain=v1',
+    '--porcelain',
     '--untracked-files=all',
   ]);
   if (!revision || status === undefined || status.length > 0) {

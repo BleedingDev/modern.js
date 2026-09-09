@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { configureUltramodernTypeChecker } from '@modern-js/app-tools-extensions/native-type-checker';
 import { resolveUltramodernReleaseIdentity } from '@modern-js/app-tools-extensions/release-identity';
 import { mergeConfig } from '@modern-js/plugin/cli';
 import { type RspackChain, rspack } from '@rsbuild/core';
+import { resolveEffectTsgoCompiler } from './config/build-environment';
 import type { AppUserConfig } from './types';
 
 export { default as ultramodernReleaseEnvelopePlugin } from './plugins/ultramodernReleaseEnvelope';
@@ -268,7 +270,14 @@ export const createPresetUltramodernConfig = (
         : {}),
     },
     tools: {
-      bundlerChain: setReactRouterBridgeSafeAliases,
+      bundlerChain: (chain, utils) => {
+        setReactRouterBridgeSafeAliases(chain, utils);
+        configureUltramodernTypeChecker(
+          chain,
+          utils.CHAIN_ID.PLUGIN.TS_CHECKER,
+          from => resolveEffectTsgoCompiler({ from }),
+        );
+      },
       // Keep generated Tailwind apps on Rsbuild's native CSS pipeline.
       lightningcssLoader: true,
       ...(bundledReleaseIdentity
