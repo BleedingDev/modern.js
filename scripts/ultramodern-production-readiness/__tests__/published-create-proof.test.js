@@ -549,6 +549,101 @@ test('default-off clean-room install excludes and cannot resolve RSC runtimes', 
   );
 });
 
+test('acceptance Git setup rejects a nested parent without changing it and accepts a canonical workspace root', async () => {
+  const { configureAcceptanceWorkspaceGit } = await import(
+    '../published-create-proof/acceptance-profile.mjs'
+  );
+  const fixture = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'acceptance-git-root-'),
+  );
+  const parent = path.join(fixture, 'parent');
+  const nested = path.join(parent, 'generated');
+  const ownRoot = path.join(fixture, 'standalone');
+  const env = {
+    GIT_CONFIG_GLOBAL: path.join(fixture, 'empty-gitconfig'),
+    GIT_CONFIG_NOSYSTEM: '1',
+  };
+  const calls = [];
+  const runImpl = (command, args, options = {}) => {
+    calls.push(args);
+    const result = spawnSync(command, args, {
+      cwd: options.cwd ?? parent,
+      encoding: 'utf8',
+      env: createProcessEnv({ ...env, ...options.env }),
+      stdio: 'pipe',
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    return result.stdout.trim();
+  };
+  try {
+    fs.mkdirSync(nested, { recursive: true });
+    fs.mkdirSync(ownRoot);
+    fs.writeFileSync(env.GIT_CONFIG_GLOBAL, '');
+    runImpl('git', ['init', '--quiet']);
+    runImpl('git', ['config', 'user.name', 'Parent Author']);
+    runImpl('git', ['config', 'user.email', 'parent@example.test']);
+    runImpl('git', [
+      'remote',
+      'add',
+      'origin',
+      'https://example.test/parent.git',
+    ]);
+    fs.writeFileSync(path.join(parent, 'tracked.txt'), 'initial\n');
+    runImpl('git', ['add', 'tracked.txt']);
+    runImpl('git', ['-c', 'commit.gpgsign=false', 'commit', '-m', 'initial']);
+    fs.writeFileSync(path.join(parent, 'tracked.txt'), 'staged\n');
+    runImpl('git', ['add', 'tracked.txt']);
+    fs.writeFileSync(path.join(parent, 'tracked.txt'), 'unstaged\n');
+    fs.writeFileSync(path.join(nested, 'package.json'), '{"private":true}\n');
+    const originalHead = runImpl('git', ['rev-parse', 'HEAD']);
+    const originalRemotes = runImpl('git', ['remote', '-v']);
+    const originalFiles = new Map(
+      ['HEAD', 'index', 'config'].map(name => [
+        name,
+        fs.readFileSync(path.join(parent, '.git', name)),
+      ]),
+    );
+    const nestedAlias = path.join(fixture, 'nested-alias');
+    fs.symlinkSync(nested, nestedAlias, 'dir');
+    for (const projectDir of [nested, nestedAlias]) {
+      calls.length = 0;
+      assert.throws(
+        () => configureAcceptanceWorkspaceGit(projectDir, env, runImpl),
+        /workspace must be its own Git root:.*Use a work directory outside an existing repository/u,
+      );
+      assert.deepEqual(calls, [['rev-parse', '--show-toplevel']]);
+      for (const [name, original] of originalFiles) {
+        assert.deepEqual(
+          fs.readFileSync(path.join(parent, '.git', name)),
+          original,
+          `parent ${name} changed`,
+        );
+      }
+      assert.equal(runImpl('git', ['rev-parse', 'HEAD']), originalHead);
+      assert.equal(runImpl('git', ['remote', '-v']), originalRemotes);
+    }
+
+    runImpl('git', ['init', '--quiet'], { cwd: ownRoot });
+    const ownAlias = path.join(fixture, 'standalone-alias');
+    fs.symlinkSync(ownRoot, ownAlias, 'dir');
+    configureAcceptanceWorkspaceGit(ownAlias, env, runImpl);
+    assert.equal(
+      runImpl('git', ['config', '--local', 'user.name'], { cwd: ownRoot }),
+      'UltraModern Acceptance',
+    );
+    assert.equal(
+      runImpl('git', ['config', '--local', 'user.email'], { cwd: ownRoot }),
+      'acceptance@ultramodern.local',
+    );
+    assert.equal(
+      runImpl('git', ['remote', 'get-url', 'origin'], { cwd: ownRoot }),
+      'https://github.com/ultramodern-ci/acceptance-superapp.git',
+    );
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('snapshots installed source with real hooks before a build can use its revision', async t => {
   const { snapshotAcceptanceWorkspaceSource } = await import(
     '../published-create-proof/acceptance-profile.mjs'
@@ -742,11 +837,18 @@ test('browser runtime children scrub inherited source and deployment overrides',
   }
 });
 
-test('browser smoke exposes the bounded child cause through the outer acceptance failure', async () => {
+test('browser smoke exposes the bounded child cause through the outer acceptance failure', async t => {
   const { runBrowserSmoke } = await import(
     '../published-create-proof/browser-smoke.mjs'
   );
-  const logPath = '/tmp/inventory-serve.log';
+  const artifactRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'acceptance-browser-failure-'),
+  );
+  t.after(() => fs.rmSync(artifactRoot, { recursive: true, force: true }));
+  const artifactDir = path.join(artifactRoot, 'source-node');
+  const reportPath = path.join(artifactRoot, 'source-node-summary.json');
+  const logPath = path.join(artifactDir, 'inventory-serve.log');
+  fs.writeFileSync(reportPath, '{"status":"stale"}\n');
   const exactCause = "Error: Cannot find module '@modern-js/prod-server'";
   const genericFailure = new Error(
     'Command failed: node run-browser-smoke.mjs',
@@ -758,6 +860,7 @@ test('browser smoke exposes the bounded child cause through the outer acceptance
         '/tmp/generated-superapp',
         {
           artifactMode: 'source',
+          artifactRoot,
           mode: 'source',
           platform: 'node',
           shellRuntime: 'node',
@@ -788,7 +891,10 @@ test('browser smoke exposes the bounded child cause through the outer acceptance
             },
             status: 'fail',
           }),
-          runImpl: () => {
+          runImpl: (_command, args) => {
+            assert.equal(args[args.indexOf('--artifact-dir') + 1], artifactDir);
+            assert.equal(args[args.indexOf('--out') + 1], reportPath);
+            assert.equal(fs.existsSync(reportPath), false);
             throw genericFailure;
           },
         },
@@ -818,6 +924,7 @@ test('browser smoke exposes the bounded child cause through the outer acceptance
       assert.equal(evidence.appId, 'inventory');
       assert.equal(evidence.apiResponse.status, 500);
       assert.equal(error.details.logPath, logPath);
+      assert.equal(error.details.reportPath, reportPath);
       assert.ok(error.details.logTail.length <= 8_192);
       assert.equal(typeof error.details.apiResponse.body, 'string');
       assert.ok(error.details.apiResponse.body.length <= 2_048);

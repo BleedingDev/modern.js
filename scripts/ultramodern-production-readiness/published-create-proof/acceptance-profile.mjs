@@ -622,6 +622,26 @@ function assertCohortResolutionProvenance(
   return { cohortPackageCount, registryOrigin };
 }
 
+function configureAcceptanceWorkspaceGit(projectDir, env, runImpl = run) {
+  const git = args =>
+    runImpl('git', args, { cwd: projectDir, env, stdio: 'pipe' });
+  const workspaceRoot = fs.realpathSync(projectDir);
+  const gitRoot = fs.realpathSync(git(['rev-parse', '--show-toplevel']));
+  if (gitRoot !== workspaceRoot) {
+    throw new Error(
+      `Generated acceptance workspace must be its own Git root: ${workspaceRoot} belongs to ${gitRoot}. Use a work directory outside an existing repository.`,
+    );
+  }
+  git(['config', 'user.name', 'UltraModern Acceptance']);
+  git(['config', 'user.email', 'acceptance@ultramodern.local']);
+  git([
+    'remote',
+    'add',
+    'origin',
+    'https://github.com/ultramodern-ci/acceptance-superapp.git',
+  ]);
+}
+
 function snapshotAcceptanceWorkspaceSource(projectDir, env, runImpl = run) {
   const git = (args, stdio = 'pipe') =>
     runImpl('git', args, { cwd: projectDir, env, stdio });
@@ -1023,24 +1043,10 @@ async function runAcceptanceProfile({
           // the repository. No Zephyr token is set, so nothing
           // is uploaded: this exercises "builds with Zephyr present, without a
           // Zephyr account".
-          runImpl('git', ['config', 'user.name', 'UltraModern Acceptance'], {
-            cwd: projectDir,
-            env: packageManagerEnv,
-          });
-          runImpl(
-            'git',
-            ['config', 'user.email', 'acceptance@ultramodern.local'],
-            { cwd: projectDir, env: packageManagerEnv },
-          );
-          runImpl(
-            'git',
-            [
-              'remote',
-              'add',
-              'origin',
-              'https://github.com/ultramodern-ci/acceptance-superapp.git',
-            ],
-            { cwd: projectDir, env: packageManagerEnv },
+          configureAcceptanceWorkspaceGit(
+            projectDir,
+            packageManagerEnv,
+            runImpl,
           );
           return {
             runner: 'pnpm dlx',
@@ -1322,6 +1328,7 @@ export {
   acceptancePlaywrightInstallArgs,
   assertCohortResolutionProvenance,
   assertDefaultOffRscInstall,
+  configureAcceptanceWorkspaceGit,
   createAcceptanceBuildEnv,
   createAcceptancePackageManagerEnv,
   createAcceptanceRuntimeContext,

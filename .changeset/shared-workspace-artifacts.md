@@ -7,3 +7,5 @@ Derive fresh, add-vertical and migrated workspace scripts from one artifact proj
 Keep additional shells' backend API dependencies independent of their UI composition, including explicitly empty composition, and complete missing generated build identity fields without replacing explicit stamped identity. Recognize generated artifacts against their finite compact and live-port candidates while preserving unmatched consumer content.
 
 Retain configured bridge gates in the aggregate workspace check when adding a vertical or migrating an existing workspace.
+
+Recognize the exact historical generated validator function/call pair when migrating development-overlay projections, while retaining full canonical comparison and protecting authored code.

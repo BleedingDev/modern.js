@@ -49,6 +49,89 @@ function isLiteralData(
   );
 }
 
+/** Recognize the paired overlay transition from framework template blob 0206251369. */
+function normalizeHistoricalOverlayPair(
+  source: string,
+  currentGeneratedSource: string,
+): string {
+  const options: Parameters<typeof parse>[1] = {
+    sourceType: 'module',
+    plugins: ['typescript'],
+  };
+  // The published 57e02ede template used both statements together. Matching a
+  // name or just one statement is not ownership evidence.
+  const historical = parse(
+    `const readGeneratedContractView = config => {
+  return synthesizeGeneratedContractFromCompact(config);
+};
+const generatedContract = readGeneratedContractView(ultramodernConfig);`,
+    options,
+  );
+  const previous = parse(source, options);
+  const current = parse(currentGeneratedSource, options);
+  const declarationName = (node: any): string | undefined =>
+    node.type === 'VariableDeclaration' &&
+    node.kind === 'const' &&
+    node.declarations.length === 1 &&
+    node.declarations[0].id.type === 'Identifier'
+      ? node.declarations[0].id.name
+      : undefined;
+  const syntaxIdentity = (node: unknown) =>
+    JSON.stringify(node, (key, value) =>
+      [
+        'start',
+        'end',
+        'loc',
+        'extra',
+        'leadingComments',
+        'trailingComments',
+        'innerComments',
+      ].includes(key)
+        ? undefined
+        : value,
+    );
+  const replacements: Array<{ start: number; end: number; text: string }> = [];
+  for (const expected of historical.program.body) {
+    const name = declarationName(expected);
+    const oldStatements = previous.program.body.filter(
+      node => declarationName(node) === name,
+    );
+    const newStatements = current.program.body.filter(
+      node => declarationName(node) === name,
+    );
+    if (oldStatements.length !== 1 || newStatements.length !== 1) return source;
+    const oldStatement = oldStatements[0]!;
+    const newStatement = newStatements[0]!;
+    if (syntaxIdentity(oldStatement) !== syntaxIdentity(expected))
+      return source;
+    // Historical statements contain no comments. Never erase an authored
+    // comment inside a replaced span; comments outside it remain in source and
+    // must pass the whole-file canonical comparison below.
+    if (
+      previous.comments?.some(
+        comment =>
+          comment.start! >= oldStatement.start! &&
+          comment.end! <= oldStatement.end!,
+      )
+    )
+      return source;
+    replacements.push({
+      start: oldStatement.start!,
+      end: oldStatement.end!,
+      text: currentGeneratedSource.slice(
+        newStatement.start!,
+        newStatement.end!,
+      ),
+    });
+  }
+  for (const replacement of replacements.sort((a, b) => b.start - a.start))
+    source =
+      source.slice(0, replacement.start) +
+      replacement.text +
+      source.slice(replacement.end);
+  return source;
+}
+
 function withoutGeneratedData(
   source: string,
   binding?: string,
@@ -56,6 +139,8 @@ function withoutGeneratedData(
 ) {
   if (!binding) return source;
   if (binding === 'workspaceValidationContract') {
+    if (currentGeneratedSource)
+      source = normalizeHistoricalOverlayPair(source, currentGeneratedSource);
     source = source
       .replace(/^\s*'scripts\/check-ultramodern-api-boundaries\.mts',\n/mu, '')
       .replace(
