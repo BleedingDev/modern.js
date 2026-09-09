@@ -14,6 +14,10 @@ import {
   normalizeUltramodernBridgeConfig,
   parseUltramodernBridgeCliOptions,
 } from '../src/ultramodern-workspace/bridge-config';
+import {
+  prependCommandFixturePath,
+  writeNodeCommandFixture,
+} from './helpers/node-command-fixture';
 import { snapshotWorkspace } from './helpers/workspace-kit';
 
 const readJson = (root: string, relativePath: string) =>
@@ -27,12 +31,10 @@ type RecordedCommand = {
 const createCommandRecorder = (root: string) => {
   const binDir = path.join(root, 'command-recorder-bin');
   const logPath = path.join(root, 'command-recorder.ndjson');
-  const executablePath = path.join(binDir, 'pnpm');
-
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    executablePath,
-    `#!/usr/bin/env node
+  writeNodeCommandFixture(
+    binDir,
+    'pnpm',
+    `
 const fs = require('node:fs');
 
 const argv = process.argv.slice(2);
@@ -48,9 +50,7 @@ if (failArgv && JSON.stringify(argv) === JSON.stringify(failArgv)) {
   process.exit(73);
 }
 `,
-    'utf-8',
   );
-  fs.chmodSync(executablePath, 0o755);
 
   return {
     clear() {
@@ -58,8 +58,7 @@ if (failArgv && JSON.stringify(argv) === JSON.stringify(failArgv)) {
     },
     env(failArgv?: string[]): NodeJS.ProcessEnv {
       return {
-        ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+        ...prependCommandFixturePath(binDir),
         ULTRAMODERN_COMMAND_LOG: logPath,
         ...(failArgv
           ? { ULTRAMODERN_FAIL_ARGV: JSON.stringify(failArgv) }

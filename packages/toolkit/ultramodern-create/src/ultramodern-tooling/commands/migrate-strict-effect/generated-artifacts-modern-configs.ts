@@ -216,13 +216,14 @@ export function updateGeneratedModernConfigs(
       app.directory,
       'modern.config.ts',
     );
+    // Predecessor transforms use LF anchors; template checkout endings vary.
     const rawGeneratedModernConfig = createAppModernConfig(
       config.workspace.packageScope,
       app,
       remotes,
       config.features.tailwind,
       configuredDevPorts,
-    );
+    ).replace(/\r\n/gu, '\n');
     const previousTailwindModernConfig =
       addPreviousTailwindOptimizationOverride(rawGeneratedModernConfig);
     const currentGeneratedModernConfigs = [

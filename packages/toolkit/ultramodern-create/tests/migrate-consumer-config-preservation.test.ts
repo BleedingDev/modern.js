@@ -24,7 +24,10 @@ import {
   createFederatedComponentsRegistry,
   createRemoteExposeFragmentPage,
 } from '../src/ultramodern-workspace/demo-components';
-import { formatGeneratedSourceCandidates } from '../src/ultramodern-workspace/fs-io';
+import {
+  createPackageRoot,
+  formatGeneratedSourceCandidates,
+} from '../src/ultramodern-workspace/fs-io';
 import {
   createAppModernConfig,
   createRemoteModuleFederationConfig,
@@ -1300,6 +1303,72 @@ test.each([
         file,
       );
   } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test.each([
+  'LF',
+  'CRLF',
+] as const)('historical config migration accepts %s templates and preserves authored programs', lineEnding => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-template-newlines-'));
+  const readFileSync = fs.readFileSync;
+  const templatePath = path.join(
+    createPackageRoot,
+    'templates/workspace/apps/modern.config.ts.handlebars',
+  );
+  let templateReads = 0;
+  let templateSpy: ReturnType<typeof rstest.spyOn> | undefined;
+  try {
+    generateUltramodernWorkspace({
+      targetDir: root,
+      packageName: 'template-newlines',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource: { strategy: 'workspace' },
+    });
+    const config = readUltramodernConfig(root);
+    const app = allWorkspaceAppsFromToolingConfig(config)[0];
+    const file = path.join(root, app.directory, 'modern.config.ts');
+    const current = fs.readFileSync(file, 'utf8');
+    const predecessors = [
+      addLegacyGeneratedDefaults(
+        removeTsCheckerBuildOverride(
+          current.replace(
+            'pluginTailwindcss()',
+            'pluginTailwindcss({ optimize: false })',
+          ),
+        ),
+      ),
+      removeReleaseEnvelopePlugin(previousCompositionSource(current)),
+      previousCompositionSource(current),
+    ];
+    templateSpy = rstest
+      .spyOn(fs, 'readFileSync')
+      .mockImplementation((filePath, options) => {
+        const source = readFileSync(filePath, options);
+        if (filePath !== templatePath) return source;
+        assert.equal(typeof source, 'string');
+        templateReads++;
+        return source.replace(/\r?\n/gu, lineEnding === 'CRLF' ? '\r\n' : '\n');
+      });
+    const run = () =>
+      updateGeneratedModernConfigs(createMigrationIo(root, false), config);
+    for (const predecessor of predecessors) {
+      fs.writeFileSync(file, predecessor);
+      run();
+      const migrated = fs.readFileSync(file, 'utf8');
+      assert.equal(generatedUiSourceRequiresRewrite(migrated, current), false);
+      run();
+      assert.equal(fs.readFileSync(file, 'utf8'), migrated);
+      const authored = `${predecessor}\nexport const authoredBusinessPolicy = 'keep';\n`;
+      fs.writeFileSync(file, authored);
+      run();
+      assert.equal(fs.readFileSync(file, 'utf8'), authored);
+    }
+    assert.ok(templateReads > 0);
+  } finally {
+    templateSpy?.mockRestore();
     fs.rmSync(root, { recursive: true, force: true });
   }
 });

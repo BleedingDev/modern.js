@@ -169,8 +169,12 @@ function createTemporarySibling(root: string): string {
   const absoluteRoot = path.resolve(root);
   const parent = path.dirname(absoluteRoot);
   fs.mkdirSync(parent, { recursive: true });
-  return fs.mkdtempSync(
-    path.join(parent, `.${path.basename(absoluteRoot)}.ultramodern-stage-`),
+  // Recovery resolves receipt paths natively. Persist the same representation
+  // when the caller uses a Windows short path or an aliased parent directory.
+  return fs.realpathSync.native(
+    fs.mkdtempSync(
+      path.join(parent, `.${path.basename(absoluteRoot)}.ultramodern-stage-`),
+    ),
   );
 }
 

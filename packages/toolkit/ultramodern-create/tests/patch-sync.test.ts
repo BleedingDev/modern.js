@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -18,7 +19,6 @@ const packageRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(packageRoot, '../../..');
 const repoPatchDir = path.join(repoRoot, 'patches');
 const templatePatchDir = path.join(packageRoot, 'template-workspace/patches');
-const pnpmModulesDir = path.join(repoRoot, 'node_modules/.pnpm');
 const pnpmLock = fs.readFileSync(path.join(repoRoot, 'pnpm-lock.yaml'), 'utf8');
 const require = createRequire(import.meta.url);
 const nativeTypeScriptManifestPath = require.resolve(
@@ -32,17 +32,27 @@ const nativeTypeScriptCli = path.resolve(
   nativeTypeScriptManifest.bin.tsgo,
 );
 
-function packageStoreDirectory(
+function installedDependencyDirectory(
+  importerDirectory: string,
   packageName: string,
   exactVersion?: string,
 ): string {
-  for (const entry of fs.readdirSync(pnpmModulesDir)) {
-    const packageDirectory = path.join(
-      pnpmModulesDir,
-      entry,
-      'node_modules',
-      packageName,
-    );
+  const importerManifestPath = path.join(importerDirectory, 'package.json');
+  const importerManifest = JSON.parse(
+    fs.readFileSync(importerManifestPath, 'utf8'),
+  ) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  assert.ok(
+    importerManifest.dependencies?.[packageName] ||
+      importerManifest.devDependencies?.[packageName],
+    `${importerManifestPath} must declare ${packageName}`,
+  );
+  const importerRequire = createRequire(importerManifestPath);
+  for (const modulesDirectory of importerRequire.resolve.paths(packageName) ??
+    []) {
+    const packageDirectory = path.join(modulesDirectory, packageName);
     const manifestPath = path.join(packageDirectory, 'package.json');
     if (!fs.existsSync(manifestPath)) {
       continue;
@@ -51,12 +61,11 @@ function packageStoreDirectory(
       name: string;
       version: string;
     };
-    if (
-      manifest.name === packageName &&
-      (!exactVersion || manifest.version === exactVersion)
-    ) {
-      return fs.realpathSync(packageDirectory);
+    assert.equal(manifest.name, packageName);
+    if (exactVersion) {
+      assert.equal(manifest.version, exactVersion);
     }
+    return fs.realpathSync(packageDirectory);
   }
   assert.fail(
     `${packageName}${exactVersion ? `@${exactVersion}` : ''} must be installed for patch validation`,
@@ -69,9 +78,36 @@ function moduleFederationPackageDirectory(packageName: string): string {
     new RegExp(`^  '${selector}': ([a-f0-9]{64})$`, 'm'),
   )?.[1];
   assert.ok(patchHash, `${selector} must have a lockfile patch hash`);
-  return packageStoreDirectory(
-    `@module-federation/${packageName}`,
-    MODULE_FEDERATION_VERSION,
+  assert.equal(
+    createHash('sha256')
+      .update(
+        fs.readFileSync(
+          path.join(
+            repoPatchDir,
+            `@module-federation__${packageName}@${MODULE_FEDERATION_VERSION}.patch`,
+          ),
+        ),
+      )
+      .digest('hex'),
+    patchHash,
+    `${selector} patch bytes must match the installed lockfile identity`,
+  );
+  const dependencyChain =
+    packageName === 'modern-js-v3'
+      ? ['modern-js-v3']
+      : packageName === 'bridge-react'
+        ? ['modern-js-v3', packageName]
+        : packageName === 'runtime-core'
+          ? ['modern-js-v3', 'runtime', packageName]
+          : ['modern-js-v3', 'enhanced', packageName];
+  return dependencyChain.reduce(
+    (importerDirectory, dependencyName) =>
+      installedDependencyDirectory(
+        importerDirectory,
+        `@module-federation/${dependencyName}`,
+        MODULE_FEDERATION_VERSION,
+      ),
+    path.join(repoRoot, 'examples/module-federation/base/host'),
   );
 }
 
@@ -756,7 +792,16 @@ function assertDeclarationPatchesCompile(): void {
     for (const [packageName, exactVersion] of Object.entries(
       dependencyVersions,
     )) {
-      const installedDependencyPath = packageStoreDirectory(
+      const importerDirectory =
+        packageName === '@module-federation/sdk'
+          ? moduleFederationPackageDirectory('modern-js-v3')
+          : packageName === 'undici-types'
+            ? installedDependencyDirectory(packageRoot, '@types/node')
+            : packageName === '@types/node'
+              ? packageRoot
+              : repoRoot;
+      const installedDependencyPath = installedDependencyDirectory(
+        importerDirectory,
         packageName,
         exactVersion,
       );
@@ -779,7 +824,8 @@ function assertDeclarationPatchesCompile(): void {
       }
     }
 
-    const installedDrizzleDir = packageStoreDirectory(
+    const installedDrizzleDir = installedDependencyDirectory(
+      packageRoot,
       'drizzle-orm',
       DRIZZLE_ORM_VERSION,
     );

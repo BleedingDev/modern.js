@@ -1,16 +1,16 @@
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import execa from '@modern-js/utils/execa';
 import type { CommandContext } from '../context';
 
 export function runPnpmLockfileRefresh(context: CommandContext) {
-  const result = spawnSync(
+  const result = execa.sync(
     'pnpm',
     ['install', '--no-frozen-lockfile', '--ignore-scripts'],
-    { cwd: context.workspaceRoot, stdio: 'inherit' },
+    { cwd: context.workspaceRoot, stdio: 'inherit', reject: false },
   );
-  if (result.error) throw result.error;
-  return result.status ?? 1;
+  if ('code' in result) throw result;
+  return result.exitCode ?? 1;
 }
 
 export function runStagedTargetChecks(
@@ -26,7 +26,10 @@ export function runStagedTargetChecks(
       'node_modules/.bin',
       command,
     );
-    if (!fs.existsSync(executable)) {
+    if (
+      !fs.existsSync(executable) &&
+      !(process.platform === 'win32' && fs.existsSync(`${executable}.cmd`))
+    ) {
       throw new Error(`Staged target analyzer is unavailable: ${command}`);
     }
   }
@@ -34,12 +37,13 @@ export function runStagedTargetChecks(
     ['exec', 'modern-api-check'],
     ['exec', 'ultramodern-create', 'ultramodern', 'validate'],
   ]) {
-    const result = spawnSync('pnpm', args, {
+    const result = execa.sync('pnpm', args, {
       cwd: context.workspaceRoot,
       stdio: 'inherit',
+      reject: false,
     });
-    if (result.error) throw result.error;
-    if (result.status !== 0) return result.status ?? 2;
+    if ('code' in result) throw result;
+    if (result.exitCode !== 0) return result.exitCode ?? 2;
   }
   return 0;
 }

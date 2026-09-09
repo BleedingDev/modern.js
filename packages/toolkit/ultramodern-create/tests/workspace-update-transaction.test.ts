@@ -213,7 +213,11 @@ function crashDuringPublication(root: string) {
   );
 }
 
-function crashDuringFreshPublication(root: string, phase = 'file') {
+function crashDuringFreshPublication(
+  root: string,
+  phase = 'file',
+  targetPath = root,
+) {
   const transactionUrl = pathToFileURL(
     path.resolve(
       __dirname,
@@ -247,7 +251,7 @@ function crashDuringFreshPublication(root: string, phase = 'file') {
     __transactionTestHooks.afterPublishPath = () => {
       if (phase === 'file') process.kill(process.pid, 'SIGKILL');
     };
-    runFreshWorkspaceTransaction(process.cwd(), stage => {
+    runFreshWorkspaceTransaction(${JSON.stringify(targetPath)}, stage => {
       fs.mkdirSync(path.join(stage, 'nested/deeper'), { recursive: true });
       fs.writeFileSync(path.join(stage, 'nested/deeper/first.txt'), 'first');
       fs.writeFileSync(path.join(stage, 'nested/second.txt'), 'second');
@@ -298,6 +302,38 @@ test('fresh retry recovers nested files and directory ownership after hard inter
     } finally {
       f.clean();
     }
+  }
+});
+
+test('fresh receipt recovery canonicalizes an aliased staging parent without relaxing ownership checks', () => {
+  const f = fixture();
+  try {
+    fs.unlinkSync(path.join(f.root, 'owned.json'));
+    const alias = path.join(f.parent, 'parent-alias');
+    fs.symlinkSync(
+      f.parent,
+      alias,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    crashDuringFreshPublication(f.root, 'file', path.join(alias, 'workspace'));
+    const receiptPath = path.join(
+      f.parent,
+      fs.readdirSync(f.parent).find(entry => entry.endsWith('.receipt.json'))!,
+    );
+    const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+    const canonicalStage = fs.realpathSync.native(
+      receiptPath.slice(0, -'.receipt.json'.length),
+    );
+    for (const directory of receipt.directories)
+      assert.equal(path.dirname(directory.temporaryPath), canonicalStage);
+    recoverFreshWorkspaceTransactions(f.root);
+    assert.deepEqual(fs.readdirSync(f.root), []);
+    assert.deepEqual(fs.readdirSync(f.parent).sort(), [
+      'parent-alias',
+      'workspace',
+    ]);
+  } finally {
+    f.clean();
   }
 });
 
@@ -471,7 +507,7 @@ test('fresh nested-directory conflicts preserve external bytes and never reclaim
         import fs from 'node:fs';
         import path from 'node:path';
         import { runFreshWorkspaceTransaction } from ${JSON.stringify(transactionUrl)};
-        const root = process.cwd();
+        const root = fs.realpathSync.native(process.cwd());
         const parent = path.dirname(root);
         const outside = path.join(parent, 'outside');
         const preserved = path.join(parent, 'preserved-parent');

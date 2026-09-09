@@ -237,7 +237,10 @@ for (const format of ['cjs', 'esm', 'esm-node']) {
         assert.match(failed.output, /deliberate-parser-failure/u);
         assert.match(failed.output, /Error running JS plugin/u);
         assert.doesNotMatch(failed.output, topologyFailure);
-        assert.ok(failed.output.includes(valid[0]), failed.output);
+        assert.ok(
+          failed.output.includes(path.normalize(valid[0])),
+          failed.output,
+        );
       }
       assert.deepEqual(
         fs

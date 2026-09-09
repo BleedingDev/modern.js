@@ -10,11 +10,16 @@ interface OxlintReport {
 }
 
 const packageRoot = path.resolve(__dirname, '..');
-const toolDependencyNodeModules = path.dirname(
-  fs.realpathSync(path.join(packageRoot, 'node_modules/ultracite')),
+const ultraciteRoot = fs.realpathSync(
+  path.join(packageRoot, 'node_modules/ultracite'),
 );
-const oxfmtCliPath = path.join(toolDependencyNodeModules, 'oxfmt/bin/oxfmt');
-const oxlintCliPath = path.join(toolDependencyNodeModules, 'oxlint/bin/oxlint');
+const toolPackageRoots = {
+  ultracite: ultraciteRoot,
+  oxfmt: fs.realpathSync(path.join(packageRoot, 'node_modules/oxfmt')),
+  oxlint: fs.realpathSync(path.join(path.dirname(ultraciteRoot), 'oxlint')),
+};
+const oxfmtCliPath = path.join(toolPackageRoots.oxfmt, 'bin/oxfmt');
+const oxlintCliPath = path.join(toolPackageRoots.oxlint, 'bin/oxlint');
 
 function runTool(cliPath: string, args: string[], workspaceRoot: string) {
   return spawnSync(process.execPath, [cliPath, ...args], {
@@ -54,11 +59,14 @@ test('migration restores executable Ultracite format and component-style policie
     'migrated-tool-config',
     { tempPrefix: 'um-migrated-tool-config-' },
   );
-  fs.symlinkSync(
-    toolDependencyNodeModules,
-    path.join(workspaceRoot, 'node_modules'),
-    process.platform === 'win32' ? 'junction' : 'dir',
-  );
+  fs.mkdirSync(path.join(workspaceRoot, 'node_modules'));
+  for (const [name, installedRoot] of Object.entries(toolPackageRoots)) {
+    fs.symlinkSync(
+      installedRoot,
+      path.join(workspaceRoot, 'node_modules', name),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+  }
   fs.writeFileSync(
     path.join(workspaceRoot, 'oxfmt.config.ts'),
     `import { defineConfig } from 'oxfmt';

@@ -39,7 +39,7 @@ test('Cloudflare command resolves the native provider and reports output diagnos
       process.execPath,
       [
         '--import',
-        require.resolve('tsx'),
+        pathToFileURL(require.resolve('tsx')).href,
         runner,
         '--output',
         'missing-output',

@@ -502,15 +502,16 @@ export function migratePackageOwnedApiArtifacts(
           ].join('\n'),
         });
       }
-      let directory = path.dirname(relativePath);
+      // workspaceFiles returns slash-normalized keys, including on Windows.
+      let directory = path.posix.dirname(relativePath);
       while (
-        !files.includes(path.join(directory, 'package.json')) &&
+        !files.includes(path.posix.join(directory, 'package.json')) &&
         directory !== '.'
       )
-        directory = path.dirname(directory);
-      if (!files.includes(path.join(directory, 'package.json')))
+        directory = path.posix.dirname(directory);
+      if (!files.includes(path.posix.join(directory, 'package.json')))
         conflict(relativePath, 'no owning package manifest');
-      manifestFiles.add(path.join(directory, 'package.json'));
+      manifestFiles.add(path.posix.join(directory, 'package.json'));
     }
     if (
       rootExportsBaseline &&

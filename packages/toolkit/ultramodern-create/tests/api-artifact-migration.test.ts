@@ -121,6 +121,44 @@ test('hash-proven historical copies retire with direct imports and a convergent 
   migrate();
   expect(snapshot()).toEqual(first);
 });
+test('nested consumers receive the dependency in their nearest manifest without changing parent dependencies', () => {
+  const parentManifest = read('verticals/inventory/package.json');
+  write('verticals/inventory/shared/api.ts', 'export const business = true;\n');
+  const nested = 'verticals/inventory/features/orders';
+  write(
+    `${nested}/package.json`,
+    JSON.stringify({
+      name: '@warehouse/orders',
+      dependencies: { 'consumer-library': '1.2.3' },
+      consumerMetadata: { owner: 'orders' },
+    }),
+  );
+  write(
+    `${nested}/src/api.ts`,
+    "import { MicroVerticalReadinessSchema } from '@warehouse/shared-contracts/microvertical-api-baseline';\nexport const readiness = MicroVerticalReadinessSchema;\n",
+  );
+  const before = snapshot();
+  const plan = migrate(true);
+  expect(snapshot()).toEqual(before);
+  expect(plan.some(line => line.includes(`${nested}/package.json`))).toBe(true);
+  migrate();
+  expect(JSON.parse(read(`${nested}/package.json`))).toEqual({
+    name: '@warehouse/orders',
+    dependencies: {
+      'consumer-library': '1.2.3',
+      '@modern-js/bff-effect': 'workspace:*',
+    },
+    consumerMetadata: { owner: 'orders' },
+  });
+  expect(read('verticals/inventory/package.json')).toBe(parentManifest);
+  expect(JSON.parse(read('package.json')).dependencies).toBeUndefined();
+  expect(read(`${nested}/src/api.ts`)).toContain(
+    "from '@modern-js/bff-effect/microvertical-api'",
+  );
+  const first = snapshot();
+  migrate();
+  expect(snapshot()).toEqual(first);
+});
 test('formatted released copies and named public root imports migrate without touching business bindings', () => {
   for (const artifact of retiredApiArtifacts.filter(item =>
     fs.existsSync(path.join(root, item.relativePath)),

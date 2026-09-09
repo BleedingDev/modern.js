@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -10,8 +11,27 @@ import {
   planUltramodernShell,
 } from '../src/ultramodern-workspace';
 import { UnknownUltramodernShellError } from '../src/ultramodern-workspace/add-vertical/preflight';
+import { sharedPackages } from '../src/ultramodern-workspace/descriptors';
+import {
+  prependCommandFixturePath,
+  writeNodeCommandFixture,
+} from './helpers/node-command-fixture';
 
 const createBinPath = path.resolve(__dirname, '../bin/run.js');
+const nativePreviewRequire = createRequire(
+  createRequire(import.meta.url).resolve(
+    '@typescript/native-preview/package.json',
+  ),
+);
+const nativeCompiler = path.join(
+  path.dirname(
+    nativePreviewRequire.resolve(
+      `@typescript/native-preview-${process.platform}-${process.arch}/package.json`,
+    ),
+  ),
+  'lib',
+  process.platform === 'win32' ? 'tsgo.exe' : 'tsgo',
+);
 
 function readJson(workspaceDir: string, relativePath: string): any {
   return JSON.parse(
@@ -56,12 +76,10 @@ function runRecordedRootBuild(
   );
   const binDir = path.join(recorderRoot, 'bin');
   const invocationLog = path.join(recorderRoot, 'invocations.jsonl');
-  const fakePnpm = path.join(binDir, 'pnpm');
-  const fakeTsgo = path.join(binDir, 'tsgo');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    fakePnpm,
-    `#!/usr/bin/env node
+  writeNodeCommandFixture(
+    binDir,
+    'pnpm',
+    `
 const fs = require('node:fs');
 const argv = process.argv.slice(2);
 fs.appendFileSync(
@@ -73,18 +91,35 @@ if (argv.includes(process.env.ULTRAMODERN_TEST_FAIL_FILTER)) {
 }
 `,
   );
-  fs.chmodSync(fakePnpm, 0o755);
-  fs.writeFileSync(fakeTsgo, '#!/usr/bin/env node\n');
-  fs.chmodSync(fakeTsgo, 0o755);
+  // Exercise the generated prebuild with a real compiler and a dependency-free fixture.
+  for (const { directory } of sharedPackages) {
+    const fixtureRoot = path.join(workspaceDir, directory);
+    fs.writeFileSync(
+      path.join(fixtureRoot, 'root-build-fixture.ts'),
+      'export const buildContract: string = "checked";\n',
+    );
+    fs.writeFileSync(
+      path.join(fixtureRoot, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          composite: true,
+          declaration: true,
+          emitDeclarationOnly: true,
+          outDir: './dist',
+          types: [],
+        },
+        files: ['root-build-fixture.ts'],
+      }),
+    );
+  }
 
   const rootPackage = readJson(workspaceDir, 'package.json');
   const result = spawnSync(rootPackage.scripts.build, {
     cwd: workspaceDir,
     encoding: 'utf-8',
     env: {
-      ...process.env,
-      PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
-      EFFECT_TSGO_BIN: fakeTsgo,
+      ...prependCommandFixturePath(binDir),
+      EFFECT_TSGO_BIN: nativeCompiler,
       ULTRAMODERN_CREATE_BIN: createBinPath,
       ULTRAMODERN_TEST_BUILD_LOG: invocationLog,
       ULTRAMODERN_TEST_FAIL_FILTER: options.failFilter ?? '',
@@ -224,12 +259,21 @@ test('root build executes every shell before and after adding a vertical and pro
     assert.equal(
       buildBeforeVertical.result.status,
       0,
-      buildBeforeVertical.result.stderr,
+      `${buildBeforeVertical.result.stdout}\n${buildBeforeVertical.result.stderr}`,
     );
     assert.deepEqual(
       buildBeforeVertical.invocations.map(invocation => invocation.argv),
       expectedInvocations,
     );
+    for (const { directory } of sharedPackages) {
+      assert.equal(
+        fs.existsSync(
+          path.join(workspaceDir, directory, 'dist/root-build-fixture.d.ts'),
+        ),
+        true,
+        'shared declaration prebuilds must run before shell commands',
+      );
+    }
     assert.ok(
       buildBeforeVertical.invocations.every(
         invocation => invocation.cwd === fs.realpathSync(workspaceDir),
@@ -245,7 +289,7 @@ test('root build executes every shell before and after adding a vertical and pro
     assert.equal(
       buildAfterVertical.result.status,
       0,
-      buildAfterVertical.result.stderr,
+      `${buildAfterVertical.result.stdout}\n${buildAfterVertical.result.stderr}`,
     );
     assert.deepEqual(
       buildAfterVertical.invocations.map(invocation => invocation.argv),

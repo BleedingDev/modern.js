@@ -1,10 +1,19 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { createAppEnvDts } from '../../../toolkit/ultramodern-create/src/ultramodern-workspace/app-files';
 import { shellApp } from '../../../toolkit/ultramodern-create/src/ultramodern-workspace/descriptors';
 
 const repoRoot = join(__dirname, '../../../..');
+const compilerLauncher = join(
+  dirname(
+    createRequire(import.meta.url).resolve(
+      '@typescript/native-preview/package.json',
+    ),
+  ),
+  'bin/tsgo',
+);
 
 describe('app-tools types', () => {
   it('typechecks generated app environment globals and asset modules under strict settings', () => {
@@ -49,8 +58,8 @@ describe('app-tools types', () => {
 
       expect(() =>
         execFileSync(
-          process.platform === 'win32' ? 'tsgo.cmd' : 'tsgo',
-          ['-p', 'tsconfig.json'],
+          process.execPath,
+          [compilerLauncher, '-p', 'tsconfig.json'],
           {
             cwd: fixture,
             stdio: 'pipe',

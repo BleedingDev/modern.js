@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { yaml } from '@modern-js/utils';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
 import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
+import {
+  runPnpmLockfileRefresh,
+  runStagedTargetChecks,
+} from '../src/ultramodern-tooling/commands/migrate-strict-effect/install';
 import { MODULE_FEDERATION_VERSION } from '../src/ultramodern-workspace/versions';
+import { writeNodeCommandFixture } from './helpers/node-command-fixture';
 import { createWorkspace } from './helpers/workspace-kit';
 
 const migrationVersion = '3.5.0-ultramodern.1';
@@ -105,21 +111,17 @@ snapshots: {}
 ) {
   const binDir = path.join(tempRoot, 'bin');
   const invocationLog = path.join(tempRoot, 'pnpm-invocations.log');
-  const executable = path.join(binDir, 'pnpm');
-  fs.mkdirSync(binDir, { recursive: true });
-  fs.writeFileSync(
-    executable,
-    `#!/bin/sh
-set -eu
-${options.requireLockfilePresent ? 'test -f pnpm-lock.yaml' : ''}
-printf '%s\\n' "$*" >> "$ULTRAMODERN_TEST_PNPM_LOG"
-cat > pnpm-lock.yaml <<'LOCKFILE'
-${lockfile}LOCKFILE
+  writeNodeCommandFixture(
+    binDir,
+    'pnpm',
+    `const fs = require('node:fs');
+${options.requireLockfilePresent ? "if (!fs.existsSync('pnpm-lock.yaml')) process.exit(1);" : ''}
+fs.appendFileSync(process.env.ULTRAMODERN_TEST_PNPM_LOG, process.argv.slice(2).join(' ') + '\\n');
+fs.writeFileSync('pnpm-lock.yaml', ${JSON.stringify(lockfile)});
 ${options.beforeExit ?? ''}
-exit ${options.exitCode ?? 0}
+process.exit(${options.exitCode ?? 0});
 `,
   );
-  fs.chmodSync(executable, 0o755);
   return { binDir, invocationLog };
 }
 
@@ -177,6 +179,55 @@ function assertCleanPackageSource(
   }
 }
 
+test('migration subprocesses preserve staged command order, nonzero exits and launch failures', () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-migration-process-'),
+  );
+  const workspaceRoot = path.join(tempRoot, 'workspace with spaces');
+  fs.mkdirSync(workspaceRoot);
+  const context = { invocationCwd: workspaceRoot, workspaceRoot };
+  const previousPath = process.env.PATH;
+  const previousInvocationLog = process.env.ULTRAMODERN_TEST_PNPM_LOG;
+
+  try {
+    for (const command of ['modern-api-check', 'ultramodern-create']) {
+      writeNodeCommandFixture(
+        path.join(workspaceRoot, 'node_modules/.bin'),
+        command,
+        'process.exit(0);',
+      );
+    }
+    const { binDir, invocationLog } = installFakePnpm(tempRoot);
+    process.env.PATH = `${binDir}${path.delimiter}${previousPath ?? ''}`;
+    process.env.ULTRAMODERN_TEST_PNPM_LOG = invocationLog;
+    assert.equal(runStagedTargetChecks(context, 'install'), 0);
+    assert.deepEqual(
+      fs.readFileSync(invocationLog, 'utf8').trim().split('\n'),
+      ['exec modern-api-check', 'exec ultramodern-create ultramodern validate'],
+    );
+
+    installFakePnpm(tempRoot, undefined, { exitCode: 23 });
+    fs.rmSync(invocationLog);
+    assert.equal(runStagedTargetChecks(context, 'install'), 23);
+    assert.equal(
+      fs.readFileSync(invocationLog, 'utf8').trim(),
+      'exec modern-api-check',
+    );
+    assert.equal(runPnpmLockfileRefresh(context), 23);
+
+    process.env.PATH = '';
+    assert.throws(() => runPnpmLockfileRefresh(context), /ENOENT/u);
+    assert.throws(() => runStagedTargetChecks(context, 'install'), /ENOENT/u);
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousInvocationLog === undefined)
+      delete process.env.ULTRAMODERN_TEST_PNPM_LOG;
+    else process.env.ULTRAMODERN_TEST_PNPM_LOG = previousInvocationLog;
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('source-checkout migrate uses workspace links and is byte-idempotent after install', async () => {
   const { tempRoot, workspaceDir } = createWorkspace('migration-idempotence', {
     tempPrefix: 'um-migration-idempotence-',
@@ -186,6 +237,8 @@ test('source-checkout migrate uses workspace links and is byte-idempotent after 
 
   try {
     const extension = seedRetiredMetadata(workspaceDir);
+    const consumerToolMode =
+      fs.statSync(path.join(workspaceDir, 'consumer-tool.sh')).mode & 0o7777;
     const { binDir, invocationLog } = installFakePnpm(tempRoot);
     process.env.PATH = `${binDir}${path.delimiter}${previousPath ?? ''}`;
     process.env.ULTRAMODERN_TEST_PNPM_LOG = invocationLog;
@@ -253,7 +306,7 @@ test('source-checkout migrate uses workspace links and is byte-idempotent after 
     );
     assert.deepEqual(consumerTool, {
       content: Buffer.from('#!/bin/sh\nexit 0\n').toString('base64'),
-      mode: 0o751,
+      mode: consumerToolMode,
       path: 'consumer-tool.sh',
       type: 'file',
     });
@@ -336,10 +389,10 @@ snapshots: {}
 `;
     fs.writeFileSync(path.join(workspaceDir, 'pnpm-lock.yaml'), staleLockfile);
     const { binDir, invocationLog } = installFakePnpm(tempRoot, undefined, {
-      beforeExit: `rm package.json
-chmod 600 consumer-tool.sh
-mkdir -p .modernjs/failed-lock-refresh
-printf 'created by failed refresh\\n' > .modernjs/failed-lock-refresh/artifact.txt`,
+      beforeExit: `fs.rmSync('package.json');
+fs.chmodSync('consumer-tool.sh', 0o600);
+fs.mkdirSync('.modernjs/failed-lock-refresh', { recursive: true });
+fs.writeFileSync('.modernjs/failed-lock-refresh/artifact.txt', 'created by failed refresh\\n');`,
       exitCode: 23,
       requireLockfilePresent: true,
     });

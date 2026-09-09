@@ -65,7 +65,10 @@ function readCommandRecords(filePath: string) {
     .readFileSync(filePath, 'utf-8')
     .trim()
     .split('\n')
-    .map(line => JSON.parse(line) as CommandRecord);
+    .map(line => {
+      const record = JSON.parse(line) as CommandRecord;
+      return { ...record, cwd: fs.realpathSync.native(record.cwd) };
+    });
 }
 
 const ownership = {
@@ -121,8 +124,8 @@ test('Zerops commands preserve interpolated arguments and launch the materialize
     fs.mkdirSync(path.join(fakeHome, '.local/bin'), { recursive: true });
     fs.mkdirSync(fakeBin, { recursive: true });
     fs.mkdirSync(runtimeDirectory, { recursive: true });
-    const workspaceRealPath = fs.realpathSync(tempRoot);
-    const runtimeRealPath = fs.realpathSync(runtimeDirectory);
+    const workspaceRealPath = fs.realpathSync.native(tempRoot);
+    const runtimeRealPath = fs.realpathSync.native(runtimeDirectory);
     fs.mkdirSync(path.join(tempRoot, 'topology/local-overlays'), {
       recursive: true,
     });
@@ -235,10 +238,10 @@ fs.appendFileSync(
       cwd: string;
       service: string;
     };
-    assert.deepEqual(startResult, {
-      cwd: runtimeRealPath,
-      service: app.id,
-    });
+    assert.deepEqual(
+      { ...startResult, cwd: fs.realpathSync.native(startResult.cwd) },
+      { cwd: runtimeRealPath, service: app.id },
+    );
   } finally {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   }

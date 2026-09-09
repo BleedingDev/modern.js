@@ -83,6 +83,10 @@ function generateWorkspace(workspaceDir: string, enableTailwind = true) {
     name: 'catalog',
     modernVersion: '3.2.1',
   });
+  linkInstalledCompiler(workspaceDir);
+}
+
+function linkInstalledCompiler(workspaceDir: string) {
   const compilerScope = path.join(workspaceDir, 'node_modules/@typescript');
   fs.mkdirSync(compilerScope, { recursive: true });
   fs.symlinkSync(
@@ -312,7 +316,11 @@ test('generated validator rejects schema, cohort, topology, policy, and legacy d
 
     for (const scenario of scenarios) {
       const workspaceDir = path.join(tempRoot, scenario.name);
-      fs.cpSync(baselineDir, workspaceDir, { recursive: true });
+      fs.cpSync(baselineDir, workspaceDir, {
+        recursive: true,
+        filter: source => source !== path.join(baselineDir, 'node_modules'),
+      });
+      linkInstalledCompiler(workspaceDir);
       scenario.mutate(workspaceDir);
 
       const result = runValidation(workspaceDir);
@@ -439,7 +447,11 @@ test('generated validator enforces additional-shell ownership, build, degraded, 
 
     for (const scenario of scenarios) {
       const workspaceDir = path.join(tempRoot, scenario.name);
-      fs.cpSync(baselineDir, workspaceDir, { recursive: true });
+      fs.cpSync(baselineDir, workspaceDir, {
+        recursive: true,
+        filter: source => source !== path.join(baselineDir, 'node_modules'),
+      });
+      linkInstalledCompiler(workspaceDir);
       scenario.mutate(workspaceDir);
       const result = runValidation(workspaceDir);
       const output = commandOutput(result);

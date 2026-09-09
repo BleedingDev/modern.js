@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { generateUltramodernWorkspace } from '../src/ultramodern-workspace';
+import { workspaceTemplateDir } from '../src/ultramodern-workspace/fs-io';
 
 /**
  * Supply-chain guardrails for generated workspaces: a plain `pnpm install`
@@ -150,8 +151,13 @@ test('generated postinstall installs vendored Codex skills without formatting co
   const { tempRoot, workspaceDir } = scaffoldWorkspace();
 
   try {
+    // Bootstrap copies the authoritative vendored bytes. Initial generation
+    // formats Markdown, which can differ from a Windows CRLF source checkout.
     const expectedSkill = fs.readFileSync(
-      path.join(workspaceDir, '.codex/skills/rsbuild-best-practices/SKILL.md'),
+      path.join(
+        workspaceTemplateDir,
+        '.codex/skills/rsbuild-best-practices/SKILL.md',
+      ),
     );
     fs.rmSync(path.join(workspaceDir, '.codex/skills/rsbuild-best-practices'), {
       force: true,
@@ -220,6 +226,13 @@ test('generated postinstall installs vendored Codex skills without formatting co
         path.join(workspaceDir, '.codex/skills/local-user-skill/SKILL.md'),
       ),
       true,
+    );
+    assert.equal(
+      fs.readFileSync(
+        path.join(workspaceDir, '.codex/skills/local-user-skill/SKILL.md'),
+        'utf8',
+      ),
+      '# Local user skill\n',
     );
     assert.equal(
       fs.existsSync(path.join(workspaceDir, '.codex/skills/mf')),

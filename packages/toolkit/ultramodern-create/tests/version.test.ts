@@ -24,6 +24,14 @@ const writeExecutable = (filePath: string, content: string) => {
 
 const generatedConfigRuntimePackages = {
   'app-tools': path.resolve(packageRoot, '../../solutions/app-tools'),
+  'app-tools-extensions': path.resolve(
+    packageRoot,
+    '../../solutions/app-tools-extensions',
+  ),
+  'ultramodern-app-tools': path.resolve(
+    packageRoot,
+    '../../solutions/ultramodern-app-tools',
+  ),
   'plugin-i18n': path.resolve(packageRoot, '../../runtime/plugin-i18n'),
   'plugin-tanstack': path.resolve(packageRoot, '../../runtime/plugin-tanstack'),
 };

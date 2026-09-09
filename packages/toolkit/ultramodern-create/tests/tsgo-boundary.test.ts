@@ -1,23 +1,18 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { yaml } from '@modern-js/utils';
 import { generateUltramodernWorkspace } from '../src/ultramodern-workspace';
 import { TYPESCRIPT_VERSION } from '../src/ultramodern-workspace/versions';
+import { writeNodeCommandFixture } from './helpers/node-command-fixture';
 
 const packageRoot = path.resolve(__dirname, '..');
 function readPackageJson(relativePath = 'package.json'): any {
   return JSON.parse(
     fs.readFileSync(path.join(packageRoot, relativePath), 'utf-8'),
   );
-}
-
-function writeExecutable(filePath: string, lines: string[]) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${lines.join('\n')}\n`);
-  fs.chmodSync(filePath, 0o755);
 }
 
 function createPackageScriptWorkspace(
@@ -45,21 +40,27 @@ function createPackageScriptWorkspace(
       scripts,
     }),
   );
-  writeExecutable(path.join(binDir, 'rslib'), [
-    '#!/usr/bin/env node',
-    "const fs = require('node:fs');",
-    "fs.mkdirSync('dist/esm-node', { recursive: true });",
-    "fs.mkdirSync('dist/types', { recursive: true });",
-    "fs.writeFileSync('dist/esm-node/index.js', 'export const runtime = true;\\n');",
-    "fs.writeFileSync('dist/types/index.d.ts', 'export declare const runtime: true;\\n');",
-  ]);
-  writeExecutable(path.join(binDir, 'rstest'), [
-    '#!/usr/bin/env node',
-    "const fs = require('node:fs');",
-    "if (!fs.existsSync('dist/esm-node/index.js')) throw new Error('runtime artifact missing');",
-    "if (!fs.existsSync('dist/types/index.d.ts')) throw new Error('declaration artifact missing');",
-    "fs.writeFileSync('dist/test-evidence.json', JSON.stringify({ declarations: true, runtime: true }));",
-  ]);
+  writeNodeCommandFixture(
+    binDir,
+    'rslib',
+    [
+      "const fs = require('node:fs');",
+      "fs.mkdirSync('dist/esm-node', { recursive: true });",
+      "fs.mkdirSync('dist/types', { recursive: true });",
+      "fs.writeFileSync('dist/esm-node/index.js', 'export const runtime = true;\\n');",
+      "fs.writeFileSync('dist/types/index.d.ts', 'export declare const runtime: true;\\n');",
+    ].join('\n'),
+  );
+  writeNodeCommandFixture(
+    binDir,
+    'rstest',
+    [
+      "const fs = require('node:fs');",
+      "if (!fs.existsSync('dist/esm-node/index.js')) throw new Error('runtime artifact missing');",
+      "if (!fs.existsSync('dist/types/index.d.ts')) throw new Error('declaration artifact missing');",
+      "fs.writeFileSync('dist/test-evidence.json', JSON.stringify({ declarations: true, runtime: true }));",
+    ].join('\n'),
+  );
 
   return createPackageDir;
 }
@@ -80,7 +81,7 @@ test('create package scripts emit runtime and declarations before testing', () =
       path.join(createPackageDir, 'dist/stale-before-build'),
       '',
     );
-    execFileSync('pnpm', ['run', 'build'], {
+    execSync('pnpm run build', {
       cwd: createPackageDir,
       stdio: 'pipe',
     });
@@ -101,7 +102,7 @@ test('create package scripts emit runtime and declarations before testing', () =
     );
 
     fs.writeFileSync(path.join(createPackageDir, 'dist/stale-before-test'), '');
-    execFileSync('pnpm', ['run', 'test'], {
+    execSync('pnpm run test', {
       cwd: createPackageDir,
       stdio: 'pipe',
     });

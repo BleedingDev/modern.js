@@ -83,10 +83,14 @@ describe('scope-aware native API scaffolding', () => {
     );
     expect(createSharedContractsIndex()).not.toContain('@modern-js/bff-effect');
     expect(createSharedContractsIndex()).not.toContain('defineEffectBff');
-    expect(readFileTemplate('packages/effect-bff-runtime.ts')).toBe(
-      "export { assembleEffectBffRuntime } from '@modern-js/bff-effect/assembly';\n" +
-        "export type { EffectBffRuntimeAssembly } from '@modern-js/bff-effect/assembly';\n",
-    );
+    // Git checkout EOL does not change this native two-declaration contract.
+    expect(
+      readFileTemplate('packages/effect-bff-runtime.ts').split(/\r?\n/u),
+    ).toEqual([
+      "export { assembleEffectBffRuntime } from '@modern-js/bff-effect/assembly';",
+      "export type { EffectBffRuntimeAssembly } from '@modern-js/bff-effect/assembly';",
+      '',
+    ]);
   });
   test('migration emits the owning AST helper rather than a consumer customization', () => {
     const artifacts = migratedWorkspaceScriptArtifacts({

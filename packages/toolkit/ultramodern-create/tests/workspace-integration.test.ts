@@ -853,8 +853,6 @@ function assertIntegratedVertical(
 test('generated typecheck wrapper emits only when explicitly requested', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-typecheck-'));
   const workspaceDir = path.join(tempRoot, 'integration-workspace');
-  const compilerLog = path.join(tempRoot, 'compiler-args.json');
-  const fakeCompiler = path.join(tempRoot, 'effect-tsgo');
 
   try {
     generateUltramodernWorkspace({
@@ -864,16 +862,36 @@ test('generated typecheck wrapper emits only when explicitly requested', () => {
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    const source = 'export const value: string = "checked";\n';
+    const config = {
+      compilerOptions: {
+        declaration: true,
+        emitDeclarationOnly: true,
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        outDir: './declarations',
+        strict: true,
+        types: [],
+      },
+      files: ['consumer.ts'],
+    };
+    for (const directory of [
+      workspaceDir,
+      path.join(workspaceDir, 'verticals/catalog'),
+    ]) {
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(path.join(directory, 'consumer.ts'), source);
+      writeJson(directory, 'tsconfig.json', config);
+    }
+    // The passthrough --skipLibCheck flag must suppress this declaration-only error.
     fs.writeFileSync(
-      fakeCompiler,
-      `#!/usr/bin/env node
-require('node:fs').writeFileSync(
-  process.env.ULTRAMODERN_TEST_TSGO_LOG,
-  JSON.stringify(process.argv.slice(2)),
-);
-`,
-      { mode: 0o755 },
+      path.join(workspaceDir, 'verticals/catalog/external.d.ts'),
+      'declare const externalValue: MissingExternalType;\n',
     );
+    writeJson(workspaceDir, 'verticals/catalog/tsconfig.json', {
+      ...config,
+      files: ['consumer.ts', 'external.d.ts'],
+    });
 
     const runTypecheck = (args: string[]) =>
       spawnSync(
@@ -884,18 +902,17 @@ require('node:fs').writeFileSync(
           encoding: 'utf8',
           env: {
             ...hermeticEnv,
-            EFFECT_TSGO_BIN: fakeCompiler,
-            ULTRAMODERN_TEST_TSGO_LOG: compilerLog,
+            EFFECT_TSGO_BIN: resolveInstalledTsgoExecutable(),
           },
         },
       );
 
     const strictCheck = runTypecheck(['--project', 'tsconfig.json']);
     assert.equal(strictCheck.status, 0, commandOutput(strictCheck));
-    assert.ok(
-      (readJson(tempRoot, 'compiler-args.json') as string[]).includes(
-        '--noEmit',
-      ),
+    assert.equal(
+      fs.existsSync(path.join(workspaceDir, 'declarations')),
+      false,
+      'the default check must suppress the configured declaration emit',
     );
 
     const declarationBuild = runTypecheck([
@@ -905,16 +922,15 @@ require('node:fs').writeFileSync(
       '--skipLibCheck',
     ]);
     assert.equal(declarationBuild.status, 0, commandOutput(declarationBuild));
-    const declarationArgs = readJson(
-      tempRoot,
-      'compiler-args.json',
-    ) as string[];
-    assert.deepEqual(declarationArgs.slice(0, 2), [
-      '--project',
-      'verticals/catalog/tsconfig.json',
-    ]);
-    assert.equal(declarationArgs.includes('--noEmit'), false);
-    assert.ok(declarationArgs.includes('--skipLibCheck'));
+    assert.match(
+      read(workspaceDir, 'verticals/catalog/declarations/consumer.d.ts'),
+      /export declare const value: string;/u,
+    );
+    assert.equal(
+      fs.existsSync(path.join(workspaceDir, 'declarations')),
+      false,
+      '--project must emit only for the requested vertical',
+    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
