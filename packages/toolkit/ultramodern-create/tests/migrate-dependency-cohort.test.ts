@@ -194,15 +194,19 @@ test('historical migration registers app providers by declared surface and prese
       runtime: [
         '@modern-js/federation-runtime',
         '@modern-js/boundary-debugger',
+        '@modern-js/runtime-renderer-extensions',
       ],
     },
     {
       app: { ...shellApp, kind: 'vertical', surfaceProfile: 'ui-only' },
-      runtime: ['@modern-js/federation-runtime'],
+      runtime: [
+        '@modern-js/federation-runtime',
+        '@modern-js/runtime-renderer-extensions',
+      ],
     },
     {
       app: { ...shellApp, kind: 'vertical', surfaceProfile: 'api-only' },
-      runtime: [],
+      runtime: ['@modern-js/runtime-renderer-extensions'],
     },
     { runtime: [] },
   ];

@@ -1,7 +1,7 @@
 import {
   getRouterRuntimeState,
   type InternalRouterRuntimeState,
-} from '@modern-js/runtime/context';
+} from '@modern-js/runtime-extensions/router-state';
 import type { AnyRouter } from '@tanstack/react-router';
 
 /**

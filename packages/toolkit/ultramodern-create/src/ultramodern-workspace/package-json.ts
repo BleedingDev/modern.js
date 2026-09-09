@@ -48,6 +48,10 @@ export function appDependencies(
       '@modern-js/federation-runtime',
       packageSource,
     ),
+    '@modern-js/runtime-renderer-extensions': modernPackageSpecifier(
+      '@modern-js/runtime-renderer-extensions',
+      packageSource,
+    ),
     '@modern-js/runtime-extensions': modernPackageSpecifier(
       '@modern-js/runtime-extensions',
       packageSource,
@@ -239,6 +243,10 @@ export function createRootPackageJson(
     },
     devDependencies: {
       ...ULTRAMODERN_PACKAGE_PINS.rootDevDependencies,
+      '@modern-js/runtime-renderer-extensions': modernPackageSpecifier(
+        '@modern-js/runtime-renderer-extensions',
+        packageSource,
+      ),
       '@modern-js/ultramodern-app-tools': modernPackageSpecifier(
         '@modern-js/ultramodern-app-tools',
         packageSource,

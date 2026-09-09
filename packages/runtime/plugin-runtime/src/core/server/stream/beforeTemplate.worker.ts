@@ -1,9 +1,10 @@
 // @effect-diagnostics asyncFunction:off processEnv:off strictBooleanExpressions:off unnecessaryArrowBlock:off
-import { getRouterMatchedRouteIds } from '../../../router/runtime/lifecycle';
+import type { SSRHeadData } from '@modern-js/plugin/runtime';
+import { getRouterMatchedRouteIds } from '@modern-js/runtime-extensions/router-state';
 import type { TInternalRuntimeContext } from '../../context';
 import { CHUNK_CSS_PLACEHOLDER } from '../constants';
 import { createFederatedCssLinks } from '../federatedCss';
-import { createReplaceHelemt, getHelmetData } from '../helmet';
+import { createReplaceHelemt } from '../helmet';
 import type { HandleRequestConfig } from '../requestHandler';
 import { type BuildHtmlCb, buildHtml } from '../shared';
 import { hasStylesheetLink, safeReplace } from '../utils';
@@ -30,6 +31,7 @@ export interface BuildShellBeforeTemplateOptions {
   config: HandleRequestConfig;
   styledComponentsStyleTags?: string;
   moduleFederationCssAssets?: string[];
+  helmetData?: SSRHeadData;
 }
 
 type RouteManifest = {
@@ -50,9 +52,8 @@ export async function buildShellBeforeTemplate(
     styledComponentsStyleTags,
     entryName,
     moduleFederationCssAssets,
+    helmetData,
   } = options;
-
-  const helmetData = getHelmetData(runtimeContext);
 
   const callbacks: BuildHtmlCb[] = [
     createReplaceHelemt(helmetData),

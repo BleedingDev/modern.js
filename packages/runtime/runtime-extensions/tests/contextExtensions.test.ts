@@ -1,13 +1,12 @@
-import { getInitialContext } from '../../../src/core/context';
-import { createRuntimeContextExtension } from '../../../src/core/context/extensions';
+import { createRuntimeContextExtension } from '../src/contextExtensions';
 
 describe('runtime context extensions', () => {
   it('stores and retrieves typed values per context object', () => {
     const extension = createRuntimeContextExtension<{ value: number }>(
       'test:isolation-a',
     );
-    const contextA = getInitialContext(true);
-    const contextB = getInitialContext(true);
+    const contextA = {};
+    const contextB = {};
 
     extension.set(contextA, { value: 1 });
     extension.set(contextB, { value: 2 });
@@ -23,7 +22,7 @@ describe('runtime context extensions', () => {
   it('isolates extensions with different ids on the same context', () => {
     const first = createRuntimeContextExtension<string>('test:first');
     const second = createRuntimeContextExtension<string>('test:second');
-    const context = getInitialContext(true);
+    const context = {};
 
     first.set(context, 'one');
     second.set(context, 'two');
@@ -35,7 +34,7 @@ describe('runtime context extensions', () => {
   it('shares state between extensions created with the same id', () => {
     const a = createRuntimeContextExtension<string>('test:shared');
     const b = createRuntimeContextExtension<string>('test:shared');
-    const context = getInitialContext(true);
+    const context = {};
 
     a.set(context, 'value');
     expect(b.get(context)).toBe('value');
@@ -48,7 +47,7 @@ describe('runtime context extensions', () => {
 
   it('does not leak into string-key enumeration of the context', () => {
     const extension = createRuntimeContextExtension<string>('test:hidden');
-    const context = getInitialContext(true);
+    const context = {};
     const keysBefore = Object.keys(context);
 
     extension.set(context, 'secret');
@@ -63,7 +62,7 @@ describe('runtime context extensions', () => {
 
   it('survives object spreads so SSR context copies keep their extensions', () => {
     const extension = createRuntimeContextExtension<string>('test:spread');
-    const context = getInitialContext(true);
+    const context = {};
     extension.set(context, 'carried');
 
     const copy = { ...context };

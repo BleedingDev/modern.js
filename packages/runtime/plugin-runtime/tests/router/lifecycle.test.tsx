@@ -1,3 +1,15 @@
+import {
+  applyRouterRuntimeState,
+  applyRouterServerPrepareResult,
+  cleanupRouterRuntimeState,
+  createRouterRuntimeState,
+  createRouterServerSnapshot,
+  getRouterHydrationScripts,
+  getRouterMatchedRouteIds,
+  getRouterRuntimeState,
+  getRouterServerSnapshot,
+} from '@modern-js/runtime-extensions/router-state';
+import * as contextAPI from '../../src/core/context';
 import { getInitialContext } from '../../src/core/context';
 import {
   modifyRoutes,
@@ -7,17 +19,28 @@ import {
   onBeforeCreateRoutes,
   onBeforeHydrateRouter,
 } from '../../src/router/runtime/hooks';
-import {
-  applyRouterRuntimeState,
-  applyRouterServerPrepareResult,
-  createRouterServerSnapshot,
-  getRouterHydrationScripts,
-  getRouterMatchedRouteIds,
-  getRouterRuntimeState,
-  getRouterServerSnapshot,
-} from '../../src/router/runtime/lifecycle';
 
 describe('router lifecycle seams', () => {
+  it('preserves the public context helpers as the shared fork primitives', () => {
+    expect(contextAPI.applyRouterRuntimeState).toBe(applyRouterRuntimeState);
+    expect(contextAPI.applyRouterServerPrepareResult).toBe(
+      applyRouterServerPrepareResult,
+    );
+    expect(contextAPI.cleanupRouterRuntimeState).toBe(
+      cleanupRouterRuntimeState,
+    );
+    expect(contextAPI.createRouterRuntimeState).toBe(createRouterRuntimeState);
+    expect(contextAPI.createRouterServerSnapshot).toBe(
+      createRouterServerSnapshot,
+    );
+    expect(contextAPI.getRouterHydrationScripts).toBe(
+      getRouterHydrationScripts,
+    );
+    expect(contextAPI.getRouterMatchedRouteIds).toBe(getRouterMatchedRouteIds);
+    expect(contextAPI.getRouterRuntimeState).toBe(getRouterRuntimeState);
+    expect(contextAPI.getRouterServerSnapshot).toBe(getRouterServerSnapshot);
+  });
+
   it('should expose generic router runtime state helpers', () => {
     const context = getInitialContext(true) as any;
     applyRouterRuntimeState(context, {

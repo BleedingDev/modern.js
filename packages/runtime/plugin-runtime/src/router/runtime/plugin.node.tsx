@@ -1,4 +1,9 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off unnecessaryArrowBlock:off
+
+import {
+  applyRouterRuntimeState,
+  createRouterServerSnapshot,
+} from '@modern-js/runtime-extensions/router-state';
 import { merge } from '@modern-js/runtime-utils/merge';
 import {
   createRequestContext,
@@ -31,12 +36,7 @@ import {
 import type { TInternalRuntimeContext } from '../../core/context/runtime';
 import { setServerPayload } from '../../core/context/serverPayload/index.server';
 import DeferredDataScripts from './DeferredDataScripts.node';
-import type { RouterExtendsHooks } from './hooks';
-import {
-  applyRouterRuntimeState,
-  createRouterServerSnapshot,
-  type RouterLifecycleContext,
-} from './lifecycle';
+import type { RouterExtendsHooks, RouterLifecycleContext } from './hooks';
 import { Link as PrefetchLink } from './PrefetchLink';
 import { routerProviderRegistryHooks } from './provider';
 import {

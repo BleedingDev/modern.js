@@ -46,6 +46,15 @@ export default defineConfig({
     },
     {
       ...sharedConfig,
+      output: {
+        ...sharedConfig.output,
+        externals: {
+          'react-server-dom-rspack/server.node':
+            'module-import react-server-dom-rspack/server.edge',
+          'react-server-dom-rspack/client.node':
+            'module-import react-server-dom-rspack/client.edge',
+        },
+      },
       source: {
         entry: {
           rscWorker: './src/rsc.worker.ts',

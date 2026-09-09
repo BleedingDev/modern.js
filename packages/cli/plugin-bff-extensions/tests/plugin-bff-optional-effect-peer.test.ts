@@ -10,7 +10,7 @@ rstest.mock('@modern-js/plugin-bff-extensions/client-generator', () => {
 
 describe('optional Effect peer', () => {
   test('loads the base BFF CLI without evaluating Effect', async () => {
-    await expect(import('../src/cli')).resolves.toEqual(
+    await expect(import('../../plugin-bff/src/cli')).resolves.toEqual(
       expect.objectContaining({
         bffPlugin: expect.any(Function),
       }),

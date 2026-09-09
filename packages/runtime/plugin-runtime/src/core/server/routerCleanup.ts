@@ -11,7 +11,7 @@
  * swallowed.
  */
 import type { OnError } from '@modern-js/app-tools';
-import { getRouterRuntimeState } from '../../router/runtime/lifecycle';
+import { getRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import type { TInternalRuntimeContext } from '../context';
 
 export const ROUTER_CLEANUP_ERROR =

@@ -14,6 +14,13 @@ const createFixtureApp = async () => {
   const appDir = await fs.promises.mkdtemp(
     path.join(__dirname, '.tmp-effect-client-'),
   );
+  const fixtureScope = path.join(appDir, 'node_modules', '@modern-js');
+  await fs.promises.mkdir(fixtureScope, { recursive: true });
+  await fs.promises.symlink(
+    path.resolve(__dirname, '../../plugin-bff'),
+    path.join(fixtureScope, 'plugin-bff'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
   const apiDir = path.join(appDir, 'api');
   const effectDir = path.join(apiDir, 'effect');
   await fs.promises.mkdir(effectDir, { recursive: true });

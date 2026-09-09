@@ -1,7 +1,7 @@
 import vm from 'node:vm';
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import { RenderLevel } from '../../../../src/core/constants';
 import { SSRDataCollector } from '../../../../src/core/server/string/ssrData';
-import { applyRouterRuntimeState } from '../../../../src/router/runtime/lifecycle';
 
 const createScripts = (options?: {
   useJsonScript?: boolean;

@@ -1,9 +1,9 @@
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import { RenderLevel } from '../../../../src/core/constants';
 import { SSR_DATA_PLACEHOLDER } from '../../../../src/core/server/constants';
 import { buildShellAfterTemplate } from '../../../../src/core/server/stream/afterTemplate';
 import { getTemplates } from '../../../../src/core/server/stream/template';
 import { SSRDataCollector } from '../../../../src/core/server/string/ssrData';
-import { applyRouterRuntimeState } from '../../../../src/router/runtime/lifecycle';
 
 const withRouterSnapshot = (
   runtimeContext: Record<string, unknown>,

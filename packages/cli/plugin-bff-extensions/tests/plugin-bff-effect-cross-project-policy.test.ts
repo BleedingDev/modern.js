@@ -2,23 +2,23 @@ import { resolveCrossProjectPolicy } from '@modern-js/bff-core';
 import {
   collectEffectEndpoints,
   createEffectEndpointContractHash,
+  createHttpApiHandler,
+  defineEffectBff,
   type EffectApiModule,
   extractHttpApiFromModule,
   resolveEffectBffModuleHandler,
   toOperationContractSources,
 } from '@modern-js/bff-effect/effect';
-import { checkCrossProjectPolicyForRequest } from '../../plugin-bff-extensions/src/cross-project-policy/evaluation';
+import * as Effect from 'effect/Effect';
+import * as Layer from 'effect/Layer';
+import * as Schema from 'effect/Schema';
 import {
-  createHttpApiHandler,
-  defineEffectBff,
-  Effect,
   HttpApi,
   HttpApiBuilder,
   HttpApiEndpoint,
   HttpApiGroup,
-  Layer,
-  Schema,
-} from '../src/runtime/effect';
+} from 'effect/unstable/httpapi';
+import { checkCrossProjectPolicyForRequest } from '../src/cross-project-policy/evaluation';
 
 const REQUEST_ID = 'crm.producer-app';
 const PREFIX = '/api';

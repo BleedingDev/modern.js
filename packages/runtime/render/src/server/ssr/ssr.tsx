@@ -21,6 +21,8 @@ function CSSLinks({ cssFiles }: { cssFiles: string[] }) {
 type Options = {
   request: Request;
   routes?: unknown[];
+  /** Wrap only the HTML render tree, never the input serialized by Flight. */
+  wrapHtmlRoot?: (root: ReactNode) => ReactNode;
   rscManifest?: {
     clientManifest?: ClientManifest;
     serverConsumerModuleMap?: unknown;
@@ -47,7 +49,8 @@ export const renderSSRStream = async (
   children: React.ReactNode,
   options: Options & { rscRoot: React.ReactElement },
 ): Promise<ReturnType<typeof renderToReadableStream>> => {
-  const { rscManifest, rscRoot, routes } = options;
+  const { rscManifest, rscRoot, routes, wrapHtmlRoot, ...reactOptions } =
+    options;
   const clientManifest = rscManifest?.clientManifest;
   const serverConsumerModuleMap = rscManifest?.serverConsumerModuleMap;
   const entryCssFiles = rscManifest?.entryCssFiles;
@@ -55,10 +58,13 @@ export const renderSSRStream = async (
   const hasRoutes = Boolean(routes && routes.length > 0);
 
   if (!clientManifest || !serverConsumerModuleMap) {
-    return renderToReadableStream(children, {
-      ...options,
-      identifierPrefix: SSR_HYDRATION_ID_PREFIX,
-    });
+    return renderToReadableStream(
+      wrapHtmlRoot ? wrapHtmlRoot(children) : children,
+      {
+        ...reactOptions,
+        identifierPrefix: SSR_HYDRATION_ID_PREFIX,
+      },
+    );
   }
 
   try {
@@ -89,13 +95,16 @@ export const renderSSRStream = async (
       cssFiles = Object.values(entryCssFiles).flat();
     }
 
-    const htmlStream = await renderToReadableStream(
+    const htmlRoot = (
       <ServerElementsProvider elements={elements}>
         <CSSLinks cssFiles={cssFiles} />
         {children}
-      </ServerElementsProvider>,
+      </ServerElementsProvider>
+    );
+    const htmlStream = await renderToReadableStream(
+      wrapHtmlRoot ? wrapHtmlRoot(htmlRoot) : htmlRoot,
       {
-        ...options,
+        ...reactOptions,
         identifierPrefix: SSR_HYDRATION_ID_PREFIX,
       },
     );

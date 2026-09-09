@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { ProjectConfig } from '@rstest/core';
 import { withTestPreset } from '@scripts/rstest-config';
 
@@ -23,6 +24,7 @@ export default {
       name: 'plugin-runtime-node',
       testEnvironment: 'node',
       exclude: [
+        'tests/ssr/serverRender/workerLifecycle.test.tsx',
         'tests/router/plugin.client.test.tsx',
         'tests/router/prefetch.test.tsx',
         'tests/router/prefetch-realm-isolation.test.tsx',
@@ -46,6 +48,36 @@ export default {
           },
         },
       ],
+    }),
+    withTestPreset({
+      name: 'plugin-runtime-worker-lifecycle',
+      testEnvironment: 'node',
+      extends: commonConfig,
+      include: ['tests/ssr/serverRender/workerLifecycle.test.tsx'],
+      resolve: {
+        alias: {
+          '@modern-js/render/ssr': path.join(
+            __dirname,
+            '../render/src/server/ssr/index.ts',
+          ),
+          'react-server-dom-rspack/client.browser': path.join(
+            __dirname,
+            'tests/fixtures/rsc-client.ts',
+          ),
+          'react-server-dom-rspack/client.edge': path.join(
+            __dirname,
+            'tests/fixtures/rsc-client.ts',
+          ),
+          '@modern-js/render/rsc': path.join(
+            __dirname,
+            'tests/fixtures/rsc-server.ts',
+          ),
+          '@modern-js/render/rsc-worker': path.join(
+            __dirname,
+            'tests/fixtures/rsc-server.ts',
+          ),
+        },
+      },
     }),
     withTestPreset({
       name: 'plugin-runtime-client',

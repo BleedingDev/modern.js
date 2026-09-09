@@ -25,6 +25,22 @@ type InternalRuntimeContextLike = {
   [key: string]: any;
 };
 
+export {
+  createRuntimeContextExtension,
+  type RuntimeContextExtension,
+} from '@modern-js/runtime-extensions/context-extensions';
+export {
+  applyRouterRuntimeState,
+  applyRouterServerPrepareResult,
+  cleanupRouterRuntimeState,
+  createRouterRuntimeState,
+  createRouterServerSnapshot,
+  getRouterHydrationScripts,
+  getRouterMatchedRouteIds,
+  getRouterRuntimeState,
+  getRouterServerSnapshot,
+  type RouterLifecyclePhase,
+} from '@modern-js/runtime-extensions/router-state';
 // Router runtime state shared between router providers (react-router,
 // @modern-js/plugin-tanstack, ...) and the SSR pipeline. Exported from the
 // `/context` subpath so router plugins can use it without pulling the
@@ -38,20 +54,8 @@ export {
   onBeforeCreateRoutes,
   onBeforeHydrateRouter,
   type RouterExtendsHooks,
-} from '../../router/runtime/hooks';
-export {
-  applyRouterRuntimeState,
-  applyRouterServerPrepareResult,
-  cleanupRouterRuntimeState,
-  createRouterRuntimeState,
-  createRouterServerSnapshot,
-  getRouterHydrationScripts,
-  getRouterMatchedRouteIds,
-  getRouterRuntimeState,
-  getRouterServerSnapshot,
   type RouterLifecycleContext,
-  type RouterLifecyclePhase,
-} from '../../router/runtime/lifecycle';
+} from '../../router/runtime/hooks';
 export {
   createRouterProviderRealm,
   type RouterProviderFactory,
@@ -74,12 +78,9 @@ export type {
   RouterServerPrepareResult,
 } from '../../router/runtime/types';
 export {
-  createRuntimeContextExtension,
-  type RuntimeContextExtension,
-} from './extensions';
-export {
   getInitialContext,
   InternalRuntimeContext,
+  RuntimeComponentResolverContext,
   RuntimeContext,
   type TInternalRuntimeContext,
   type TRuntimeContext,

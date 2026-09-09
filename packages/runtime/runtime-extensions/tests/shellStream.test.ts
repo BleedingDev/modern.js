@@ -83,3 +83,40 @@ describe('conserving web shell stream', () => {
     expect(published).toEqual(['previous']);
   });
 });
+
+test('cancellation waits for the owned source cancellation to finish once', async () => {
+  let release!: () => void;
+  let started!: () => void;
+  const cancelling = new Promise<void>(resolve => {
+    started = resolve;
+  });
+  const gate = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  const cancel = rstest.fn(async () => {
+    started();
+    await gate;
+  });
+  const source = new ReadableStream<Uint8Array>({ cancel });
+  const reader = createConservingWebShellStream(source, {}, MARKER).getReader();
+  let settled = false;
+  const cancellation = reader.cancel('stop').then(() => {
+    settled = true;
+  });
+  await cancelling;
+  expect(settled).toBe(false);
+  release();
+  await cancellation;
+  expect(cancel).toHaveBeenCalledExactlyOnceWith('stop');
+});
+
+test('cancellation propagates an owned source cleanup failure', async () => {
+  const source = new ReadableStream<Uint8Array>({
+    cancel() {
+      throw new Error('cleanup failed');
+    },
+  });
+  await expect(
+    createConservingWebShellStream(source, {}, MARKER).cancel('stop'),
+  ).rejects.toThrow('cleanup failed');
+});

@@ -1,6 +1,5 @@
 // @effect-diagnostics strictBooleanExpressions:off
 'use client';
-import * as runtimeHead from '@modern-js/runtime-extensions';
 import React from 'react';
 import {
   Helmet as AsyncHelmet,
@@ -13,40 +12,18 @@ import {
   type HelmetServerState,
   type HelmetTags,
 } from 'react-helmet-async';
-import { InternalRuntimeContext } from '../core/context';
-import { ensureHelmetContext } from '../core/context/helmetContext';
-
-const collectServerHelmet = (
-  runtimeContext: object,
-  props: React.PropsWithChildren<HelmetProps>,
-) => {
-  const helmetContext = ensureHelmetContext(runtimeContext);
-  const createRecord = () => runtimeHead.createHelmetRecord(React, props);
-  const deriveState = (records: runtimeHead.HelmetCompatRecord[]) =>
-    runtimeHead.deriveHelmetServerState(React, records) as HelmetServerState;
-  const marker = runtimeHead.collectHeadState(
-    runtimeContext,
-    createRecord,
-    deriveState,
-    helmetContext,
-  );
-  if (marker !== undefined) return marker;
-  helmetContext.helmet = runtimeHead.collectImmediateHelmetState(
-    React,
-    helmetContext,
-    createRecord(),
-  ) as HelmetServerState;
-};
+import { RuntimeComponentResolverContext } from '../core/context/runtime';
 
 export const Helmet = (props: React.PropsWithChildren<HelmetProps>) => {
-  const runtimeContext = React.useContext(InternalRuntimeContext);
-  if (runtimeContext !== null && runtimeContext.isBrowser === false) {
-    return runtimeHead.renderHeadMarker(
-      React,
-      collectServerHelmet(runtimeContext, props),
+  const resolveComponent = React.useContext(RuntimeComponentResolverContext);
+  const Component =
+    resolveComponent?.(AsyncHelmet, { name: 'head.Helmet' }) ?? AsyncHelmet;
+  if (Component === Helmet) {
+    throw new Error(
+      'A component resolver cannot resolve head.Helmet to itself.',
     );
   }
-  return React.createElement(AsyncHelmet, props);
+  return React.createElement(Component, props);
 };
 
 const head = {

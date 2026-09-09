@@ -22,4 +22,14 @@ export const ultramodernAppTools = (): CliPlugin<AppTools> => ({
     createDeployOutputAliasesPlugin(),
     ultramodernReleaseEnvelopePlugin(),
   ],
+  setup(api) {
+    api._internalRuntimePlugins(({ entrypoint, plugins }) => {
+      plugins.push({
+        name: 'rendererHead',
+        path: '@modern-js/runtime-renderer-extensions',
+        config: {},
+      });
+      return { entrypoint, plugins };
+    });
+  },
 });

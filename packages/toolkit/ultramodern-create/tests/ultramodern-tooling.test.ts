@@ -27,6 +27,7 @@ import {
   regenerateGeneratedNavigationSurface,
   regenerateGeneratedProductRouteAdapter,
 } from '../src/ultramodern-workspace/demo-components';
+import { shellApp } from '../src/ultramodern-workspace/descriptors';
 import {
   createAppMfTypesTsConfig,
   createAppTsConfig,
@@ -3854,6 +3855,8 @@ test('migration replaces the retired create alias before regenerating the lockfi
       'npm:@bleedingdev/modern-js-runtime@3.8.3-ultramodern.2',
     '@modern-js/runtime-extensions':
       'npm:@bleedingdev/modern-js-runtime-extensions@3.8.3-ultramodern.2',
+    '@modern-js/runtime-renderer-extensions':
+      'npm:@bleedingdev/modern-js-runtime-renderer-extensions@3.8.3-ultramodern.2',
     '@modern-js/ultramodern-create':
       'npm:@bleedingdev/modern-js-ultramodern-create@3.8.3-ultramodern.2',
     eslint: 'consumer-selected-eslint',
@@ -3915,4 +3918,80 @@ test('migration converges legacy generated TS-Go pins without rewriting unrelate
   assert.deepEqual(consumerPackage, {
     devDependencies: { eslint: 'consumer-selected-eslint' },
   });
+});
+
+test('migration authenticates direct renderer dependencies and preserves consumer selections', () => {
+  const renderer = '@modern-js/runtime-renderer-extensions';
+  const packageSource = {
+    strategy: 'install' as const,
+    modernPackageVersion: '3.8.3-ultramodern.2',
+    aliasScope: 'bleedingdev',
+    aliasPackageNamePrefix: 'modern-js-',
+  };
+  const cohort = {
+    packages: [
+      '@modern-js/ultramodern-app-tools',
+      '@modern-js/app-tools-extensions',
+      '@modern-js/federation-runtime',
+      '@modern-js/boundary-debugger',
+      renderer,
+    ].map(sourceName => ({
+      sourceName,
+      targetName: sourceName.replace('@modern-js/', '@bleedingdev/modern-js-'),
+      version: packageSource.modernPackageVersion,
+    })),
+  };
+  const app: Record<string, any> = {
+    dependencies: { '@modern-js/runtime': '3.8.2', react: 'consumer-react' },
+    devDependencies: { 'consumer-tool': 'consumer-version' },
+  };
+  const original = structuredClone(app);
+  for (const packages of [
+    cohort.packages.filter(item => item.sourceName !== renderer),
+    cohort.packages.map(item =>
+      item.sourceName === renderer ? { ...item, version: '3.8.2' } : item,
+    ),
+  ]) {
+    assert.throws(
+      () =>
+        updateModernDependencies(
+          app,
+          packageSource,
+          { packages },
+          { app: shellApp },
+        ),
+      /runtime-renderer-extensions is absent from the authenticated target cohort/u,
+    );
+    assert.deepEqual(app, original);
+  }
+  assert.equal(
+    updateModernDependencies(app, packageSource, cohort, { app: shellApp }),
+    true,
+  );
+  assert.equal(
+    app.dependencies[renderer],
+    'npm:@bleedingdev/modern-js-runtime-renderer-extensions@3.8.3-ultramodern.2',
+  );
+  assert.equal(app.dependencies.react, 'consumer-react');
+  assert.equal(app.devDependencies['consumer-tool'], 'consumer-version');
+  assert.equal(
+    updateModernDependencies(app, packageSource, cohort, { app: shellApp }),
+    false,
+  );
+
+  const root: Record<string, any> = {
+    modernjs: { workspace: 'ultramodern-superapp' },
+    devDependencies: { 'consumer-tool': 'consumer-version' },
+  };
+  assert.equal(updateModernDependencies(root, packageSource, cohort), true);
+  assert.equal(root.devDependencies[renderer], app.dependencies[renderer]);
+  assert.equal(root.devDependencies['consumer-tool'], 'consumer-version');
+  assert.equal(updateModernDependencies(root, packageSource, cohort), false);
+
+  const unrelated = { dependencies: { react: 'consumer-react' } };
+  assert.equal(
+    updateModernDependencies(unrelated, packageSource, cohort),
+    false,
+  );
+  assert.deepEqual(unrelated, { dependencies: { react: 'consumer-react' } });
 });

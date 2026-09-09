@@ -1,11 +1,13 @@
 // @effect-diagnostics asyncFunction:off processEnv:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 // Todo: This import will introduce router code, like remix, even if router config is false
+
+import type { SSRHeadData } from '@modern-js/plugin/runtime';
+import { getRouterMatchedRouteIds } from '@modern-js/runtime-extensions/router-state';
 import { matchRoutes } from '@modern-js/runtime-utils/router';
-import { getRouterMatchedRouteIds } from '../../../router/runtime/lifecycle';
 import type { TInternalRuntimeContext } from '../../context';
 import { CHUNK_CSS_PLACEHOLDER } from '../constants';
 import { createFederatedCssLinks } from '../federatedCss';
-import { createReplaceHelemt, getHelmetData } from '../helmet';
+import { createReplaceHelemt } from '../helmet';
 import type { HandleRequestConfig } from '../requestHandler';
 import { type BuildHtmlCb, buildHtml } from '../shared';
 import { checkIsNode, hasStylesheetLink, safeReplace } from '../utils';
@@ -44,6 +46,7 @@ export interface BuildShellBeforeTemplateOptions {
   config: HandleRequestConfig;
   styledComponentsStyleTags?: string;
   moduleFederationCssAssets?: string[];
+  helmetData?: SSRHeadData;
 }
 
 type RouteManifest = {
@@ -64,9 +67,8 @@ export async function buildShellBeforeTemplate(
     styledComponentsStyleTags,
     entryName,
     moduleFederationCssAssets,
+    helmetData,
   } = options;
-
-  const helmetData = getHelmetData(runtimeContext);
 
   const callbacks: BuildHtmlCb[] = [
     createReplaceHelemt(helmetData),

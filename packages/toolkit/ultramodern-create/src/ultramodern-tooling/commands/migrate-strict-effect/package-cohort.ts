@@ -68,6 +68,7 @@ export function updateModernDependencies(
     ? [
         ['devDependencies', '@modern-js/ultramodern-app-tools'],
         ['devDependencies', '@modern-js/app-tools-extensions'],
+        ['dependencies', '@modern-js/runtime-renderer-extensions'],
         ...(appEmitsBrowserUi(options.app)
           ? [
               ['dependencies', '@modern-js/federation-runtime'] as [
@@ -86,6 +87,20 @@ export function updateModernDependencies(
           : []),
       ]
     : [];
+  if (!options.app) {
+    const rendererSections = new Set<string>();
+    for (const section of ['dependencies', 'devDependencies']) {
+      if (Object.hasOwn(packageJson[section] ?? {}, '@modern-js/runtime')) {
+        rendererSections.add(section);
+      }
+    }
+    if (packageJson.modernjs?.workspace === 'ultramodern-superapp') {
+      rendererSections.add('devDependencies');
+    }
+    for (const section of rendererSections) {
+      providers.push([section, '@modern-js/runtime-renderer-extensions']);
+    }
+  }
   for (const [section, name] of providers) {
     if (
       packageJson[section] !== undefined &&

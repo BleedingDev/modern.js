@@ -34,6 +34,7 @@ export const ULTRAMODERN_WORKSPACE_MODERN_PACKAGES = [
   '@modern-js/plugin-tanstack',
   '@modern-js/runtime',
   '@modern-js/runtime-extensions',
+  '@modern-js/runtime-renderer-extensions',
   '@modern-js/federation-runtime',
   '@modern-js/app-tools-extensions',
   '@modern-js/ultramodern-app-tools',

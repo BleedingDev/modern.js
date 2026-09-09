@@ -1,14 +1,23 @@
 // @effect-diagnostics asyncFunction:off newPromise:off processEnv:off strictBooleanExpressions:off
-import * as rendererHead from '@modern-js/runtime-extensions/node';
+import type { StreamSSRExtender } from '@modern-js/plugin/runtime';
 import { storage } from '@modern-js/runtime-utils/node';
 import { SSR_HYDRATION_ID_PREFIX } from '@modern-js/utils/universal/constants';
-import type { ReactElement } from 'react';
-import { PassThrough, Readable, Transform } from 'stream';
+import { finished, PassThrough, pipeline, Readable, Transform } from 'stream';
 import { ESCAPED_SHELL_STREAM_END_MARK } from '../../../common';
 import { RenderLevel } from '../../constants';
-import { getGlobalInternalRuntimeContext } from '../../context';
+import {
+  getGlobalEnableRsc,
+  getGlobalInternalRuntimeContext,
+} from '../../context';
 import { getMonitors } from '../../context/monitors';
+import { wrapRuntimeComponentResolver } from '../../react/wrapper';
 import { createReplaceHelemt, getHelmetData } from '../helmet';
+import {
+  createSSRRenderLifecycle,
+  createSSRStreamErrorReporter,
+  observeSSRStream,
+  orderSSRStreamTransforms,
+} from '../shared';
 import { enqueueFromEntries } from './deferredScript';
 import {
   type CreateReadableStreamFromElement,
@@ -17,22 +26,6 @@ import {
   ShellChunkStatus,
 } from './shared';
 import { getTemplates } from './template';
-
-type StreamSSRExtender = {
-  init?: (options: {
-    rootElement: ReactElement;
-    forceStream2String: boolean;
-  }) => void;
-  modifyRootElement?: (rootElement: ReactElement) => ReactElement;
-  getStyleTags?: () => string;
-  processStream?: (stream: NodeJS.ReadWriteStream) => NodeJS.ReadWriteStream;
-};
-
-const defaultExtender: StreamSSRExtender = {
-  modifyRootElement: (rootElement: ReactElement) => rootElement,
-  getStyleTags: () => '',
-  processStream: (stream: NodeJS.ReadWriteStream) => stream,
-};
 
 export const createReadableStreamFromElement: CreateReadableStreamFromElement =
   async (request, rootElement, options) => {
@@ -45,225 +38,264 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       entryName,
       moduleFederationCssAssets,
     } = options;
-    let shellChunkStatus = ShellChunkStatus.START;
-
-    let renderLevel = RenderLevel.SERVER_RENDER;
-
+    const hooks = getGlobalInternalRuntimeContext().hooks;
+    const isRsc = getGlobalEnableRsc() === true;
+    const extenders: StreamSSRExtender[] =
+      hooks.extendStreamSSR.call({
+        runtimeContext,
+        request,
+        platform: 'node',
+        mode: 'stream',
+        isRsc,
+        terminalMarker: ESCAPED_SHELL_STREAM_END_MARK,
+      }) || [];
+    const lifecycle = createSSRRenderLifecycle(extenders);
+    const reportError = createSSRStreamErrorReporter(options.onError);
     const forceStream2String = Boolean(process.env.MODERN_JS_STREAM_TO_STRING);
-    // When a crawler visit the page, we should waiting for entrie content of page
-
     const { onReady } = resolveStreamingMode(request, forceStream2String);
-
-    const internalRuntimeContext = getGlobalInternalRuntimeContext();
-    const hooks = internalRuntimeContext.hooks;
-
-    const extenders: StreamSSRExtender[] = hooks.extendStreamSSR.call() || [];
-
-    if (extenders.length === 0) {
-      extenders.push(defaultExtender);
-    }
-
-    extenders.forEach(extender => {
-      if (extender.init) {
-        extender.init({
-          rootElement,
-          forceStream2String,
-        });
-      }
-    });
-
-    let processedRootElement = rootElement;
-    extenders.forEach(extender => {
-      if (extender.modifyRootElement) {
-        processedRootElement = extender.modifyRootElement(processedRootElement);
-      }
-    });
-
-    const chunkVec: Buffer[] = [];
+    let renderLevel = RenderLevel.SERVER_RENDER;
     let hasStartedPipe = false;
-    rendererHead.beginHeadRender(runtimeContext);
-    const reportError = rendererHead.createOnceErrorReporter(options.onError);
+    let failed = false;
+    let reactStream: ReturnType<typeof renderToPipeableStream> | undefined;
+    const ownedStreams = new Set<NodeJS.ReadWriteStream>();
+    const streamCompletions: Promise<Error | undefined>[] = [];
+    let teardown: Promise<void> | undefined;
 
-    return new Promise(resolve => {
-      const { pipe: reactStreamingPipe } = renderToPipeableStream(
-        processedRootElement,
-        {
+    return new Promise<ReadableStream<Uint8Array>>((resolve, reject) => {
+      const destroyOwnedStreams = (reason?: unknown): Promise<void> => {
+        if (teardown) return teardown;
+        const error =
+          reason === undefined
+            ? undefined
+            : reason instanceof Error
+              ? reason
+              : new Error(String(reason));
+        for (const stream of ownedStreams) {
+          const destroyable = stream as NodeJS.ReadWriteStream & {
+            destroy?: (error?: Error) => void;
+          };
+          destroyable.destroy?.(error);
+        }
+        teardown = Promise.all(streamCompletions).then(errors => {
+          const cleanupError = errors.find(
+            value =>
+              value !== undefined &&
+              value !== error &&
+              (value as NodeJS.ErrnoException).code !==
+                'ERR_STREAM_PREMATURE_CLOSE',
+          );
+          if (cleanupError) throw cleanupError;
+        });
+        return teardown;
+      };
+      const abortReact = (reason?: unknown) => reactStream?.abort(reason);
+      const fail = (error: unknown) => {
+        if (failed) return;
+        failed = true;
+        request.signal.removeEventListener('abort', onStartupAbort);
+        if (request.signal.aborted) {
+          lifecycle.finish({
+            status: 'cancelled',
+            reason: request.signal.reason,
+          });
+        } else {
+          lifecycle.finish({ status: 'error', error });
+          reportError(error);
+        }
+        abortReact(error);
+        destroyOwnedStreams(error).then(
+          () => reject(error),
+          () => reject(error),
+        );
+      };
+      const own = (stream: NodeJS.ReadWriteStream) => {
+        if (!ownedStreams.has(stream)) {
+          ownedStreams.add(stream);
+          streamCompletions.push(
+            new Promise<Error | undefined>(done => {
+              finished(stream, error => done(error ?? undefined));
+            }),
+          );
+          stream.on('error', fail);
+        }
+        return stream;
+      };
+      const onStartupAbort = () => fail(request.signal.reason);
+      const deliver = (source: ReadableStream<Uint8Array>) => {
+        const stream = observeSSRStream(source, {
+          lifecycle,
+          signal: request.signal,
+          async onError(error) {
+            failed = true;
+            abortReact(error);
+            await destroyOwnedStreams(error);
+            reportError(error);
+          },
+          onCancel(reason) {
+            failed = true;
+            const cleanup = destroyOwnedStreams();
+            abortReact(reason);
+            return cleanup;
+          },
+        });
+        request.signal.removeEventListener('abort', onStartupAbort);
+        resolve(stream);
+      };
+      const templateOptions = () => ({
+        request,
+        ssrConfig,
+        renderLevel,
+        runtimeContext,
+        config,
+        entryName,
+        moduleFederationCssAssets,
+      });
+
+      const startOutput = async () => {
+        if (hasStartedPipe || failed) return;
+        hasStartedPipe = true;
+        const styledComponentsStyleTags = extenders
+          .map(extender => extender.getStyleTags?.() ?? '')
+          .join('');
+        options[onReady]?.();
+        // Head is read only after the completed shell has passed body transforms.
+        const { shellBefore, shellAfter } = await getTemplates(htmlTemplate, {
+          ...templateOptions(),
+          styledComponentsStyleTags,
+        });
+        if (failed) return;
+        const chunks: Buffer[] = [];
+        const marker = Buffer.from(ESCAPED_SHELL_STREAM_END_MARK);
+        const pendingScripts: string[] = [];
+        let shellChunkStatus = ShellChunkStatus.START;
+        const emitShell = (
+          destination: Transform,
+          buffered: Buffer,
+          markerIndex: number,
+        ) => {
+          const beforeMark = lifecycle.completedBody(
+            buffered.subarray(0, markerIndex).toString('utf8'),
+            'shell',
+          );
+          const completedShellBefore = createReplaceHelemt(
+            getHelmetData(extenders),
+          )(shellBefore);
+          shellChunkStatus = ShellChunkStatus.FINISH;
+          chunks.length = 0;
+          destination.push(`${completedShellBefore}${beforeMark}${shellAfter}`);
+          const afterMark = buffered.subarray(markerIndex + marker.length);
+          if (afterMark.length > 0) destination.push(afterMark);
+          for (const script of pendingScripts) destination.push(script);
+          pendingScripts.length = 0;
+        };
+        const body = new Transform({
+          transform(chunk, _encoding, callback) {
+            try {
+              if (shellChunkStatus === ShellChunkStatus.FINISH) {
+                this.push(chunk);
+              } else {
+                chunks.push(
+                  Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
+                );
+                const buffered = Buffer.concat(chunks);
+                const markerIndex = buffered.indexOf(marker);
+                if (markerIndex !== -1) emitShell(this, buffered, markerIndex);
+              }
+              callback();
+            } catch (error) {
+              callback(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+            }
+          },
+          flush(callback) {
+            try {
+              // A normal Node EOF completes an unmarked shell without losing bytes.
+              if (shellChunkStatus !== ShellChunkStatus.FINISH) {
+                const buffered = Buffer.concat(chunks);
+                emitShell(this, buffered, buffered.length);
+              }
+              callback();
+            } catch (error) {
+              callback(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+            }
+          },
+        });
+        own(body);
+        const passThrough = new PassThrough();
+        let processedStream = own(passThrough);
+        for (const extender of orderSSRStreamTransforms(extenders)) {
+          if (extender.processStream)
+            processedStream = own(extender.processStream(processedStream));
+        }
+        pipeline(processedStream, body, error => {
+          if (error !== undefined && error !== null && !failed) fail(error);
+        });
+        deliver(Readable.toWeb(body) as ReadableStream<Uint8Array>);
+        reactStream!.pipe(passThrough);
+
+        try {
+          const activeDeferreds = storage.useContext?.()?.activeDeferreds;
+          const entries: Array<[string, unknown]> =
+            activeDeferreds instanceof Map
+              ? Array.from(activeDeferreds.entries())
+              : [];
+          enqueueFromEntries(entries, config.nonce, script => {
+            if (failed || body.destroyed || body.writableEnded) return;
+            if (shellChunkStatus === ShellChunkStatus.FINISH)
+              body.write(script);
+            else pendingScripts.push(script);
+          });
+        } catch (error) {
+          getMonitors().error('cannot inject router data script', error);
+        }
+      };
+      const renderFallback = async (error: unknown) => {
+        if (failed || hasStartedPipe) return;
+        lifecycle.finish({ status: 'fallback', error });
+        renderLevel = RenderLevel.CLIENT_RENDER;
+        const { shellBefore, shellAfter } = await getTemplates(htmlTemplate, {
+          ...templateOptions(),
+          helmetData: getHelmetData(extenders),
+        });
+        if (failed) return;
+        options.onShellError?.(error);
+        deliver(getReadableStreamFromString(`${shellBefore}${shellAfter}`));
+      };
+
+      request.signal.addEventListener('abort', onStartupAbort, { once: true });
+      try {
+        request.signal.throwIfAborted();
+        for (const extender of extenders)
+          extender.init?.({ rootElement, forceStream2String });
+        let processedRootElement =
+          isRsc && runtimeContext.isBrowser === false
+            ? wrapRuntimeComponentResolver(rootElement, hooks)
+            : rootElement;
+        for (const extender of extenders) {
+          processedRootElement =
+            extender.modifyRootElement?.(processedRootElement) ??
+            processedRootElement;
+        }
+        lifecycle.beforeReact();
+        reactStream = renderToPipeableStream(processedRootElement, {
           nonce: config.nonce,
           identifierPrefix: SSR_HYDRATION_ID_PREFIX,
           [onReady]() {
-            if (hasStartedPipe) {
-              return;
-            }
-            hasStartedPipe = true;
-
-            let styledComponentsStyleTags = '';
-            extenders.forEach(extender => {
-              if (extender.getStyleTags) {
-                styledComponentsStyleTags += extender.getStyleTags();
-              }
-            });
-
-            options[onReady]?.();
-
-            getTemplates(htmlTemplate, {
-              request,
-              ssrConfig,
-              renderLevel,
-              runtimeContext,
-              config,
-              entryName,
-              moduleFederationCssAssets,
-              styledComponentsStyleTags,
-            }).then(({ shellAfter, shellBefore }) => {
-              const pendingScripts: string[] = [];
-              const body = new Transform({
-                transform(chunk, _encoding, callback) {
-                  try {
-                    if (shellChunkStatus !== ShellChunkStatus.FINISH) {
-                      chunkVec.push(
-                        Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
-                      );
-                      /**
-                       * The shell content of App may be splitted by multiple chunks to transform,
-                       * when any node value's size is larger than the React limitation, refer to:
-                       * https://github.com/facebook/react/blob/v18.2.0/packages/react-server/src/ReactServerStreamConfigNode.js#L53.
-                       * So we use the `SHELL_STREAM_END_MARK` to mark the shell content' tail.
-                       *
-                       * The marker can also land in the middle of a chunk that already carries
-                       * suspense-boundary content emitted right after the shell (React's chunk
-                       * boundaries are byte-driven, not render-phase-driven). Concat first so
-                       * we also catch markers that straddle two chunks, then split the buffered
-                       * content at the marker: everything before goes between shellBefore and
-                       * shellAfter; everything after goes out as-is so it lands past the
-                       * closing `</html>` instead of being swallowed inside it.
-                       */
-                      const concatedChunk = Buffer.concat(
-                        chunkVec as any,
-                      ).toString('utf-8');
-                      const markerIndex = concatedChunk.indexOf(
-                        ESCAPED_SHELL_STREAM_END_MARK,
-                      );
-                      if (markerIndex !== -1) {
-                        const beforeMark = concatedChunk.slice(0, markerIndex);
-                        const afterMark = concatedChunk.slice(
-                          markerIndex + ESCAPED_SHELL_STREAM_END_MARK.length,
-                        );
-                        rendererHead.publishHeadRender(runtimeContext);
-                        const completedShellBefore = createReplaceHelemt(
-                          getHelmetData(runtimeContext),
-                        )(shellBefore);
-
-                        shellChunkStatus = ShellChunkStatus.FINISH;
-                        this.push(
-                          `${completedShellBefore}${beforeMark}${shellAfter}`,
-                        );
-                        if (afterMark) {
-                          this.push(afterMark);
-                        }
-                        // Flush any pending <script> collected before shell finished
-                        if (pendingScripts.length > 0) {
-                          for (const s of pendingScripts) {
-                            this.push(s);
-                          }
-                        }
-                      }
-                    } else {
-                      this.push(chunk);
-                    }
-                    callback();
-                  } catch (e) {
-                    if (e instanceof Error) {
-                      callback(e);
-                    } else {
-                      callback(
-                        new Error('Received unknown error when streaming'),
-                      );
-                    }
-                  }
-                },
-              });
-
-              const passThrough = new PassThrough();
-
-              // Transform the Node.js readable stream to a Web ReadableStream
-              // For modern.js depend on hono.js, and we use Web standard
-              const stream = Readable.toWeb(body) as ReadableStream<Uint8Array>;
-              resolve(stream);
-
-              let processedStream: NodeJS.ReadWriteStream = passThrough;
-              extenders.forEach(extender => {
-                if (extender.processStream) {
-                  processedStream = extender.processStream(processedStream);
-                }
-              });
-              rendererHead.pipeNodeHeadStream({
-                source: processedStream,
-                destination: body,
-                context: runtimeContext,
-                terminalMarker: ESCAPED_SHELL_STREAM_END_MARK,
-                onError: reportError,
-              });
-              reactStreamingPipe(passThrough);
-
-              // Inject router data scripts, enqueue until shell finished
-              try {
-                const storageContext = storage.useContext?.();
-                const activeDeferreds = storageContext?.activeDeferreds;
-
-                /**
-                 * activeDeferreds is injected into storageContext by @modern-js/runtime.
-                 * @see packages/toolkit/runtime-utils/src/browser/nestedRoutes.tsx
-                 */
-                const entries: Array<[string, unknown]> =
-                  activeDeferreds instanceof Map
-                    ? Array.from(activeDeferreds.entries())
-                    : [];
-
-                if (entries.length > 0) {
-                  const enqueueScript = (s: string) => {
-                    if (shellChunkStatus === ShellChunkStatus.FINISH) {
-                      body.write(s);
-                    } else {
-                      pendingScripts.push(s);
-                    }
-                  };
-
-                  enqueueFromEntries(entries, config.nonce, (s: string) =>
-                    enqueueScript(s),
-                  );
-                }
-              } catch (err) {
-                const monitors = getMonitors();
-                monitors.error('cannot inject router data script', err);
-              }
-            });
+            startOutput().catch(fail);
           },
-
           onShellError(error: unknown) {
-            rendererHead.abortHeadRender(runtimeContext);
-            renderLevel = RenderLevel.CLIENT_RENDER;
-            getTemplates(htmlTemplate, {
-              request,
-              ssrConfig,
-              renderLevel,
-              runtimeContext,
-              entryName,
-              config,
-              moduleFederationCssAssets,
-            }).then(({ shellAfter, shellBefore }) => {
-              const fallbackHtml = `${shellBefore}${shellAfter}`;
-
-              const readableStream = getReadableStreamFromString(fallbackHtml);
-              resolve(readableStream);
-              options?.onShellError?.(error);
-            });
+            renderFallback(error).catch(fail);
           },
           onError(error: unknown) {
             renderLevel = RenderLevel.CLIENT_RENDER;
-
-            reportError(error);
+            if (!request.signal.aborted && !failed) reportError(error);
           },
-        },
-      );
+        });
+      } catch (error) {
+        fail(error);
+      }
     });
   };

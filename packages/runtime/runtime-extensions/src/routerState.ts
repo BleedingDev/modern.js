@@ -1,14 +1,21 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off
-import type { RouteObject } from '@modern-js/runtime-utils/router';
-import { createRuntimeContextExtension } from '../../core/context/extensions';
-import type { TInternalRuntimeContext } from '../../core/context/runtime';
+import { createRuntimeContextExtension } from './contextExtensions';
 import type {
   InternalRouterRuntimeState,
   InternalRouterServerSnapshot,
-  RouterFramework,
   RouterRouteMatchSnapshot,
   RouterServerPrepareResult,
-} from './types';
+} from './routerStateTypes';
+
+export type {
+  BuiltInRouterFramework,
+  InternalRouterRuntimeState,
+  InternalRouterServerSnapshot,
+  RouterFramework,
+  RouterLifecyclePhase,
+  RouterRouteMatchSnapshot,
+  RouterServerPrepareResult,
+} from './routerStateTypes';
 
 /**
  * Router runtime state is shared by every router provider (react-router,
@@ -42,21 +49,6 @@ export function getRouterServerSnapshot(
 ): InternalRouterServerSnapshot | undefined {
   return routerServerSnapshotExtension.get(runtimeContext);
 }
-
-export type RouterLifecyclePhase = 'ssr-prepare' | 'client-create' | 'hydrate';
-
-export type RouterLifecycleContext = {
-  framework: RouterFramework;
-  phase: RouterLifecyclePhase;
-  routes: RouteObject[];
-  runtimeContext: TInternalRuntimeContext;
-  basename?: string;
-  hydrationData?: unknown;
-  router?: unknown;
-  matches?: RouterRouteMatchSnapshot[];
-  cleanup?: () => void | Promise<void>;
-  serverSnapshot?: InternalRouterServerSnapshot;
-};
 
 type RouterSnapshotLike = Partial<InternalRouterServerSnapshot>;
 
@@ -153,8 +145,8 @@ export function createRouterRuntimeState(
   };
 }
 
-export function applyRouterRuntimeState(
-  runtimeContext: TInternalRuntimeContext,
+export function applyRouterRuntimeState<Context extends object>(
+  runtimeContext: Context,
   state: InternalRouterRuntimeState,
 ) {
   const normalized = createRouterRuntimeState(state);
@@ -169,8 +161,8 @@ export function applyRouterRuntimeState(
   return runtimeContext;
 }
 
-export function applyRouterServerPrepareResult(
-  runtimeContext: TInternalRuntimeContext,
+export function applyRouterServerPrepareResult<Context extends object>(
+  runtimeContext: Context,
   result: RouterServerPrepareResult,
 ) {
   const state = createRouterRuntimeState({
@@ -182,9 +174,7 @@ export function applyRouterServerPrepareResult(
   return runtimeContext;
 }
 
-export function getRouterHydrationScripts(
-  runtimeContext: TInternalRuntimeContext,
-) {
+export function getRouterHydrationScripts(runtimeContext: object) {
   const serverSnapshot = getRouterServerSnapshot(runtimeContext);
   const runtimeState = getRouterRuntimeState(runtimeContext);
   return (
@@ -200,9 +190,7 @@ export function getRouterHydrationScripts(
   );
 }
 
-export function getRouterMatchedRouteIds(
-  runtimeContext: TInternalRuntimeContext,
-) {
+export function getRouterMatchedRouteIds(runtimeContext: object) {
   const serverSnapshot = getRouterServerSnapshot(runtimeContext);
   const runtimeState = getRouterRuntimeState(runtimeContext);
   return (
@@ -213,9 +201,7 @@ export function getRouterMatchedRouteIds(
   );
 }
 
-export async function cleanupRouterRuntimeState(
-  runtimeContext: TInternalRuntimeContext,
-) {
+export async function cleanupRouterRuntimeState(runtimeContext: object) {
   try {
     await getRouterRuntimeState(runtimeContext)?.cleanup?.();
   } catch {}

@@ -1,7 +1,28 @@
 import { createSyncHook } from '@modern-js/plugin';
+import type {
+  InternalRouterServerSnapshot,
+  RouterFramework,
+  RouterLifecyclePhase,
+  RouterRouteMatchSnapshot,
+} from '@modern-js/runtime-extensions/router-state';
 import type { RouteObject } from '@modern-js/runtime-utils/router';
-import type { TRuntimeContext } from '../../core/context/runtime';
-import type { RouterLifecycleContext } from './lifecycle';
+import type {
+  TInternalRuntimeContext,
+  TRuntimeContext,
+} from '../../core/context/runtime';
+
+export type RouterLifecycleContext = {
+  framework: RouterFramework;
+  phase: RouterLifecyclePhase;
+  routes: RouteObject[];
+  runtimeContext: TInternalRuntimeContext;
+  basename?: string;
+  hydrationData?: unknown;
+  router?: unknown;
+  matches?: RouterRouteMatchSnapshot[];
+  cleanup?: () => void | Promise<void>;
+  serverSnapshot?: InternalRouterServerSnapshot;
+};
 
 export type RouterSyncHook<Handler extends (...args: any[]) => any> = {
   call: (...args: Parameters<Handler>) => ReturnType<Handler>;

@@ -1,329 +1,117 @@
-import * as rendererHead from '@modern-js/runtime-extensions';
+import { initHooks } from '@modern-js/plugin/runtime';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { InternalRuntimeContext } from '../../src/core/context';
-import { getHelmetData } from '../../src/core/server/helmet';
-import { Helmet } from '../../src/exports/head';
+import {
+  Helmet as AsyncHelmet,
+  HelmetData,
+  HelmetProvider,
+} from 'react-helmet-async';
+import { RuntimeComponentResolverContext } from '../../src/core/context/runtime';
+import { wrapRuntimeComponentResolver } from '../../src/core/react/wrapper';
+import head, { Helmet } from '../../src/exports/head';
 
-const createServerContext = () => ({ isBrowser: false }) as any;
-
-const renderWithContext = (context: any, node: React.ReactNode) => {
-  rendererHead.beginHeadRender(context);
-  try {
+describe('native head component resolution', () => {
+  it('preserves named/default exports and the unconfigured native Helmet behavior', () => {
+    expect(head.Helmet).toBe(Helmet);
+    expect(head.HelmetData).toBe(HelmetData);
+    expect(head.HelmetProvider).toBe(HelmetProvider);
     const html = renderToString(
-      <InternalRuntimeContext.Provider value={context}>
-        {node}
-      </InternalRuntimeContext.Provider>,
-    );
-    return rendererHead.completeHeadRender(context, html);
-  } catch (error) {
-    rendererHead.abortHeadRender(context);
-    throw error;
-  }
-};
-
-describe('server Helmet collection', () => {
-  it('excludes Helmet records from a discarded Suspense primary branch', () => {
-    const context = createServerContext();
-    const never = new Promise<never>(() => {});
-
-    const SuspendForever = (): null => {
-      throw never;
-    };
-
-    const html = renderWithContext(
-      context,
-      <>
-        <Helmet>
-          <meta name="outside" content="committed" />
-        </Helmet>
-        <React.Suspense
-          fallback={
-            <>
-              <Helmet>
-                <meta name="fallback" content="committed" />
-              </Helmet>
-              <span>fallback rendered</span>
-            </>
-          }
-        >
-          <Helmet>
-            <meta name="abandoned-unique" content="ghost" />
-          </Helmet>
-          <SuspendForever />
-        </React.Suspense>
-      </>,
+      <HelmetProvider>
+        <head.Helmet>
+          <title>Native head</title>
+          <meta name="description" content="native" />
+        </head.Helmet>
+      </HelmetProvider>,
     );
 
-    expect(html).toContain('fallback rendered');
-    const meta = getHelmetData(context)!.meta.toString();
-    expect(meta).toContain('name="outside"');
-    expect(meta).toContain('name="fallback"');
-    expect(meta).not.toContain('name="abandoned-unique"');
-  });
-
-  it('collects title/meta during SSR and renders nothing inline', () => {
-    const context = createServerContext();
-    const html = renderWithContext(
-      context,
-      <main>
-        <Helmet>
-          <title>Server Title</title>
-          <meta name="description" content="hello" />
-        </Helmet>
-        body
-      </main>,
-    );
-
-    expect(html).not.toContain('Server Title');
-    const helmet = getHelmetData(context)!;
-    expect(helmet.title.toString()).toBe(
-      '<title data-rh="true">Server Title</title>',
-    );
-    expect(helmet.meta.toString()).toBe(
-      '<meta data-rh="true" name="description" content="hello">',
+    expect(html).toContain('<title>Native head</title>');
+    expect(html).toContain('content="native"');
+    expect(html).toBe(
+      renderToString(
+        <HelmetProvider>
+          <AsyncHelmet>
+            <title>Native head</title>
+            <meta name="description" content="native" />
+          </AsyncHelmet>
+        </HelmetProvider>,
+      ),
     );
   });
 
-  it('dedupes meta by primary attribute across nested Helmets, inner wins', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet>
-          <meta name="description" content="outer" />
-          <meta name="keywords" content="modernjs" />
-        </Helmet>
-        <section>
-          <Helmet>
-            <meta name="description" content="inner" />
-          </Helmet>
-        </section>
-      </>,
+  it('chains component resolution while preserving unrelated component names', () => {
+    const hooks = initHooks();
+    const calls: string[] = [];
+    const First = () => <span>first</span>;
+    const value = React.createContext('outside');
+    const Second = ({ title }: { title?: string }) => (
+      <p>{`${title}:${React.useContext(value)}`}</p>
     );
-
-    const meta = getHelmetData(context)!.meta.toString();
-    expect(meta).toContain('content="inner"');
-    expect(meta).not.toContain('content="outer"');
-    expect(meta).toContain('content="modernjs"');
-    // outer instance tags come first, like react-helmet-async
-    expect(meta.indexOf('keywords')).toBeLessThan(meta.indexOf('description'));
-  });
-
-  it('keeps duplicate metas within a single Helmet instance', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet>
-        <meta name="author" content="a" />
-        <meta name="author" content="b" />
-      </Helmet>,
-    );
-
-    const meta = getHelmetData(context)!.meta.toString();
-    expect(meta).toContain('content="a"');
-    expect(meta).toContain('content="b"');
-  });
-
-  it('normalizes charSet when deduping and drops meta without primary attribute', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet>
-          <meta charSet="utf-8" />
-          <meta content="orphan" />
-        </Helmet>
-        <Helmet meta={[{ charSet: 'utf-8' } as any]} />
-      </>,
-    );
-
-    const meta = getHelmetData(context)!.meta.toString();
-    expect(meta.match(/charset/g)).toHaveLength(1);
-    expect(meta).not.toContain('orphan');
-  });
-
-  it('applies the innermost title and the innermost titleTemplate', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet titleTemplate="%s | Site">
-          <title>Outer</title>
-        </Helmet>
-        <Helmet>
-          <title>Inner</title>
-        </Helmet>
-      </>,
-    );
-
-    expect(getHelmetData(context)!.title.toString()).toBe(
-      '<title data-rh="true">Inner | Site</title>',
-    );
-  });
-
-  it('falls back to defaultTitle without applying the template', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet defaultTitle="Default" titleTemplate="%s | Site" />,
-    );
-
-    expect(getHelmetData(context)!.title.toString()).toBe(
-      '<title data-rh="true">Default</title>',
-    );
-  });
-
-  it('maps <html>/<body> children to html/body attributes', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet>
-        <html lang="en" />
-        <body className="dark" />
-      </Helmet>,
-    );
-
-    const helmet = getHelmetData(context)!;
-    expect(helmet.htmlAttributes.toString()).toBe('lang="en"');
-    expect(helmet.bodyAttributes.toString()).toBe('class="dark"');
-  });
-
-  it('keeps one canonical link but all distinct stylesheets', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet>
-          <link rel="canonical" href="https://outer.example/" />
-          <link rel="stylesheet" href="/a.css" />
-          <link rel="stylesheet" href="/b.css" />
-        </Helmet>
-        <Helmet>
-          <link rel="canonical" href="https://inner.example/" />
-        </Helmet>
-      </>,
-    );
-
-    const link = getHelmetData(context)!.link.toString();
-    expect(link).toContain('https://inner.example/');
-    expect(link).not.toContain('https://outer.example/');
-    expect(link).toContain('/a.css');
-    expect(link).toContain('/b.css');
-  });
-
-  it('does not serialize script innerHTML as an attribute', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet>
-        <script type="application/ld+json">{'{"@context":"a"}'}</script>
-      </Helmet>,
-    );
-
-    const script = getHelmetData(context)!.script.toString();
-    expect(script).toBe(
-      '<script data-rh="true" type="application/ld+json">{"@context":"a"}</script>',
-    );
-  });
-
-  it('publishes prioritized SEO tags separately with component parity', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet prioritizeSeoTags htmlAttributes={{ class: 'app' } as any}>
-        <title>Priority Page</title>
-        <meta name="description" content="priority description" />
-        <meta name="keywords" content="ordinary keywords" />
-        <link rel="canonical" href="https://example.com/page" />
-        <link rel="stylesheet" href="/page.css" />
-        <script type="application/ld+json">{'{"name":"page"}'}</script>
-        <script src="/ordinary.js" />
-      </Helmet>,
-    );
-
-    const helmet = getHelmetData(context)!;
-    expect(helmet.priority.toString()).toContain('priority description');
-    expect(helmet.priority.toString()).toContain('https://example.com/page');
-    expect(helmet.priority.toString()).toContain('application/ld+json');
-    expect(helmet.meta.toString()).toContain('ordinary keywords');
-    expect(helmet.meta.toString()).not.toContain('priority description');
-    expect(helmet.link.toString()).toContain('/page.css');
-    expect(helmet.link.toString()).not.toContain('https://example.com/page');
-    expect(helmet.script.toString()).toContain('/ordinary.js');
-    expect(helmet.script.toString()).not.toContain('application/ld+json');
-
-    const priority = helmet.priority.toComponent();
-    expect(priority.map(element => element.type)).toEqual([
-      'meta',
-      'link',
-      'script',
-    ]);
-    expect(priority[0].props).toMatchObject({
-      'data-rh': true,
-      content: 'priority description',
-      name: 'description',
+    hooks.resolveComponent.tap((component, { name }) => {
+      if (name !== 'head.Helmet') return component;
+      calls.push('first');
+      expect(component).toBe(AsyncHelmet);
+      return First;
     });
-    expect(priority[2].props).toMatchObject({
-      'data-rh': true,
-      dangerouslySetInnerHTML: { __html: '{"name":"page"}' },
-      type: 'application/ld+json',
+    hooks.resolveComponent.tap((component, { name }) => {
+      if (name !== 'head.Helmet') return component;
+      calls.push('second');
+      expect(component).toBe(First);
+      return Second;
     });
-    expect(helmet.meta.toComponent()[0].props).toMatchObject({
-      content: 'ordinary keywords',
-      name: 'keywords',
-    });
-    expect(helmet.title.toComponent()[0].props.children).toBe('Priority Page');
-    expect(helmet.htmlAttributes.toComponent()).toEqual({ className: 'app' });
+
+    expect(hooks.resolveComponent.call(First, { name: 'unrelated' })).toBe(
+      First,
+    );
+    const html = renderToString(
+      wrapRuntimeComponentResolver(
+        <value.Provider value="scoped">
+          <Helmet title="Selected" />
+        </value.Provider>,
+        hooks,
+      ),
+    );
+
+    expect(html).toBe('<p>Selected:scoped</p>');
+    expect(calls).toEqual(['first', 'second']);
   });
 
-  it('is idempotent when React replays the tree (streaming SSR retry)', () => {
-    const context = createServerContext();
-    const app = (
+  it('keeps resolver selection scoped to its provider', () => {
+    const First = () => <p>first provider</p>;
+    const Second = () => <p>second provider</p>;
+    const tree = (
       <>
-        <Helmet titleTemplate="%s | Site">
-          <title>Page</title>
-          <meta name="description" content="stable" />
-          <html lang="en" />
-        </Helmet>
-        <Helmet>
-          <meta property="og:title" content="Page" />
-        </Helmet>
+        <RuntimeComponentResolverContext.Provider value={() => First}>
+          <Helmet />
+        </RuntimeComponentResolverContext.Provider>
+        <RuntimeComponentResolverContext.Provider value={() => Second}>
+          <Helmet />
+        </RuntimeComponentResolverContext.Provider>
       </>
     );
-
-    renderWithContext(context, app);
-    const first = getHelmetData(context)!;
-    const firstSnapshot = {
-      title: first.title.toString(),
-      meta: first.meta.toString(),
-      htmlAttributes: first.htmlAttributes.toString(),
-    };
-
-    // Simulate a replayed render against the same per-request context.
-    renderWithContext(context, app);
-    const second = getHelmetData(context)!;
-
-    expect(second.title.toString()).toBe(firstSnapshot.title);
-    expect(second.meta.toString()).toBe(firstSnapshot.meta);
-    expect(second.htmlAttributes.toString()).toBe(firstSnapshot.htmlAttributes);
-    expect(second.meta.toString().match(/description/g)).toHaveLength(1);
+    expect(renderToString(tree)).toBe(
+      '<p>first provider</p><p>second provider</p>',
+    );
   });
 
-  it('keeps the innermost base tag only', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet base={{ href: 'https://outer.example/' } as any} />
-        <Helmet>
-          <base href="https://inner.example/" />
-        </Helmet>
-      </>,
-    );
-
-    const base = getHelmetData(context)!.base.toString();
-    expect(base).toContain('https://inner.example/');
-    expect(base).not.toContain('https://outer.example/');
+  it('propagates resolver errors and rejects direct recursive resolution', () => {
+    const error = new Error('resolver failed');
+    expect(() =>
+      renderToString(
+        <RuntimeComponentResolverContext.Provider
+          value={() => {
+            throw error;
+          }}
+        >
+          <Helmet />
+        </RuntimeComponentResolverContext.Provider>,
+      ),
+    ).toThrow(error);
+    expect(() =>
+      renderToString(
+        <RuntimeComponentResolverContext.Provider value={() => Helmet}>
+          <Helmet />
+        </RuntimeComponentResolverContext.Provider>,
+      ),
+    ).toThrow('cannot resolve head.Helmet to itself');
   });
 });

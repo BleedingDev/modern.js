@@ -1,8 +1,7 @@
-import { ensureHelmetContext } from '../../../../src/core/context/helmetContext';
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import { CHUNK_CSS_PLACEHOLDER } from '../../../../src/core/server/constants';
 import { buildShellBeforeTemplate } from '../../../../src/core/server/stream/beforeTemplate';
 import { buildShellBeforeTemplate as buildWorkerShellBeforeTemplate } from '../../../../src/core/server/stream/beforeTemplate.worker';
-import { applyRouterRuntimeState } from '../../../../src/router/runtime/lifecycle';
 
 const withRouterSnapshot = (
   runtimeContext: Record<string, unknown>,
@@ -42,7 +41,7 @@ describe('buildShellBeforeTemplate', () => {
     );
     const helmetStylesheet =
       '<link href="/assets/helmet.css" rel="stylesheet" data-rh="true">';
-    ensureHelmetContext(runtimeContext).helmet = {
+    const helmetData = {
       bodyAttributes: '',
       htmlAttributes: '',
       base: '',
@@ -76,6 +75,7 @@ describe('buildShellBeforeTemplate', () => {
         runtimeContext: runtimeContext as any,
         config: {} as any,
         styledComponentsStyleTags,
+        helmetData,
         moduleFederationCssAssets: [
           '/assets/shared.css',
           '/assets/federated.css',

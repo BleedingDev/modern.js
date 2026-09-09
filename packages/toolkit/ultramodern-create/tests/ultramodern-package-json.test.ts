@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { UltramodernBridgeConfig } from '../src/ultramodern-workspace/bridge-config';
 import {
   createShellHost,
@@ -46,6 +50,7 @@ const installAppDependencies = {
   '@modern-js/plugin-i18n': packageVersion,
   '@modern-js/runtime': packageVersion,
   '@modern-js/runtime-extensions': packageVersion,
+  '@modern-js/runtime-renderer-extensions': packageVersion,
   '@modern-js/federation-runtime': packageVersion,
   '@module-federation/bridge-react': '2.9.0',
   '@module-federation/modern-js-v3': '2.9.0',
@@ -149,6 +154,7 @@ test('workspace package source uses workspace versions for generated framework d
     '@modern-js/plugin-i18n': 'workspace:*',
     '@modern-js/runtime': 'workspace:*',
     '@modern-js/runtime-extensions': 'workspace:*',
+    '@modern-js/runtime-renderer-extensions': 'workspace:*',
     '@modern-js/federation-runtime': 'workspace:*',
     '@module-federation/bridge-react': '2.9.0',
     '@module-federation/modern-js-v3': '2.9.0',
@@ -242,6 +248,7 @@ test('root package json pins workspace package versions and bridge workspace glo
     '@modern-js/code-tools': packageVersion,
     '@modern-js/app-tools-extensions': packageVersion,
     '@modern-js/ultramodern-app-tools': packageVersion,
+    '@modern-js/runtime-renderer-extensions': packageVersion,
     '@modern-js/ultramodern-create': packageVersion,
     '@modern-js/bff-effect': packageVersion,
     '@modern-js/plugin-bff': packageVersion,
@@ -274,4 +281,52 @@ test('app package generation throws for unknown remote refs', () => {
         'Unknown remote vertical reference missing for shell-super-app. Available remotes: catalog.',
     },
   );
+});
+
+test('generated apps resolve their public renderer entry with isolated direct dependencies', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-renderer-direct-'));
+  try {
+    const app = path.join(root, 'apps/shell');
+    const modernScope = path.join(app, 'node_modules/@modern-js');
+    fs.mkdirSync(modernScope, { recursive: true });
+    const manifest = packageRecord(
+      createAppPackage(scope, shellApp, workspacePackageSource, false),
+    );
+    const dependencies = {
+      ...packageRecord(manifest.dependencies),
+      ...packageRecord(manifest.devDependencies),
+    };
+    const packages = {
+      '@modern-js/ultramodern-app-tools':
+        '../../solutions/ultramodern-app-tools',
+      '@modern-js/runtime-renderer-extensions':
+        '../../runtime/renderer-extensions',
+    };
+    // Link only declared app dependencies, without a hoisted root node_modules.
+    for (const [name, directory] of Object.entries(packages)) {
+      if (!Object.hasOwn(dependencies, name)) continue;
+      fs.symlinkSync(
+        path.resolve(__dirname, '..', directory),
+        path.join(modernScope, name.split('/')[1]),
+        'dir',
+      );
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=commonjs',
+        '-e',
+        `const { createRequire } = require('node:module');
+const appRequire = createRequire(process.argv[1]);
+appRequire.resolve('@modern-js/ultramodern-app-tools');
+process.stdout.write(appRequire.resolve('@modern-js/runtime-renderer-extensions'));`,
+        path.join(app, '.modern-js/main/runtime.js'),
+      ],
+      { cwd: app, env: { ...process.env, NODE_PATH: '' }, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /renderer-extensions/u);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

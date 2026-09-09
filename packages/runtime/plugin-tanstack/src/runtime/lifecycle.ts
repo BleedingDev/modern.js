@@ -1,9 +1,11 @@
 /**
- * The router runtime state helpers are owned by @modern-js/runtime (the same
+ * The router runtime state helpers are owned by @modern-js/runtime-extensions (the same
  * implementation backs the built-in react-router provider and the SSR
  * pipeline). This module only re-exports them so every router provider
  * writes to the exact same runtime-context extension slot.
  */
+
+export type { RouterLifecycleContext } from '@modern-js/runtime/context';
 export {
   applyRouterRuntimeState,
   applyRouterServerPrepareResult,
@@ -11,6 +13,5 @@ export {
   createRouterServerSnapshot,
   getRouterRuntimeState,
   getRouterServerSnapshot,
-  type RouterLifecycleContext,
   type RouterLifecyclePhase,
-} from '@modern-js/runtime/context';
+} from '@modern-js/runtime-extensions/router-state';

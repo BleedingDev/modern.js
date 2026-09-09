@@ -1,5 +1,6 @@
 // @effect-diagnostics globalConsole:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type { RuntimePluginAPI } from '@modern-js/plugin/runtime';
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import { merge } from '@modern-js/runtime-utils/merge';
 import type { RouterSubscriber } from '@modern-js/runtime-utils/router';
 import {
@@ -28,11 +29,7 @@ import {
   InternalRuntimeContext,
 } from '../../core/context';
 import type { TInternalRuntimeContext } from '../../core/context/runtime';
-import type { RouterExtendsHooks } from './hooks';
-import {
-  applyRouterRuntimeState,
-  type RouterLifecycleContext,
-} from './lifecycle';
+import type { RouterExtendsHooks, RouterLifecycleContext } from './hooks';
 import { Link as PrefetchLink } from './PrefetchLink';
 import { routerProviderRegistryHooks } from './provider';
 import { createClientRouterFromPayload } from './rsc-router';

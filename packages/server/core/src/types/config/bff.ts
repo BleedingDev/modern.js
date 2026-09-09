@@ -1,9 +1,9 @@
-import type { HttpMethodDecider } from '@modern-js/types';
 import type {
   BffCrossProjectPolicyUserConfig,
   BffEffectUserConfig,
   BffRuntimeFramework,
-} from './bffRuntime';
+} from '@modern-js/runtime-extensions/server-config';
+import type { HttpMethodDecider } from '@modern-js/types';
 
 export type {
   BffCrossProjectPolicyUserConfig,
@@ -13,7 +13,7 @@ export type {
   BffEffectOpenApiUserConfig,
   BffEffectUserConfig,
   BffRuntimeFramework,
-} from './bffRuntime';
+} from '@modern-js/runtime-extensions/server-config';
 
 export interface BffUserConfig {
   prefix?: string | string[];

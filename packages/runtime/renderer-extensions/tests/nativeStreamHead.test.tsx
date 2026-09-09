@@ -1,7 +1,8 @@
 import React from 'react';
-import { setGlobalInternalRuntimeContext } from '../../../../src/core/context';
-import { renderStreaming } from '../../../../src/core/server/stream';
-import { Helmet } from '../../../../src/exports/head';
+import { registerPlugin } from '../../plugin-runtime/src/core/plugin';
+import { renderStreaming } from '../../plugin-runtime/src/core/server/stream';
+import { Helmet } from '../../plugin-runtime/src/exports/head';
+import { rendererHeadPlugin } from '../src/node';
 
 const createRuntimeContext = () => ({
   isBrowser: false,
@@ -25,13 +26,7 @@ const createRuntimeContext = () => ({
 
 describe('streaming Helmet collection', () => {
   it('publishes only Helmet markers present in the completed shell', async () => {
-    setGlobalInternalRuntimeContext({
-      hooks: {
-        extendStreamSSR: {
-          call: () => [],
-        },
-      },
-    } as any);
+    registerPlugin([rendererHeadPlugin()]);
 
     const AbandonPrimary = (): null => {
       throw new Error('abandon primary');

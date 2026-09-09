@@ -6,7 +6,7 @@ import {
   type ServerPlugin,
 } from '@modern-js/server-core';
 import path from 'path';
-import plugin from '../src/server';
+import plugin from '../../plugin-bff/src/server';
 
 test('the Effect-first server registers every configured prefix', async () => {
   let effectPaths: string[] = [];
@@ -25,7 +25,10 @@ test('the Effect-first server registers every configured prefix', async () => {
       });
     },
   };
-  const appDirectory = path.resolve(__dirname, './fixtures/function');
+  const appDirectory = path.resolve(
+    __dirname,
+    '../../plugin-bff/tests/fixtures/function',
+  );
   const { serverContext } = await server.run({
     plugins: [compatPlugin(), plugin(), observer] as BasePlugin[],
     options: {

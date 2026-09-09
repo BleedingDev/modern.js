@@ -1,5 +1,5 @@
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import { createRouteHydrationScriptTags } from '../../../src/core/server/scriptOrder';
-import { applyRouterRuntimeState } from '../../../src/router/runtime/lifecycle';
 
 describe('route hydration script serialization', () => {
   it('quotes and escapes asset and nonce attributes', () => {

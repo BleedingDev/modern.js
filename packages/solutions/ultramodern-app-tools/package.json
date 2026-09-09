@@ -38,7 +38,8 @@
     "@modern-js/app-tools-extensions": "workspace:*",
     "@modern-js/plugin": "workspace:*",
     "@modern-js/server-core": "workspace:*",
-    "@rsbuild/core": "2.2.3"
+    "@rsbuild/core": "2.2.3",
+    "@modern-js/runtime-renderer-extensions": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/backend-federation-contracts": "workspace:*",

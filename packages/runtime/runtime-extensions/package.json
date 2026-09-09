@@ -34,15 +34,6 @@
       },
       "default": "./dist/esm-node/node.mjs"
     },
-    "./rsc-html-stream": {
-      "types": "./dist/types/rscHtmlStream.d.ts",
-      "modern:source": "./src/rscHtmlStream.ts",
-      "node": {
-        "import": "./dist/esm-node/rscHtmlStream.mjs",
-        "require": "./dist/cjs/rscHtmlStream.js"
-      },
-      "default": "./dist/esm-node/rscHtmlStream.mjs"
-    },
     "./safe-failure": {
       "types": "./dist/types/safeFailure.d.ts",
       "modern:source": "./src/safeFailure.ts",
@@ -91,6 +82,60 @@
         "require": "./dist/cjs/reactContext.js"
       },
       "default": "./dist/esm/reactContext.mjs"
+    },
+    "./context-extensions": {
+      "types": "./dist/types/contextExtensions.d.ts",
+      "modern:source": "./src/contextExtensions.ts",
+      "node": {
+        "import": "./dist/esm-node/contextExtensions.mjs",
+        "require": "./dist/cjs/contextExtensions.js"
+      },
+      "default": "./dist/esm/contextExtensions.mjs"
+    },
+    "./helmet-context": {
+      "types": "./dist/types/helmetContext.d.ts",
+      "modern:source": "./src/helmetContext.ts",
+      "node": {
+        "import": "./dist/esm-node/helmetContext.mjs",
+        "require": "./dist/cjs/helmetContext.js"
+      },
+      "default": "./dist/esm/helmetContext.mjs"
+    },
+    "./head-runtime": {
+      "types": "./dist/types/headRuntime.d.ts",
+      "modern:source": "./src/headRuntime.tsx",
+      "node": {
+        "import": "./dist/esm-node/headRuntime.mjs",
+        "require": "./dist/cjs/headRuntime.js"
+      },
+      "default": "./dist/esm/headRuntime.mjs"
+    },
+    "./context-projection": {
+      "types": "./dist/types/runtimeContextProjection.d.ts",
+      "modern:source": "./src/runtimeContextProjection.ts",
+      "node": {
+        "import": "./dist/esm-node/runtimeContextProjection.mjs",
+        "require": "./dist/cjs/runtimeContextProjection.js"
+      },
+      "default": "./dist/esm/runtimeContextProjection.mjs"
+    },
+    "./server-config": {
+      "types": "./dist/types/server-config/index.d.ts",
+      "modern:source": "./src/server-config/index.ts",
+      "node": {
+        "import": "./dist/esm-node/server-config/index.mjs",
+        "require": "./dist/cjs/server-config/index.js"
+      },
+      "default": "./dist/esm/server-config/index.mjs"
+    },
+    "./router-state": {
+      "types": "./dist/types/routerState.d.ts",
+      "modern:source": "./src/routerState.ts",
+      "node": {
+        "import": "./dist/esm-node/routerState.mjs",
+        "require": "./dist/cjs/routerState.js"
+      },
+      "default": "./dist/esm/routerState.mjs"
     }
   },
   "typesVersions": {
@@ -102,10 +147,6 @@
       "node": [
         "./dist/types/node.d.ts",
         "./src/node.ts"
-      ],
-      "rsc-html-stream": [
-        "./dist/types/rscHtmlStream.d.ts",
-        "./src/rscHtmlStream.ts"
       ],
       "safe-failure": [
         "./dist/types/safeFailure.d.ts",
@@ -126,6 +167,30 @@
       "react-context": [
         "./dist/types/reactContext.d.ts",
         "./src/reactContext.ts"
+      ],
+      "context-extensions": [
+        "./dist/types/contextExtensions.d.ts",
+        "./src/contextExtensions.ts"
+      ],
+      "helmet-context": [
+        "./dist/types/helmetContext.d.ts",
+        "./src/helmetContext.ts"
+      ],
+      "head-runtime": [
+        "./dist/types/headRuntime.d.ts",
+        "./src/headRuntime.tsx"
+      ],
+      "context-projection": [
+        "./dist/types/runtimeContextProjection.d.ts",
+        "./src/runtimeContextProjection.ts"
+      ],
+      "server-config": [
+        "./dist/types/server-config/index.d.ts",
+        "./src/server-config/index.ts"
+      ],
+      "router-state": [
+        "./dist/types/routerState.d.ts",
+        "./src/routerState.ts"
       ]
     }
   },
@@ -166,5 +231,8 @@
     "react": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "react-helmet-async": "3.0.0"
   }
 }

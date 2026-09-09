@@ -1,8 +1,18 @@
+import type { RouterFramework } from '@modern-js/runtime-extensions/router-state';
 import type {
   Params,
   RouteObject,
   RouteProps,
 } from '@modern-js/runtime-utils/router';
+
+export type {
+  BuiltInRouterFramework,
+  InternalRouterRuntimeState,
+  InternalRouterServerSnapshot,
+  RouterFramework,
+  RouterRouteMatchSnapshot,
+  RouterServerPrepareResult,
+} from '@modern-js/runtime-extensions/router-state';
 
 export type ModernRoute = {
   type: 'nested' | 'page';
@@ -28,9 +38,6 @@ export type SingleRouteConfig = RouteProps & {
    */
   component?: React.ComponentType;
 };
-
-export type BuiltInRouterFramework = 'react-router' | 'tanstack';
-export type RouterFramework = BuiltInRouterFramework | (string & {});
 
 export type RouterConfig = {
   /**
@@ -62,49 +69,8 @@ export type RouterConfig = {
 
 export type Routes = RouterConfig['routesConfig']['routes'];
 
-export interface RouterRouteMatchSnapshot {
-  routeId: string;
-  assetRouteId?: string;
-  pathname?: string;
-  params?: Record<string, string>;
-}
-
 export interface RouteManifest {
   routeAssets: RouteAssets;
-}
-
-export interface InternalRouterServerSnapshot {
-  framework?: RouterFramework;
-  basename?: string;
-  statusCode?: number;
-  errors?: Record<string, unknown>;
-  routerData?: {
-    loaderData?: Record<string, unknown>;
-    errors?: Record<string, unknown>;
-  };
-  hydrationScript?: string;
-  hydrationScripts?: string[];
-  matchedRouteIds?: string[];
-  matches?: RouterRouteMatchSnapshot[];
-}
-
-export interface InternalRouterRuntimeState {
-  framework: RouterFramework;
-  basename?: string;
-  instance?: unknown;
-  hydrationScript?: string;
-  hydrationScripts?: string[];
-  matchedRouteIds?: string[];
-  matches?: RouterRouteMatchSnapshot[];
-  serverSnapshot?: InternalRouterServerSnapshot;
-  cleanup?: () => void | Promise<void>;
-}
-
-export interface RouterServerPrepareResult {
-  state: InternalRouterRuntimeState;
-  snapshot?: InternalRouterServerSnapshot;
-  redirect?: Response;
-  cleanup?: () => void | Promise<void>;
 }
 
 export interface RouteAssets {

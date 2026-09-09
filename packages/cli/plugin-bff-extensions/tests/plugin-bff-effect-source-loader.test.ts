@@ -9,13 +9,14 @@ import {
 } from '@modern-js/bff-core';
 import { generateEffectClient } from '@modern-js/plugin-bff-extensions/client-generator';
 import { bundleEffectEntryForNode } from '@modern-js/plugin-bff-extensions/effect-source-loader';
+import apiLoader, { type APILoaderOptions } from '../../plugin-bff/src/loader';
 import {
   loadEffectBuiltModule,
   loadEffectSourceModule,
-} from '../../plugin-bff-extensions/src/effect-source-loader/loader';
-import apiLoader, { type APILoaderOptions } from '../src/loader';
+} from '../src/effect-source-loader/loader';
 
-const require = createRequire(import.meta.url);
+const pluginBffRoot = path.resolve(__dirname, '../../plugin-bff');
+const require = createRequire(path.join(pluginBffRoot, 'package.json'));
 
 const writeFile = async (filename: string, source: string) => {
   await fs.promises.mkdir(path.dirname(filename), { recursive: true });
@@ -135,12 +136,12 @@ const buildEffectWorkerRuntimeModule = async ({
   const result = await build({
     alias: {
       '@modern-js/plugin-bff/effect-edge': path.resolve(
-        __dirname,
-        '../src/runtime/effect/edge.ts',
+        pluginBffRoot,
+        'src/runtime/effect/edge.ts',
       ),
       '@modern-js/plugin-bff/effect-edge/dispatcher': path.resolve(
-        __dirname,
-        '../src/runtime/effect/edge-dispatcher.ts',
+        pluginBffRoot,
+        'src/runtime/effect/edge-dispatcher.ts',
       ),
       '@modern-js/server-runtime-extensions/backend-federation-security':
         path.resolve(
@@ -183,7 +184,7 @@ describe('Effect source graph loading', () => {
     try {
       const pluginManifest = JSON.parse(
         await fs.promises.readFile(
-          path.join(__dirname, '../package.json'),
+          path.join(pluginBffRoot, 'package.json'),
           'utf8',
         ),
       ) as {

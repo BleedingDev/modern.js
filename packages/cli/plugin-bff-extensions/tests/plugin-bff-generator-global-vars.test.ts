@@ -1,8 +1,8 @@
 import { fs } from '@modern-js/utils';
 import os from 'os';
 import path from 'path';
-import { createBffGenerator } from '../src/cli/generator';
-import { serializeServerGlobalVars } from '../src/cli/serverGlobalVars';
+import { createBffGenerator } from '../../plugin-bff/src/cli/generator';
+import { serializeServerGlobalVars } from '../../plugin-bff/src/cli/serverGlobalVars';
 
 describe('BFF compiler global variables', () => {
   it('resolves the server option chain and rejects values without an exact JSON representation', () => {

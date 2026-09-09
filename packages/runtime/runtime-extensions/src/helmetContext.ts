@@ -3,7 +3,7 @@
  * instead of an ad-hoc `_helmetContext` field on `TInternalRuntimeContext`.
  */
 import type { HelmetServerState } from 'react-helmet-async';
-import { createRuntimeContextExtension } from './extensions';
+import { createRuntimeContextExtension } from './contextExtensions';
 
 export interface HelmetContextSlot {
   helmet?: HelmetServerState | null;

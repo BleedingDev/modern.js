@@ -1,6 +1,6 @@
+import type { ServerTelemetryUserConfig } from '@modern-js/runtime-extensions/server-config';
 import type { SSRMode } from '@modern-js/types';
 import type { WatchOptions } from '@modern-js/utils';
-import type { ServerTelemetryUserConfig } from './serverTelemetry';
 
 export type {
   ServerTelemetryCanaryAutopilotStateStoreUserConfig,
@@ -14,7 +14,7 @@ export type {
   ServerTelemetrySloUserConfig,
   ServerTelemetryUserConfig,
   ServerTelemetryVictoriaMetricsOptions,
-} from './serverTelemetry';
+} from '@modern-js/runtime-extensions/server-config';
 
 type Route =
   | string

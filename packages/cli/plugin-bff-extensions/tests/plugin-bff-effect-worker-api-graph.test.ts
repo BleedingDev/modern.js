@@ -41,7 +41,10 @@ test('worker API helpers execute while browser imports remain blocked', async ()
             test: /\.ts$/,
             use: [
               {
-                loader: path.resolve(__dirname, '../dist/cjs/loader.js'),
+                loader: path.resolve(
+                  __dirname,
+                  '../../plugin-bff/dist/cjs/loader.js',
+                ),
                 options: {
                   apiDir,
                   appDir: root,

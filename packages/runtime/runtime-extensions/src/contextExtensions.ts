@@ -5,8 +5,7 @@
  * `TInternalRuntimeContext`. Instead they store state in a single internal
  * slot (a `Map` keyed by symbol) attached to the context object under a
  * symbol property, so nothing leaks into string-key enumeration
- * (`Object.keys`, `JSON.stringify`, `{ ...context }` rest patterns over
- * named keys).
+ * (`Object.keys`, `JSON.stringify`). Object spreads preserve the slot.
  *
  * `Symbol.for` is used for both the slot and the extension keys so that the
  * mechanism stays coherent even if this module is instantiated twice

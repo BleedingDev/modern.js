@@ -1,3 +1,4 @@
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import React from 'react';
 import { RenderLevel } from '../../../src/core/constants';
 import {
@@ -5,7 +6,6 @@ import {
   orderHydrationScriptChunks,
 } from '../../../src/core/server/scriptOrder';
 import { LoadableCollector } from '../../../src/core/server/string/loadable';
-import { applyRouterRuntimeState } from '../../../src/router/runtime/lifecycle';
 
 const createRuntimeContextWithMatchedRoutes = (matchedRouteIds: string[]) => {
   const runtimeContext = {} as any;

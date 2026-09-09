@@ -7,7 +7,18 @@ export type {
   RuntimePluginExtends,
 } from '../types/runtime';
 export type {
+  Collector,
+  ExtendStreamSSRFn,
+  ResolveComponentFn,
   RuntimeContextProjection,
+  SSRHeadData,
+  SSRHeadPart,
+  SSRRenderInfo,
+  SSRRenderLifecycle,
+  SSRRenderTerminal,
+  StreamSSRExtender,
+  StreamSSRInfo,
+  StringSSRCollectorsInfo,
   TransformRuntimeContextFn,
 } from '../types/runtime/hooks';
 export { initPluginAPI } from './api';

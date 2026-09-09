@@ -4,7 +4,7 @@ import {
   type RouteManifestLike,
   replaceChunkJsPlaceholder as replaceHydrationPlaceholder,
 } from '@modern-js/runtime-extensions';
-import { getRouterMatchedRouteIds } from '../../router/runtime/lifecycle';
+import { getRouterMatchedRouteIds } from '@modern-js/runtime-extensions/router-state';
 import type { TInternalRuntimeContext } from '../context';
 import { CHUNK_JS_PLACEHOLDER } from './constants';
 
