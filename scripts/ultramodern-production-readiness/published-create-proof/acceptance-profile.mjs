@@ -638,7 +638,6 @@ function snapshotAcceptanceWorkspaceSource(projectDir, env, runImpl = run) {
         '-c',
         'user.email=acceptance@ultramodern.local',
         'commit',
-        '--no-verify',
         '-m',
         'test: snapshot generated ERP-10 application source',
       ],
@@ -819,11 +818,8 @@ function createOperationalIndependenceCommit(
     [
       '-c',
       'commit.gpgsign=false',
-      '-c',
-      'core.hooksPath=/dev/null',
       'commit',
       '--no-gpg-sign',
-      '--no-verify',
       '-m',
       'test: rotate inventory operational identity',
     ],
@@ -1020,10 +1016,11 @@ async function runAcceptanceProfile({
           // The generated project is always-Zephyr by design (the zephyr-gating
           // policy forbids disabling it), and zephyr-agent requires git identity
           // and a remote origin to initialize a build — a hard requirement in CI.
-          // A real consumer project has both; the create CLI already stamps an
-          // initial commit, so the clean-room only needs to record a remote
-          // origin (never fetched — Zephyr just parses the URL) to reproduce a
-          // realistic, buildable repository. No Zephyr token is set, so nothing
+          // The create CLI initializes Git without committing before install.
+          // Set the acceptance author and remote here; the checked workspace is
+          // committed with hooks after installation, before its first build.
+          // This origin is never fetched; Zephyr only parses the URL to identify
+          // the repository. No Zephyr token is set, so nothing
           // is uploaded: this exercises "builds with Zephyr present, without a
           // Zephyr account".
           runImpl('git', ['config', 'user.name', 'UltraModern Acceptance'], {

@@ -940,6 +940,7 @@ function migrateStrictEffect(
     updateGeneratedPackageScripts(packageJson, {
       preservedArtifacts: artifactOwnership.preservedPaths,
       relativePackageFile,
+      bridgeEnabled: Boolean(migrated.bridge),
       apps: allMigratedApps,
       shellOnly,
       canRetireLegacyOxfmtCliExclusion,

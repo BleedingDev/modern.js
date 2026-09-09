@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
 import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
@@ -610,7 +611,7 @@ test('bridge mode materializes workspace packages, app dependencies, compact con
       'typecheck',
       'skills:check',
       'i18n:boundaries',
-      'api:check',
+      'api:check:files',
       'contract:check',
       'performance:readiness',
       'bridge:check',
@@ -759,6 +760,25 @@ test('bridge mode materializes workspace packages, app dependencies, compact con
       commandRecorder.read(),
       composedCheckInvocations.slice(0, 3),
     );
+
+    assert.equal(
+      runMigrateStrictEffect(['--skip-install'], {
+        workspaceRoot: workspaceDir,
+        invocationCwd: workspaceDir,
+      }),
+      0,
+    );
+    const migratedRootPackage = readJson(workspaceDir, 'package.json');
+    commandRecorder.clear();
+    assertScriptPassed(
+      runGeneratedScript(
+        workspaceDir,
+        migratedRootPackage,
+        'check',
+        commandRecorder,
+      ),
+    );
+    assert.deepEqual(commandRecorder.read(), composedCheckInvocations);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

@@ -23,6 +23,8 @@ export const EN_LOCALE = {
     step1: 'cd {projectName}',
     step2: 'pnpm install',
     step3: 'pnpm dev',
+    initialCommit:
+      'Commit the checked scaffold before starting development or CI builds. Git uses your configured identity and hooks.',
   },
   agentsCmd: {
     created: '✔ Created {file}',

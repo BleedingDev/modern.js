@@ -566,7 +566,7 @@ test('--workspace conflicts with an explicit install package source', () => {
   }
 });
 
-test('local source defaults to workspace dependencies without registry lookup', () => {
+test('local source initializes Git and leaves the first commit to the user', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
   const fakeBinDir = path.join(tmpDir, 'fake-bin');
   const hooksDir = path.join(tmpDir, 'hooks');
@@ -579,90 +579,184 @@ test('local source defaults to workspace dependencies without registry lookup', 
     path.join(hooksDir, 'pre-commit'),
     '#!/bin/sh\n: > "$ULTRAMODERN_TEST_HOOK_MARKER"\n',
   );
-  fs.writeFileSync(isolatedGitConfig, `[core]\n\thooksPath = ${hooksDir}\n`);
+  const gitConfig = `[core]\n\thooksPath = ${hooksDir}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`;
+  fs.writeFileSync(isolatedGitConfig, gitConfig);
+  const env = {
+    ...hermeticEnv,
+    GIT_CONFIG_GLOBAL: isolatedGitConfig,
+    PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
+    ULTRAMODERN_TEST_HOOK_MARKER: hookMarker,
+  };
+  const workspaceDir = path.join(tmpDir, 'offline-fallback-smoke');
+  const git = (args: string[]) =>
+    spawnSync('git', args, { cwd: workspaceDir, env, encoding: 'utf8' });
 
   try {
     const result = spawnSync(
       process.execPath,
       [builtCliPath, 'offline-fallback-smoke'],
-      {
-        cwd: tmpDir,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GIT_CONFIG_GLOBAL: isolatedGitConfig,
-          MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION: undefined,
-          PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
-          ULTRAMODERN_TEST_HOOK_MARKER: hookMarker,
-        },
-      },
+      { cwd: tmpDir, encoding: 'utf8', env },
     );
 
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stderr, '');
+    assert.equal(fs.existsSync(hookMarker), false);
     assert.equal(
-      fs.existsSync(hookMarker),
-      true,
-      'the initial scaffold commit must run configured hooks',
+      git(['symbolic-ref', '--short', 'HEAD']).stdout.trim(),
+      'main',
     );
-    const head = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
-      cwd: path.join(tmpDir, 'offline-fallback-smoke'),
-      encoding: 'utf8',
-    });
-    assert.equal(head.status, 0, head.stderr);
+    assert.notEqual(git(['rev-parse', '--verify', 'HEAD']).status, 0);
+    const staged = git(['diff', '--cached', '--name-only']);
+    assert.equal(staged.status, 0, staged.stderr);
+    assert.equal(staged.stdout, '');
+    assert.match(
+      result.stdout,
+      /pnpm install[\s\S]*pnpm check[\s\S]*git add \.[\s\S]*git commit -m "chore: initial UltraModern scaffold"[\s\S]*pnpm dev/u,
+    );
+    assert.equal(fs.readFileSync(isolatedGitConfig, 'utf8'), gitConfig);
+    const localIdentity = git(['config', '--local', '--get', 'user.name']);
+    assert.equal(
+      localIdentity.status,
+      1,
+      'generation must not set an identity',
+    );
     const ultramodernConfig = JSON.parse(
-      readGeneratedFile(
-        path.join(tmpDir, 'offline-fallback-smoke'),
-        '.modernjs/ultramodern.json',
-      ),
+      readGeneratedFile(workspaceDir, '.modernjs/ultramodern.json'),
     );
     assert.equal(ultramodernConfig.packageSource.strategy, 'workspace');
     assert.equal(
       ultramodernConfig.packageSource.modernPackageVersion,
       'workspace:*',
     );
+
+    const add = git(['add', '.']);
+    assert.equal(add.status, 0, add.stderr);
+    const commit = git(['commit', '-m', 'test: explicitly commit scaffold']);
+    assert.equal(commit.status, 0, commit.stderr);
+    assert.equal(fs.existsSync(hookMarker), true);
+    const head = git(['rev-parse', '--verify', 'HEAD']);
+    assert.equal(head.status, 0, head.stderr);
+    assert.equal(
+      git(['log', '-1', '--format=%an <%ae>']).stdout.trim(),
+      'Scaffold Test <scaffold@example.test>',
+    );
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
 
-test('a rejecting initial-commit hook fails visibly without claiming a complete repository', () => {
+test('a rejecting hook runs only when the user explicitly commits the scaffold', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
-  const fakeBinDir = path.join(tmpDir, 'fake-bin');
   const hooksDir = path.join(tmpDir, 'hooks');
+  const hookMarker = path.join(tmpDir, 'pre-commit-ran');
   const isolatedGitConfig = path.join(tmpDir, 'gitconfig');
-  fs.mkdirSync(fakeBinDir);
   fs.mkdirSync(hooksDir);
-  writeExecutable(path.join(fakeBinDir, 'npm'), '#!/bin/sh\nexit 1\n');
   writeExecutable(
     path.join(hooksDir, 'pre-commit'),
-    '#!/bin/sh\necho "initial scaffold hook rejected" >&2\nexit 19\n',
+    '#!/bin/sh\n: > "$ULTRAMODERN_TEST_HOOK_MARKER"\necho "initial scaffold hook rejected" >&2\nexit 19\n',
   );
-  fs.writeFileSync(isolatedGitConfig, `[core]\n\thooksPath = ${hooksDir}\n`);
+  fs.writeFileSync(
+    isolatedGitConfig,
+    `[core]\n\thooksPath = ${hooksDir}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`,
+  );
+  const env = {
+    ...hermeticEnv,
+    GIT_CONFIG_GLOBAL: isolatedGitConfig,
+    ULTRAMODERN_TEST_HOOK_MARKER: hookMarker,
+  };
+  const workspaceDir = path.join(tmpDir, 'rejected-initial-commit');
+  const git = (args: string[]) =>
+    spawnSync('git', args, { cwd: workspaceDir, env, encoding: 'utf8' });
 
   try {
     const result = spawnSync(
       process.execPath,
       [builtCliPath, 'rejected-initial-commit'],
-      {
-        cwd: tmpDir,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GIT_CONFIG_GLOBAL: isolatedGitConfig,
-          MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION: undefined,
-          PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
-        },
-      },
+      { cwd: tmpDir, encoding: 'utf8', env },
     );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(hookMarker), false);
+    assert.notEqual(git(['rev-parse', '--verify', 'HEAD']).status, 0);
 
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /initial scaffold hook rejected/u);
-    const head = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
-      cwd: path.join(tmpDir, 'rejected-initial-commit'),
+    const add = git(['add', '.']);
+    assert.equal(add.status, 0, add.stderr);
+    const commit = git(['commit', '-m', 'test: explicitly commit scaffold']);
+    assert.notEqual(commit.status, 0);
+    assert.match(commit.stderr, /initial scaffold hook rejected/u);
+    assert.equal(fs.existsSync(hookMarker), true);
+    assert.notEqual(git(['rev-parse', '--verify', 'HEAD']).status, 0);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('creation inside a repository preserves its HEAD and staged changes', () => {
+  const tmpDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'modern-create-parent-'),
+  );
+  const parentDir = path.join(tmpDir, 'parent');
+  const hooksDir = path.join(tmpDir, 'hooks');
+  const hookMarker = path.join(tmpDir, 'pre-commit-ran');
+  const isolatedGitConfig = path.join(tmpDir, 'gitconfig');
+  fs.mkdirSync(parentDir);
+  fs.mkdirSync(hooksDir);
+  writeExecutable(
+    path.join(hooksDir, 'pre-commit'),
+    '#!/bin/sh\n: > "$ULTRAMODERN_TEST_HOOK_MARKER"\n',
+  );
+  fs.writeFileSync(
+    isolatedGitConfig,
+    `[core]\n\thooksPath = ${hooksDir}\n[user]\n\tname = Parent Test\n\temail = parent@example.test\n[commit]\n\tgpgsign = false\n`,
+  );
+  const env = {
+    ...hermeticEnv,
+    GIT_CONFIG_GLOBAL: isolatedGitConfig,
+    ULTRAMODERN_TEST_HOOK_MARKER: hookMarker,
+  };
+  const git = (args: string[]) => {
+    const result = spawnSync('git', args, {
+      cwd: parentDir,
+      env,
       encoding: 'utf8',
     });
-    assert.notEqual(head.status, 0);
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+
+  try {
+    git(['init', '-b', 'consumer']);
+    fs.writeFileSync(path.join(parentDir, 'tracked.txt'), 'original\n');
+    git(['add', '.']);
+    git(['commit', '-m', 'test: parent baseline']);
+    fs.rmSync(hookMarker);
+    fs.writeFileSync(
+      path.join(parentDir, 'tracked.txt'),
+      'staged user change\n',
+    );
+    git(['add', 'tracked.txt']);
+    const beforeHead = git(['rev-parse', 'HEAD']);
+    const beforeIndex = git(['diff', '--cached', '--binary']);
+    const beforeConfig = fs.readFileSync(
+      path.join(parentDir, '.git/config'),
+      'utf8',
+    );
+    const result = spawnSync(
+      process.execPath,
+      [builtCliPath, 'nested-workspace'],
+      { cwd: parentDir, env, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      fs.existsSync(path.join(parentDir, 'nested-workspace/.git')),
+      false,
+    );
+    assert.equal(git(['rev-parse', 'HEAD']), beforeHead);
+    assert.equal(git(['diff', '--cached', '--binary']), beforeIndex);
+    assert.equal(
+      fs.readFileSync(path.join(parentDir, '.git/config'), 'utf8'),
+      beforeConfig,
+    );
+    assert.equal(fs.existsSync(hookMarker), false);
+    assert.equal(result.stdout.includes('git commit'), false);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

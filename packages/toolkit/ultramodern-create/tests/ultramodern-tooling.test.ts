@@ -2142,11 +2142,11 @@ declare module '*.css' {}
     );
     assert.equal(
       migratedIdentityTopology.shell.moduleFederation.remotes[0].alias,
-      undefined,
+      'catalog',
     );
     assert.equal(
       migratedIdentityTopology.shell.moduleFederation.remotes[0].manifestEnv,
-      undefined,
+      'VERTICAL_CATALOG_MF_MANIFEST',
     );
     const migratedOwnership = readJson(workspaceDir, 'topology/ownership.json');
     const migratedCatalogOwner = migratedOwnership.owners.find(

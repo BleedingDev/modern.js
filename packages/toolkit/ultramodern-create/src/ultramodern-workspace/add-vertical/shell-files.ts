@@ -72,6 +72,7 @@ export function updateRootWorkspaceScripts(
   }
   updateGeneratedPackageScripts(rootPackage, {
     relativePackageFile: 'package.json',
+    bridgeEnabled: Boolean(bridge),
     apps: [primaryShell, ...remotes, ...additionalShells],
   });
   writeJsonFile(packagePath, rootPackage as JsonValue);

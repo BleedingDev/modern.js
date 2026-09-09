@@ -549,96 +549,145 @@ test('default-off clean-room install excludes and cannot resolve RSC runtimes', 
   );
 });
 
-test('snapshots install-materialized generated source before building', async () => {
+test('snapshots installed source with real hooks before a build can use its revision', async t => {
   const { snapshotAcceptanceWorkspaceSource } = await import(
     '../published-create-proof/acceptance-profile.mjs'
   );
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ultramodern-acceptance-source-'),
-  );
-  const runImpl = (command, args, options = {}) => {
-    const result = spawnSync(command, args, {
-      cwd: options.cwd,
-      encoding: 'utf8',
-      env: createProcessEnv(options.env ?? {}),
-      stdio: options.stdio === 'inherit' ? 'ignore' : 'pipe',
+  for (const scenario of [
+    'unborn',
+    'existing',
+    'reject-pre-commit',
+    'reject-commit-msg',
+  ]) {
+    await t.test(scenario, () => {
+      const fixture = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'acceptance-source-hooks-'),
+      );
+      const root = path.join(fixture, 'workspace');
+      const hooks = path.join(fixture, 'hooks');
+      fs.mkdirSync(root);
+      fs.mkdirSync(hooks);
+      const config = path.join(fixture, 'gitconfig');
+      fs.writeFileSync(
+        config,
+        `[user]\nuseConfigOnly = true\n[core]\nhooksPath = ${JSON.stringify(hooks)}\n`,
+      );
+      const env = { GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: '1' };
+      const runImpl = (command, args, options = {}) => {
+        const result = spawnSync(command, args, {
+          cwd: options.cwd ?? root,
+          encoding: 'utf8',
+          env: createProcessEnv({ ...env, ...options.env }),
+          stdio: 'pipe',
+        });
+        if (result.status !== 0) {
+          throw new Error(
+            result.stderr || result.stdout || `${command} failed`,
+          );
+        }
+        return result.stdout?.trim() ?? '';
+      };
+      try {
+        runImpl('git', ['init', '--quiet']);
+        fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}\n');
+        let initial;
+        if (scenario === 'existing') {
+          runImpl('git', ['add', '-A']);
+          runImpl('git', [
+            '-c',
+            'commit.gpgsign=false',
+            '-c',
+            'user.name=Fixture Author',
+            '-c',
+            'user.email=fixture@example.test',
+            'commit',
+            '-m',
+            'initial',
+          ]);
+          initial = runImpl('git', ['rev-parse', 'HEAD']);
+        }
+        fs.mkdirSync(path.join(root, 'verticals/catalog'), { recursive: true });
+        fs.writeFileSync(
+          path.join(root, 'verticals/catalog/package.json'),
+          '{"name":"catalog"}\n',
+        );
+        fs.writeFileSync(
+          path.join(root, 'pnpm-lock.yaml'),
+          'lockfileVersion: 9\n',
+        );
+        fs.mkdirSync(path.join(root, '.codex/skills/mf'), { recursive: true });
+        fs.writeFileSync(
+          path.join(root, '.codex/skills/mf/SKILL.md'),
+          '# Installed skill\n',
+        );
+        for (const hook of ['pre-commit', 'commit-msg']) {
+          fs.writeFileSync(
+            path.join(hooks, hook),
+            `#!/bin/sh
+printf '%s\n' '${hook}' >> .git/hook-events
+test -f pnpm-lock.yaml || exit 1
+test -f .codex/skills/mf/SKILL.md || exit 1
+${scenario === `reject-${hook}` ? `echo 'fixture ${hook} rejected snapshot' >&2\nexit 1` : 'exit 0'}
+`,
+            { mode: 0o755 },
+          );
+        }
+        if (scenario.startsWith('reject-')) {
+          assert.throws(
+            () => snapshotAcceptanceWorkspaceSource(root, env, runImpl),
+            /fixture (?:pre-commit|commit-msg) rejected snapshot/u,
+          );
+          assert.throws(() =>
+            runImpl('git', ['rev-parse', '--verify', 'HEAD']),
+          );
+          assert.notEqual(runImpl('git', ['status', '--porcelain=v1']), '');
+        } else {
+          const revision = snapshotAcceptanceWorkspaceSource(
+            root,
+            env,
+            runImpl,
+          );
+          assert.match(revision, /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u);
+          assert.notEqual(revision, initial);
+          assert.equal(
+            runImpl('git', [
+              'status',
+              '--porcelain=v1',
+              '--untracked-files=all',
+            ]),
+            '',
+          );
+          assert.equal(
+            runImpl('git', ['rev-list', '--count', 'HEAD']),
+            scenario === 'existing' ? '2' : '1',
+          );
+          assert.equal(
+            runImpl('git', ['show', 'HEAD:pnpm-lock.yaml']),
+            'lockfileVersion: 9',
+          );
+          assert.equal(
+            runImpl('git', ['show', 'HEAD:.codex/skills/mf/SKILL.md']),
+            '# Installed skill',
+          );
+          // An unchanged snapshot returns the same real commit without rerunning hooks.
+          assert.equal(
+            snapshotAcceptanceWorkspaceSource(root, env, runImpl),
+            revision,
+          );
+        }
+        assert.deepEqual(
+          fs
+            .readFileSync(path.join(root, '.git/hook-events'), 'utf8')
+            .trim()
+            .split('\n'),
+          scenario === 'reject-pre-commit'
+            ? ['pre-commit']
+            : ['pre-commit', 'commit-msg'],
+        );
+      } finally {
+        fs.rmSync(fixture, { recursive: true, force: true });
+      }
     });
-    if (result.status !== 0) {
-      throw new Error(result.stderr || `${command} failed`);
-    }
-    return result.stdout?.trim() ?? '';
-  };
-
-  try {
-    runImpl('git', ['init', '--quiet'], { cwd: root });
-    fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}\n');
-    runImpl('git', ['add', 'package.json'], { cwd: root });
-    runImpl(
-      'git',
-      [
-        '-c',
-        'user.name=Fixture Author',
-        '-c',
-        'user.email=fixture@example.test',
-        'commit',
-        '--quiet',
-        '-m',
-        'initial',
-      ],
-      { cwd: root },
-    );
-    const initial = runImpl('git', ['rev-parse', 'HEAD'], { cwd: root });
-    fs.mkdirSync(path.join(root, 'verticals', 'catalog'), {
-      recursive: true,
-    });
-    fs.writeFileSync(
-      path.join(root, 'verticals', 'catalog', 'package.json'),
-      '{"name":"catalog"}\n',
-    );
-    fs.writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n');
-    fs.mkdirSync(path.join(root, '.codex', 'skills', 'mf'), {
-      recursive: true,
-    });
-    fs.writeFileSync(
-      path.join(root, '.codex', 'skills', 'mf', 'SKILL.md'),
-      '# Pinned Module Federation skill\n',
-    );
-
-    const revision = snapshotAcceptanceWorkspaceSource(
-      root,
-      {
-        GIT_CONFIG_COUNT: '1',
-        GIT_CONFIG_GLOBAL: '/dev/null',
-        GIT_CONFIG_KEY_0: 'user.useConfigOnly',
-        GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_VALUE_0: 'true',
-      },
-      runImpl,
-    );
-
-    assert.match(revision, /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u);
-    assert.notEqual(revision, initial);
-    assert.equal(
-      runImpl('git', ['status', '--porcelain=v1', '--untracked-files=all'], {
-        cwd: root,
-      }),
-      '',
-    );
-    assert.equal(
-      runImpl('git', ['show', '--format=', '--name-only', 'HEAD'], {
-        cwd: root,
-      }).includes('verticals/catalog/package.json'),
-      true,
-    );
-    assert.equal(
-      runImpl('git', ['show', '--format=', '--name-only', 'HEAD'], {
-        cwd: root,
-      }).includes('.codex/skills/mf/SKILL.md'),
-      true,
-      'the promotable source identity must include first-install materialization',
-    );
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
   }
 });
 

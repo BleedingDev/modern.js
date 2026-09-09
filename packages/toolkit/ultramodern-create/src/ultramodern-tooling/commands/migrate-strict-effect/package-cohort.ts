@@ -458,6 +458,7 @@ export function updateGeneratedPackageScripts(
     relativePackageFile?: string;
     apps?: WorkspaceApp[];
     shellOnly?: boolean;
+    bridgeEnabled?: boolean;
     canRetireLegacyOxfmtCliExclusion?: boolean;
     onPreserveScript?: (scriptName: string) => void;
     preservedArtifacts?: ReadonlySet<string>;
@@ -532,6 +533,9 @@ export function updateGeneratedPackageScripts(
         apps.filter(candidate => candidate.kind !== 'shell'),
         {
           shells: apps.filter(candidate => candidate.kind === 'shell'),
+          bridgeCheck: options.bridgeEnabled
+            ? ' && pnpm bridge:check'
+            : undefined,
         },
       )
     : app
