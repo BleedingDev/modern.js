@@ -23,16 +23,17 @@ const artifact = {
   },
 } as const;
 
-afterEach(() => rstest.unstubAllGlobals());
+const readers = {
+  buildMarker: () => 'compiled-build',
+  sourceRevision: () => 'compiled-revision',
+};
 
 it('retains generation identity when the module is evaluated without a compiler', () => {
   expect(resolveUltramodernBuildArtifact(artifact)).toEqual(artifact);
 });
 
 it('applies injected identity to every surface without mutating the artifact', () => {
-  rstest.stubGlobal('ULTRAMODERN_BUILD_MARKER', 'compiled-build');
-  rstest.stubGlobal('ULTRAMODERN_SOURCE_REVISION', 'compiled-revision');
-  const resolved = resolveUltramodernBuildArtifact(artifact);
+  const resolved = resolveUltramodernBuildArtifact(artifact, readers);
   for (const record of [
     resolved.deliveryUnit,
     resolved.surfaces.api,
@@ -48,4 +49,24 @@ it('applies injected identity to every surface without mutating the artifact', (
   expect(resolved.surfaces.api.surface).toBe('api');
   expect(resolved.surfaces.ui.surface).toBe('ui');
   expect(artifact.deliveryUnit.buildMarker).toBe('original');
+});
+
+it('falls back only for missing compiler references and preserves each supplied value', () => {
+  const result = resolveUltramodernBuildArtifact(artifact, {
+    buildMarker: readers.buildMarker,
+    sourceRevision: () => {
+      throw new ReferenceError('ULTRAMODERN_SOURCE_REVISION is not defined');
+    },
+  });
+  expect(result.deliveryUnit.buildMarker).toBe('compiled-build');
+  expect(result.deliveryUnit.sourceRevision).toBe('workspace');
+  const failure = new Error('reader failed');
+  expect(() =>
+    resolveUltramodernBuildArtifact(artifact, {
+      ...readers,
+      buildMarker: () => {
+        throw failure;
+      },
+    }),
+  ).toThrow(failure);
 });
