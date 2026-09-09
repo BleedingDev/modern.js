@@ -15,19 +15,21 @@
     "@modern-js/plugin-bff": "workspace:*",
     "@modern-js/runtime": "workspace:*",
     "@modern-js/server-runtime": "workspace:*",
-    "koa": "2.16.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "koa": "3.2.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "ts-node": "^10.9.2",
-    "tsconfig-paths": "3.15.0",
-    "zod": "^3.25.76"
+    "tsconfig-paths": "4.2.0",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@modern-js/app-tools": "workspace:*",
-    "@types/koa": "2.15.2",
-    "@types/node": "^20",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "typescript": "^5"
+    "@types/jest": "^30.0.0",
+    "@types/koa": "3.0.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "typescript": "^7.0.2"
   }
 }

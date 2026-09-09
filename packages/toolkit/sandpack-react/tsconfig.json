@@ -3,8 +3,8 @@
   "compilerOptions": {
     "declaration": false,
     "jsx": "preserve",
-    "baseUrl": "./",
-    "paths": {}
+    "paths": {},
+    "rootDir": "./src"
   },
   "include": ["src"]
 }

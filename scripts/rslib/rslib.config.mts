@@ -14,7 +14,9 @@ export default defineConfig({
         target: 'node',
       },
       dts: {
-        distPath: 'dist/types',
+        abortOnError: true,
+        bundle: false,
+        distPath: './dist/types',
       },
       autoExtension: true,
     },

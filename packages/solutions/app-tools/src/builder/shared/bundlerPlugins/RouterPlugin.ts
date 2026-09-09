@@ -1,8 +1,8 @@
-import { createHash } from 'crypto';
 import { ROUTE_MANIFEST_FILE } from '@modern-js/utils';
 import { merge, mergeWith } from '@modern-js/utils/lodash';
 import { ROUTE_MANIFEST } from '@modern-js/utils/universal/constants';
 import type { Rspack, ScriptLoading } from '@rsbuild/core';
+import { createHash } from 'crypto';
 
 const PLUGIN_NAME = 'ModernjsRoutePlugin';
 
@@ -30,6 +30,28 @@ type Options = {
 
 const generateContentHash = (content: string) => {
   return createHash('md5').update(content).digest('hex').slice(0, 8);
+};
+
+const isAutomaticPublicPath = (
+  publicPath: unknown,
+): publicPath is 'auto' | 'auto/' =>
+  publicPath === 'auto' || publicPath === 'auto/';
+
+const normalizeAutomaticHtmlAsset = (asset: string): string =>
+  asset.startsWith('auto/') ? `/${asset.slice('auto/'.length)}` : asset;
+
+export const normalizeRouterAssetPublicPath = (
+  publicPath: string | undefined,
+): string => {
+  if (!publicPath) {
+    return '';
+  }
+
+  if (isAutomaticPublicPath(publicPath)) {
+    return '/';
+  }
+
+  return publicPath.endsWith('/') ? publicPath : `${publicPath}/`;
 };
 
 export class RouterPlugin {
@@ -111,29 +133,41 @@ export class RouterPlugin {
     const { Compilation, sources } = rspack;
     const { RawSource } = sources;
 
-    const normalizePath = (path: string): string => {
-      if (!path.endsWith('/')) {
-        return `${path}/`;
-      }
-
-      return path;
-    };
-
     const chunksToHtmlName = new Map();
     const ROUTE_MANIFEST_HOLDER = `route-manifest`;
     const placeholder = `<!--<?- ${ROUTE_MANIFEST_HOLDER} ?>-->`;
 
     compiler.hooks.thisCompilation.tap(PLUGIN_NAME, compilation => {
-      this.HtmlBundlerPlugin.getCompilationHooks(
-        compilation,
-      ).beforeEmit.tapAsync('RouterManifestPlugin', (data, callback) => {
-        const { outputName } = data;
-        const { chunks } = data.plugin.options!;
-        chunksToHtmlName.set(chunks, outputName);
+      const htmlPluginHooks =
+        this.HtmlBundlerPlugin.getCompilationHooks(compilation);
+      htmlPluginHooks.beforeAssetTagGeneration.tapAsync(
+        'RouterManifestPlugin',
+        (data, callback) => {
+          if (isAutomaticPublicPath(compiler.options.output.publicPath)) {
+            data.assets.publicPath = '/';
+            data.assets.js = data.assets.js.map(normalizeAutomaticHtmlAsset);
+            data.assets.css = data.assets.css.map(normalizeAutomaticHtmlAsset);
+            if (data.assets.favicon) {
+              data.assets.favicon = normalizeAutomaticHtmlAsset(
+                data.assets.favicon,
+              );
+            }
+          }
 
-        data.html = data.html.replace('</script>', `</script>${placeholder}`);
-        callback(null, data);
-      });
+          callback(null, data);
+        },
+      );
+      htmlPluginHooks.beforeEmit.tapAsync(
+        'RouterManifestPlugin',
+        (data, callback) => {
+          const { outputName } = data;
+          const { chunks } = data.plugin.options!;
+          chunksToHtmlName.set(chunks, outputName);
+
+          data.html = data.html.replace('</script>', `</script>${placeholder}`);
+          callback(null, data);
+        },
+      );
 
       compilation.hooks.processAssets.tapPromise(
         {
@@ -154,6 +188,7 @@ export class RouterPlugin {
             chunks = [],
             namedChunkGroups,
           } = stats as Rspack.StatsCompilation;
+          const assetPublicPath = normalizeRouterAssetPublicPath(publicPath);
           const routeAssets: RouteAssets = {};
 
           if (!namedChunkGroups) {
@@ -190,9 +225,7 @@ export class RouterPlugin {
               for (const chunk of child.chunks) {
                 for (const file of chunk.files) {
                   if (/\.css$/.test(file)) {
-                    cssFiles.add(
-                      publicPath ? normalizePath(publicPath) + file : file,
-                    );
+                    cssFiles.add(assetPublicPath + file);
                   }
                 }
               }
@@ -216,9 +249,7 @@ export class RouterPlugin {
 
             const assets = (chunkGroup as ChunkGroupLike).assets.map(asset => {
               const filename = asset.name;
-              return publicPath
-                ? normalizePath(publicPath) + filename
-                : filename;
+              return assetPublicPath + filename;
             });
             const directCssAssets = assets.filter(asset =>
               /\.css$/.test(asset),
@@ -316,7 +347,9 @@ export class RouterPlugin {
                 ) {
                   if (!useRsc) return undefined;
                   return v.map(item => {
-                    return item.replace(publicPath, '');
+                    return assetPublicPath
+                      ? item.replace(assetPublicPath, '')
+                      : item;
                   });
                 }
                 return v;
@@ -369,7 +402,7 @@ export class RouterPlugin {
                     : `.${generateContentHash(injectedContent)}.js`
                 }`;
 
-                const scriptUrl = `${publicPath}${scriptPath}`;
+                const scriptUrl = `${assetPublicPath}${scriptPath}`;
 
                 const scriptLoadingAttr =
                   scriptLoading === 'defer'

@@ -1,10 +1,19 @@
-import path from 'path';
 import type { RsbuildPlugin, Rspack } from '@rsbuild/core';
+import path from 'path';
 
 // Constants for RSC configuration
 const ASYNC_STORAGE_PATTERN = /universal[/\\]async_storage/;
+const SERVER_LOADER_ENTRY_PATTERN =
+  /[/\\](?:server-loader-combined|route-server-loaders)\.js$/;
+const RENDER_RSC_SOURCE_PATTERN = /render[/\\].*[/\\]server[/\\]rsc/;
+const RENDER_RSC_RSLIB_ENTRY_PATTERN =
+  /render[/\\]dist[/\\]esm[/\\]rsc(?:Worker)?\.mjs$/;
+const RENDER_RSC_RUNTIME = '@modern-js/render/rsc';
+const RENDER_RSC_WORKER_RUNTIME = '@modern-js/render/rsc-worker';
 const RSC_COMMON_LAYER = 'rsc-common';
 const ENTRY_NAME_VAR = '__MODERN_JS_ENTRY_NAME';
+const ROUTE_DATA_FILE_PATTERN =
+  /[/\\]routes[/\\](?:.*[/\\])?(?:layout|page|\$)\.(?:loader|data)\.[tj]sx?(?:\?.*)?$/;
 
 const createVirtualModule = (content: string) =>
   `data:text/javascript,${encodeURIComponent(content)}`;
@@ -56,6 +65,23 @@ export function pluginRscConfig(): RsbuildPlugin {
       api.modifyBundlerChain({
         handler: (chain, { isServer }) => {
           if (isServer) {
+            chain.resolve.alias.set(
+              `${RENDER_RSC_RUNTIME}$`,
+              RENDER_RSC_WORKER_RUNTIME,
+            );
+            let emptyModulePath: string;
+            try {
+              emptyModulePath = require.resolve('../shared/rsc/rscEmptyModule');
+            } catch {
+              emptyModulePath = path.resolve(
+                __dirname,
+                '../shared/rsc/rscEmptyModule',
+              );
+            }
+            chain.module
+              .rule('rsc-route-data-server-only')
+              .test(ROUTE_DATA_FILE_PATTERN)
+              .resolve.alias.set('server-only$', emptyModulePath);
             // Pattern 1: Match route files in routes directory (conventional routing)
             // Matches: layout.tsx, layout.ts, layout.jsx, layout.js
             //         page.tsx, page.ts, page.jsx, page.js
@@ -224,9 +250,7 @@ export async function getRscPlugins(
   environments?: { server?: string; client?: string },
 ): Promise<RsbuildPlugin[]> {
   if (enableRsc) {
-    const routesFileReg = new RegExp(
-      `${internalDirectory.replace(/[/\\]/g, '[/\\\\]')}[/\\\\][^/\\\\]*[/\\\\]routes`,
-    );
+    const rscLayerMatchers = createRscLayerMatchers(internalDirectory);
     // Dynamically import pluginRSC to avoid CJS -> ESM require() issue(e2e test cases in CI)
     // rsbuild-plugin-rsc is a pure ESM module (type: "module")
     // Static import in CJS code causes issues in e2e test environments
@@ -235,11 +259,36 @@ export async function getRscPlugins(
       pluginRSC({
         ...(environments ? { environments } : {}),
         layers: {
-          rsc: [/render[/\\].*[/\\]server[/\\]rsc/, /AppProxy/, routesFileReg],
+          ssr: SERVER_LOADER_ENTRY_PATTERN,
+          rsc: [
+            RENDER_RSC_SOURCE_PATTERN,
+            RENDER_RSC_RSLIB_ENTRY_PATTERN,
+            /AppProxy/,
+            ...rscLayerMatchers,
+          ],
         },
       }),
       pluginRscConfig(),
     ];
   }
   return [];
+}
+
+export function createRscLayerMatchers(internalDirectory: string) {
+  const escapedInternalDirectory = internalDirectory
+    .split(/[/\\]+/u)
+    .map(segment => segment.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'))
+    .join('[/\\\\]');
+  const routesFileReg = new RegExp(
+    `${escapedInternalDirectory}[/\\\\][^/\\\\]+[/\\\\]routes(?:\\.server)?\\.js(?:\\?.*)?$`,
+  );
+  const isolatedRouteDataReg = new RegExp(
+    `${escapedInternalDirectory}[/\\\\][^/\\\\]+[/\\\\]__rsc_route_data__[/\\\\][^/\\\\]+\\.js(?:\\?.*)?$`,
+  );
+  // Conventional route modules render through Flight and belong to the RSC
+  // layer. TanStack renders its route table into the HTML shell in the SSR
+  // layer, while only explicitly marked server-only data modules enter the
+  // RSC layer. Unmarked route data can also be imported by the SSR-only
+  // server-loader entry and must retain that issuer's layer.
+  return [routesFileReg, isolatedRouteDataReg];
 }

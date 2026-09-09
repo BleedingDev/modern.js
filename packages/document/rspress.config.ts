@@ -1,8 +1,8 @@
-import path from 'path';
 import { pluginSass } from '@rsbuild/plugin-sass';
-import { defineConfig } from '@rspress/core';
 import { transformerNotationHighlight } from '@shikijs/transformers';
+import path from 'path';
 import { pluginOpenGraph } from 'rsbuild-plugin-open-graph';
+import { defineUltraModernConfig as defineConfig } from './ultramodern-preset/src/index.ts';
 
 const docPath = path.join(__dirname, 'docs');
 const siteTitle = 'Modern.js';
@@ -32,34 +32,18 @@ export default defineConfig({
   search: {
     codeBlocks: true,
   },
-  // head: [
-  //   () => {
-  //     return [
-  //       `<meta property="og:image" content="${socialImage}">`,
-  //       `<meta property="og:description" content="${socialDescription}">`,
-  //       `<meta property="og:image:alt" content="${siteTitle}">`,
-  //       `<meta name="twitter:card" content="summary_large_image">`,
-  //       `<meta name="twitter:title" content="${siteTitle}">`,
-  //       `<meta name="twitter:description" content="${socialDescription}">`,
-  //       `<meta name="twitter:image" content="${socialImage}">`,
-  //       `<meta name="twitter:image:alt" content="${siteTitle}">`,
-  //     ].join('');
-  //   },
-  // ],
   themeConfig: {
     locales: [
       {
         lang: 'zh',
         title: siteTitle,
         description: socialDescription,
-        // nav: getNavbar('zh'),
         label: '简体中文',
       },
       {
         lang: 'en',
         title: siteTitle,
         description: socialDescription,
-        // nav: getNavbar('en'),
         label: 'English',
       },
     ],

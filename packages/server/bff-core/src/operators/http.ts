@@ -76,7 +76,7 @@ export const Data = <Schema extends z.ZodType>(
 
       helper.inputs = {
         ...helper.inputs,
-        data: await validateInput(schema, data),
+        data: await validateInput(schema, data as z.input<Schema>),
       };
       return next();
     },
@@ -105,7 +105,7 @@ export const Query = <Schema extends z.ZodType>(
 
       helper.inputs = {
         ...helper.inputs,
-        query: await validateInput(schema, query),
+        query: await validateInput(schema, query as z.input<Schema>),
       };
       return next();
     },
@@ -134,7 +134,7 @@ export const Params = <Schema extends z.ZodType>(
 
       helper.inputs = {
         ...helper.inputs,
-        params: await validateInput(schema, params),
+        params: await validateInput(schema, params as z.input<Schema>),
       };
       return next();
     },
@@ -163,7 +163,7 @@ export const Headers = <Schema extends z.ZodType>(
 
       helper.inputs = {
         ...helper.inputs,
-        headers: await validateInput(schema, headers),
+        headers: await validateInput(schema, headers as z.input<Schema>),
       };
       return next();
     },
@@ -219,7 +219,7 @@ export const Upload = <Schema extends z.ZodType>(
   schema?: Schema,
 ): Operator<
   {
-    files: z.input<Schema>;
+    formData: z.input<Schema>;
   },
   {
     formData: z.output<Schema>;
@@ -242,12 +242,12 @@ export const Upload = <Schema extends z.ZodType>(
       }
 
       const {
-        inputs: { formData: files },
+        inputs: { formData },
       } = helper;
 
       (helper.inputs as any) = {
         ...helper.inputs,
-        files: await validateInput(schema, files),
+        formData: await validateInput(schema, formData as z.input<Schema>),
       };
       return next();
     },

@@ -22,13 +22,13 @@ import type { PluginAssetsRetryOptions } from '@rsbuild/plugin-assets-retry';
 import type { PluginCheckSyntaxOptions } from '@rsbuild/plugin-check-syntax';
 import type { PluginCssMinimizerOptions } from '@rsbuild/plugin-css-minimizer';
 import type { PluginLessOptions } from '@rsbuild/plugin-less';
+import type { PluginReactOptions } from '@rsbuild/plugin-react';
 import type { PluginRemOptions } from '@rsbuild/plugin-rem';
 import type { PluginSassOptions } from '@rsbuild/plugin-sass';
 import type { PluginSourceBuildOptions } from '@rsbuild/plugin-source-build';
 import type { SvgDefaultExport } from '@rsbuild/plugin-svgr';
 import type { PluginTypeCheckerOptions } from '@rsbuild/plugin-type-check';
 import type { Options as AutoprefixerOptions } from 'autoprefixer';
-
 export type CacheGroup = Rspack.OptimizationSplitChunksCacheGroup;
 
 export type Stats = Omit<
@@ -56,6 +56,11 @@ export type MetaOptions = {
 
 export type CreateBuilderCommonOptions = {
   frameworkConfigPath?: string;
+  /**
+   * Disable Modern's default React Compiler SWC option for consumers whose
+   * build pipeline does not support Rspack's `jsc.transform.reactCompiler`.
+   */
+  disableReactCompiler?: boolean;
   /** The root path of current project. */
   cwd: string;
   rscClientRuntimePath?: string;
@@ -175,6 +180,16 @@ export type BuilderExtraConfig = {
      * Define global variables. It can replace expressions like `process.env.FOO` in your code after compile.
      */
     globalVars?: ChainedGlobalVars;
+    /**
+     * Enable or configure the Rust-backed React Compiler transform.
+     *
+     * The transform is enabled by default through Rsbuild's SWC integration.
+     * Set this to `false` to disable it.
+     *
+     * For React 17 or 18, install `react-compiler-runtime` and set the
+     * matching target version, for example `{ target: '18' }`.
+     */
+    reactCompiler?: PluginReactOptions['reactCompiler'];
   };
   output?: {
     /**

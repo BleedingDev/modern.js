@@ -1,4 +1,26 @@
 import { isLazyCompilationSafeByDefault } from '../../src/config';
+import { createDefaultConfig } from '../../src/config/default';
+
+describe('createDefaultConfig', () => {
+  it('should leave precompress unset in core defaults', () => {
+    const config = createDefaultConfig({
+      metaName: 'modern-js',
+      internalDirAlias: '@_modern_internal',
+      internalDirectory: '/tmp/.modern',
+      internalSrcAlias: '@_modern_src',
+      srcDirectory: '/tmp/src',
+      sharedDirectory: '/tmp/shared',
+    } as any);
+
+    expect(config.output?.precompress).toBeUndefined();
+  });
+
+  it('uses config/mock as the default Mock directory', () => {
+    const config = createDefaultConfig({ metaName: 'modern' } as any);
+
+    expect(config.dev?.mockDir).toBe('./config/mock');
+  });
+});
 
 describe('isLazyCompilationSafeByDefault', () => {
   it('enables for pure CSR (no ssr / rsc / ssg)', () => {

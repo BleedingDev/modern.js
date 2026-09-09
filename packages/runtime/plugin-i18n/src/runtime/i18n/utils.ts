@@ -1,11 +1,9 @@
 import { isBrowser } from '@modern-js/runtime';
 import type { BaseBackendOptions } from '../../shared/type';
 import { mergeBackendOptions } from './backend';
-import { HttpBackendWithSave } from './backend/middleware';
-import { useI18nextBackend } from './backend/middleware';
+import { HttpBackendWithSave, useI18nextBackend } from './backend/middleware';
 import { SdkBackend } from './backend/sdk-backend';
-import { cacheUserLanguage } from './detection';
-import { mergeDetectionOptions } from './detection';
+import { cacheUserLanguage, mergeDetectionOptions } from './detection';
 import type { I18nInitOptions, I18nInstance } from './instance';
 import {
   getActualI18nextInstance,
@@ -13,7 +11,16 @@ import {
   isI18nWrapperInstance,
 } from './instance';
 
-export function assertI18nInstance(obj: any): asserts obj is I18nInstance {
+type MergedBackendOptions = NonNullable<I18nInitOptions['backend']> & {
+  _useChainedBackend?: boolean;
+  _chainedBackendConfig?: {
+    backendOptions: Array<Record<string, unknown>>;
+  };
+  backends?: unknown[];
+  backendOptions?: unknown;
+};
+
+export function assertI18nInstance(obj: unknown): asserts obj is I18nInstance {
   if (!isI18nInstance(obj)) {
     throw new Error('Object does not implement I18nInstance interface');
   }
@@ -26,8 +33,8 @@ export const buildInitOptions = async (
   finalLanguage: string,
   fallbackLanguage: string,
   languages: string[],
-  mergedDetection: any,
-  mergedBackend: any,
+  mergedDetection: I18nInitOptions['detection'],
+  mergedBackend: MergedBackendOptions | undefined,
   userInitOptions?: I18nInitOptions,
   useSuspense?: boolean,
   i18nInstance?: I18nInstance,
@@ -59,7 +66,8 @@ export const buildInitOptions = async (
     fallbackLng: fallbackLanguage,
     supportedLngs: languages,
     detection: mergedDetection,
-    initImmediate: sanitizedUserInitOptions?.initImmediate ?? true,
+    // Ensure resources are ready before first render unless user opts into async init.
+    initImmediate: sanitizedUserInitOptions?.initImmediate ?? false,
     interpolation: {
       ...(sanitizedUserInitOptions?.interpolation || {}),
       escapeValue:
@@ -85,8 +93,8 @@ export const buildInitOptions = async (
     if (isChainedBackend && mergedBackend._chainedBackendConfig) {
       // Try to get backend classes from i18nInstance.options.backend.backends first
       // This avoids importing fs-backend in browser environment
-      let HttpBackend: any;
-      let SdkBackendClass: any;
+      let HttpBackend: unknown;
+      let SdkBackendClass: unknown;
 
       if (
         i18nInstance?.options?.backend?.backends &&
@@ -149,7 +157,7 @@ export const changeI18nLanguage = async (
   i18nInstance: I18nInstance,
   newLang: string,
   options?: {
-    detectionOptions?: any;
+    detectionOptions?: I18nInitOptions['detection'];
   },
 ): Promise<void> => {
   if (!newLang || typeof newLang !== 'string') {
@@ -180,8 +188,8 @@ export const initializeI18nInstance = async (
   finalLanguage: string,
   fallbackLanguage: string,
   languages: string[],
-  mergedDetection: any,
-  mergedBackend: any,
+  mergedDetection: I18nInitOptions['detection'],
+  mergedBackend: MergedBackendOptions | undefined,
   userInitOptions?: I18nInitOptions,
   useSuspense?: boolean,
 ): Promise<void> => {
@@ -239,32 +247,10 @@ export const initializeI18nInstance = async (
       }
     }
 
-    if (mergedBackend && hasOptions(i18nInstance)) {
-      // For chained backend with cacheHitMode: 'refreshAndUpdateStore',
-      // i18next-chained-backend automatically:
-      // 1. Loads from the first backend (HTTP/FS) and displays immediately
-      // 2. Asynchronously loads from the second backend (SDK) and updates the store
-      // 3. Triggers 'loaded' event when SDK resources are loaded, which causes React to re-render
-      //
-      // Note: i18next.init() returns a Promise that resolves when the first backend loads.
-      // For chained backend, it does NOT wait for the second backend (SDK) to load.
-      // The SDK backend loads asynchronously and triggers 'loaded' event automatically.
-      const defaultNS =
-        initOptions.defaultNS || initOptions.ns || 'translation';
-      const ns = Array.isArray(defaultNS) ? defaultNS[0] : defaultNS;
-
-      let retries = 20;
-      while (retries > 0) {
-        // Get the actual i18next instance to access store property
-        const actualInstance = getActualI18nextInstance(i18nInstance);
-        const store = (actualInstance as any).store;
-        if (store?.data?.[finalLanguage]?.[ns]) {
-          break;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-        retries--;
-      }
-    }
+    // i18next.init() is the synchronization boundary for the primary backend.
+    // Chained SDK refreshes update the store through their own loaded events and
+    // must not block SSR HTML, otherwise missing/edge-only resources add fixed
+    // latency to every route render.
   }
 };
 
@@ -288,7 +274,7 @@ export const setupClonedInstance = async (
   backendEnabled: boolean,
   backend: BaseBackendOptions | undefined,
   i18nextDetector: boolean,
-  detection: any,
+  detection: I18nInitOptions['detection'],
   localePathRedirect: boolean,
   userInitOptions: I18nInitOptions | undefined,
 ): Promise<void> => {
@@ -328,6 +314,25 @@ export const setupClonedInstance = async (
       );
     }
   } else {
-    await ensureLanguageMatch(i18nInstance, finalLanguage);
+    if (!i18nInstance.isInitialized) {
+      const mergedDetection = mergeDetectionOptions(
+        i18nextDetector,
+        detection,
+        localePathRedirect,
+        userInitOptions,
+      );
+      await initializeI18nInstance(
+        i18nInstance,
+        finalLanguage,
+        fallbackLanguage,
+        languages,
+        mergedDetection,
+        undefined,
+        userInitOptions,
+        false, // SSR always uses false for useSuspense
+      );
+    } else {
+      await ensureLanguageMatch(i18nInstance, finalLanguage);
+    }
   }
 };

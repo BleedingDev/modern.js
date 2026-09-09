@@ -1,6 +1,11 @@
 import type { Context } from 'hono';
 import { createStorage } from './utils/storage';
 
-const { run, useHonoContext } = createStorage<Context>();
+const kHonoContextStorage = Symbol.for(
+  'modernjs.server-core.honoContextStorage',
+);
+
+const { run, useContext: useHonoContext } =
+  createStorage<Context>(kHonoContextStorage);
 
 export { run, useHonoContext };

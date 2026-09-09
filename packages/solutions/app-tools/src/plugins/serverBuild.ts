@@ -1,12 +1,12 @@
-import fs from 'fs';
-import path from 'path';
 import { compile } from '@modern-js/server-utils';
 import {
-  SERVER_DIR,
-  SHARED_DIR,
   getMeta,
   resolveServerTsconfig,
+  SERVER_DIR,
+  SHARED_DIR,
 } from '@modern-js/utils';
+import fs from 'fs';
+import path from 'path';
 import type { AppTools, CliPlugin } from '../types';
 
 function checkHasCache(appDir: string) {
@@ -30,7 +30,8 @@ export default (): CliPlugin<AppTools> => ({
 
   setup(api) {
     api.onAfterBuild(async () => {
-      const { appDirectory, distDirectory, metaName } = api.getAppContext();
+      const { appDirectory, distDirectory, metaName, moduleType } =
+        api.getAppContext();
       if (
         !checkHasCache(appDirectory) &&
         !checkHasConfig(appDirectory, metaName)
@@ -71,6 +72,7 @@ export default (): CliPlugin<AppTools> => ({
             sourceDirs,
             distDir,
             tsconfigPath,
+            moduleType,
           },
         );
       }

@@ -44,7 +44,6 @@ const getHostInUrl = (host: string) => {
 };
 
 export const getAddressUrls = (
-  // biome-ignore lint/style/useDefaultParameterLast: <explanation>
   protocol = 'http',
   port: number,
   host?: string,
@@ -106,11 +105,12 @@ export const prettyInstructions = (appContext: any, config: any) => {
   let message = '\n';
 
   if (isSingleEntry(entrypoints, config.source?.mainEntryName) || apiOnly) {
+    const defaultRoutePath = routes[0]?.urlPath ?? '';
     message += urls
       .map(
         ({ label, url }) =>
           `  ${chalk.bold(`> ${label.padEnd(10)}`)}${chalk.cyanBright(
-            normalizeUrl(`${url}/${routes[0].urlPath}`),
+            normalizeUrl(`${url}/${defaultRoutePath}`),
           )}\n`,
       )
       .join('');

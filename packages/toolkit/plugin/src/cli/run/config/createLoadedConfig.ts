@@ -1,7 +1,7 @@
 import {
-  fs,
   CONFIG_FILE_EXTENSIONS,
   chalk,
+  fs,
   getCommand,
   getNodeEnv,
   isDevCommand,
@@ -49,7 +49,7 @@ async function loadLocalConfig<T>(
 
 export async function createLoadedConfig<T>(
   appDirectory: string,
-  configFilePath: string,
+  configFilePath: string | false,
   otherConfig?: T,
 ): Promise<LoadedConfig<T>> {
   const configFile = getConfigFilePath(appDirectory, configFilePath);

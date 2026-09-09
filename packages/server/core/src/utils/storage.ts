@@ -1,10 +1,28 @@
 import * as ah from 'async_hooks';
 
-const createStorage = <T>() => {
-  let storage: ah.AsyncLocalStorage<any>;
+type StorageGlobals = typeof globalThis & {
+  [key: symbol]: ah.AsyncLocalStorage<unknown> | undefined;
+};
+
+const getGlobalStorage = <T>(storageKey: string | symbol) => {
+  const globalStore = globalThis as StorageGlobals;
+  const key =
+    typeof storageKey === 'string' ? Symbol.for(storageKey) : storageKey;
+  const sharedStorage = globalStore[key];
+  const storage =
+    (sharedStorage as ah.AsyncLocalStorage<T> | undefined) ??
+    new ah.AsyncLocalStorage<T>();
+  globalStore[key] = storage;
+  return storage;
+};
+
+const createStorage = <T>(storageKey?: string | symbol) => {
+  let storage: ah.AsyncLocalStorage<T>;
 
   if (typeof ah.AsyncLocalStorage !== 'undefined') {
-    storage = new ah.AsyncLocalStorage();
+    storage = storageKey
+      ? getGlobalStorage<T>(storageKey)
+      : new ah.AsyncLocalStorage<T>();
   }
 
   const run = <O>(context: T, cb: () => O | Promise<O>): Promise<O> => {
@@ -24,7 +42,7 @@ const createStorage = <T>() => {
     });
   };
 
-  const useHonoContext: () => T = () => {
+  const useContext: () => T = () => {
     if (!storage) {
       throw new Error(`Unable to use async_hook, please confirm the node version >= 12.17
         `);
@@ -39,7 +57,8 @@ const createStorage = <T>() => {
 
   return {
     run,
-    useHonoContext,
+    useContext,
+    useHonoContext: useContext,
   };
 };
 

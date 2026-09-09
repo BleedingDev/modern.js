@@ -1,9 +1,10 @@
-import path from 'path';
+// @effect-diagnostics asyncFunction:off nodeBuiltinImport:off processEnv:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type { AppTools, CliPlugin } from '@modern-js/app-tools';
 import {
   isReact18 as checkIsReact18,
   cleanRequireCache,
 } from '@modern-js/utils';
+import path from 'path';
 import { documentPlugin } from '../document/cli';
 import { routerPlugin } from '../router/cli';
 import { builderPluginAlias } from './alias';
@@ -12,8 +13,19 @@ import { ENTRY_BOOTSTRAP_FILE_NAME, ENTRY_POINT_FILE_NAME } from './constants';
 import { isRuntimeEntry } from './entry';
 import { ssrPlugin } from './ssr';
 
+export {
+  getEntrypointRoutesDir,
+  getEntrypointRoutesOwner,
+  handleFileChange,
+  handleGeneratorEntryCode,
+  handleModifyEntrypoints,
+  isRouteEntry,
+  updateNestedRoutesSpec,
+} from '../router/cli';
+export { makeLegalIdentifier } from '../router/cli/code/makeLegalIdentifier';
+export { getPathWithoutExt } from '../router/cli/code/utils';
 export { isRuntimeEntry } from './entry';
-export { ssrPlugin, routerPlugin, documentPlugin };
+export { documentPlugin, routerPlugin, ssrPlugin };
 export const runtimePlugin = (params?: {
   plugins?: CliPlugin<AppTools>[];
 }): CliPlugin<AppTools> => ({
@@ -77,14 +89,12 @@ export const runtimePlugin = (params?: {
     api.config(() => {
       const { appDirectory, metaName } = api.getAppContext();
 
-      const isReact18 = checkIsReact18(appDirectory);
-
-      process.env.IS_REACT18 = isReact18.toString();
-
       return {
         source: {
           globalVars: {
-            'process.env.IS_REACT18': process.env.IS_REACT18,
+            // The runtime itself no longer reads this, but user code may.
+            // React >=18 is required now, so it is always 'true'.
+            'process.env.IS_REACT18': 'true',
           },
           include: [
             new RegExp(
@@ -102,19 +112,6 @@ export const runtimePlugin = (params?: {
               )
               .end()
               .sideEffects(true);
-          },
-          /**
-           * Add IgnorePlugin to fix react-dom/client import error when use react17
-           */
-          rspack: (_config, { appendPlugins, rspack }) => {
-            if (!isReact18) {
-              appendPlugins([
-                new rspack.IgnorePlugin({
-                  resourceRegExp: /^react-dom\/client$/,
-                  contextRegExp: /@modern-js\/runtime/,
-                }),
-              ]);
-            }
           },
         },
       };

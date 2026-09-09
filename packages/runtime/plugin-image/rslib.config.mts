@@ -5,7 +5,7 @@ export default defineConfig({
     {
       format: 'esm',
       syntax: 'es2021',
-      dts: true,
+      dts: false,
       source: {
         entry: { runtime: 'src/runtime.ts' },
       },
@@ -13,6 +13,11 @@ export default defineConfig({
     {
       format: 'cjs',
       syntax: 'es2021',
+      dts: {
+        abortOnError: true,
+        bundle: false,
+        distPath: './dist/types',
+      },
       source: {
         entry: { index: 'src/cli.ts' },
       },

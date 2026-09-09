@@ -1,14 +1,17 @@
+// @effect-diagnostics asyncFunction:off processEnv:off
 import { renderSSRStream } from '@modern-js/render/ssr';
+import * as rendererHead from '@modern-js/runtime-extensions';
 import { storage } from '@modern-js/runtime-utils/node';
 import { ESCAPED_SHELL_STREAM_END_MARK } from '../../../common';
 import { RenderLevel } from '../../constants';
+import { createReplaceHelemt, getHelmetData } from '../helmet';
 import { enqueueFromEntries } from './deferredScript';
 import {
   type CreateReadableStreamFromElement,
-  ShellChunkStatus,
   encodeForWebStream,
   getReadableStreamFromString,
   resolveStreamingMode,
+  ShellChunkStatus,
 } from './shared';
 import { getTemplates } from './template';
 
@@ -22,8 +25,11 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       config,
       ssrConfig,
       entryName,
+      moduleFederationCssAssets,
+      rscManifest,
       rscRoot,
     } = options;
+    rendererHead.beginHeadRender(runtimeContext);
 
     const { shellBefore, shellAfter } = await getTemplates(htmlTemplate, {
       renderLevel: RenderLevel.SERVER_RENDER,
@@ -32,12 +38,14 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       request,
       config,
       entryName,
+      moduleFederationCssAssets,
     });
 
     try {
       const readableOriginal = await renderSSRStream(rootElement, {
         request,
         nonce: config.nonce,
+        rscManifest,
         rscRoot: rscRoot!,
         routes: runtimeContext.routes,
         onError(error: unknown) {
@@ -71,7 +79,14 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
         await readableOriginal.allReady;
       }
 
-      const reader = readableOriginal.getReader();
+      const reader = rendererHead
+        .createConservingWebShellStream(
+          readableOriginal,
+          runtimeContext,
+          ESCAPED_SHELL_STREAM_END_MARK,
+          options.onError,
+        )
+        .getReader();
 
       const stream = new ReadableStream({
         start(controller) {
@@ -159,14 +174,18 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
                   const afterMark = concatedChunk.slice(
                     markerIndex + ESCAPED_SHELL_STREAM_END_MARK.length,
                   );
+                  rendererHead.publishHeadRender(runtimeContext);
+                  const completedShellBefore = createReplaceHelemt(
+                    getHelmetData(runtimeContext),
+                  )(shellBefore);
 
                   shellChunkStatus = ShellChunkStatus.FINISH;
                   safeEnqueue(
                     encodeForWebStream(
-                      `${shellBefore}${beforeMark}${shellAfter}`,
+                      `${completedShellBefore}${beforeMark}${shellAfter}`,
                     ),
                   );
-                  if (afterMark) {
+                  if (afterMark.length > 0) {
                     safeEnqueue(encodeForWebStream(afterMark));
                   }
                   flushPendingScripts();
@@ -177,6 +196,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
 
               if (!isClosed) push();
             } catch (error) {
+              rendererHead.abortHeadRender(runtimeContext);
               if (!isClosed) {
                 isClosed = true;
                 try {
@@ -190,6 +210,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
           push();
         },
         cancel(reason) {
+          rendererHead.abortHeadRender(runtimeContext);
           reader.cancel(reason).catch(() => {
             // Ignore cancellation errors
           });
@@ -197,6 +218,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
       });
       return stream;
     } catch (e) {
+      rendererHead.abortHeadRender(runtimeContext);
       // Don't log error in `onShellError` callback, since it has been logged in `onError` callback
       const fallbackHtml = `${shellBefore}${shellAfter}`;
       const stream = getReadableStreamFromString(fallbackHtml);

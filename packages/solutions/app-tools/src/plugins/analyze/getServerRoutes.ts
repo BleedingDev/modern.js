@@ -1,16 +1,17 @@
-import path from 'path';
 import type { Entrypoint, ServerRoute } from '@modern-js/types';
 import {
   fs,
-  ROUTE_SPEC_FILE,
-  SERVER_BUNDLE_DIRECTORY,
-  SERVER_WORKER_BUNDLE_DIRECTORY,
   getEntryOptions,
   isPlainObject,
+  MAIN_ENTRY_NAME,
+  ROUTE_SPEC_FILE,
   removeLeadingSlash,
   removeTailSlash,
+  SERVER_BUNDLE_DIRECTORY,
+  SERVER_WORKER_BUNDLE_DIRECTORY,
   urlJoin,
 } from '@modern-js/utils';
+import path from 'path';
 import type { AppNormalizedConfig } from '../../types';
 import type { AppToolsContext } from '../../types/plugin';
 import { isMainEntry } from '../../utils/routes';
@@ -123,9 +124,7 @@ const collectHtmlRoutes = (
   const {
     source: { mainEntryName },
     html: { outputStructure },
-    output: {
-      distPath: { html: htmlPath } = {},
-    },
+    output: { distPath: { html: htmlPath } = {} },
     server: { baseUrl, routes, ssr, ssrByEntries, rsc },
     deploy,
   } = config;
@@ -267,4 +266,25 @@ export const getProdServerRoutes = (distDirectory: string) => {
       `Failed to read routes from ${routeJSON}, please check if the file exists.`,
     );
   }
+};
+
+export const getProdEntrypoints = (
+  distDirectory: string,
+  routes: ServerRoute[],
+  mainEntryName = MAIN_ENTRY_NAME,
+): Entrypoint[] => {
+  const byEntryName = new Map<string, Entrypoint>();
+  for (const route of routes) {
+    if (!route.entryName || byEntryName.has(route.entryName)) {
+      continue;
+    }
+    const builtEntry = route.bundle || route.entryPath;
+    byEntryName.set(route.entryName, {
+      entryName: route.entryName,
+      entry: path.resolve(distDirectory, builtEntry),
+      isAutoMount: true,
+      isMainEntry: route.entryName === mainEntryName,
+    });
+  }
+  return [...byEntryName.values()];
 };

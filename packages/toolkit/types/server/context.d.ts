@@ -5,7 +5,7 @@ import type {
   ServerResponse,
 } from 'http';
 import type qs from 'querystring';
-import type { SSRMode } from 'common';
+import type { SSRMode } from '../common';
 import type { Logger, Metrics, Reporter, ServerTiming } from './utils';
 
 export interface RequestPayload {
@@ -57,7 +57,7 @@ export interface ModernServerContext {
 
   resHasHandled: () => boolean;
 
-  error: (dig: string, e: Error | string = '') => void;
+  error: (dig: string, e?: Error | string) => void;
 
   setServerData: (key: string, value: any) => void;
 }
@@ -91,7 +91,12 @@ export type BaseSSRServerContext<T extends 'node' | 'worker' = 'node'> = {
   logger: Logger;
   serverTiming: ServerTiming;
   reporter?: Reporter;
-  metrics?: Metrics;
+  cacheConfig?: any;
+
+  enableUnsafeCtx?: boolean;
+
+  unsafeHeaders?: string[];
+
   nonce?: string;
   /** SSR type  */
   mode?: SSRMode;

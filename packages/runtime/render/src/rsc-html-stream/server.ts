@@ -2,6 +2,8 @@
  * forked and modified from https://github.com/devongovett/rsc-html-stream/blob/main/server.js
  * license at https://github.com/devongovett/rsc-html-stream/blob/main/LICENSE
  */
+import { injectRSCPayload as injectExtendedRSCPayload } from '@modern-js/runtime-extensions/rsc-html-stream';
+
 const encoder = new TextEncoder();
 const closingTagsPattern = /<\/body>\s*<\/html>\s*$/i;
 
@@ -13,6 +15,9 @@ export function injectRSCPayload(
     injectClosingTags?: boolean;
   },
 ): TransformStream {
+  if (injectClosingTags) {
+    return injectExtendedRSCPayload(rscStream);
+  }
   const decoder = new TextDecoder();
   let resolveFlightDataPromise: (value: void) => void;
   const flightDataPromise = new Promise<void>(
@@ -29,11 +34,16 @@ export function injectRSCPayload(
   function flushBufferedChunks(
     controller: TransformStreamDefaultController<Uint8Array>,
   ) {
+    let buf = '';
     for (const chunk of buffered) {
-      let buf = decoder.decode(chunk);
-      if (closingTagsPattern.test(buf)) {
-        buf = buf.replace(closingTagsPattern, '');
-      }
+      buf += decoder.decode(chunk, { stream: true });
+    }
+
+    if (closingTagsPattern.test(buf)) {
+      buf = buf.replace(closingTagsPattern, '');
+    }
+
+    if (buf) {
       controller.enqueue(encoder.encode(buf));
     }
 
@@ -66,6 +76,10 @@ export function injectRSCPayload(
       if (timeout) {
         clearTimeout(timeout);
         flushBufferedChunks(controller);
+      }
+      const remaining = decoder.decode();
+      if (remaining) {
+        controller.enqueue(encoder.encode(remaining));
       }
       if (injectClosingTags) {
         controller.enqueue(encoder.encode('</body></html>'));

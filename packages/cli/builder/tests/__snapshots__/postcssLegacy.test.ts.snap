@@ -8,6 +8,12 @@ exports[`lightningcss-loader > should register lightningcss-loader and disable p
     },
     "oneOf": [
       {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
+      {
         "resolve": {
           "preferRelative": true,
         },
@@ -133,6 +139,12 @@ exports[`lightningcss-loader > should register lightningcss-loader and postcss-l
       "not": "url",
     },
     "oneOf": [
+      {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
       {
         "resolve": {
           "preferRelative": true,
@@ -307,6 +319,12 @@ exports[`plugin-postcssLegacy > should allow tools.postcss to override the plugi
       "not": "url",
     },
     "oneOf": [
+      {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
       {
         "resolve": {
           "preferRelative": true,
@@ -562,6 +580,12 @@ exports[`plugin-postcssLegacy > should allow tools.postcss to override the plugi
         ],
       },
       {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
+      {
         "resourceQuery": /\\[\\?&\\]raw\\(\\?:&\\|=\\|\\$\\)/,
         "type": "asset/source",
       },
@@ -739,6 +763,12 @@ exports[`plugin-postcssLegacy > should allow tools.postcss to override the plugi
         ],
       },
       {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
+      {
         "resourceQuery": /\\[\\?&\\]raw\\(\\?:&\\|=\\|\\$\\)/,
         "type": "asset/source",
       },
@@ -809,6 +839,12 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 1
     },
     "oneOf": [
       {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
+      {
         "resolve": {
           "preferRelative": true,
         },
@@ -855,6 +891,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 1
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -914,6 +953,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 1
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -984,6 +1026,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 1
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1065,6 +1110,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 2
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1142,6 +1190,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 2
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1188,6 +1239,12 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 2
         ],
       },
       {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
+      {
         "resourceQuery": /\\[\\?&\\]raw\\(\\?:&\\|=\\|\\$\\)/,
         "type": "asset/source",
       },
@@ -1230,6 +1287,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 2
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1335,6 +1395,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 3
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1403,6 +1466,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 3
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1438,6 +1504,12 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 3
             },
           },
         ],
+      },
+      {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
       },
       {
         "resourceQuery": /\\[\\?&\\]raw\\(\\?:&\\|=\\|\\$\\)/,
@@ -1482,6 +1554,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin by browserslist 3
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1535,6 +1610,12 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
     },
     "oneOf": [
       {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
+      {
         "resolve": {
           "preferRelative": true,
         },
@@ -1585,6 +1666,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1654,6 +1738,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1734,6 +1821,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1777,6 +1867,12 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
       "not": "url",
     },
     "oneOf": [
+      {
+        "type": "asset/source",
+        "with": {
+          "type": "text",
+        },
+      },
       {
         "resolve": {
           "preferRelative": true,
@@ -1828,6 +1924,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -1878,8 +1977,8 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                         "prepare": [Function],
                       },
                       {
-                        "OnceExit": [Function],
                         "postcssPlugin": "postcss-minify-selectors",
+                        "prepare": [Function],
                       },
                       {
                         "postcssPlugin": "postcss-minify-params",
@@ -1932,10 +2031,6 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                       {
                         "OnceExit": [Function],
                         "postcssPlugin": "postcss-unique-selectors",
-                      },
-                      {
-                        "OnceExit": [Function],
-                        "postcssPlugin": "css-declaration-sorter",
                       },
                       {
                         "OnceExit": [Function],
@@ -2010,6 +2105,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -2060,8 +2158,8 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                         "prepare": [Function],
                       },
                       {
-                        "OnceExit": [Function],
                         "postcssPlugin": "postcss-minify-selectors",
+                        "prepare": [Function],
                       },
                       {
                         "postcssPlugin": "postcss-minify-params",
@@ -2114,10 +2212,6 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                       {
                         "OnceExit": [Function],
                         "postcssPlugin": "postcss-unique-selectors",
-                      },
-                      {
-                        "OnceExit": [Function],
-                        "postcssPlugin": "css-declaration-sorter",
                       },
                       {
                         "OnceExit": [Function],
@@ -2203,6 +2297,9 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                     "postcssPlugin": "postcss-media-minmax",
                   },
                   {
+                    "AtRule": {
+                      "nest": [Function],
+                    },
                     "Rule": [Function],
                     "postcssPlugin": "postcss-nesting",
                   },
@@ -2253,8 +2350,8 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                         "prepare": [Function],
                       },
                       {
-                        "OnceExit": [Function],
                         "postcssPlugin": "postcss-minify-selectors",
+                        "prepare": [Function],
                       },
                       {
                         "postcssPlugin": "postcss-minify-params",
@@ -2307,10 +2404,6 @@ exports[`plugin-postcssLegacy > should register postcss plugin correctly when in
                       {
                         "OnceExit": [Function],
                         "postcssPlugin": "postcss-unique-selectors",
-                      },
-                      {
-                        "OnceExit": [Function],
-                        "postcssPlugin": "css-declaration-sorter",
                       },
                       {
                         "OnceExit": [Function],

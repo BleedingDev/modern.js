@@ -1,18 +1,91 @@
-import type { InternalRuntimeContext } from '@modern-js/plugin';
-import type { NestedRoute, PageRoute } from '@modern-js/types';
 import type React from 'react';
-import type { RuntimeExtends } from '../plugin/types';
 import type { ServerPayload } from './serverPayload/index';
 
+export type RuntimeRoute = {
+  children?: RuntimeRoute[];
+  routes?: RuntimeRoute[];
+  [key: string]: any;
+};
+
+type RuntimeHookCaller = {
+  call: (...args: any[]) => any;
+  [key: string]: unknown;
+};
+
+type RuntimeHooks = Record<string, RuntimeHookCaller>;
+
+type RuntimePluginAPI = {
+  updateRuntimeContext?: (context: unknown) => unknown;
+  [key: string]: any;
+};
+
+type InternalRuntimeContextLike = {
+  hooks: RuntimeHooks;
+  pluginAPI?: RuntimePluginAPI;
+  [key: string]: any;
+};
+
+// Router runtime state shared between router providers (react-router,
+// @modern-js/plugin-tanstack, ...) and the SSR pipeline. Exported from the
+// `/context` subpath so router plugins can use it without pulling the
+// react-router based runtime in.
+export { DefaultNotFound } from '../../router/runtime/DefaultNotFound';
 export {
-  type TRuntimeContext,
-  type TInternalRuntimeContext,
-  RuntimeContext,
-  InternalRuntimeContext,
+  modifyRoutes,
+  onAfterCreateRouter,
+  onAfterHydrateRouter,
+  onBeforeCreateRouter,
+  onBeforeCreateRoutes,
+  onBeforeHydrateRouter,
+  type RouterExtendsHooks,
+} from '../../router/runtime/hooks';
+export {
+  applyRouterRuntimeState,
+  applyRouterServerPrepareResult,
+  cleanupRouterRuntimeState,
+  createRouterRuntimeState,
+  createRouterServerSnapshot,
+  getRouterHydrationScripts,
+  getRouterMatchedRouteIds,
+  getRouterRuntimeState,
+  getRouterServerSnapshot,
+  type RouterLifecycleContext,
+  type RouterLifecyclePhase,
+} from '../../router/runtime/lifecycle';
+export {
+  createRouterProviderRealm,
+  type RouterProviderFactory,
+  type RouterProviderPlugin,
+  type RouterProviderRealm,
+  type RouterProviderRegistration,
+  registerRouterProvider,
+  resolveRouterProvider,
+  routerProviderRegistryHooks,
+} from '../../router/runtime/provider';
+export type {
+  BuiltInRouterFramework,
+  InternalRouterRuntimeState,
+  InternalRouterServerSnapshot,
+  LoaderFunction,
+  LoaderFunctionArgs,
+  ModernRoute,
+  RouterFramework,
+  RouterRouteMatchSnapshot,
+  RouterServerPrepareResult,
+} from '../../router/runtime/types';
+export {
+  createRuntimeContextExtension,
+  type RuntimeContextExtension,
+} from './extensions';
+export {
   getInitialContext,
+  InternalRuntimeContext,
+  RuntimeContext,
+  type TInternalRuntimeContext,
+  type TRuntimeContext,
 } from './runtime';
 
-export type { ServerPayload, PayloadRoute } from './serverPayload/index';
+export type { PayloadRoute, ServerPayload } from './serverPayload/index';
 
 interface GlobalContext {
   entryName?: string;
@@ -23,7 +96,7 @@ interface GlobalContext {
   /**
    * nest router and page router config
    */
-  routes?: (NestedRoute | PageRoute)[];
+  routes?: RuntimeRoute[];
   /**
    * nest router init function
    */
@@ -37,7 +110,7 @@ interface GlobalContext {
    */
   basename?: string;
 
-  internalRuntimeContext?: InternalRuntimeContext<RuntimeExtends>;
+  internalRuntimeContext?: InternalRuntimeContextLike;
   /**
    * RSCRoot
    */
@@ -85,7 +158,7 @@ export function getGlobalRSCRoot() {
 }
 
 export function setGlobalInternalRuntimeContext(
-  context: InternalRuntimeContext<RuntimeExtends>,
+  context: InternalRuntimeContextLike,
 ) {
   globalContext.internalRuntimeContext = context;
 }
@@ -98,7 +171,7 @@ export function getGlobalApp() {
   return globalContext.App;
 }
 
-export function getGlobalRoutes(): undefined | (NestedRoute | PageRoute)[] {
+export function getGlobalRoutes(): undefined | RuntimeRoute[] {
   return globalContext.routes;
 }
 

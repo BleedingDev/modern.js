@@ -1,5 +1,5 @@
 import loadable from '@modern-js/runtime/loadable';
-import { Suspense, lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import './b.css';
 
 const C = lazy(() => import('./C'));

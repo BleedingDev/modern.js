@@ -1,6 +1,6 @@
 import dns from 'node:dns';
-import path from 'path';
 import { fs as fse } from '@modern-js/utils';
+import path from 'path';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import {
   getPort,
@@ -12,14 +12,20 @@ import {
   sleep,
 } from '../../../utils/modernTestUtils';
 
-rstest.setConfig({ testTimeout: 1000 * 60 * 2, hookTimeout: 1000 * 60 * 2 });
+rstest.setConfig({ testTimeout: 1000 * 60 * 5, hookTimeout: 1000 * 60 * 5 });
 
 const sourceAppDir = path.resolve(__dirname, '../');
+const ensureWorkspacePackages = [
+  '@modern-js/app-tools',
+  '@modern-js/plugin-bff',
+  '@modern-js/server-utils',
+];
+const buildDoneMarker = /(?:^|\n)File \((?:client|server)\)\s+/i;
 dns.setDefaultResultOrder('ipv4first');
 
-async function createIsolatedAppDir() {
+async function createIsolatedAppDir(prefix: string) {
   const appDir = await fse.mkdtemp(
-    path.join(path.dirname(sourceAppDir), '.pure-esm-index-'),
+    path.join(path.dirname(sourceAppDir), prefix),
   );
 
   await fse.copy(sourceAppDir, appDir, {
@@ -137,9 +143,11 @@ describe('pure-esm-project in dev', () => {
   let appDir: string;
 
   beforeAll(async () => {
-    appDir = await createIsolatedAppDir();
+    appDir = await createIsolatedAppDir('.pure-esm-index-');
     port = await getPort();
-    app = await launchApp(appDir, port);
+    app = await launchApp(appDir, port, {
+      ensureWorkspacePackages,
+    });
     browser = await puppeteer.launch(launchOptions as any);
     page = await browser.newPage();
     await waitForApiInfoReady(host, port);
@@ -181,10 +189,15 @@ describe('pure-esm-project in prod', () => {
   let appDir: string;
 
   beforeAll(async () => {
-    appDir = await createIsolatedAppDir();
+    appDir = await createIsolatedAppDir('.pure-esm-index-');
     port = await getPort();
 
-    await modernBuild(appDir, [], {});
+    await modernBuild(appDir, [], {
+      stdout: false,
+      stderr: false,
+      marker: buildDoneMarker,
+      ensureWorkspacePackages,
+    });
 
     app = await modernServe(appDir, port, {});
     browser = await puppeteer.launch(launchOptions as any);

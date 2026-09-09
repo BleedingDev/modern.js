@@ -3,8 +3,8 @@
   "compilerOptions": {
     "declaration": false,
     "jsx": "preserve",
-    "baseUrl": "./",
-    "isolatedModules": true
+    "isolatedModules": true,
+    "rootDir": "./src"
   },
   "include": ["src", "env.d.ts"]
 }

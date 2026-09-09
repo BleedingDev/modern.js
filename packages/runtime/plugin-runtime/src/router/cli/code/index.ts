@@ -1,4 +1,4 @@
-import path from 'path';
+// @effect-diagnostics asyncFunction:off nodeBuiltinImport:off strictBooleanExpressions:off
 import type {
   AppNormalizedConfig,
   AppTools,
@@ -14,21 +14,20 @@ import type {
   SSRMode,
 } from '@modern-js/types';
 import {
-  fs,
-  type EagerRouteComponentFilesByEntry,
   collectRouteComponentFiles,
+  type EagerRouteComponentFilesByEntry,
+  filterRoutesForServer,
+  filterRoutesLoader,
+  fs,
   getEntryOptions,
   isSSGEntry,
   isUseRsc,
   isUseSSRBundle,
   logger,
-} from '@modern-js/utils';
-import {
-  filterRoutesForServer,
-  filterRoutesLoader,
   markRoutes,
 } from '@modern-js/utils';
 import { cloneDeep } from '@modern-js/utils/lodash';
+import path from 'path';
 import { ENTRY_POINT_RUNTIME_GLOBAL_CONTEXT_FILE_NAME } from '../../../cli/constants';
 import { resolveSSRMode } from '../../../cli/ssr/mode';
 import { FILE_SYSTEM_ROUTES_FILE_NAME } from '../constants';
@@ -105,11 +104,24 @@ export const generateCode = async (
   config: AppNormalizedConfig,
   entrypoints: Entrypoint[],
   api: CLIPluginAPI<AppTools>,
+  options: {
+    hydrateRscClientRoutes?: boolean;
+    includeRouteServerLoadersInSsrEntry?: boolean;
+    isolateRouteDataInRscLayer?: boolean;
+    serverRoutesFileName?: string;
+  } = {},
 ) => {
   const { internalDirectory, srcDirectory, internalSrcAlias, packageName } =
     appContext;
+  const includeRouteServerLoadersInSsrEntry =
+    options.includeRouteServerLoadersInSsrEntry !== false || !isUseRsc(config);
 
   const hooks = api.getHooks();
+
+  const generatedRoutesByEntry: Record<
+    string,
+    (NestedRouteForCli | PageRoute)[]
+  > = {};
 
   // Collect route component files from the FINAL routes (after every
   // `modifyFileSystemRoutes` consumer ran) keyed by entry. A fresh Map per
@@ -202,6 +214,10 @@ export const generateCode = async (
           entrypoint,
           routes: markedRoutes,
         });
+        generatedRoutesByEntry[entryName] = routes as (
+          | NestedRouteForCli
+          | PageRoute
+        )[];
 
         // Collect route component files from the FINAL routes (after every
         // `modifyFileSystemRoutes` consumer ran), so the SSR builder plugin can
@@ -239,6 +255,7 @@ export const generateCode = async (
             internalDirectory,
             splitRouteChunks: config?.output?.splitRouteChunks,
             isRscClientBundle: isUseRsc(config),
+            hydrateRscClientRoutes: options.hydrateRscClientRoutes,
             srcDirectory,
             internalSrcAlias: appContext.internalSrcAlias,
           }),
@@ -257,16 +274,20 @@ export const generateCode = async (
           const filtedRoutesForServer = filterRoutesForServer(
             routes as (NestedRouteForCli | PageRoute)[],
           );
-          const routesForServerLoaderMatches = filterRoutesLoader(
-            routes as (NestedRouteForCli | PageRoute)[],
-          );
+          if (includeRouteServerLoadersInSsrEntry) {
+            const routesForServerLoaderMatches = filterRoutesLoader(
+              routes as (NestedRouteForCli | PageRoute)[],
+            );
 
-          const code = templates.routesForServer({
-            routesForServerLoaderMatches,
-          });
+            const code = templates.routesForServer({
+              routesForServerLoaderMatches,
+            });
 
-          await fs.ensureFile(routesServerFile);
-          await fs.writeFile(routesServerFile, code);
+            await fs.ensureFile(routesServerFile);
+            await fs.writeFile(routesServerFile, code);
+          } else {
+            await fs.remove(routesServerFile);
+          }
 
           const serverRoutesCode = await templates.fileSystemRoutes({
             metaName,
@@ -277,12 +298,17 @@ export const generateCode = async (
             internalDirectory,
             splitRouteChunks: config?.output?.splitRouteChunks,
             isRscClientBundle: false,
+            isolateRouteDataInRscLayer:
+              isUseRsc(config) && options.isolateRouteDataInRscLayer,
             srcDirectory,
             internalSrcAlias: appContext.internalSrcAlias,
           });
 
           await fs.outputFile(
-            path.resolve(internalDirectory, `./${entryName}/routes.server.js`),
+            path.resolve(
+              internalDirectory,
+              `./${entryName}/${options.serverRoutesFileName || 'routes.server.js'}`,
+            ),
             serverRoutesCode,
             'utf8',
           );
@@ -293,6 +319,9 @@ export const generateCode = async (
           entrypoint,
           config as AppNormalizedConfig,
           appContext,
+          {
+            includeRouteServerLoaders: includeRouteServerLoadersInSsrEntry,
+          },
         );
         if (serverLoaderCombined) {
           const serverLoaderFile = getServerCombinedModuleFile(
@@ -314,6 +343,8 @@ export const generateCode = async (
       }
     }
   }
+
+  return generatedRoutesByEntry;
 };
 
 export function generatorRegisterCode(

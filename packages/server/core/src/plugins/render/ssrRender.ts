@@ -1,15 +1,20 @@
-import type { IncomingMessage } from 'http';
 import type { Logger, Metrics, Reporter, ServerRoute } from '@modern-js/types';
 import type {
   Monitors,
+  NodeRequest,
   ClientManifest as RscClientManifest,
-  SSRManifest as RscSSRManifest,
   ServerManifest as RscServerManifest,
+  SSRManifest as RscSSRManifest,
 } from '@modern-js/types/server';
-import type { NodeRequest } from '@modern-js/types/server';
 import { MAIN_ENTRY_NAME } from '@modern-js/utils/universal/constants';
+import type { IncomingMessage } from 'http';
 import { X_MODERNJS_RENDER } from '../../constants';
-import type { CacheConfig, ServerManifest, UserConfig } from '../../types';
+import type {
+  CacheConfig,
+  Context,
+  ServerManifest,
+  UserConfig,
+} from '../../types';
 import type {
   OnError,
   OnTiming,
@@ -35,6 +40,7 @@ export interface SSRRenderOptions {
   rscSSRManifest?: RscSSRManifest;
 
   loaderContext: Map<string, unknown>;
+  serverContext?: Context;
 
   params: Params;
   /** Produce by custom server hook */
@@ -75,6 +81,8 @@ export async function ssrRender(
   const { entryName } = routeInfo;
   const loadableStats = serverManifest.loadableStats || {};
   const routeManifest = serverManifest.routeManifest || {};
+  const moduleFederationCssAssets =
+    serverManifest.moduleFederationCssAssets || [];
 
   const headers = parseHeaders(request);
 
@@ -102,6 +110,7 @@ export async function ssrRender(
       route: routeInfo,
       loadableStats,
       routeManifest,
+      moduleFederationCssAssets,
       htmlTemplate: html,
       entryName: entryName || MAIN_ENTRY_NAME,
     },

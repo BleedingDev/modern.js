@@ -7,12 +7,12 @@ import {
 import { nodeDepEmit as handleDependencies } from 'ndepe';
 import { readTemplate, resolveESMDependency } from '../utils';
 import { generateHandler } from '../utils/generator';
+import { preserveNpmAliases, readPackageIdentity } from '../utils/npmAliases';
 import type { CreatePreset } from './platform';
 
 export const createNodePreset: CreatePreset = ({
   appContext,
   modernConfig,
-  api,
 }) => {
   const { appDirectory, distDirectory, moduleType } = appContext;
   const isEsmProject = moduleType === 'module';
@@ -25,7 +25,16 @@ export const createNodePreset: CreatePreset = ({
       await fse.remove(outputDirectory);
     },
     async writeOutput() {
-      await fse.copy(distDirectory, outputDirectory);
+      await fse.copy(distDirectory, outputDirectory, {
+        filter: src => {
+          const relativePath = path
+            .relative(distDirectory, src)
+            .replace(/\\/gu, '/');
+          return (
+            relativePath !== 'release' && !relativePath.startsWith('release/')
+          );
+        },
+      });
     },
     async genEntry() {
       const template = await readTemplate(
@@ -54,6 +63,7 @@ export const createNodePreset: CreatePreset = ({
       if (!entry) {
         throw new Error('Cannot find @modern-js/prod-server');
       }
+      const prodServerPackage = await readPackageIdentity(entry);
       await handleDependencies({
         appDir: appDirectory,
         sourceDir: outputDirectory,
@@ -74,6 +84,17 @@ export const createNodePreset: CreatePreset = ({
             ),
           };
         },
+      });
+      await preserveNpmAliases({
+        appDirectory,
+        outputDirectory,
+        implicitAliases: [
+          {
+            aliasName: '@modern-js/prod-server',
+            targetName: prodServerPackage.name,
+            targetVersion: prodServerPackage.version,
+          },
+        ],
       });
       console.log(
         'Static directory:',

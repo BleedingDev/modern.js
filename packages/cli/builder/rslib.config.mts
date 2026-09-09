@@ -1,4 +1,12 @@
 import { rslibConfig } from '@modern-js/rslib';
 import { defineConfig } from '@rslib/core';
 
-export default defineConfig(rslibConfig);
+import { publicDeclarationsPlugin } from '../../../scripts/prebundle/ultramodern/public-declarations.mjs';
+
+export default defineConfig({
+  ...rslibConfig,
+  plugins: [
+    ...(rslibConfig.plugins ?? []),
+    publicDeclarationsPlugin('builder'),
+  ],
+});

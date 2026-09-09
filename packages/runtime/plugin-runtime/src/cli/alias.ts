@@ -1,6 +1,7 @@
-import path from 'path';
+// @effect-diagnostics nodeBuiltinImport:off
 import type { Entrypoint } from '@modern-js/types';
 import type { RsbuildPlugin } from '@rsbuild/core';
+import path from 'path';
 import { ENTRY_POINT_REGISTER_FILE_NAME } from './constants';
 
 export const builderPluginAlias = ({

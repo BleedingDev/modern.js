@@ -1,12 +1,12 @@
-import fs from 'fs';
-import path from 'path';
 import {
-  JS_EXTENSIONS,
   getCommand,
+  JS_EXTENSIONS,
   normalizeToPosixPath,
 } from '@modern-js/utils';
-import { transform } from '@swc/core';
 import { parse } from 'es-module-lexer';
+import { transform } from 'esbuild';
+import fs from 'fs';
+import path from 'path';
 
 export const walkDirectory = (dir: string): string[] =>
   fs.readdirSync(dir).reduce<string[]>((previous, filename) => {
@@ -43,19 +43,22 @@ export const parseModule = async ({
 
   if (JS_EXTENSIONS.some(ext => filename.endsWith(ext))) {
     const ext = path.extname(filename);
-    const isTs = ext === '.ts' || ext === '.tsx';
-    const isJsx = ext === '.jsx' || ext === '.tsx';
     const result = await transform(content, {
-      filename,
-      isModule: true,
-      module: { type: 'es6' },
-      jsc: {
-        parser: isTs
-          ? { syntax: 'typescript', tsx: isJsx, decorators: true }
-          : { syntax: 'ecmascript', jsx: isJsx, decorators: true },
-        transform: { legacyDecorator: true },
-        target: 'es2022',
-        keepClassNames: true,
+      sourcefile: filename,
+      format: 'esm',
+      loader:
+        ext === '.ts'
+          ? 'ts'
+          : ext === '.tsx'
+            ? 'tsx'
+            : ext === '.jsx'
+              ? 'jsx'
+              : 'js',
+      target: 'es2022',
+      tsconfigRaw: {
+        compilerOptions: {
+          experimentalDecorators: true,
+        },
       },
     });
     content = result.code;
@@ -71,7 +74,7 @@ export const getServerCombinedModuleFile = (
   return path.join(internalDirectory, entryName, 'server-loader-combined.js');
 };
 
-export const checkIsBuildCommands = () => {
+export const checkIsBuildCommands = (contextCommand?: string) => {
   const buildCommands = [
     'dev',
     'start',
@@ -82,7 +85,16 @@ export const checkIsBuildCommands = () => {
   ];
   const command = getCommand();
 
-  return buildCommands.includes(command);
+  if (buildCommands.includes(command)) {
+    return true;
+  }
+
+  return (
+    contextCommand === 'dev' ||
+    contextCommand === 'start' ||
+    contextCommand === 'build' ||
+    contextCommand === 'deploy'
+  );
 };
 
 export const checkIsServeCommand = () => {

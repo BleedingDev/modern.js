@@ -1,3 +1,4 @@
+// @effect-diagnostics strictBooleanExpressions:off
 /**
  * Type definitions for config-based routing
  */
@@ -17,13 +18,13 @@ import type {
 
 // Re-export types for backward compatibility
 export type {
-  RouteConfig,
-  RouteFunction,
+  DefineRoutesFunction,
   LayoutFunction,
   PageFunction,
-  WildcardFunction,
+  RouteConfig,
+  RouteFunction,
   RouteFunctions,
-  DefineRoutesFunction,
+  WildcardFunction,
 };
 
 /**

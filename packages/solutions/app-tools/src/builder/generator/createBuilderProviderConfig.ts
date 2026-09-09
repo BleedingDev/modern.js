@@ -23,6 +23,9 @@ export function createBuilderProviderConfig(
   resolveConfig: AppNormalizedConfig,
   appContext: AppToolsContext,
 ): Omit<AppNormalizedConfig, 'plugins'> {
+  const builderDevConfig = { ...resolveConfig.dev };
+  delete builderDevConfig.mockDir;
+
   const htmlConfig = { ...resolveConfig.html };
   if (!htmlConfig.template) {
     htmlConfig.template = ({ entryName }) => {
@@ -49,7 +52,7 @@ export function createBuilderProviderConfig(
       ...resolveConfig.source,
     },
     dev: {
-      ...resolveConfig.dev,
+      ...builderDevConfig,
       port: appContext.port,
     },
     server: serverConfig,
@@ -66,9 +69,12 @@ export function createBuilderProviderConfig(
         compress: {
           filter: (req: IncomingMessage) => {
             const bffPrefix = resolveConfig.bff?.prefix || DEFAULT_API_PREFIX;
+            const bffPrefixes = Array.isArray(bffPrefix)
+              ? bffPrefix
+              : [bffPrefix];
             const url = req.url;
 
-            if (url?.startsWith(bffPrefix)) {
+            if (bffPrefixes.some(prefix => url?.startsWith(prefix))) {
               return false;
             }
 

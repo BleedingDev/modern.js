@@ -1,21 +1,34 @@
-import { PassThrough, Readable, Transform } from 'stream';
+// @effect-diagnostics asyncFunction:off newPromise:off processEnv:off strictBooleanExpressions:off
+import * as rendererHead from '@modern-js/runtime-extensions/node';
 import { storage } from '@modern-js/runtime-utils/node';
 import { SSR_HYDRATION_ID_PREFIX } from '@modern-js/utils/universal/constants';
 import type { ReactElement } from 'react';
+import { PassThrough, Readable, Transform } from 'stream';
 import { ESCAPED_SHELL_STREAM_END_MARK } from '../../../common';
 import { RenderLevel } from '../../constants';
 import { getGlobalInternalRuntimeContext } from '../../context';
 import { getMonitors } from '../../context/monitors';
+import { createReplaceHelemt, getHelmetData } from '../helmet';
 import { enqueueFromEntries } from './deferredScript';
 import {
   type CreateReadableStreamFromElement,
-  ShellChunkStatus,
   getReadableStreamFromString,
   resolveStreamingMode,
+  ShellChunkStatus,
 } from './shared';
 import { getTemplates } from './template';
 
-const defaultExtender = {
+type StreamSSRExtender = {
+  init?: (options: {
+    rootElement: ReactElement;
+    forceStream2String: boolean;
+  }) => void;
+  modifyRootElement?: (rootElement: ReactElement) => ReactElement;
+  getStyleTags?: () => string;
+  processStream?: (stream: NodeJS.ReadWriteStream) => NodeJS.ReadWriteStream;
+};
+
+const defaultExtender: StreamSSRExtender = {
   modifyRootElement: (rootElement: ReactElement) => rootElement,
   getStyleTags: () => '',
   processStream: (stream: NodeJS.ReadWriteStream) => stream,
@@ -24,8 +37,14 @@ const defaultExtender = {
 export const createReadableStreamFromElement: CreateReadableStreamFromElement =
   async (request, rootElement, options) => {
     const { renderToPipeableStream } = await import('react-dom/server');
-    const { runtimeContext, htmlTemplate, config, ssrConfig, entryName } =
-      options;
+    const {
+      runtimeContext,
+      htmlTemplate,
+      config,
+      ssrConfig,
+      entryName,
+      moduleFederationCssAssets,
+    } = options;
     let shellChunkStatus = ShellChunkStatus.START;
 
     let renderLevel = RenderLevel.SERVER_RENDER;
@@ -38,7 +57,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
     const internalRuntimeContext = getGlobalInternalRuntimeContext();
     const hooks = internalRuntimeContext.hooks;
 
-    const extenders = hooks.extendStreamSSR.call() || [];
+    const extenders: StreamSSRExtender[] = hooks.extendStreamSSR.call() || [];
 
     if (extenders.length === 0) {
       extenders.push(defaultExtender);
@@ -61,6 +80,9 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
     });
 
     const chunkVec: Buffer[] = [];
+    let hasStartedPipe = false;
+    rendererHead.beginHeadRender(runtimeContext);
+    const reportError = rendererHead.createOnceErrorReporter(options.onError);
 
     return new Promise(resolve => {
       const { pipe: reactStreamingPipe } = renderToPipeableStream(
@@ -69,6 +91,11 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
           nonce: config.nonce,
           identifierPrefix: SSR_HYDRATION_ID_PREFIX,
           [onReady]() {
+            if (hasStartedPipe) {
+              return;
+            }
+            hasStartedPipe = true;
+
             let styledComponentsStyleTags = '';
             extenders.forEach(extender => {
               if (extender.getStyleTags) {
@@ -85,6 +112,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
               runtimeContext,
               config,
               entryName,
+              moduleFederationCssAssets,
               styledComponentsStyleTags,
             }).then(({ shellAfter, shellBefore }) => {
               const pendingScripts: string[] = [];
@@ -120,9 +148,15 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
                         const afterMark = concatedChunk.slice(
                           markerIndex + ESCAPED_SHELL_STREAM_END_MARK.length,
                         );
+                        rendererHead.publishHeadRender(runtimeContext);
+                        const completedShellBefore = createReplaceHelemt(
+                          getHelmetData(runtimeContext),
+                        )(shellBefore);
 
                         shellChunkStatus = ShellChunkStatus.FINISH;
-                        this.push(`${shellBefore}${beforeMark}${shellAfter}`);
+                        this.push(
+                          `${completedShellBefore}${beforeMark}${shellAfter}`,
+                        );
                         if (afterMark) {
                           this.push(afterMark);
                         }
@@ -162,9 +196,14 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
                   processedStream = extender.processStream(processedStream);
                 }
               });
+              rendererHead.pipeNodeHeadStream({
+                source: processedStream,
+                destination: body,
+                context: runtimeContext,
+                terminalMarker: ESCAPED_SHELL_STREAM_END_MARK,
+                onError: reportError,
+              });
               reactStreamingPipe(passThrough);
-
-              processedStream.pipe(body);
 
               // Inject router data scripts, enqueue until shell finished
               try {
@@ -201,6 +240,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
           },
 
           onShellError(error: unknown) {
+            rendererHead.abortHeadRender(runtimeContext);
             renderLevel = RenderLevel.CLIENT_RENDER;
             getTemplates(htmlTemplate, {
               request,
@@ -209,6 +249,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
               runtimeContext,
               entryName,
               config,
+              moduleFederationCssAssets,
             }).then(({ shellAfter, shellBefore }) => {
               const fallbackHtml = `${shellBefore}${shellAfter}`;
 
@@ -220,7 +261,7 @@ export const createReadableStreamFromElement: CreateReadableStreamFromElement =
           onError(error: unknown) {
             renderLevel = RenderLevel.CLIENT_RENDER;
 
-            options?.onError?.(error);
+            reportError(error);
           },
         },
       );

@@ -1,6 +1,6 @@
+import type { InternalPlugins } from '@modern-js/types';
 import os from 'os';
 import path from 'path';
-import type { InternalPlugins } from '@modern-js/types';
 import { fs, json5 } from '../../compiled';
 import { isDepExists } from '../is';
 import { canUsePnpm, canUseYarn } from '../package';
@@ -50,18 +50,20 @@ export function getInternalPlugins(
     ...Object.keys(internalPlugins)
       .filter(name => {
         const config = internalPlugins[name];
-        if (typeof config !== 'string' && config.forced === true) {
+        if (config && typeof config !== 'string' && config.forced === true) {
           return true;
         }
         return isDepExists(appDirectory, name);
       })
       .map(name => {
         const config = internalPlugins[name];
-        if (typeof config !== 'string') {
+        if (config && typeof config !== 'string') {
           return config.path;
-        } else {
+        }
+        if (typeof config === 'string') {
           return config;
         }
+        return name;
       }),
   ];
 }

@@ -1,5 +1,5 @@
-import path from 'path';
 import { execa, fs as fse } from '@modern-js/utils';
+import path from 'path';
 import {
   getPort,
   killApp,
@@ -8,6 +8,41 @@ import {
 } from '../../../utils/modernTestUtils';
 
 const sourceAppDir = path.resolve(__dirname, '../');
+const ensureWorkspacePackages = [
+  '@modern-js/app-tools',
+  '@modern-js/plugin-bff',
+  '@modern-js/server-utils',
+];
+
+async function createIsolatedAppDir() {
+  const appDir = await fse.mkdtemp(
+    path.join(path.dirname(sourceAppDir), '.pure-esm-deploy-'),
+  );
+
+  await fse.copy(sourceAppDir, appDir, {
+    filter: src => {
+      const relative = path.relative(sourceAppDir, src);
+      if (!relative) {
+        return true;
+      }
+      const [firstSegment] = relative.split(path.sep);
+      return ![
+        'node_modules',
+        'dist',
+        'dist-deploy',
+        '.output',
+        'tests',
+      ].includes(firstSegment);
+    },
+  });
+  await fse.ensureSymlink(
+    path.join(sourceAppDir, 'node_modules'),
+    path.join(appDir, 'node_modules'),
+    'dir',
+  );
+
+  return appDir;
+}
 
 async function checkAppRun(host: string) {
   // Page render
@@ -39,36 +74,14 @@ describe('deploy', () => {
   let appDir: string;
 
   beforeAll(async () => {
-    appDir = await fse.mkdtemp(
-      path.join(path.dirname(sourceAppDir), '.pure-esm-deploy-'),
-    );
-    await fse.copy(sourceAppDir, appDir, {
-      filter: src => {
-        const relative = path.relative(sourceAppDir, src);
-        if (!relative) {
-          return true;
-        }
-        const [firstSegment] = relative.split(path.sep);
-        return ![
-          'node_modules',
-          'dist',
-          'dist-deploy',
-          '.output',
-          'tests',
-        ].includes(firstSegment);
-      },
-    });
-    await fse.ensureSymlink(
-      path.join(sourceAppDir, 'node_modules'),
-      path.join(appDir, 'node_modules'),
-      'dir',
-    );
+    appDir = await createIsolatedAppDir();
 
     await modernBuild(appDir, [], {
       env: {
         TEST_DIST: 'dist-deploy',
         TEST_BUNDLE_SERVER: 'false',
       },
+      ensureWorkspacePackages,
     });
   });
 
@@ -92,13 +105,14 @@ describe('deploy', () => {
     const staticDirectory = path.join(outputDirectory, 'static');
     const htmlDirectory = path.join(outputDirectory, 'html');
     const apiFile = path.join(outputDirectory, 'api/lambda/index.js');
+    const apiInfoFile = path.join(outputDirectory, 'api/lambda/info.js');
     const bootstrapPath = path.join(outputDirectory, 'index.js');
 
     expect(await fse.pathExists(staticDirectory)).toBe(true);
     expect(await fse.pathExists(htmlDirectory)).toBe(true);
     expect(await fse.pathExists(apiFile)).toBe(true);
+    expect(await fse.pathExists(apiInfoFile)).toBe(true);
     expect(await fse.pathExists(bootstrapPath)).toBe(true);
-
     // check server run
     const port = await getPort();
     const app = await runContinuousTask(['.output/index.js'], undefined, {

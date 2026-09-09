@@ -1,17 +1,14 @@
 import path from 'node:path';
 import {
-  fs,
   type Alias,
+  fs,
   getAliasConfig,
-  isDepExists,
-  loadFromProject,
   mergeAlias,
-  readTsConfigByFile,
   resolveServerTsconfig,
 } from '@modern-js/utils';
 import type { ConfigChain } from '@rsbuild/core';
 
-type TsRuntimeRegisterMode = 'ts-node' | 'node-loader' | 'unsupported';
+type TsRuntimeRegisterMode = 'node-loader' | 'unsupported';
 
 interface TsRuntimeSetupOptions {
   moduleType?: string;
@@ -129,21 +126,14 @@ const createRuntimePaths = ({
   return normalizedPaths;
 };
 
-// Describes final runtime selection policy.
-// Prefer ts-node when available, otherwise use Node.js native TypeScript support.
-export const resolveTsRuntimeRegisterMode = (
-  hasTsNode: boolean,
-): TsRuntimeRegisterMode => {
-  if (hasTsNode) {
-    return 'ts-node';
-  }
-
+// Describes final runtime selection policy. UltraModern keeps the repository on
+// TS-Go/Node-native TypeScript only; classic runtime transpilers are intentionally not supported.
+export const resolveTsRuntimeRegisterMode = (): TsRuntimeRegisterMode => {
   const hasNativeTypeScriptSupport = (process as any).features?.typescript;
-  const nodeMajorVersion = Number(process.versions.node.split('.')[0]);
+  const nodeVersion = process.versions.node.split('.').map(Number);
   const supportsNativeTypeScript =
-    hasNativeTypeScriptSupport === undefined
-      ? nodeMajorVersion >= 22
-      : hasNativeTypeScriptSupport !== false;
+    (nodeVersion[0] > 26 || (nodeVersion[0] === 26 && nodeVersion[1] >= 7)) &&
+    [true, 'strip'].includes(hasNativeTypeScriptSupport);
 
   if (supportsNativeTypeScript) {
     return 'node-loader';
@@ -154,7 +144,7 @@ export const resolveTsRuntimeRegisterMode = (
 
 /**
  * Setup TypeScript runtime support.
- * Register ts-node for compilation and tsconfig-paths for path alias resolution.
+ * Register Node-native TypeScript path alias resolution.
  */
 export const setupTsRuntime = async (
   appDir: string,
@@ -162,15 +152,19 @@ export const setupTsRuntime = async (
   alias?: ConfigChain<Alias>,
   options: TsRuntimeSetupOptions = {},
 ) => {
+  if (resolveTsRuntimeRegisterMode() === 'unsupported') {
+    throw new Error(
+      `UltraModern.js requires Node.js >=26.7.0 with native TypeScript support; detected v${process.versions.node}. Legacy TypeScript runtime transpilers are unsupported.`,
+    );
+  }
   const tsconfigPath = resolveServerTsconfig(appDir, options.tsconfigPath);
   const isTsProject = await fs.pathExists(tsconfigPath);
-  const hasTsNode = isDepExists(appDir, 'ts-node');
 
   if (!isTsProject) {
     return;
   }
 
-  const registerMode = resolveTsRuntimeRegisterMode(hasTsNode);
+  const registerMode = resolveTsRuntimeRegisterMode();
 
   const aliasConfig = getAliasConfig(alias, {
     appDirectory: appDir,
@@ -183,46 +177,7 @@ export const setupTsRuntime = async (
     absoluteBaseUrl,
   });
 
-  if (registerMode === 'unsupported') {
-    return;
-  }
-
-  if (registerMode === 'ts-node') {
-    if (options.moduleType === 'module') {
-      const { registerModuleHooks } = await import('../esm/register-esm.mjs');
-      await registerModuleHooks({
-        appDir,
-        distDir,
-        baseUrl: absoluteBaseUrl || './',
-        paths: runtimePaths,
-      });
-    } else {
-      const { register } = await import('@modern-js/utils/tsconfig-paths');
-      register({
-        baseUrl: absoluteBaseUrl || './',
-        paths: runtimePaths,
-      });
-    }
-
-    // Keep CJS require hooks in module projects:
-    // some server scanners still do `require('*.ts')` first and only
-    // fallback to `import()` on ERR_REQUIRE_ESM.
-    const tsConfig = readTsConfigByFile(tsconfigPath);
-    const tsNode = await loadFromProject('ts-node', appDir);
-    const tsNodeOptions = tsConfig['ts-node'];
-    tsNode.register({
-      project: tsconfigPath,
-      scope: true,
-      // for env.d.ts, https://www.npmjs.com/package/ts-node#missing-types
-      files: true,
-      transpileOnly: true,
-      ignore: [
-        '(?:^|/)node_modules/',
-        `(?:^|/)${path.relative(appDir, distDir)}/`,
-      ],
-      ...tsNodeOptions,
-    });
-  } else if (registerMode === 'node-loader') {
+  if (registerMode === 'node-loader') {
     const { registerPathsLoader } = await import('../esm/register-esm.mjs');
     await registerPathsLoader({
       appDir,

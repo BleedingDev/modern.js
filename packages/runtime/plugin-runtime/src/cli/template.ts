@@ -1,6 +1,7 @@
-import path from 'path';
+// @effect-diagnostics nodeBuiltinImport:off processEnv:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type { RuntimePluginConfig } from '@modern-js/app-tools';
-import { JS_EXTENSIONS, findExists, formatImportPath } from '@modern-js/utils';
+import { findExists, formatImportPath, JS_EXTENSIONS } from '@modern-js/utils';
+import path from 'path';
 import {
   ENTRY_POINT_RUNTIME_GLOBAL_CONTEXT_FILE_NAME,
   ENTRY_POINT_RUNTIME_REGISTER_FILE_NAME,
@@ -344,7 +345,7 @@ export const runtimeGlobalContextForRSCClient = ({
      setServerCallback,
    } from '@${metaName}/runtime/rsc/client';`
        : ''
-   }
+}
    import { createElement, Fragment } from 'react';
    import { setGlobalContext } from '@${metaName}/runtime/context';
 
@@ -379,9 +380,9 @@ export const runtimeGlobalContextForRSCClient = ({
        : `createFromReadableStream(rscStream, {
      callServer: callServer,
    })`
-   };`
+};`
        : ''
-   }
+}
 
    const DefaultRoot = ({ children }) =>
      createElement(Fragment, null, children);
@@ -390,7 +391,7 @@ export const runtimeGlobalContextForRSCClient = ({
      customEntry
        ? 'const RSCRoot = () => createElement(RscClientRoot, { rscPayload: data });'
        : ''
-   }
+}
 
    setGlobalContext({
      App: ${customEntry ? 'RSCRoot' : 'DefaultRoot'}

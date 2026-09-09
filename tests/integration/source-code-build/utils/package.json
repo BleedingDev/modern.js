@@ -16,10 +16,10 @@
     }
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsgo"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "@typescript/native-preview": "7.0.0-dev.20260707.2"
   },
   "exports": {
     ".": {

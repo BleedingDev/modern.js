@@ -1,0 +1,16 @@
+{
+  "extends": "@modern-js/tsconfig/base",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "declaration": false,
+    "jsx": "preserve",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@api/*": ["./api/*"],
+      "@shared/*": ["./shared/*"]
+    },
+    "types": ["jest"]
+  },
+  "include": ["src", "api", "shared", "server", "modern.config.ts"]
+}

@@ -1,22 +1,32 @@
-Modern.js 提供了 `@modern-js/create` 工具来创建项目，不需要全局安装，直接使用 `npx` 按需运行即可。
+UltraModern.js 提供 BleedingDev create 包来创建 SuperApp workspace，不需要全局安装，直接使用 `pnpm dlx` 按需运行即可。
 
-你可以在已有的空目录来创建项目：
+pnpm 支持的命令契约是 scoped package specifier：
+`pnpm dlx @bleedingdev/modern-js-ultramodern-create <target>`。不要简写成
+`pnpm dlx modern-js-ultramodern-create`；npm 上没有这个未加 scope 的包。
+
+你可以在当前已有的空目录中初始化项目：
 
 ```bash
 mkdir myapp && cd myapp
-npx @modern-js/create@latest
+pnpm dlx @bleedingdev/modern-js-ultramodern-create .
 ```
 
 也可以直接用新目录创建项目：
 
 ```bash
-npx @modern-js/create@latest myapp
+pnpm dlx @bleedingdev/modern-js-ultramodern-create myapp
 ```
 
-`@modern-js/create` 会直接创建应用，不再提供问答界面：
+使用 workspace 协议依赖初始化（用于在本地 monorepo 中联调未发布的 Modern.js 包）：
 
 ```bash
-🚀 欢迎使用 Modern.js
+pnpm dlx @bleedingdev/modern-js-ultramodern-create myapp --workspace
+```
+
+BleedingDev create 包会直接创建应用，不再提供问答界面：
+
+```bash
+🚀 欢迎使用 UltraModern.js
 
 📦 正在创建项目 "myapp"...
 
@@ -45,16 +55,34 @@ npx @modern-js/create@latest myapp
 
 ```
 .
-├── biome.json
-├── modern.config.ts
+├── apps
+│   └── shell-super-app
 ├── package.json
-├── README.md
-├── src
-│   ├── modern-app-env.d.ts
-│   ├── modern.runtime.ts
-│   └── routes
-│       ├── index.css
-│       ├── layout.tsx
-│       └── page.tsx
-└── tsconfig.json
+├── packages
+│   ├── shared-contracts
+│   ├── shared-design-tokens
+│   └── shared-effect-client
+├── scripts
+├── topology
+└── verticals
 ```
+
+默认 workspace 从 shell 起步，并安装已发布的 BleedingDev 包别名：
+
+```bash
+pnpm dlx @bleedingdev/modern-js-ultramodern-create my-super-app
+```
+
+在已生成的 SuperApp workspace 根目录中，可以就地添加业务
+MicroVertical：
+
+```bash
+pnpm dlx @bleedingdev/modern-js-ultramodern-create transportation --vertical
+```
+
+`--vertical` 会修改当前 workspace：新增 vertical 包，并写入 topology、
+ownership 元数据、shell Module Federation、开发 overlays、包依赖、生成契约、
+路由归属 i18n、CSS 隔离，以及 Effect BFF/client surface。
+
+底层 `--ultramodern-package-*` 参数只保留给发布工程和本地包源测试使用。
+BleedingDev 包通过 GitHub Actions trusted publishing 发布；不要从开发机器手动发布。

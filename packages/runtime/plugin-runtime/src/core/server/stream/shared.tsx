@@ -1,30 +1,40 @@
+// @effect-diagnostics asyncFunction:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type { OnError } from '@modern-js/app-tools';
 import { time } from '@modern-js/runtime-utils/time';
 import type {
   ClientManifest as RscClientManifest,
-  SSRManifest as RscSSRManifest,
   ServerManifest as RscServerManifest,
+  SSRManifest as RscSSRManifest,
 } from '@modern-js/types/server';
-import checkIsBot from 'isbot';
+import { isbot as checkIsBot } from 'isbot';
 import type React from 'react';
 import { JSX_SHELL_STREAM_END_MARK } from '../../../common';
-import type { TRuntimeContext } from '../../context';
+import type { TInternalRuntimeContext } from '../../context';
 import { wrapRuntimeContextProvider } from '../../react/wrapper';
 import type { HandleRequestConfig } from '../requestHandler';
 import type { RenderStreaming, SSRConfig } from '../shared';
 import { SSRErrors, SSRTimings } from '../tracer';
 import { getSSRConfigByEntry } from '../utils';
 
+export type RscManifest = {
+  clientManifest?: RscClientManifest;
+  serverConsumerModuleMap?: unknown;
+  serverManifest?: RscServerManifest;
+  entryCssFiles?: Record<string, string[]>;
+};
+
 export type CreateReadableStreamFromElementOptions = {
-  runtimeContext: TRuntimeContext;
+  runtimeContext: TInternalRuntimeContext;
   config: HandleRequestConfig;
   ssrConfig: SSRConfig;
   htmlTemplate: string;
   entryName: string;
+  moduleFederationCssAssets?: string[];
 
   rscClientManifest?: RscClientManifest;
   rscSSRManifest?: RscSSRManifest;
   rscServerManifest?: RscServerManifest;
+  rscManifest?: RscManifest;
   rscRoot?: React.ReactElement;
   onShellReady?: () => void;
   onShellError?: (error: unknown) => void;
@@ -125,7 +135,7 @@ export function createRenderStreaming(
     const { runtimeContext, config, resource } = options;
     const { onError, onTiming } = options;
 
-    const { htmlTemplate, entryName } = resource;
+    const { htmlTemplate, entryName, moduleFederationCssAssets } = resource;
 
     const ssrConfig = getSSRConfigByEntry(
       entryName,
@@ -135,7 +145,9 @@ export function createRenderStreaming(
 
     const StreamServerRootWrapper = ({
       children,
-    }: { children: React.ReactNode }) => {
+    }: {
+      children: React.ReactNode;
+    }) => {
       return (
         <>
           {children}
@@ -159,9 +171,12 @@ export function createRenderStreaming(
       runtimeContext,
       ssrConfig,
       entryName,
+      moduleFederationCssAssets,
       rscClientManifest: options.rscClientManifest,
       rscSSRManifest: options.rscSSRManifest,
       rscServerManifest: options.rscServerManifest,
+      rscManifest: (options as typeof options & { rscManifest?: RscManifest })
+        .rscManifest,
       rscRoot: options.rscRoot,
       onShellReady() {
         const cost = end();

@@ -1,5 +1,7 @@
+// @effect-diagnostics processEnv:off strictBooleanExpressions:off
 import type { DeferredData } from '@modern-js/runtime-utils/browser';
 import { runRouterDataFnStr } from '../../../router/runtime/constants';
+import { shouldRedactServerError } from '../utils';
 
 export type DeferredDataLike = Pick<DeferredData, 'data' | 'pendingKeys'> & {
   data?: Record<string, unknown>;
@@ -38,13 +40,17 @@ export function toErrorInfo(error: unknown): {
   message: string;
   stack?: string;
 } {
+  if (shouldRedactServerError()) {
+    return { message: 'Unexpected Server Error' };
+  }
+
   if (error && typeof error === 'object') {
     const maybeMsg = (error as { message?: unknown }).message;
     const maybeStack = (error as { stack?: string }).stack;
     return {
       message:
         typeof maybeMsg === 'string' ? maybeMsg : String(maybeMsg ?? error),
-      stack: process.env.NODE_ENV !== 'production' ? maybeStack : undefined,
+      stack: maybeStack,
     };
   }
   return { message: String(error) };

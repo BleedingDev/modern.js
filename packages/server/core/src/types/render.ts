@@ -5,17 +5,18 @@ import type {
   Monitors,
   Reporter,
   ClientManifest as RscClientManifest,
-  SSRManifest as RscSSRManifest,
   ServerManifest as RscServerManifest,
+  SSRManifest as RscSSRManifest,
 } from '@modern-js/types';
 import type { NodeRequest } from '@modern-js/types/server';
-import type { ServerManifest } from './server';
+import type { Context, ServerManifest } from './server';
 
 // TODO: combine some field with RequestHandlerOptions
 export interface RenderOptions {
   monitors: Monitors;
 
   loaderContext?: Map<string, unknown>;
+  serverContext?: Context;
 
   /** ssr render html templates */
   templates: Record<string, string>;

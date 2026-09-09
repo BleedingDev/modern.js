@@ -1,10 +1,11 @@
-import path from 'path';
+// @effect-diagnostics nodeBuiltinImport:off strictBooleanExpressions:off
 import type {
   Entrypoint,
   NestedRouteForCli,
   PageRoute,
 } from '@modern-js/types';
 import { fs } from '@modern-js/utils';
+import path from 'path';
 import {
   FILE_SYSTEM_ROUTES_COMPONENTS_DIR,
   FILE_SYSTEM_ROUTES_DYNAMIC_REGEXP,
@@ -135,7 +136,6 @@ const normalizeNestedRoutes = (
       `import React from 'react';`,
       `import ${lastComponent} from '${route._component}'`,
     ];
-    // biome-ignore lint/style/noParameterAssign: <explanation>
     while ((route = route.parent!)) {
       const layoutComponent = route.component;
       const layoutComponentAbbr = layoutNameAbbr(route._component);

@@ -1,20 +1,21 @@
-import * as path from 'path';
+import { CssExtractRuntimePlugin } from '@modern-js/app-tools-extensions';
 import {
+  isHtmlDisabled,
   type Rspack,
   SERVICE_WORKER_ENVIRONMENT_NAME,
-  isHtmlDisabled,
 } from '@modern-js/builder';
 import { fs, isUseRsc, isUseSSRBundle, logger } from '@modern-js/utils';
 import {
+  mergeRsbuildConfig,
   type RsbuildPlugin,
   type RspackChain,
-  mergeRsbuildConfig,
 } from '@rsbuild/core';
+import * as path from 'path';
 import { getServerCombinedModuleFile } from '../../../plugins/analyze/utils';
 import type {
   AppNormalizedConfig,
-  SSGMultiEntryOptions,
   ServerUserConfig,
+  SSGMultiEntryOptions,
 } from '../../../types';
 import type { AppToolsContext } from '../../../types/plugin';
 import { HtmlAsyncChunkPlugin, RouterPlugin } from '../bundlerPlugins';
@@ -151,7 +152,7 @@ const isStreamingSSR = (userConfig: AppNormalizedConfig): boolean => {
  * apply (not stream SSR, RSC, lazy disabled, or no route components collected),
  * so the caller leaves the config untouched.
  */
-function getSSRLazyCompilation(
+export function getSSRLazyCompilation(
   current: unknown,
   normalizedConfig: AppNormalizedConfig,
   appContext: AppToolsContext,
@@ -246,6 +247,9 @@ function applyRouterPlugin(
     : enableInlineRouteManifests;
 
   if (existNestedRoutes || workerSSR) {
+    chain
+      .plugin(`${pluginName}-css-extract-runtime`)
+      .use(CssExtractRuntimePlugin);
     chain.plugin(pluginName).use(RouterPlugin, [
       {
         HtmlBundlerPlugin,
@@ -352,6 +356,10 @@ async function applySSRLoaderEntry(
         } catch (err) {
           // ignore the error
         }
+      } else if (isUseRsc(optinos.normalizedConfig)) {
+        chain
+          .entry(`${entryName}-server-loaders`)
+          .add('data:text/javascript,export%20{};');
       }
     }),
   );

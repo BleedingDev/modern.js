@@ -52,12 +52,20 @@ const Page = () => {
 
   useEffect(() => {
     apiCalls.forEach(call => {
-      call.api().catch(error => {
-        setErrorStates(prev => ({
-          ...prev,
-          [call.name]: error,
-        }));
-      });
+      call
+        .api()
+        .then(result => {
+          setErrorStates(prev => ({
+            ...prev,
+            [call.name]: result,
+          }));
+        })
+        .catch(error => {
+          setErrorStates(prev => ({
+            ...prev,
+            [call.name]: error,
+          }));
+        });
     });
   }, []);
 

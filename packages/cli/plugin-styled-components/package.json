@@ -8,7 +8,7 @@
     "modern",
     "modern.js"
   ],
-  "version": "3.5.0",
+  "version": "3.9.0",
   "types": "./src/index.ts",
   "main": "./dist/cjs/index.js",
   "export": {
@@ -30,21 +30,23 @@
     "build": "rslib build"
   },
   "dependencies": {
-    "@rsbuild/plugin-styled-components": "1.6.2",
-    "@swc/helpers": "^0.5.17"
+    "@rsbuild/plugin-styled-components": "1.7.0",
+    "@swc/helpers": "^0.5.23"
   },
   "devDependencies": {
     "@modern-js/app-tools": "workspace:*",
     "@modern-js/rslib": "workspace:*",
     "@modern-js/runtime": "workspace:*",
-    "@rslib/core": "0.23.1",
-    "@types/node": "^20",
+    "@rslib/core": "1.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.4.1",
     "@types/styled-components": "^5.1.36",
-    "styled-components": "^5.3.1",
-    "typescript": "^5.3.3"
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "styled-components": "^6.5.3",
+    "typescript": "^7.0.2"
   },
   "peerDependencies": {
-    "styled-components": "^5.3.1"
+    "styled-components": "^6.5.3"
   },
   "exports": {
     ".": {

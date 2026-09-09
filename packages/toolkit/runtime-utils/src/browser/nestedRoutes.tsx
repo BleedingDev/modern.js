@@ -6,12 +6,12 @@ import { LOADER_REPORTER_NAME } from '@modern-js/utils/universal/constants';
 import type React from 'react';
 import { type JSX, Suspense } from 'react';
 import {
+  createRoutesFromElements,
   type LoaderFunction,
   type LoaderFunctionArgs,
   Outlet,
   Route,
   type RouteProps,
-  createRoutesFromElements,
 } from 'react-router';
 import { time } from '../time';
 import { getAsyncLocalStorage } from '../universal/async_storage';
@@ -57,7 +57,6 @@ export const renderNestedRoute = (
     id: nestedRoute.id,
     loader: createLoader(nestedRoute),
     action: nestedRoute.action,
-    hasErrorBoundary: nestedRoute.hasErrorBoundary,
     shouldRevalidate: nestedRoute.shouldRevalidate,
     handle: {
       ...handle,

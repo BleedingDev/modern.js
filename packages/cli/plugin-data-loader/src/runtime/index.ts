@@ -1,14 +1,15 @@
-import { transformNestedRoutes } from '@modern-js/runtime-utils/browser';
 import type { DeferredData } from '@modern-js/runtime-utils/browser';
+import { transformNestedRoutes } from '@modern-js/runtime-utils/browser';
 import {
   createRequestContext,
   reporterCtx,
+  storage,
 } from '@modern-js/runtime-utils/node';
-import { storage } from '@modern-js/runtime-utils/node';
 import {
-  DEFERRED_SYMBOL,
   createStaticHandler,
+  DEFERRED_SYMBOL,
   isRouteErrorResponse,
+  matchRoutes,
 } from '@modern-js/runtime-utils/router';
 import { matchEntry } from '@modern-js/runtime-utils/server';
 import { time } from '@modern-js/runtime-utils/time';
@@ -72,7 +73,7 @@ export const handleRequest: ServerLoaderBundle['handleRequest'] = async ({
   onTiming,
 }): Promise<Response | void> => {
   const url = new URL(request.url);
-  const routeId = url.searchParams.get(LOADER_ID_PARAM) as string;
+  const requestedRouteId = url.searchParams.get(LOADER_ID_PARAM) as string;
 
   // Check if pathname has file extension (excluding .html)
   // Reject requests like /three/user/profile.js but allow /three/user/profile
@@ -82,7 +83,7 @@ export const handleRequest: ServerLoaderBundle['handleRequest'] = async ({
 
   const entry = matchEntry(url.pathname, serverRoutes);
   // LOADER_ID_PARAM is the indicator for CSR data loader request.
-  if (!routeId || !entry) {
+  if (!requestedRouteId || !entry) {
     return;
   }
 
@@ -101,6 +102,13 @@ export const handleRequest: ServerLoaderBundle['handleRequest'] = async ({
     },
     async () => {
       const routes = transformNestedRoutes(routesConfig);
+      const routeId = resolveLocalisedLoaderRouteId(
+        routesConfig,
+        requestedRouteId,
+        matchRoutes(routes, url.pathname, basename)?.map(
+          match => match.route.id,
+        ),
+      );
       const { queryRoute } = createStaticHandler(routes, {
         basename,
       });
@@ -198,3 +206,5 @@ export const handleRequest: ServerLoaderBundle['handleRequest'] = async ({
     },
   );
 };
+
+import { resolveLocalisedLoaderRouteId } from '@modern-js/runtime-extensions/localised-loader-identity';

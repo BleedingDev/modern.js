@@ -7,12 +7,13 @@
  * Copyright 2021 Remix Software Inc.
  * https://github.com/remix-run/remix/blob/2b5e1a72fc628d0408e27cf4d72e537762f1dc5b/LICENSE.md
  */
-import { TextEncoder } from 'util';
+
 import type {
   DeferredData,
   TrackedPromise,
 } from '@modern-js/runtime-utils/browser';
 import { serializeJson } from '@modern-js/runtime-utils/node';
+import { TextEncoder } from 'util';
 
 function isTrackedPromise(value: any): value is TrackedPromise {
   return (
@@ -21,6 +22,24 @@ function isTrackedPromise(value: any): value is TrackedPromise {
 }
 
 const DEFERRED_VALUE_PLACEHOLDER_PREFIX = '__deferred_promise:';
+
+function serializeDeferredError(error: Error) {
+  if (
+    process.env.NODE_ENV !== 'development' &&
+    process.env.NODE_ENV !== 'test'
+  ) {
+    return {
+      message: 'Unexpected Server Error',
+      stack: undefined,
+    };
+  }
+
+  return {
+    message: error.message,
+    stack: error.stack,
+  };
+}
+
 export function createDeferredReadableStream(
   deferredData: DeferredData,
   signal: AbortSignal,
@@ -87,10 +106,7 @@ function enqueueTrackedPromise(
     controller.enqueue(
       encoder.encode(
         `error:${serializeJson({
-          [settledKey]: {
-            message: _error.message,
-            stack: _error.stack,
-          },
+          [settledKey]: serializeDeferredError(_error),
         })}\n\n`,
       ),
     );

@@ -1,15 +1,11 @@
-export * from './plugin';
 export type {
-  ServerConfig,
-  CacheConfig,
-  OnFallback,
-  FallbackReason,
-  FallbackContext,
-  GetRenderHandlerOptions,
-  FileChangeEvent,
-  FallbackInput,
-  WebServerStartInput,
   APIServerStartInput,
-  ServerMiddleware,
+  CacheConfig,
+  FileChangeEvent,
+  GetRenderHandlerOptions,
   MiddlewareObj,
+  ServerConfig,
+  ServerMiddleware,
+  WebServerStartInput,
 } from './base';
+export * from './plugin';

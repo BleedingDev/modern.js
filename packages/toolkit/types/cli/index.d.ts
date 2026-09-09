@@ -1,6 +1,7 @@
 import type { Config as JestConfigTypes } from '@jest/types';
+import type * as React from 'react';
 
-export type JestConfig = JestConfigTypes.Config;
+export type JestConfig = JestConfigTypes.InitialOptions;
 
 export interface TestConfig {
   /**
@@ -62,9 +63,16 @@ export interface Route {
   path?: string;
   id?: string;
   loader?: any;
+  loaderDeps?: any;
   action?: any;
+  /**
+   * @deprecated React Router v8 no longer accepts `hasErrorBoundary` on route
+   * objects. Provide `error`/`errorElement` instead and let the router infer
+   * the boundary.
+   */
   hasErrorBoundary?: boolean;
   shouldRevalidate?: any;
+  validateSearch?: any;
   handle?: any;
   index?: boolean;
   children?: Route[] | undefined;
@@ -75,7 +83,8 @@ export interface Route {
 
 export type NestedRouteForCli = NestedRoute<string>;
 
-export interface NestedRoute<T = string | (() => JSX.Element)> extends Route {
+export interface NestedRoute<T = string | (() => React.ReactElement)>
+  extends Route {
   type: 'nested';
   origin: 'file-system' | 'config';
   // Route type to distinguish between page and layout routes

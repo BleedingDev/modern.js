@@ -12,20 +12,21 @@
   },
   "dependencies": {
     "@modern-js/runtime": "workspace:*",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@modern-js/adapter-rstest": "workspace:*",
     "@modern-js/app-tools": "workspace:*",
     "@modern-js/plugin-bff": "workspace:*",
-    "@modern-js/adapter-rstest": "workspace:*",
-    "@rstest/core": "0.9.10",
-    "@testing-library/react": "^16.3.2",
+    "@rstest/core": "0.11.12",
     "@testing-library/jest-dom": "^6.9.1",
-    "happy-dom": "^20.9.0",
-    "@types/node": "^20",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "typescript": "^5"
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "happy-dom": "^20.14.0",
+    "typescript": "^7.0.2"
   }
 }

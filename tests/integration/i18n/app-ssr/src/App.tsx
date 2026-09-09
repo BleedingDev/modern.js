@@ -1,9 +1,7 @@
 import { useModernI18n } from '@modern-js/plugin-i18n/runtime';
-import { useTranslation } from 'react-i18next';
 
 const App = () => {
-  const { changeLanguage } = useModernI18n();
-  const { t } = useTranslation();
+  const { changeLanguage, t } = useModernI18n();
   return (
     <>
       <div>

@@ -1,9 +1,9 @@
 import type { BaseBackendOptions } from '../../shared/type';
 
-export interface I18nResourceStore {
+interface I18nResourceStore {
   data?: {
     [language: string]: {
-      [namespace: string]: string | { [key: string]: any };
+      [namespace: string]: ResourceValue;
     };
   };
   addResourceBundle?: (
@@ -15,30 +15,49 @@ export interface I18nResourceStore {
   ) => void;
 }
 
-export function isI18nWrapperInstance(obj: any): boolean {
+type I18nWrapperInstance = I18nInstance & {
+  i18nInstance: {
+    instance: I18nInstance;
+  };
+};
+
+export function isI18nWrapperInstance(
+  obj: unknown,
+): obj is I18nWrapperInstance {
   if (!obj || typeof obj !== 'object') {
     return false;
   }
-  if (!obj.i18nInstance || typeof obj.i18nInstance !== 'object') {
+  const candidate = obj as {
+    i18nInstance?: unknown;
+    init?: unknown;
+    use?: unknown;
+  };
+  if (!candidate.i18nInstance || typeof candidate.i18nInstance !== 'object') {
     return false;
   }
-  if (!obj.i18nInstance.instance) {
+  const wrapper = candidate.i18nInstance as { instance?: unknown };
+  if (!wrapper.instance) {
     return false;
   }
-  if (typeof obj.init !== 'function' || typeof obj.use !== 'function') {
+  if (
+    typeof candidate.init !== 'function' ||
+    typeof candidate.use !== 'function'
+  ) {
     return false;
   }
   return true;
 }
 
-export function getI18nWrapperI18nextInstance(wrapperInstance: any): any {
+function getI18nWrapperI18nextInstance(
+  wrapperInstance: unknown,
+): I18nInstance | null {
   if (isI18nWrapperInstance(wrapperInstance)) {
     return wrapperInstance.i18nInstance?.instance;
   }
   return null;
 }
 
-export function getActualI18nextInstance(instance: I18nInstance | any): any {
+export function getActualI18nextInstance(instance: I18nInstance): I18nInstance {
   if (isI18nWrapperInstance(instance)) {
     const i18nextInstance = getI18nWrapperI18nextInstance(instance);
     return i18nextInstance || instance;
@@ -46,43 +65,101 @@ export function getActualI18nextInstance(instance: I18nInstance | any): any {
   return instance;
 }
 
+export type TranslateFn = (
+  key: string | string[],
+  options?: Record<string, unknown>,
+) => string;
+
+// FORK: intentionally diverges from upstream @modern-js/plugin-i18n. Upstream
+// declares a top-level `[key: string]: any` and overloaded call-signature
+// properties; both make i18next's `i18n` structurally unassignable to this
+// type, so the documented `i18nInstance: i18next` usage does not typecheck.
+// Do NOT restore upstream's shape when resolving a sync merge — the guard is
+// tests/type-fixture/i18nInstanceTypes.fixture.ts.
 export interface I18nInstance {
   language: string;
   isInitialized?: boolean;
-  init: {
-    (callback?: (error: any, t: any) => void): Promise<any>;
-    (
-      options: I18nInitOptions,
-      callback?: (error: any, t: any) => void,
-    ): Promise<any>;
-  };
-  changeLanguage?: (
-    lng?: string,
-    callback?: (error: any, t: any) => void,
-  ) => Promise<any>;
+  // Single non-overloaded method signatures. Method syntax is required for
+  // bivariant parameter checking; a SINGLE signature is required because
+  // overload bivariance is order-dependent across program compositions.
+  init(options?: any, callback?: any): Promise<any>;
+  changeLanguage?(lng?: string, callback?: any): Promise<any>;
   setLang?: (lang: string) => void | Promise<void>;
-  use: (plugin: any) => void;
-  createInstance?: (options?: I18nInitOptions) => I18nInstance;
-  cloneInstance?: () => I18nInstance; // ssr need
-  // i18next store (may not be in type definition but exists at runtime)
+  use(plugin: any): unknown;
+  t: TranslateFn;
+  exists?: (
+    key: string | string[],
+    options?: Record<string, unknown>,
+  ) => boolean;
+  // `lng` is required: i18next's getFixedT does not accept `undefined`.
+  getFixedT?: (
+    lng: string | readonly string[] | null,
+    ns?: string | readonly string[] | null,
+    keyPrefix?: string,
+  ) => TranslateFn;
+  hasLoadedNamespace?: (
+    ns: string | readonly string[],
+    options?: Record<string, unknown>,
+  ) => boolean;
+  dir?: (lng?: string) => string;
+  format?: (
+    value: unknown,
+    format?: string,
+    lng?: string,
+    options?: Record<string, unknown>,
+  ) => string;
+  // readonly: i18next declares `languages: readonly string[]`.
+  languages?: readonly string[];
+  resolvedLanguage?: string;
+  loadNamespaces?: (
+    ns: string | readonly string[],
+    callback?: (...args: any[]) => void,
+  ) => Promise<void>;
+  loadLanguages?: (
+    lngs: string | readonly string[],
+    callback?: (...args: any[]) => void,
+  ) => Promise<void>;
+  addResourceBundle?: (
+    lng: string,
+    ns: string,
+    resources: Record<string, unknown>,
+    deep?: boolean,
+    overwrite?: boolean,
+  ) => unknown;
+  getResourceBundle?: (lng: string, ns: string) => unknown;
+  getDataByLanguage?: (
+    lng: string,
+  ) => Record<string, Record<string, string>> | undefined;
+  createInstance?(options?: any, callback?: any): I18nInstance;
+  cloneInstance?(options?: any, callback?: any): I18nInstance; // ssr need
+  // i18next store (may not be in the type definition but exists at runtime)
   store?: I18nResourceStore;
-  emit?: (event: string, ...args: any[]) => void;
-  reloadResources?: (language?: string, namespace?: string) => Promise<void>;
+  emit?(event: string, ...args: any[]): unknown;
+  reloadResources?(
+    language?: any,
+    namespace?: any,
+    callback?: any,
+  ): Promise<void>;
+  removeResourceBundle?(language: string, namespace: string): I18nInstance;
+  // No nested index signature: i18next's `Services` is an interface and would
+  // fail "Index signature for type 'string' is missing".
   services?: {
-    languageDetector?: {
-      detect: (request?: any, options?: any) => string | string[] | undefined;
-      [key: string]: any;
-    };
+    store?: unknown;
+    languageDetector?: any;
     resourceStore?: I18nResourceStore;
-    backend?: any; // Backend instance (e.g., SdkBackend)
-    [key: string]: any;
+    backend?: unknown; // Backend instance (e.g. SdkBackend)
   };
   // i18next instance options (available after initialization)
   options?: {
-    backend?: BackendOptions;
-    [key: string]: any;
+    detection?: any;
+    backend?: any;
+    ns?: any;
+    defaultNS?: any;
   };
-  [key: string]: any;
+  // NO `[key: string]: unknown`. TypeScript never grants an interface an
+  // implicit index signature, so any index signature here makes i18next's
+  // `i18n` permanently unassignable. BREAKING for consumers that read
+  // undeclared properties off I18nInstance.
 }
 
 type LanguageDetectorOrder = string[];
@@ -101,14 +178,16 @@ export interface LanguageDetectorOptions {
 }
 
 export interface BackendOptions extends Omit<BaseBackendOptions, 'enabled'> {
-  parse?: (data: string) => any;
-  stringify?: (data: any) => string;
+  parse?: (data: string) => unknown;
+  stringify?: (data: unknown) => string;
   [key: string]: any;
 }
 
+type ResourceValue = string | { [key: string]: ResourceValue };
+
 export interface Resources {
   [lng: string]: {
-    [source: string]: string | Record<string, string>;
+    [source: string]: ResourceValue;
   };
 }
 
@@ -124,15 +203,16 @@ export type I18nInitOptions = {
   defaultNS?: string | string[];
   interpolation?: {
     escapeValue?: boolean;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   react?: {
     useSuspense?: boolean;
-    [key: string]: any;
+    [key: string]: unknown;
   };
+  forkResourceStore?: boolean;
 };
 
-export function isI18nInstance(obj: any): obj is I18nInstance {
+export function isI18nInstance(obj: unknown): obj is I18nInstance {
   if (!obj || typeof obj !== 'object') {
     return false;
   }
@@ -141,7 +221,10 @@ export function isI18nInstance(obj: any): obj is I18nInstance {
     return true;
   }
 
-  return typeof obj.init === 'function' && typeof obj.use === 'function';
+  const candidate = obj as { init?: unknown; use?: unknown };
+  return (
+    typeof candidate.init === 'function' && typeof candidate.use === 'function'
+  );
 }
 
 async function tryImportI18next(): Promise<I18nInstance | null> {
@@ -167,30 +250,58 @@ async function createI18nextInstance(): Promise<I18nInstance | null> {
   }
 }
 
-async function tryImportReactI18next() {
-  try {
-    const reactI18next = await import('react-i18next');
-    return reactI18next;
-  } catch (error) {
-    return null;
-  }
-}
-
 export function getI18nextInstanceForProvider(
-  instance: I18nInstance | any,
-): any {
+  instance: I18nInstance,
+  language?: string,
+): I18nInstance {
+  let providerInstance = instance;
   if (isI18nWrapperInstance(instance)) {
     const i18nextInstance = getI18nWrapperI18nextInstance(instance);
     if (i18nextInstance) {
-      return i18nextInstance;
+      providerInstance = i18nextInstance;
     }
   }
 
-  return instance;
+  if (!language || typeof Proxy === 'undefined') {
+    return providerInstance;
+  }
+
+  return new Proxy(providerInstance, {
+    get(target, property, receiver) {
+      if (property === 'language' || property === 'resolvedLanguage') {
+        return language;
+      }
+      if (property === 'languages') {
+        const languages = Reflect.get(target, property, receiver);
+        return Array.isArray(languages)
+          ? [language, ...languages.filter(item => item !== language)]
+          : [language];
+      }
+      if (property === 't' && typeof target.getFixedT === 'function') {
+        return target.getFixedT(language);
+      }
+      if (
+        property === 'hasLoadedNamespace' &&
+        typeof target.hasLoadedNamespace === 'function'
+      ) {
+        const hasLoadedNamespace = target.hasLoadedNamespace as (
+          this: I18nInstance,
+          namespace: string,
+          options?: Record<string, unknown>,
+        ) => boolean;
+        return (namespace: string, options?: Record<string, unknown>) =>
+          hasLoadedNamespace.call(target, namespace, {
+            ...options,
+            lng: options?.lng || language,
+          });
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
 }
 
 export async function getI18nInstance(
-  userInstance?: I18nInstance | any,
+  userInstance?: unknown,
 ): Promise<I18nInstance> {
   if (userInstance) {
     if (isI18nWrapperInstance(userInstance)) {
@@ -208,20 +319,4 @@ export async function getI18nInstance(
   }
 
   throw new Error('No i18n instance found');
-}
-
-export async function getInitReactI18next() {
-  const reactI18nextModule = await tryImportReactI18next();
-  if (reactI18nextModule) {
-    return reactI18nextModule.initReactI18next;
-  }
-  return null;
-}
-
-export async function getI18nextProvider() {
-  const reactI18nextModule = await tryImportReactI18next();
-  if (reactI18nextModule) {
-    return reactI18nextModule.I18nextProvider;
-  }
-  return null;
 }

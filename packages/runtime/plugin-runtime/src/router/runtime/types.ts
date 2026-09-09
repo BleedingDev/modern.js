@@ -1,10 +1,17 @@
-import type { RequestContext } from '@modern-js/runtime-utils/node';
 import type {
   Params,
   RouteObject,
   RouteProps,
 } from '@modern-js/runtime-utils/router';
-import type { NestedRoute, PageRoute } from '@modern-js/types';
+
+export type ModernRoute = {
+  type: 'nested' | 'page';
+  path?: string;
+  id?: string;
+  component?: React.ComponentType | string;
+  children?: ModernRoute[];
+  [key: string]: any;
+};
 
 export type SingleRouteConfig = RouteProps & {
   redirect?: string;
@@ -22,10 +29,19 @@ export type SingleRouteConfig = RouteProps & {
   component?: React.ComponentType;
 };
 
+export type BuiltInRouterFramework = 'react-router' | 'tanstack';
+export type RouterFramework = BuiltInRouterFramework | (string & {});
+
 export type RouterConfig = {
+  /**
+   * Select the router implementation used by Modern.js conventional routing.
+   * - `react-router` (default): React Router based integration
+   * - `tanstack`: TanStack Router integration
+   */
+  framework?: RouterFramework;
   routesConfig: {
     globalApp?: React.ComponentType<any>;
-    routes?: (NestedRoute | PageRoute)[];
+    routes?: ModernRoute[];
   };
   /**
    * You should not use it
@@ -46,8 +62,49 @@ export type RouterConfig = {
 
 export type Routes = RouterConfig['routesConfig']['routes'];
 
+export interface RouterRouteMatchSnapshot {
+  routeId: string;
+  assetRouteId?: string;
+  pathname?: string;
+  params?: Record<string, string>;
+}
+
 export interface RouteManifest {
   routeAssets: RouteAssets;
+}
+
+export interface InternalRouterServerSnapshot {
+  framework?: RouterFramework;
+  basename?: string;
+  statusCode?: number;
+  errors?: Record<string, unknown>;
+  routerData?: {
+    loaderData?: Record<string, unknown>;
+    errors?: Record<string, unknown>;
+  };
+  hydrationScript?: string;
+  hydrationScripts?: string[];
+  matchedRouteIds?: string[];
+  matches?: RouterRouteMatchSnapshot[];
+}
+
+export interface InternalRouterRuntimeState {
+  framework: RouterFramework;
+  basename?: string;
+  instance?: unknown;
+  hydrationScript?: string;
+  hydrationScripts?: string[];
+  matchedRouteIds?: string[];
+  matches?: RouterRouteMatchSnapshot[];
+  serverSnapshot?: InternalRouterServerSnapshot;
+  cleanup?: () => void | Promise<void>;
+}
+
+export interface RouterServerPrepareResult {
+  state: InternalRouterRuntimeState;
+  snapshot?: InternalRouterServerSnapshot;
+  redirect?: Response;
+  cleanup?: () => void | Promise<void>;
 }
 
 export interface RouteAssets {
@@ -68,14 +125,34 @@ export type ModernRouteObject = RouteObject & {
   hasClientLoader?: boolean;
   hasLoader?: boolean;
   hasAction?: boolean;
+  inValidSSRRoute?: boolean;
   parentId?: string;
   lazyImport?: () => Promise<{ default: React.ComponentType }>;
   component?: React.ComponentType | LazyComponentDescriptor;
   entryCssFiles?: string[];
 };
 
-// fork from react-router
-// due to the context is any in react-router.
+type LoaderContextKey<T = unknown> = {
+  symbol: symbol;
+  getDefaultValue: () => T;
+};
+
+interface LoaderRequestGet<P extends Record<string, unknown>> {
+  <Key extends keyof P>(key: Key): P[Key];
+  <T>(key: LoaderContextKey<T>): T;
+}
+
+interface LoaderRequestSet<P extends Record<string, unknown>> {
+  <Key extends keyof P>(key: Key, value: P[Key]): void;
+  <T>(key: LoaderContextKey<T>, value: T): void;
+}
+
+type LoaderRequestContext<P extends Record<string, unknown> = {}> = {
+  get: LoaderRequestGet<P & Record<string, unknown>>;
+  set: LoaderRequestSet<P & Record<string, unknown>>;
+};
+
+// fork from react-router due to the context being any in react-router.
 interface DataFunctionArgs<D = any> {
   request: Request;
   params: Params;
@@ -84,7 +161,7 @@ interface DataFunctionArgs<D = any> {
 
 export type LoaderFunctionArgs<
   P extends Record<string, unknown> = Record<string, unknown>,
-> = DataFunctionArgs<RequestContext<P>>;
+> = DataFunctionArgs<LoaderRequestContext<P>>;
 
 declare type DataFunctionValue = Response | NonNullable<unknown> | null;
 

@@ -9,7 +9,7 @@
     "directory": "packages/cli/adapter-rstest"
   },
   "license": "MIT",
-  "version": "3.5.0",
+  "version": "3.9.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,18 +27,19 @@
   },
   "dependencies": {
     "@modern-js/app-tools": "workspace:*",
-    "@rstest/adapter-rsbuild": "^0.2.6"
+    "@rstest/adapter-rsbuild": "^0.11.12"
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",
     "@modern-js/tsconfig": "workspace:*",
     "@modern-js/types": "workspace:*",
-    "@rsbuild/core": "2.1.0",
-    "@rslib/core": "0.23.1",
-    "@rstest/core": "0.9.10",
+    "@rsbuild/core": "2.2.3",
+    "@rslib/core": "1.0.0",
+    "@rstest/core": "0.11.12",
     "@scripts/rstest-config": "workspace:*",
-    "@types/node": "^20",
-    "typescript": "^5"
+    "@types/node": "^26.4.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "typescript": "^7.0.2"
   },
   "sideEffects": false,
   "publishConfig": {

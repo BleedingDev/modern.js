@@ -15,7 +15,7 @@
     "modern",
     "modern.js"
   ],
-  "version": "3.5.0",
+  "version": "3.9.0",
   "engines": {
     "node": ">=20"
   },
@@ -46,6 +46,27 @@
       },
       "default": "./dist/esm/runtime/index.mjs"
     },
+    "./runtime/consumer": {
+      "types": "./dist/types/runtime/context.d.ts",
+      "node": {
+        "module": "./dist/esm/runtime/context.mjs"
+      },
+      "default": "./dist/esm/runtime/context.mjs"
+    },
+    "./runtime/no-react-i18next": {
+      "types": "./dist/types/runtime/no-react-i18next.d.ts",
+      "node": {
+        "module": "./dist/esm/runtime/no-react-i18next.mjs"
+      },
+      "default": "./dist/esm/runtime/no-react-i18next.mjs"
+    },
+    "./runtime/no-react-i18next/consumer": {
+      "types": "./dist/types/runtime/context.d.ts",
+      "node": {
+        "module": "./dist/esm/runtime/context.mjs"
+      },
+      "default": "./dist/esm/runtime/context.mjs"
+    },
     "./server": {
       "types": "./dist/types/server/index.d.ts",
       "node": {
@@ -70,6 +91,15 @@
       "runtime": [
         "./dist/types/runtime/index.d.ts"
       ],
+      "runtime/consumer": [
+        "./dist/types/runtime/context.d.ts"
+      ],
+      "runtime/no-react-i18next": [
+        "./dist/types/runtime/no-react-i18next.d.ts"
+      ],
+      "runtime/no-react-i18next/consumer": [
+        "./dist/types/runtime/context.d.ts"
+      ],
       "server": [
         "./dist/types/server/index.d.ts"
       ],
@@ -82,28 +112,29 @@
     "dev": "rslib build --watch",
     "prepublishOnly": "only-allow-pnpm",
     "build": "rslib build",
-    "test": "rstest"
+    "test": "rstest --passWithNoTests"
   },
   "dependencies": {
+    "@modern-js/i18n-runtime-extensions": "workspace:*",
     "@modern-js/plugin": "workspace:*",
     "@modern-js/runtime-utils": "workspace:*",
     "@modern-js/server-core": "workspace:*",
     "@modern-js/server-runtime": "workspace:*",
     "@modern-js/types": "workspace:*",
     "@modern-js/utils": "workspace:*",
-    "@swc/helpers": "^0.5.17",
+    "@swc/helpers": "^0.5.23",
     "i18next-browser-languagedetector": "^8.2.1",
-    "i18next-chained-backend": "^4.6.3",
-    "i18next-fs-backend": "^2.6.3",
-    "i18next-http-backend": "^3.0.6",
-    "i18next-http-middleware": "^3.9.7"
+    "i18next-chained-backend": "^5.0.6",
+    "i18next-fs-backend": "^2.6.7",
+    "i18next-http-backend": "^4.0.2",
+    "i18next-http-middleware": "^3.9.8"
   },
   "peerDependencies": {
-    "react": ">=17.0.2",
-    "react-dom": ">=17.0.2",
+    "@modern-js/runtime": "workspace:^3.9.0",
     "i18next": ">=25.7.4",
-    "react-i18next": ">=15.7.4",
-    "@modern-js/runtime": "workspace:^3.5.0"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-i18next": ">=15.7.4"
   },
   "peerDependenciesMeta": {
     "i18next": {
@@ -117,14 +148,16 @@
     "@modern-js/app-tools": "workspace:*",
     "@modern-js/rslib": "workspace:*",
     "@modern-js/runtime": "workspace:*",
-    "@rslib/core": "0.23.1",
-    "@types/node": "^20",
-    "i18next": "25.7.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-i18next": "15.7.4",
+    "@rslib/core": "1.0.0",
+    "@types/node": "^26.4.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "esbuild": "^0.28.2",
+    "i18next": "26.4.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-i18next": "17.0.13",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^7.0.2"
   },
   "sideEffects": false,
   "publishConfig": {

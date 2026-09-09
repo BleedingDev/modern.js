@@ -1,35 +1,35 @@
-import Module from 'module';
-import { builtinModules } from 'module';
-import path from 'path';
+// @effect-diagnostics asyncFunction:off newPromise:off nodeBuiltinImport:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type {
   AppTools,
   CliPlugin,
   AppNormalizedConfig as NormalizedConfig,
 } from '@modern-js/app-tools';
 import type { Entrypoint } from '@modern-js/types/cli';
-import { fs, createDebugger, findExists, logger } from '@modern-js/utils';
+import { createDebugger, findExists, fs, logger } from '@modern-js/utils';
 import type { Rspack, RspackChain } from '@rsbuild/core';
 import { decodeHTML } from 'entities';
+import Module, { builtinModules } from 'module';
+import path from 'path';
 
 import {
   BODY_PARTICALS_SEPARATOR,
+  DOC_EXT,
   DOCUMENT_CHUNKSMAP_PLACEHOLDER,
   DOCUMENT_COMMENT_PLACEHOLDER_END,
   DOCUMENT_COMMENT_PLACEHOLDER_START,
   DOCUMENT_FILE_NAME,
   DOCUMENT_LINKS_PLACEHOLDER,
   DOCUMENT_META_PLACEHOLDER,
-  DOCUMENT_SCRIPTS_PLACEHOLDER,
   DOCUMENT_SCRIPT_ATTRIBUTES_END,
   DOCUMENT_SCRIPT_ATTRIBUTES_START,
   DOCUMENT_SCRIPT_PLACEHOLDER_END,
   DOCUMENT_SCRIPT_PLACEHOLDER_START,
-  DOCUMENT_SSRDATASCRIPT_PLACEHOLDER,
+  DOCUMENT_SCRIPTS_PLACEHOLDER,
   DOCUMENT_SSR_PLACEHOLDER,
+  DOCUMENT_SSRDATASCRIPT_PLACEHOLDER,
   DOCUMENT_STYLE_PLACEHOLDER_END,
   DOCUMENT_STYLE_PLACEHOLDER_START,
   DOCUMENT_TITLE_PLACEHOLDER,
-  DOC_EXT,
   HEAD_PARTICALS_SEPARATOR,
   HTML_SEPARATOR,
   PLACEHOLDER_REPLACER_MAP,
@@ -123,7 +123,10 @@ const isAsset = (req: string): boolean =>
     req,
   );
 
-const processScriptPlaceholders = (html: string, nonce?: string): string => {
+export const processScriptPlaceholders = (
+  html: string,
+  nonce?: string,
+): string => {
   if (
     !html.includes(DOCUMENT_SCRIPT_PLACEHOLDER_START) ||
     !html.includes(DOCUMENT_SCRIPT_PLACEHOLDER_END)
@@ -180,7 +183,12 @@ const processCommentPlaceholders = (html: string): string => {
 
 // load CommonJS module from code string (evaluated in Node), returns exports
 const requireFromString = (code: string, filename: string) => {
-  const m = new Module.Module(filename, module.parent as Module);
+  const m = new Module.Module(
+    filename,
+    process.env.MODERN_LIB_FORMAT === 'esm'
+      ? undefined
+      : (module.parent as Module),
+  );
   m.filename = filename;
   // set proper resolution paths for nested requires
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -268,10 +276,8 @@ const applyExternalsPlugin = (child: Compiler, compiler: Compiler) => {
 };
 
 const generateEntryCode = (docPath: string, _entryName: string): string => {
-  const runtimeAPI = require.resolve('../');
-  const esmRuntimeAPI = runtimeAPI
-    .replace(`cjs`, `esm`)
-    .replace(/.js$/, '.mjs');
+  // this entry will always resolve to "./dist/esm/document/index.mjs"
+  const esmRuntimeAPI = require.resolve('@modern-js/runtime/document');
 
   return `import React from 'react';
 import ReactDomServer from 'react-dom/server';

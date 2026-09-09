@@ -9,14 +9,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  DEPRECATED,
-  FEATURE_CATALOG,
-  REUSABLE_PROTO,
   appendToPluginsArray,
   classifyProject,
+  DEPRECATED,
   ensureNamedImport,
   exists,
   extractBalanced,
+  FEATURE_CATALOG,
   findConfigFile,
   hasOutputSsg,
   isPluginEnabled,
@@ -24,6 +23,7 @@ import {
   locateConfigObjStart,
   maskCommentsAndStrings,
   outputSsgState,
+  REUSABLE_PROTO,
   readText,
   topLevelPluginsHasCall,
   topLevelProps,

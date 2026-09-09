@@ -2,6 +2,9 @@ import { bffPlugin } from '@modern-js/plugin-bff';
 import { applyBaseConfig } from '../../utils/applyBaseConfig';
 
 export default applyBaseConfig({
+  dev: {
+    mockDir: './mocks',
+  },
   server: {
     ssr: {
       mode: 'stream',
@@ -10,14 +13,13 @@ export default applyBaseConfig({
   },
   bff: {
     prefix: '/bff-api',
+    runtimeFramework: 'hono',
   },
   plugins: [bffPlugin()],
   security: {
     sri: {
-      enable: true,
+      enabled: process.env.NODE_ENV === 'production',
       hashFuncNames: ['sha256'],
-      hashLoading: 'eager',
-      algorithm: 'sha256',
     },
   },
 });

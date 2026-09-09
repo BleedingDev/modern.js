@@ -6,13 +6,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  DEPRECATED,
-  TIER_LABEL,
   classifyProject,
+  DEPRECATED,
   exists,
   featureMatrix,
   findConfigFile,
   readText,
+  TIER_LABEL,
 } from './lib.mjs';
 
 function fail(msg) {

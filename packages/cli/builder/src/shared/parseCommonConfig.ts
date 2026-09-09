@@ -1,9 +1,9 @@
 import {
+  mergeRsbuildConfig,
   type ResolveConfig,
   type RsbuildConfig,
   type RsbuildPlugin,
   type ToolsConfig,
-  mergeRsbuildConfig,
 } from '@rsbuild/core';
 import { pluginCssMinimizer } from '@rsbuild/plugin-css-minimizer';
 import { pluginLess } from '@rsbuild/plugin-less';
@@ -21,6 +21,17 @@ import { NODE_MODULES_REGEX } from './utils';
 
 const CSS_MODULES_REGEX = /\.modules?\.\w+$/i;
 const GLOBAL_CSS_REGEX = /\.global\.\w+$/;
+const DEFAULT_CSS_MINIFIER_OPTIONS = {
+  minimizerOptions: {
+    preset: [
+      'default',
+      {
+        calc: false,
+        mergeLonghand: false,
+      },
+    ],
+  },
+};
 
 /** Determine if a file path is a CSS module when disableCssModuleExtension is enabled. */
 export const isLooseCssModules = (path: string) => {
@@ -70,7 +81,13 @@ export async function parseCommonConfig(
       ...outputConfig
     } = {},
     html: { outputStructure, appIcon, ...htmlConfig } = {},
-    source: { alias, globalVars, transformImport, ...sourceConfig } = {},
+    source: {
+      alias,
+      globalVars,
+      transformImport,
+      reactCompiler,
+      ...sourceConfig
+    } = {},
     dev = {},
     server = {},
     security: { checkSyntax, sri, ...securityConfig } = {},
@@ -210,6 +227,8 @@ export async function parseCommonConfig(
   rsbuildConfig.html = html;
   rsbuildConfig.output = output;
 
+  const { sourceBuild } = builderConfig.experiments || {};
+
   const rsbuildPlugins: RsbuildPlugin[] = [
     pluginGlobalVars(globalVars),
     pluginDevtool({
@@ -260,7 +279,6 @@ export async function parseCommonConfig(
     pluginRuntimeChunk(builderConfig.output?.disableInlineRuntimeChunk),
   );
 
-  const { sourceBuild } = builderConfig.experiments || {};
   if (sourceBuild) {
     const { pluginSourceBuild } = await import('@rsbuild/plugin-source-build');
 
@@ -269,13 +287,20 @@ export async function parseCommonConfig(
     );
   }
 
-  rsbuildPlugins.push(pluginReact());
+  rsbuildPlugins.push(
+    pluginReact(
+      options?.disableReactCompiler || reactCompiler === undefined
+        ? {}
+        : { reactCompiler },
+    ),
+  );
 
   if (!disableSvgr) {
     const { pluginSvgr } = await import('@rsbuild/plugin-svgr');
     rsbuildPlugins.push(
       pluginSvgr({
         mixedImport: true,
+        parallel: true,
         svgrOptions: {
           exportType: svgDefaultExport === 'component' ? 'default' : 'named',
         },
@@ -305,7 +330,7 @@ export async function parseCommonConfig(
 
   rsbuildPlugins.push(
     pluginCssMinimizer({
-      pluginOptions: minifyCss,
+      pluginOptions: minifyCss ?? DEFAULT_CSS_MINIFIER_OPTIONS,
     }),
   );
 

@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 /**
  * The following code is modified based on
  * https://github.com/gregberge/loadable-components
@@ -11,9 +12,9 @@
 // The Rspack stas & compilation lacks some fields, so `loadable-webpack-plugin` can not run normally in Rspack.
 // So that we write a `loadable-bundler-plugin` based on it.
 
-import path from 'path';
 import type { Rspack } from '@modern-js/app-tools';
 import { fs } from '@modern-js/utils';
+import path from 'path';
 
 interface LoadablePluginOptions {
   filename: string;
@@ -29,6 +30,8 @@ type Compilation = Rspack.Compilation;
 
 const normalizeChunkId = (id: string | number | null | undefined) =>
   typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : id;
+
+const DEFAULT_CHUNK_LOADING_GLOBAL = '__LOADABLE_LOADED_CHUNKS__';
 
 const normalizeChunkGroup = (
   group: Record<string, any>,
@@ -48,11 +51,10 @@ class LoadablePlugin {
       path,
       writeToDisk,
       outputAsset = true,
-      chunkLoadingGlobal = '__LOADABLE_LOADED_CHUNKS__',
+      chunkLoadingGlobal,
     }: LoadablePluginOptions = {
       filename: 'loadable-stats.json',
       outputAsset: true,
-      chunkLoadingGlobal: '__LOADABLE_LOADED_CHUNKS__',
     },
   ) {
     this.opts = {
@@ -69,7 +71,15 @@ class LoadablePlugin {
   apply(compiler: Compiler) {
     this.compiler = compiler;
 
-    compiler.options.output.chunkLoadingGlobal = this.opts.chunkLoadingGlobal;
+    const chunkLoadingGlobal =
+      this.opts.chunkLoadingGlobal ??
+      compiler.options.output.chunkLoadingGlobal ??
+      DEFAULT_CHUNK_LOADING_GLOBAL;
+
+    compiler.options.output.chunkLoadingGlobal = chunkLoadingGlobal;
+    new compiler.webpack.DefinePlugin({
+      __MODERN_CHUNK_LOADING_GLOBAL__: JSON.stringify(chunkLoadingGlobal),
+    }).apply(compiler);
 
     if (this.opts.outputAsset || this.opts.writeToDisk) {
       compiler.hooks.make.tap(

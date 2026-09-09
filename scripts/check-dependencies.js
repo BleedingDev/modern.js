@@ -1,16 +1,9 @@
-const ignoreDeps = [
-  'fs-extra',
-  'react-router-dom',
-  'tailwindcss',
-  'tsconfig-paths',
-  'typescript',
-  'lru-cache',
-  'tsx',
-];
+const ignoreDeps = ['fs-extra', 'tailwindcss', 'tsconfig-paths'];
 
-const command = `npx check-dependency-version-consistency@latest . ${ignoreDeps
+// Use the workspace-pinned version to avoid unexpected breaking changes from @latest.
+const command = `pnpm exec check-dependency-version-consistency . ${ignoreDeps
   .map(dep => `--ignore-dep "${dep}"`)
-  .join(' ')}`;
+  .join(' ')} --ignore-package-pattern "^@examples/"`;
 
 console.log(`> ${command}`);
 

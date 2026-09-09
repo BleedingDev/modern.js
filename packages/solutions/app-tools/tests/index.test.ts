@@ -1,4 +1,12 @@
-import appToolsDefault, { appTools, mergeConfig } from '../src';
+import appToolsDefault, {
+  appTools,
+  build,
+  closeServer,
+  createPresetUltramodernConfig,
+  deploy,
+  mergeConfig,
+  presetUltramodern,
+} from '../src';
 
 describe('app-tools export', () => {
   it('default export', () => {
@@ -7,6 +15,17 @@ describe('app-tools export', () => {
 
   it('named export', () => {
     expect(appTools).toBeDefined();
+    expect(build).toBeDefined();
+    expect(closeServer).toBeDefined();
+    expect(createPresetUltramodernConfig).toBeDefined();
+    expect(deploy).toBeDefined();
+    expect(presetUltramodern).toBeDefined();
+  });
+
+  it('registers the Cloudflare builder plugin', () => {
+    const pluginNames = appTools().usePlugins?.map(plugin => plugin.name);
+
+    expect(pluginNames).toContain('@modern-js/cloudflare-builder');
   });
 });
 

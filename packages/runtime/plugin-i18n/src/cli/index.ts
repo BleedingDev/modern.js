@@ -1,6 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { AppTools, CliPlugin } from '@modern-js/app-tools';
+import {
+  applyLocalisedUrlsToRoutes,
+  resolveLocalisedUrlsConfig,
+} from '@modern-js/i18n-runtime-extensions';
 import { getPublicDirRoutePrefixes } from '@modern-js/server-core';
-import type { Entrypoint } from '@modern-js/types';
+import type {
+  Entrypoint,
+  NestedRouteForCli,
+  PageRoute,
+} from '@modern-js/types';
 import type { BackendOptions, LocaleDetectionOptions } from '../shared/type';
 import { getBackendOptions, getLocaleDetectionOptions } from '../shared/utils';
 import { applyDetectedBackendPaths, detectLocalesDirectory } from './locales';
@@ -116,15 +126,55 @@ export const i18nPlugin = (
         backend: backendOptions,
         ...extendedConfig,
       };
+      const { reactI18next } = extendedConfig as { reactI18next?: boolean };
+      const runtimePluginPath =
+        customPlugin?.runtime?.path ||
+        (reactI18next === false
+          ? `@${metaName}/plugin-i18n/runtime/no-react-i18next`
+          : `@${metaName}/plugin-i18n/runtime`);
 
       plugins.push({
         name: customPlugin?.runtime?.name || 'i18n',
-        path: customPlugin?.runtime?.path || `@${metaName}/plugin-i18n/runtime`,
+        path: runtimePluginPath,
         config,
       });
       return {
         entrypoint,
         plugins,
+      };
+    });
+
+    api.modifyFileSystemRoutes(({ entrypoint, routes }) => {
+      if (!localeDetection) {
+        return { entrypoint, routes };
+      }
+
+      const localeDetectionOptions = getLocaleDetectionOptions(
+        entrypoint.entryName,
+        localeDetection,
+      );
+      const {
+        localePathRedirect,
+        languages = [],
+        localisedUrls,
+      } = localeDetectionOptions;
+
+      if (!localePathRedirect || languages.length === 0) {
+        return { entrypoint, routes };
+      }
+
+      const localisedUrlsConfig = resolveLocalisedUrlsConfig(localisedUrls);
+      if (!localisedUrlsConfig.enabled) {
+        return { entrypoint, routes };
+      }
+
+      return {
+        entrypoint,
+        routes: applyLocalisedUrlsToRoutes(
+          routes as (NestedRouteForCli | PageRoute)[],
+          languages,
+          localisedUrlsConfig.map,
+        ) as (NestedRouteForCli | PageRoute)[],
       };
     });
 

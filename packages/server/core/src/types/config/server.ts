@@ -1,5 +1,20 @@
 import type { SSRMode } from '@modern-js/types';
 import type { WatchOptions } from '@modern-js/utils';
+import type { ServerTelemetryUserConfig } from './serverTelemetry';
+
+export type {
+  ServerTelemetryCanaryAutopilotStateStoreUserConfig,
+  ServerTelemetryCanaryAutopilotUserConfig,
+  ServerTelemetryCanaryContractGateUserConfig,
+  ServerTelemetryCanaryRuntimeFallbackSignalAuthUserConfig,
+  ServerTelemetryCanaryRuntimeFallbackSignalTrustPolicyUserConfig,
+  ServerTelemetryCanaryRuntimeFallbackSignalUserConfig,
+  ServerTelemetryCanaryUserConfig,
+  ServerTelemetryExporterOptions,
+  ServerTelemetrySloUserConfig,
+  ServerTelemetryUserConfig,
+  ServerTelemetryVictoriaMetricsOptions,
+} from './serverTelemetry';
 
 type Route =
   | string
@@ -16,12 +31,26 @@ export type SSR =
   | {
       forceCSR?: boolean;
       mode?: SSRMode;
+      preload?: boolean | SSRPreload;
       inlineScript?: boolean;
+      disablePrerender?: boolean;
+      /**
+       * Additional request header names removed from SSR payload serialization.
+       * Sensitive headers are denylisted by default.
+       */
       unsafeHeaders?: string[];
       loaderFailureMode?: 'clientRender' | 'errorBoundary';
+      /**
+       * Enable app-level Module Federation SSR bridge path.
+       * This flag should be enabled in both host and remote applications.
+       * @default false
+       */
+      moduleFederationAppSSR?: boolean;
     };
 
 export type SSRByEntries = Record<string, SSR>;
+
+type SSRPreload = Record<string, unknown>;
 
 export interface ServerUserConfig {
   publicDir?: string | string[];
@@ -44,6 +73,7 @@ export interface ServerUserConfig {
    */
   useJsonScript?: boolean;
   logger?: boolean | Record<string, unknown>;
+  telemetry?: ServerTelemetryUserConfig;
   /**
    * @description disable hook middleware for performance
    * @default false
@@ -51,7 +81,7 @@ export interface ServerUserConfig {
   disableHook?: boolean;
   /**
    * Path to the tsconfig used by all server-side TypeScript stages:
-   * BFF/api compile, custom server compile, runtime ts-node register,
+   * BFF/api compile, custom server compile, runtime TypeScript register,
    * and downstream runtimes.
    *
    * @default <appDirectory>/tsconfig.json

@@ -1,14 +1,12 @@
-import { existsSync } from 'fs';
-import path from 'path';
+import type { AppTools, AppToolsContext } from '@modern-js/app-tools';
 import {
   type CLIPluginAPI,
-  type Plugin,
   createPluginManager,
+  type Plugin,
 } from '@modern-js/plugin';
 import { createContext, initPluginAPI } from '@modern-js/plugin/cli';
 import { rs } from '@rstest/core';
-
-import type { AppTools, AppToolsContext } from '@modern-js/app-tools';
+import path from 'path';
 import { getBundleEntry } from '../../../../solutions/app-tools/src/plugins/analyze/getBundleEntry';
 import { documentPlugin, getDocumentByEntryName } from '../../src/document/cli';
 

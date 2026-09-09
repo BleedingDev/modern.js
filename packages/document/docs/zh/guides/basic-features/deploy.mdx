@@ -38,7 +38,7 @@ MODERNJS_DEPLOY=netlify npx modern deploy
 npx modern deploy
 ```
 
-当执行 `modern deploy` 命令时，Modern.js 将生成可执行的部署产物，并在控制台输出以下内容：
+当执行 `modern deploy` 命令时，UltraModern.js 将生成可执行的部署产物，并在控制台输出以下内容：
 
 ```bash
 Static directory: `.output/static`
@@ -258,11 +258,11 @@ Vercel 是一个面向现代 Web 应用的部署平台，它提供了丰富的�
 
 <img src="https://sf16-sg.tiktokcdn.com/obj/eden-sg/lmeh7nuptpfnuhd/vercel-root-directory.png" />
 
-将 Node.js 运行时设置为 `20.x`：
+将 Node.js 运行时设置为 `26.7.0` 或更高版本：
 
 ```json title="package.json"
 "engines": {
-  "node": "20.x"
+  "node": ">=26.7.0"
 },
 ```
 
@@ -316,8 +316,8 @@ Github Pages 支持两种部署方式，通过分支部署或通过 Github Actio
 
 :::info
 
-1. 执行 `MODERNJS_DEPLOY=ghPages modern deploy`，Modern.js 会把可用于 github 部署的产物构建到 `.output` 目录。
-2. 可以参考项目[示例](https://github.com/web-infra-dev/modern-js-examples/tree/main/examples/modern-js-deploy-csr)。
+1. 执行 `MODERNJS_DEPLOY=ghPages modern deploy`，UltraModern.js 会把可用于 github 部署的产物构建到 `.output` 目录。
+2. 可以参考仓库内的[示例](https://github.com/web-infra-dev/modern.js/tree/main/examples/modern-js-deploy-csr)。
 
 :::
 

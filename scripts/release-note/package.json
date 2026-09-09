@@ -3,17 +3,17 @@
   "version": "2.66.0",
   "private": true,
   "scripts": {
-    "dev": "tsc --watch",
-    "build": "tsc",
+    "dev": "tsgo --watch",
+    "build": "tsgo",
     "start": "tsx ./src/index.ts"
   },
   "dependencies": {
-    "@changesets/read": "^0.6.6",
+    "@changesets/read": "^0.6.7",
     "@modern-js/utils": "workspace:*",
-    "axios": "^1.15.2"
+    "axios": "^1.20.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "tsx": "^3.14.0"
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13"
   }
 }

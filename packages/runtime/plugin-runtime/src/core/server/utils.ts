@@ -1,15 +1,23 @@
+// @effect-diagnostics processEnv:off strictBooleanExpressions:off
+
 import type { ServerUserConfig } from '@modern-js/app-tools';
 import {
-  type StaticHandlerContext,
-  isRouteErrorResponse,
-} from '@modern-js/runtime-utils/router';
+  escapeHtmlAttribute,
+  isSafeHtmlAttributeName,
+} from '@modern-js/runtime-extensions';
+import type { StaticHandlerContext } from '@modern-js/runtime-utils/router';
+import { isRouteErrorResponse } from '../../router/runtime/routerHelper';
 import type { SSRConfig } from './shared';
 
 export function attributesToString(attributes: Record<string, any>) {
   // Iterate through the properties and convert them into a string, only including properties that are not undefined.
-  return Object.entries(attributes).reduce((str, [key, value]) => {
-    return value === undefined ? str : `${str} ${key}="${value}"`;
-  }, '');
+  return Object.entries(attributes).reduce(
+    (str, [key, value]) =>
+      value === undefined || !isSafeHtmlAttributeName(key)
+        ? str
+        : `${str} ${key}="${escapeHtmlAttribute(value)}"`,
+    '',
+  );
 }
 
 /**
@@ -46,18 +54,60 @@ export function serializeErrors(
     // Hey you!  If you change this, please change the corresponding logic in
     // deserializeErrors
     if (isRouteErrorResponse(val)) {
-      serialized[key] = { ...val, __type: 'RouteErrorResponse' };
+      serialized[key] = serializeRouteErrorResponse(val);
     } else if (val instanceof Error) {
-      serialized[key] = {
-        message: val.message,
-        stack: val.stack,
-        __type: 'Error',
-      };
+      serialized[key] = serializeError(val);
     } else {
       serialized[key] = val;
     }
   }
   return serialized;
+}
+
+export function shouldRedactServerError() {
+  return (
+    process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test'
+  );
+}
+
+function serializeError(error: Error) {
+  if (shouldRedactServerError()) {
+    return {
+      message: 'Unexpected Server Error',
+      stack: undefined,
+      __type: 'Error',
+    };
+  }
+
+  return {
+    message: error.message,
+    stack: error.stack,
+    __type: 'Error',
+  };
+}
+
+function serializeRouteErrorResponse(error: unknown) {
+  if (!isRouteErrorResponse(error)) {
+    return error;
+  }
+
+  if (error.status >= 500 && shouldRedactServerError()) {
+    return {
+      status: error.status,
+      statusText: 'Internal Server Error',
+      data: 'Unexpected Server Error',
+      internal: error.internal,
+      __type: 'RouteErrorResponse',
+    };
+  }
+
+  return {
+    status: error.status,
+    statusText: error.statusText,
+    data: error.data,
+    internal: error.internal,
+    __type: 'RouteErrorResponse',
+  };
 }
 
 export function getSSRConfigByEntry(
@@ -90,11 +140,12 @@ const getLinkAttributes = (linkTag: string) => {
 
   while ((match = attributeRegExp.exec(linkTag))) {
     const [, name, doubleQuotedValue, singleQuotedValue, unquotedValue] = match;
-    if (name.toLowerCase() === 'link') {
+    const normalizedName = name.toLowerCase();
+    if (normalizedName === 'link' || attributes.has(normalizedName)) {
       continue;
     }
     attributes.set(
-      name.toLowerCase(),
+      normalizedName,
       doubleQuotedValue ?? singleQuotedValue ?? unquotedValue ?? '',
     );
   }

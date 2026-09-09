@@ -1,7 +1,7 @@
-import fs from 'fs';
 import { parse } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
+import fs from 'fs';
 
 const isFunction = (
   node:
@@ -24,18 +24,10 @@ export const isDefaultExportFunction = (file: string | false): boolean => {
     plugins: [
       'jsx',
       'typescript',
-      'classProperties',
-      'dynamicImport',
       'exportDefaultFrom',
-      'exportNamespaceFrom',
       'decorators-legacy',
       'functionBind',
-      'classPrivateMethods',
-      ['pipelineOperator', { proposal: 'minimal' }],
-      'optionalChaining',
-      'optionalCatchBinding',
-      'objectRestSpread',
-      'numericSeparator',
+      ['pipelineOperator', { proposal: 'fsharp' }],
     ],
   });
 

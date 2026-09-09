@@ -1,11 +1,15 @@
+// @effect-diagnostics asyncFunction:off processEnv:off strictBooleanExpressions:off
 import { SSR_HYDRATION_ID_PREFIX } from '@modern-js/utils/universal/constants';
-import cookieTool from 'cookie';
+import { parseCookie } from 'cookie';
 import type React from 'react';
+import { createRoot } from 'react-dom/client';
 import { getGlobalInternalRuntimeContext } from '../context';
-import { type TRuntimeContext, getInitialContext } from '../context/runtime';
+import { getInitialContext, type TRuntimeContext } from '../context/runtime';
 import { wrapRuntimeContextProvider } from '../react/wrapper';
 import type { SSRContainer } from '../types';
-import { hydrateRoot } from './hydrate';
+import { hydrateRoot, hydrateWithReact } from './hydrate';
+
+export { hydrateWithReact };
 
 const IS_REACT18 = process.env.IS_REACT18 === 'true';
 
@@ -21,6 +25,15 @@ const getQuery = () =>
       }
       return res;
     }, {});
+
+const getCookieMap = (): Record<string, string> => {
+  const parsed = parseCookie(document.cookie || '');
+  return Object.fromEntries(
+    Object.entries(parsed).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+};
 
 function getSSRData(): SSRContainer {
   const ssrData = window._SSR_DATA;
@@ -40,7 +53,7 @@ function getSSRData(): SSRContainer {
         host: ssrRequest?.host || location.host,
         pathname: ssrRequest?.pathname || location.pathname,
         headers: ssrRequest?.headers || {},
-        cookieMap: cookieTool.parse(document.cookie || '') || {},
+        cookieMap: getCookieMap(),
         cookie: document.cookie || '',
         userAgent: ssrRequest?.headers?.['user-agent'] || navigator.userAgent,
         referer: document.referrer,
@@ -66,15 +79,16 @@ function isClientArgs(id: unknown): id is HTMLElement | string {
 
 export type RenderFunc = typeof render;
 
-export async function render(
+async function renderApp(
   App: React.ReactElement<{ basename: string }>,
-  id?: HTMLElement | string,
+  id: HTMLElement | string | undefined,
+  hydrateFromSsrData: boolean,
+  internalRuntimeContext: ReturnType<typeof getGlobalInternalRuntimeContext>,
 ) {
   const context: TRuntimeContext = getInitialContext();
   const runBeforeRender = async (context: TRuntimeContext) => {
-    const internalRuntimeContext = getGlobalInternalRuntimeContext();
     const api = internalRuntimeContext!.pluginAPI;
-    api!.updateRuntimeContext(context);
+    api!.updateRuntimeContext!(context);
     const hooks = internalRuntimeContext!.hooks;
     await hooks.onBeforeRender.call(context);
   };
@@ -105,12 +119,18 @@ export async function render(
       App: React.ReactElement,
       callback?: () => void,
     ) {
-      const hydrateFunc = IS_REACT18 ? hydrateWithReact18 : hydrateWithReact17;
-      return hydrateFunc(App, rootElement, callback);
+      if (IS_REACT18) {
+        return hydrateWithReact(App, rootElement);
+      }
+      return hydrateWithReact17(App, rootElement, callback);
     }
 
-    // we should hydateRoot only when ssr
-    if (window._SSR_DATA) {
+    // we should hydrateRoot only when SSR or SSG is enabled
+    if (
+      hydrateFromSsrData &&
+      process.env.MODERN_ENABLE_HYDRATION &&
+      window._SSR_DATA
+    ) {
       return hydrateRoot(App, context, ModernRender, ModernHydrate);
     }
     return ModernRender(wrapRuntimeContextProvider(App, context));
@@ -120,12 +140,24 @@ export async function render(
   );
 }
 
+export async function render(
+  App: React.ReactElement<{ basename: string }>,
+  id?: HTMLElement | string,
+) {
+  return renderApp(App, id, true, getGlobalInternalRuntimeContext());
+}
+
+/** Bind a client renderer to the runtime context that owns a nested app root. */
+export function createNestedAppRenderer(): RenderFunc {
+  const internalRuntimeContext = getGlobalInternalRuntimeContext();
+  return (App, id) => renderApp(App, id, false, internalRuntimeContext);
+}
+
 export async function renderWithReact18(
   App: React.ReactElement,
   rootElement: HTMLElement,
 ) {
-  const ReactDOM = await import('react-dom/client');
-  const root = ReactDOM.createRoot(rootElement);
+  const root = createRoot(rootElement);
   root.render(App);
   return root;
 }
@@ -137,17 +169,6 @@ export async function renderWithReact17(
   const ReactDOM: any = await import('react-dom');
   ReactDOM.render(App, rootElement);
   return rootElement;
-}
-
-export async function hydrateWithReact18(
-  App: React.ReactElement,
-  rootElement: HTMLElement,
-) {
-  const ReactDOM = await import('react-dom/client');
-  const root = ReactDOM.hydrateRoot(rootElement, App, {
-    identifierPrefix: SSR_HYDRATION_ID_PREFIX,
-  });
-  return root;
 }
 
 export async function hydrateWithReact17(

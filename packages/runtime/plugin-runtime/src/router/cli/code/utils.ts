@@ -1,12 +1,13 @@
-import fs from 'fs';
-import path from 'path';
+// @effect-diagnostics asyncFunction:off nodeBuiltinImport:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import {
-  JS_EXTENSIONS,
   fs as fse,
+  JS_EXTENSIONS,
   normalizeToPosixPath,
 } from '@modern-js/utils';
-import { transform } from '@swc/core';
 import { parse } from 'es-module-lexer';
+import { transform } from 'esbuild';
+import fs from 'fs';
+import path from 'path';
 import { ACTION_EXPORT_NAME, LOADER_EXPORT_NAME } from '../constants';
 
 export const walkDirectory = (dir: string): string[] =>
@@ -56,19 +57,23 @@ export const parseModule = async ({
 
   if (JS_EXTENSIONS.some(ext => filename.endsWith(ext))) {
     const ext = path.extname(filename);
-    const isTs = ext === '.ts' || ext === '.tsx';
-    const isJsx = ext === '.jsx' || ext === '.tsx';
+    const loader =
+      ext === '.tsx'
+        ? 'tsx'
+        : ext === '.ts'
+          ? 'ts'
+          : ext === '.jsx'
+            ? 'jsx'
+            : 'js';
     const result = await transform(content, {
-      filename,
-      isModule: true,
-      module: { type: 'es6' },
-      jsc: {
-        parser: isTs
-          ? { syntax: 'typescript', tsx: isJsx, decorators: true }
-          : { syntax: 'ecmascript', jsx: isJsx, decorators: true },
-        transform: { legacyDecorator: true },
-        target: 'es2022',
-        keepClassNames: true,
+      sourcefile: filename,
+      loader,
+      format: 'esm',
+      target: 'es2022',
+      tsconfigRaw: {
+        compilerOptions: {
+          experimentalDecorators: true,
+        },
       },
     });
     content = result.code;

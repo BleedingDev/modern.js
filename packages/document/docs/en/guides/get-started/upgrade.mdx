@@ -24,7 +24,7 @@ All Modern.js official packages are released with a **uniform version number**, 
    - Visit [npm](https://www.npmjs.com/package/@modern-js/app-tools) to check the latest version of `@modern-js/app-tools`
    - Check [GitHub Releases](https://github.com/web-infra-dev/modern.js/releases)
 
-   <ReleaseNote />
+<ReleaseNote />
 
 2. **Update package.json**
 
@@ -46,7 +46,7 @@ All Modern.js official packages are released with a **uniform version number**, 
 
    After updating `package.json`, reinstall dependencies:
 
-   <PackageManagerTabs command="install" />
+<PackageManagerTabs command="install" />
 
 :::tip
 When upgrading, you need to upgrade all packages provided by Modern.js uniformly, rather than upgrading individual dependencies. Ensure that all `@modern-js/**` packages have the same version number.
@@ -72,16 +72,11 @@ When a nested dependency of the project has a problem and Modern.js cannot be up
 
 ### pnpm
 
-For projects using pnpm, add the following configuration to the `package.json` in the **root directory** of the project, and then run `pnpm install` again:
+For projects using pnpm, add the following configuration to `pnpm-workspace.yaml` in the **root directory** of the project, and then run `pnpm install` again:
 
-```json title="package.json"
-{
-  "pnpm": {
-    "overrides": {
-      "package-name": "^1.0.0"
-    }
-  }
-}
+```yaml title="pnpm-workspace.yaml"
+overrides:
+  package-name: ^1.0.0
 ```
 
 ### Yarn
@@ -109,6 +104,6 @@ For projects using Npm, add the following configuration to the `package.json` in
 ```
 
 :::info
-For Monorepo repositories, you can only lock dependency versions in the `package.json` in the root directory of the project, and it will affect all packages in the Monorepo.
+For Monorepo repositories, lock dependency versions in the package-manager configuration at the project root. The override affects every package in the Monorepo.
 
 :::

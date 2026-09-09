@@ -12,21 +12,20 @@ import { PackageManagerTabs } from '@theme';
 ```js
 const defaultOptions = {
   typescript: {
-    // set 'readonly' to avoid emitting tsbuildinfo,
-    // as the generated tsbuildinfo will break ts-checker-rspack-plugin
-    mode: 'readonly',
-    // enable build when using project reference
-    build: useReference,
     // avoid OOM issue
     memoryLimit: 8192,
     // use tsconfig of user project
     configFile: tsconfigPath,
-    // resolve the default TypeScript package from user project
-    resolveRoot: rootPath,
+    // use TypeScript Go checker by default
+    tsgo: true,
+    // use TS-Go native preview of user project
+    typescriptPath: require.resolve('typescript/package.json'),
   },
   issue: {
-    // ignore type errors from node_modules
-    exclude: [({ file = '' }) => /[\\/]node_modules[\\/]/.test(file)],
+    exclude: [
+      { file: '**/*.(spec|test).ts' },
+      { file: '**/node_modules/**/*' },
+    ],
   },
   logger: {
     log() {
@@ -34,11 +33,7 @@ const defaultOptions = {
       // we only want to display error messages
     },
     error(message: string) {
-      console.error(
-        message
-          .replace(/ERROR/g, 'Type Error')
-          .replace(/WARNING/g, 'Type Warning'),
-      );
+      console.error(message.replace(/ERROR/g, 'Type Error'));
     },
   },
 },
@@ -81,32 +76,28 @@ export default {
 
 > Please refer to [@rsbuild/plugin-type-check](https://github.com/rstackjs/rsbuild-plugin-type-check) for more details.
 
-## TypeScript Go Support
+## TypeScript Go by Default
 
-`tools.tsChecker` supports enabling [TypeScript Go](https://github.com/microsoft/typescript-go) for type checking. This experimental capability is provided by [`ts-checker-rspack-plugin`](https://github.com/rstackjs/ts-checker-rspack-plugin), which is integrated by [`@rsbuild/plugin-type-check`](https://github.com/rstackjs/rsbuild-plugin-type-check), and can reduce type-checking time by about 5-10x.
+Type checking runs on [TypeScript Go](https://github.com/microsoft/typescript-go) (`tsgo`) by default in this fork. The capability is provided by [`ts-checker-rspack-plugin`](https://github.com/rstackjs/ts-checker-rspack-plugin), which is integrated by [`@rsbuild/plugin-type-check`](https://github.com/rstackjs/rsbuild-plugin-type-check), and reduces type-checking time by about 5-10x.
 
-Install TypeScript 7.0 RC to enable TypeScript Go automatically:
+Modern.js prefers the project's stable `typescript` package when it is TypeScript 7 or newer, and falls back to `@typescript/native-preview` for projects still on the preview lane. To pin stable TypeScript 7, install it in your project:
 
-<PackageManagerTabs command="install typescript@rc -D" />
+<PackageManagerTabs command="install typescript -D" />
 
-You can also install `@typescript/native-preview` and set `typescript.tsgo` to `true`:
+When `tsgo` is enabled, the default `typescript.typescriptPath` resolves to `typescript/package.json` for TypeScript 7 projects. If you manually set `typescript.typescriptPath`, it must be an absolute path to `typescript/package.json` or `@typescript/native-preview/package.json`.
 
-<PackageManagerTabs command="install @typescript/native-preview -D" />
+To fall back to the classic TypeScript checker, set `typescript.tsgo` to `false` and make sure `typescript` is installed in your project:
 
 ```ts
 export default {
   tools: {
     tsChecker: {
       typescript: {
-        tsgo: true,
+        tsgo: false,
       },
     },
   },
 };
 ```
-
-When `tsgo` is enabled and `typescript.typescriptPath` is set manually, it must point to an absolute `typescript/package.json` path from TypeScript 7+ or `@typescript/native-preview/package.json`.
-
-> The `@typescript/native-preview` usage is deprecated and kept only for compatibility. We recommend installing `typescript@rc` to use `tsgo`.
 
 For supported options and limitations, please refer to [ts-checker-rspack-plugin - TypeScript Go support](https://github.com/rstackjs/ts-checker-rspack-plugin#typescript-go-support).

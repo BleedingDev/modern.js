@@ -1,6 +1,7 @@
-import * as path from 'path';
+// @effect-diagnostics asyncFunction:off nodeBuiltinImport:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import type { NestedRouteForCli } from '@modern-js/types';
 import { fs, JS_EXTENSIONS, normalizeToPosixPath } from '@modern-js/utils';
+import * as path from 'path';
 import { NESTED_ROUTE } from '../constants';
 import { getPathWithoutExt, hasAction, replaceWithAlias } from './utils';
 
@@ -154,6 +155,7 @@ export const walk = async (options: {
   let pageLoaderFile = '';
   let pageRoute = null;
   let pageConfigFile = '';
+  let pageSearchFile = '';
   let pageClientData = '';
   let pageData = '';
   let pageAction = '';
@@ -246,6 +248,10 @@ export const walk = async (options: {
       pageConfigFile = itemPathWithAlias;
     }
 
+    if (itemWithoutExt === NESTED_ROUTE.PAGE_SEARCH_FILE) {
+      pageSearchFile = itemPathWithAlias;
+    }
+
     if (itemWithoutExt === NESTED_ROUTE.PAGE_FILE) {
       pageRoute = createIndexRoute(
         {
@@ -262,6 +268,9 @@ export const walk = async (options: {
       }
       if (pageConfigFile) {
         pageRoute.config = pageConfigFile;
+      }
+      if (pageSearchFile) {
+        pageRoute.validateSearch = pageSearchFile;
       }
       if (pageData) {
         pageRoute.data = pageData;

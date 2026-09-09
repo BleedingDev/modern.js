@@ -6,7 +6,6 @@ import type {
 } from '@modern-js/types';
 import type {
   APIServerStartInput,
-  FallbackInput,
   ServerConfig,
   ServerPluginExtends,
   WebServerStartInput,
@@ -25,13 +24,8 @@ export function getHookRunners(
     prepare: () => {
       return hooks.onPrepare.call();
     },
-    reset: (params: {
-      event: ResetEvent;
-    }) => {
+    reset: (params: { event: ResetEvent }) => {
       return hooks.onReset.call(params);
-    },
-    fallback: (input: FallbackInput) => {
-      return hooks.fallback.call(input);
     },
     prepareWebServer: (input: WebServerStartInput) => {
       return hooks.prepareWebServer.call(input);

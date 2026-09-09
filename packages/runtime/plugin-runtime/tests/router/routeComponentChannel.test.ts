@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createAsyncHook } from '@modern-js/plugin';
 import {
-  type EagerRouteComponentFilesByEntry,
   collectRouteComponentFiles,
+  type EagerRouteComponentFilesByEntry,
   normalizeModulePath,
 } from '@modern-js/utils';
 import { assign } from '@modern-js/utils/lodash';

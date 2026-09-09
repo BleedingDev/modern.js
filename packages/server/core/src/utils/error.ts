@@ -1,4 +1,15 @@
 import type { Monitors } from '@modern-js/types';
+
+export type {
+  SafeFailureEnvelope,
+  SafeFailureHttpResult,
+} from '@modern-js/runtime-extensions/safe-failure';
+export {
+  createSafeFailureHttpResult,
+  createSafeJsonFailureResponse,
+  getSafeFailureStatus,
+} from '@modern-js/runtime-extensions/safe-failure';
+
 import { parseHeaders } from './request';
 
 const ERROR_PAGE_TEXT: Record<number, string> = {
