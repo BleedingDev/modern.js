@@ -1,0 +1,39 @@
+---
+name: um-zero-20260909-toolkit
+overview: "Repair shared contracts, tooling and utility ownership. packages/toolkit outside i18n-utils and already fork-owned roots; packages/tsconfig, excluding package manifests/changelogs."
+todos:
+  - id: zero-toolkit-extract
+    content: "Repair every assigned inventory row by moving genuine fork additions into existing narrowly responsible fork packages selected in the ownership contract, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+    status: pending
+  - id: zero-toolkit-integrate
+    content: "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+    status: pending
+  - id: zero-toolkit-verify
+    content: "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+    status: pending
+isProject: false
+---
+
+# Repair shared contracts, tooling and utility ownership
+
+## Execution Notes
+
+Tracking: `modernjs-cdhz.13`. Parent planning program: `modernjs-cdhz`. **Planning only: every implementation todo remains pending.** No subagents are launched by this plan. Read [the program contract](um-zero-20260909-overview.md) and [initial ownership coverage](notes/um-zero-20260909/ownership-coverage.md).
+
+Remove the current backend-federation-contract edge and inventory all transitive public exports. Delivery-unit contracts need one real owner that upstream-neutral toolkit utilities do not depend on. Preserve type/project-reference completeness and plugin lifecycle semantics; avoid a catch-all utilities package or test-only facade that retains the old implementation. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.
+
+## Constraints
+
+Own: packages/toolkit outside i18n-utils and already fork-owned roots; packages/tsconfig, excluding package manifests/changelogs.
+
+Keep AGENTS.md Rules 1–5, CONTEXT.md and ADR-0019. Additive fork behavior belongs in genuine fork-owned packages; audited identities retain their full-PR 20-line cap and required same-PR ledger. No allowance reset, scope narrowing, hidden import indirection, generated-output edit, app shim or hook bypass. Current planning permission does not authorize implementation, upstream submission, merge or release.
+
+## Operator Guidance
+
+Owner: **Repair shared contracts, tooling and utility owner**. You are not alone in the codebase: preserve other owners' work and do not edit outside your reservation. Shared manifest, export, lockfile and ledger changes go to integration owners. At execution, update these todo statuses and the br issue from actual evidence; never mark future work completed merely because its plan exists.
+
+Dependencies: [um-zero-20260909-ownership-contract](um-zero-20260909-ownership-contract.plan.md)
+
+Verification and exit: Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior.
+
+Launch successors when their actual prerequisites finish. Do not impose a global wave or two-agent cap. Retain exact plan selection/dependencies and graph ID when later running plan-graph/subagent-graph/helm. Upstream wait states and shared ports are real constraints; elapsed time is not approval.

@@ -1,0 +1,55 @@
+{
+  "planning_source": "114047c57d4eb8f4f8954ecb9dc1b90a0296d608",
+  "qualified_code_source": "7871954269a9d3e8f95a372b02fc5f2e2f965179",
+  "audit_base": "eded841256a7cffdaa622e3889fc83407debd3e4",
+  "reviewed_upstream": "2f4d9c4559e26209a0d77f02c6757f29fe3699a2",
+  "pr_merge_base": "810b57d93b0fec1a6a65f051d322141a0be8a4ae",
+  "divergence_violations": 440,
+  "fork_created": 291,
+  "audited_owned": 149,
+  "current_import_edges": 21,
+  "unallowlisted_edges": 16,
+  "active_allowlisted_edges": 5,
+  "stale_allowlist_edges": 4,
+  "distinct_import_source_files": 20,
+  "union_source_identities": 447,
+  "lanes": {
+    "bff": {
+      "debt_files": 72,
+      "import_edges": 1
+    },
+    "build": {
+      "debt_files": 69,
+      "import_edges": 1
+    },
+    "docs-ownership": {
+      "debt_files": 47,
+      "import_edges": 0
+    },
+    "localization": {
+      "debt_files": 46,
+      "import_edges": 6
+    },
+    "packaging": {
+      "debt_files": 30,
+      "import_edges": 0
+    },
+    "runtime-router": {
+      "debt_files": 62,
+      "import_edges": 2
+    },
+    "runtime-ssr": {
+      "debt_files": 33,
+      "import_edges": 5
+    },
+    "server": {
+      "debt_files": 40,
+      "import_edges": 5
+    },
+    "toolkit": {
+      "debt_files": 41,
+      "import_edges": 1
+    }
+  },
+  "limitations": "Sizing rows were captured earlier in the same implementation; exact 787 head proof confirms unchanged aggregate violations, but execution must regenerate every row against the chosen integration head. Initial ownership assignments are complete planning reservations, not a claim that a legal patch has already been designed."
+}

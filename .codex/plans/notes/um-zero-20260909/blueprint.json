@@ -1,0 +1,644 @@
+[
+  {
+    "slug": "baseline",
+    "title": "Freeze the integration baseline and complete debt register",
+    "deps": [],
+    "owner": "Integration owner",
+    "scope": "Canonical boundary evidence, Git identities and the planning debt register; read-only source inventory.",
+    "todos": [
+      [
+        "freeze",
+        "Select the isolated execution worktree and real eventual PR merge-base, reconcile PR49 and intervening fork-main work, and freeze exact source, audited identity, reviewed provenance, scope and allowance hashes."
+      ],
+      [
+        "inventory",
+        "Regenerate complete divergence and import inventories; reconcile every initial row and newly discovered debt with one owner, including all currently allowlisted imports, tests, fixtures, documentation and generated metadata."
+      ],
+      [
+        "legal-budget",
+        "Record remaining full-PR line capacity and required ledger evidence per audited identity; identify source already merged upstream, real fork additions and unresolved over-cap routes before source edits."
+      ]
+    ],
+    "notes": "Initial evidence is 440 violations (291 fork-created files, 149 audited identities), 21 current edges (16 unallowlisted, five allowlisted), and 447 distinct source identities in the union. These are planning anchors, not a promise that main is unchanged. Starting a new worktree does not reset PR49 deltas: PrefetchLink already uses 19 PR lines if its changes remain in the combined merge range. Read AGENTS.md, CONTEXT.md and ADR-0019 again at execution start.",
+    "verify": "Complete canonical reports on pinned refs; exact inventory set equality, no unassigned rows, unchanged audited base/scope, and explicit source reconciliation. No implementation or budget writer in this milestone."
+  },
+  {
+    "slug": "user-workflows",
+    "title": "Specify simple native usage and measurable update outcomes",
+    "deps": [],
+    "owner": "Consumer workflow owner",
+    "scope": "Usage/update contract and baseline measurements; private fixture definitions, no live consumer writes.",
+    "todos": [
+      [
+        "journeys",
+        "Record the current create, install, add-vertical, add-shell, API, check, build, Node/workerd, framework-update and rollback journeys using existing public commands and representative fresh and customized consumers."
+      ],
+      [
+        "acceptance",
+        "Freeze testable outcomes: one documented supported update entry, zero manual source/config repair on the supported success matrix, zero generated TS/JS or deployment-config changes for same-contract updates, and zero copied framework runtime/checker implementations in fresh apps."
+      ],
+      [
+        "metrics",
+        "Record changed consumer files, generated artifacts, manual interventions, command count, duplicate validation executions, implementation LOC and relevant time/RSS baselines; distinguish real removal from relocation and test growth."
+      ]
+    ],
+    "notes": "Reuse the accepted simplification review P1-P8 and the completed PR49 work. Keep the shell-only default, native Effect APIs, TanStack routing, React/Tailwind/i18n, multi-shell composition, independent delivery units and Node/Cloudflare. A same-contract update may update dependency manifests, the lockfile and narrowly derived release identity data; it must not reconstruct authored source or topology. Genuine public/schema changes use the explicit migration path.",
+    "verify": "Signed-off fixture/metric contract with exact starting revisions and commands; no invented percentage savings. Separately identify upstream framework refreshes and consumer cohort updates."
+  },
+  {
+    "slug": "ownership-contract",
+    "title": "Choose legal ownership routes and freeze extension interfaces",
+    "deps": ["baseline"],
+    "owner": "Architecture and integration owner",
+    "scope": "Per-file disposition register, package/public-interface map, shared-file reservations and upstream proposal contracts.",
+    "todos": [
+      [
+        "classify",
+        "Assign every debt file and all 21 current import edges a concrete retain-native, fork-owned extraction, supported extension point, genuine upstream fix, or legal capped-patch route with callers, destinations and test obligations."
+      ],
+      [
+        "seams",
+        "Freeze neutral host-to-plugin interfaces and package contracts that let fork owners depend on upstream APIs without upstream importing fork packages; list every absent seam as an upstream prerequisite."
+      ],
+      [
+        "packets",
+        "Split component ownership into independently reviewable file reservations, allocate complete-PR cap capacity across all lanes, and record unresolved routes as blocked work rather than allowance growth."
+      ]
+    ],
+    "notes": "Reuse runtime-extensions, i18n-extensions, plugin-bff-extensions, bff-effect, server-runtime-extensions, app-tools-extensions, code-tools, ultramodern-create and the fork docs/Sandpack packages. A new package needs a demonstrated separate responsibility, not one package per violation. No copying audited identities under a new name to claim exemption. Tests and docs move only when fork-created; audited originals keep their identity. Generic upstream capabilities must be useful upstream, not loaders for a named fork subsystem.",
+    "verify": "Every row has an owner and a justified legal route; unresolved feasibility is visible. No empty adapters, dynamic-import indirection, renamed markers, custom app navigation, or packaging aliases used to conceal edges."
+  },
+  {
+    "slug": "upstream-patches",
+    "title": "Prepare and land genuine upstream fixes or extension points",
+    "deps": ["ownership-contract"],
+    "owner": "Upstream contribution owner",
+    "scope": "Clean upstream proposal branches and tests, with exact references back to blocked audited identities; no fork lane edits.",
+    "todos": [
+      [
+        "prepare",
+        "Prepare independently justified upstream-native bug fixes or generic extension points for every route that cannot fit a lawful fork patch, with minimal reproductions and tests on a pinned genuine upstream checkout."
+      ],
+      [
+        "submit",
+        "Present concrete reviewed patches and obtain explicit upstream submission authorization at execution time; then submit and track those PRs without publishing fork-specific policy into upstream."
+      ],
+      [
+        "land",
+        "Record accepted upstream commits and exact semantics, or redesign rejected proposals through a lawful alternative; leave dependent release work blocked until every required upstream route is actually available."
+      ]
+    ],
+    "notes": "This planning request does not authorize upstream PR submission. Prepare work can run alongside fork-owned implementation after interfaces are frozen; upstream review time is an external dependency, never a fake completed milestone. Do not divide one conceptual over-cap remediation into artificial PRs, manufacture tiny touches to raise historical budgets, or remove meaningful tests to reduce a count.",
+    "verify": "Upstream tests and merge provenance for each required seam/fix, exact audited identity mapping and evidence that the incorporated code is genuinely upstream. Proposed patches are not treated as merged source."
+  },
+  {
+    "slug": "provenance",
+    "title": "Implement reviewed upstream provenance carry-forward",
+    "deps": ["ownership-contract"],
+    "owner": "Boundary-governance owner",
+    "scope": "scripts/ultramodern-boundary-check provenance validation/writer tests and reviewed design; actual application reserved to packaging/integration.",
+    "todos": [
+      [
+        "design",
+        "Design a reviewed provenance advancement transaction that keeps audited base eded841256, full canonical scope, immutable renamed identities and per-file budgets; bind the old and new genuine upstream commits and every incorporation conflict."
+      ],
+      [
+        "implement",
+        "Implement the separately reviewed transition path with independent CI re-derivation and atomic failure, while retaining current rejection of ad hoc ref/scope/allowlist overrides and preserving historical accounting evidence."
+      ],
+      [
+        "prove",
+        "Prove that real merged upstream changes are recognized without erasing residual fork edits, resetting budgets, relabeling renamed identities or accepting fork HEAD as upstream; hand the verified transition contract to integration."
+      ]
+    ],
+    "notes": "The current writer explicitly refuses upstreamRef changes. Neither --record-growth nor --rebase-divergence-allowlist supplies this missing provenance operation. Design it openly; do not silently repoint the pinned ref. Keep the audited mainline commit rather than the patch-equivalent non-ancestor tag. Add reverse/failed-transition cases, identity collisions, partial overlap with fork edits and non-ancestor/forged refs. A reviewed classifier correction is permissible only for a proved ownership error with adversarial tests, never as a way to exclude real debt.",
+    "verify": "Positive and negative fixture repositories establish unchanged budgets/identities and exact upstream contribution subtraction; malformed or incomplete transitions leave all files unchanged. No live transition before the required upstream commits exist."
+  },
+  {
+    "slug": "runtime-router",
+    "title": "Repair runtime routing, prefetch and browser ownership",
+    "deps": ["ownership-contract"],
+    "owner": "Repair runtime routing, prefetch and browser owner",
+    "scope": "packages/runtime/plugin-runtime except the SSR lane; native router adapters, exports, provider realms, routing tests and browser helpers.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into runtime-extensions and plugin-tanstack, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Preserve native Link/preload semantics, app-owned provider realms, cross-shell isolation, safe degradation, cancellation and Effect/React/router identity. Remove both current edges owned by this lane, including exports/head and PrefetchLink, using neutral native seams. Do not simply replace a direct import with a re-export or dynamic require. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "runtime-ssr",
+    "title": "Repair SSR, streaming, hydration and render ownership",
+    "deps": ["ownership-contract"],
+    "owner": "Repair SSR, streaming, hydration and render owner",
+    "scope": "packages/runtime/plugin-runtime/src/core/server, src/cli/ssr and tests/ssr; packages/runtime/render, excluding shared package manifests and changelogs.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into runtime-extensions plus existing native server/render seams, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Preserve Node and worker streaming behavior, early script ordering, escaping, hydration stability, RSC boundaries, public assets and module-federation composition. All five current SSR/render edges must disappear. Keep meaningful Node/worker adapter differences; no client-only rendering fallback to hide an SSR defect. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "localization",
+    "title": "Repair localization ownership and native locale integration",
+    "deps": ["ownership-contract"],
+    "owner": "Repair localization owner",
+    "scope": "packages/runtime/plugin-i18n and packages/toolkit/i18n-utils, excluding shared package manifests and changelogs.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into i18n-extensions and established runtime plugin hooks, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Remove all six current i18n edges while preserving URL language negotiation, redirects, cookie/header behavior, external i18next stores, Suspense safety and client/server identity. Keep native plugin APIs; no custom application navigation or per-app locale patches. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "server",
+    "title": "Repair server assembly, lifecycle and runtime ownership",
+    "deps": ["ownership-contract"],
+    "owner": "Repair server assembly, lifecycle and runtime owner",
+    "scope": "packages/server/core, prod-server, server, server-runtime, plugin-polyfill and utils, excluding shared package manifests and changelogs.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into server-runtime-extensions and native ServerPlugin interfaces, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Remove all five current lifecycle/server edges. Preserve Node ESM loading, Cloudflare/workerd support, request draining, cleanup on failed startup, runtime safe-failure handling, security headers and shutdown order. Code in upstream assembly cannot explicitly import the fork plugin to make registration happen; the fork preset must register through the native plugin contract. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "bff",
+    "title": "Repair BFF, request and backend-federation ownership",
+    "deps": ["ownership-contract"],
+    "owner": "Repair BFF, request and backend-federation owner",
+    "scope": "packages/server/bff-core, bff-runtime and create-request; packages/cli/plugin-bff, excluding shared package manifests and changelogs.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into bff-effect, plugin-bff-extensions and server-runtime-extensions, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Preserve native Effect HttpApi/HttpApiBuilder contracts, browser-safe API package exports, Node/worker singleton identity, data ownership and full delivery-unit API/backend identity. Trace the currently allowlisted create-request edge to its actual owner before repair; marker renaming is not a solution. Keep genuine consumer protocol freedom and do not ship a new app DSL. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "build",
+    "title": "Repair builder and app-tool integration ownership",
+    "deps": ["ownership-contract"],
+    "owner": "Repair builder and app-tool integration owner",
+    "scope": "packages/solutions/app-tools, packages/cli except plugin-bff, and packages/runtime/plugin-image, excluding manifests/changelogs.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into app-tools-extensions and existing CLI/build hooks, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Remove the current presetUltramodern edge through native composition from the fork entrypoint. Preserve Rsbuild/Rspack user overrides, createRequire bundling, environment cache isolation, deploy output, worker output, MF types and image behavior. New fork implementations, test helpers and fixtures must leave vanilla package paths. Avoid restoring stale implementation-shaped snapshots. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "toolkit",
+    "title": "Repair shared contracts, tooling and utility ownership",
+    "deps": ["ownership-contract"],
+    "owner": "Repair shared contracts, tooling and utility owner",
+    "scope": "packages/toolkit outside i18n-utils and already fork-owned roots; packages/tsconfig, excluding package manifests/changelogs.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into existing narrowly responsible fork packages selected in the ownership contract, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Remove the current backend-federation-contract edge and inventory all transitive public exports. Delivery-unit contracts need one real owner that upstream-neutral toolkit utilities do not depend on. Preserve type/project-reference completeness and plugin lifecycle semantics; avoid a catch-all utilities package or test-only facade that retains the old implementation. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "docs-ownership",
+    "title": "Repair documentation and generated metadata ownership",
+    "deps": ["ownership-contract"],
+    "owner": "Repair documentation and generated metadata owner",
+    "scope": "packages/document except package.json, and governed package CHANGELOG.md identities; coordinate routes and generated metadata with packaging.",
+    "todos": [
+      [
+        "extract",
+        "Repair every assigned inventory row by moving genuine fork additions into ultramodern-preset, ultramodern-sandpack-profile and supported documentation extension points, deleting their old implementations and redundant helpers, and retaining audited identities under their approved legal route."
+      ],
+      [
+        "integrate",
+        "Implement the frozen native extension contracts and eliminate every assigned governed import edge; return manifest/export edits and any over-cap audited caller changes to their designated owners rather than writing across reservations."
+      ],
+      [
+        "verify",
+        "Verify the preserved behavior with focused positive and negative tests, report complete-PR and cumulative deltas per affected audited identity, and provide a deletion/move/retention map with no unassigned residuals."
+      ]
+    ],
+    "notes": "Move only fork-created documentation, examples and site behavior to proven fork owners, preserving public documentation routes and exports through supported tooling. Audited docs retain identity and follow the same cap. Do not manually edit dist, generated changelogs or lockfiles; use the owning generator/upstream incorporation path, or leave the row blocked pending a lawful route. Initial reservations are the exact rows in debt-inventory.json; package manifests belong to packaging and changelogs to docs-ownership. Any shared-file change requires an explicit handoff. Code may be developed against an exact prepared upstream proposal, but cannot be integrated or released as if that proposal had already merged.",
+    "verify": "Run the relevant existing component suites plus concrete boundary/behavior regressions; validate real outputs where semantics depend on bundling or runtime identity. No green claim from renames, test deletion, adapters that retain both implementations, or source-only mocks of the failed behavior."
+  },
+  {
+    "slug": "packaging",
+    "title": "Integrate native seams, exports and the complete package cohort",
+    "deps": [
+      "runtime-router",
+      "runtime-ssr",
+      "localization",
+      "server",
+      "bff",
+      "build",
+      "toolkit",
+      "docs-ownership",
+      "upstream-patches",
+      "provenance"
+    ],
+    "owner": "Package integration owner",
+    "scope": "All assigned package.json identities; shared exports/manifests, root scripts/cohort definitions, pnpm-generated lockfile and integration of genuine upstream commits.",
+    "todos": [
+      [
+        "incorporate",
+        "Integrate the exact accepted upstream commits with attributable conflict resolution and the reviewed provenance transaction, then apply component handoffs to a single coherent fork package graph."
+      ],
+      [
+        "package",
+        "Publish responsibilities through existing fork entrypoints, package exports and native extension registration; eliminate stale dependencies/deep imports without per-app shims or unnecessary public packages."
+      ],
+      [
+        "closure",
+        "Verify ESM/CJS/browser/Node/workerd/type export closure, singleton identity, consumer dependency resolution and a complete single-version cohort including app-tools-extensions and exact stable sidecars."
+      ]
+    ],
+    "notes": "One owner writes package manifests, lockfile and shared cohort data. Component owners provide exact field-level patches. Use package-manager generation for pnpm-lock.yaml and the repository changeset/release pipeline for generated metadata. Separate genuine upstream adoption from release version selection. Never claim a relocation removed implementation LOC. New destination package classification needs immutable creation/provenance evidence and tests.",
+    "verify": "Canonical package builds and packed export/type/identity tests; full dependency graph has no hidden upstream-to-fork import path. No stale .2/.3 aliases mixed with the selected cohort and no root dependency used to conceal a missing app dependency."
+  },
+  {
+    "slug": "generated-surface",
+    "title": "Remove copied framework implementation from generated workspaces",
+    "deps": ["ownership-contract", "user-workflows"],
+    "owner": "Generator artifact owner",
+    "scope": "ultramodern-create artifact projection, existing normalization/catalog, fresh writers and framework-owned templates; shared writer interfaces frozen before dependent lanes.",
+    "todos": [
+      [
+        "inventory",
+        "Classify every fresh/add/migrate artifact as consumer business source, minimal entry wrapper, contract data or framework implementation, and identify remaining repeated implementation beyond the three templates already removed in PR49."
+      ],
+      [
+        "package",
+        "Move remaining framework runtime/checker/tooling implementations behind existing versioned package APIs and derive minimal wrappers/data through the shared normalization and command catalog; delete duplicate writer/template paths together."
+      ],
+      [
+        "parity",
+        "Prove fresh, add-shell, add-vertical and migrate agree on owned projections, with zero copied framework runtime/checker implementations and preserved raw/unknown metadata, live ports, empty references and additive shells."
+      ]
+    ],
+    "notes": "Reuse normalizeWorkspaceInputs, the generated tooling command catalog, packaged microvertical-api and code-tools; do not reimplement PR49. No new persisted master configuration, second transaction engine, registry of every internal function, or catch-all command facade. Framework-generated build identity should be data projected/read by stable packaged code, not a reason to rewrite TS/JS on each ordinary update.",
+    "verify": "Shell-only, API-bearing, headless, multiple-shell and customized fixture parity; count all generated implementation files and wrappers before/after. Record strict reduction of the remaining avoidable consumer implementation, not merely movement into another consumer directory."
+  },
+  {
+    "slug": "update-transaction",
+    "title": "Make same-contract updates primarily dependency changes",
+    "deps": ["generated-surface"],
+    "owner": "Update transaction owner",
+    "scope": "Existing migrate-strict-effect entry/orchestrator, MigrationIo transaction, cohort selection and structured change/preserve/conflict reporting.",
+    "todos": [
+      [
+        "classify",
+        "Extend the existing supported update path to distinguish same-contract dependency/cohort updates from actual public API or configuration-schema migrations, based on versioned contract evidence rather than source-format guesses."
+      ],
+      [
+        "minimal-update",
+        "Implement the same-contract path so it changes dependency references, lockfile and narrowly derived release identity data while leaving consumer TS/JS, topology, deployment config, custom scripts and patches byte-for-byte unchanged."
+      ],
+      [
+        "atomic",
+        "Expose the existing dry-run/change/preserve/conflict result and make validation, failed installation, interrupted execution and retry preserve or restore the entire transaction; second application is a no-op."
+      ]
+    ],
+    "notes": "One documented public update entry reuses current CLI and MigrationIo; a new doctor/governance CLI or permanent compatibility alias is not the objective. Preserve compatible newer package-manager settings, every first-party dependency, custom patches and consumer script segments. Never interpret an arbitrary consumer tree or reference repository as a migration target. Keep analyzer/runtime/ownership/network errors distinct and actionable.",
+    "verify": "Real tarball-based N\u2192N+1 same-contract update; exact allowlisted file diff with zero generated TS/JS or deployment-config edits; dry-run no mutation; second run no-op; injected install/check failure and interruption restore bytes, symlinks, index and Git metadata."
+  },
+  {
+    "slug": "legacy-migrations",
+    "title": "Provide complete, bounded upgrades from supported older workspaces",
+    "deps": ["update-transaction"],
+    "owner": "Legacy migration owner",
+    "scope": "Existing migration ownership recognizers and versioned transformations; no second updater or application edits.",
+    "todos": [
+      [
+        "floor",
+        "Define the supported migration floor from actual published artifact/consumer evidence and inventory every schema/API transition still needed, including customized OntOS-style workspaces and historic generated validators."
+      ],
+      [
+        "transform",
+        "Implement each necessary one-time transformation with exact ownership/public-contract checks and direct native API imports; preserve authored files and reject conflicting custom baselines before promotion."
+      ],
+      [
+        "regressions",
+        "Verify old\u2192current\u2192next, interrupted retry, rollback and idempotence for custom ports, shells, TS/MF/Modern configs, scripts, patches, reference repositories, symlinks and supported nested external bridges."
+      ]
+    ],
+    "notes": "The floor is an explicit version/contract boundary, not an expiry date or an assumption that no external users exist. Reuse PR49 history recognizers and scope guards. Native API replacement is preferred to compatibility wrappers; an unsupported customized case must receive an actionable preflight conflict, not a half-updated workspace. No global-hook bypass, synthetic links/navigation or per-app config suppression.",
+    "verify": "Historical packed fixtures plus a real customized consumer, with exact diff/rollback assertions. Baseline retirement involving external bridge consumers must fail atomically unless their coordinated migration is genuinely in scope."
+  },
+  {
+    "slug": "native-usage",
+    "title": "Make native workflows discoverable and keep applications small",
+    "deps": ["generated-surface"],
+    "owner": "Developer experience owner",
+    "scope": "Existing create/tooling help and dispatch, root user-facing skills, fork-owned public documentation and example input fixtures.",
+    "todos": [
+      [
+        "commands",
+        "Document and align create, add-vertical, add-shell, update, format, check, build and delivery-unit commands with actual dispatch/catalog metadata; remove redundant public steps without hiding required validation."
+      ],
+      [
+        "examples",
+        "Demonstrate native Effect API composition, TanStack Link/search/navigation, localized routes and Node/workerd deployment in minimal generated fixtures, preserving neutral defaults and consumer-owned business choices."
+      ],
+      [
+        "instructions",
+        "Replace obsolete API guidance directly, explain genuine breaking migrations and conflict recovery, and synchronize generated skill mirrors through pnpm sync:skills rather than hand editing them."
+      ]
+    ],
+    "notes": "No bespoke framework DSL, app navigation wrapper, synthetic anchor handler, copied checker, or architecture lecture in the normal user flow. Shells stay thin and headless verticals remain valid. The native workflow must be executable from the documented commands without hidden preparation from an agent session. Documentation deployment belongs to the final release; this lane owns content and executable examples.",
+    "verify": "Run documented journeys as fixtures, verify command/help parity and references, and count required user actions. Every supported success case must finish without manual source/config repair. Preserve original Tractor visuals."
+  },
+  {
+    "slug": "retirement",
+    "title": "Resolve remaining compatibility and update-policy complexity",
+    "deps": [
+      "legacy-migrations",
+      "runtime-router",
+      "runtime-ssr",
+      "localization"
+    ],
+    "owner": "Compatibility and policy owner",
+    "scope": "Exact legacy runtime/support-floor paths and release-age migration policy identified in the prior review; edit ownership transferred only after component lanes finish.",
+    "todos": [
+      [
+        "decide",
+        "Resolve the v2 router registry, marker-based SSR discovery, published wrapper fallbacks and emergency-age policy against a concrete supported consumer floor; record a remove-or-current-contract decision for each."
+      ],
+      [
+        "simplify",
+        "Delete proven obsolete branches and duplicate historical policy implementations through their legal owners; preserve still-required behavior in the smallest native package contract without new toggles or application aliases."
+      ],
+      [
+        "prove",
+        "Verify supported old/current consumers, explicit MF SSR, realm isolation and release-age/cohort integrity after the decision; account for any additional audited edits in the same full-PR cap ledger."
+      ]
+    ],
+    "notes": "Carry forward modernjs-gt5t and modernjs-jle1 as explicit decisions, not forgotten exclusions. Until evidence and any necessary product decision permit retirement, preserve the current emergency-adoption contract and security floor; an empty active-approval list is not proof that recognition-only migrations are dead. Retaining a still-required capability cannot retain a boundary violation or governed edge. No arbitrary old-version compatibility layer is introduced.",
+    "verify": "Explicit supported contract matrix with no unclassified legacy paths; each retained path has a current requirement, owner and test. Any optional retirement blocked on a product decision is distinguished from mandatory zero-debt repairs, which remain required."
+  },
+  {
+    "slug": "regression-matrix",
+    "title": "Prepare independent boundary, runtime and update regression proofs",
+    "deps": ["ownership-contract", "user-workflows"],
+    "owner": "Acceptance fixture owner",
+    "scope": "New isolated regression fixtures and existing test-harness integration; component source/test files remain with their assigned owners.",
+    "todos": [
+      [
+        "matrix",
+        "Build a contract-based matrix covering neutral/customized generation, same-contract and legacy updates, native API identity, routing/i18n/SSR, Node/workerd, build/export types and complete cohort resolution."
+      ],
+      [
+        "adversarial",
+        "Add meaningful negative proofs for import alias/barrel/dynamic/type edges, provenance and rename tricks, partial rollback, symlink/ancestor escapes, misleading ownership, mixed delivery units and analyzer process failures."
+      ],
+      [
+        "resources",
+        "Give each test run a private workspace, artifact root and process lifecycle; encode real shared-port conflicts instead of pretending ERP and Tractor can share default ports concurrently."
+      ]
+    ],
+    "notes": "Prepare fixtures in parallel with implementation once interfaces are stable. Reuse substantive existing tests; avoid implementation-shaped snapshots or tests that merely mirror the patch. Keep Linux runtime/native-analyzer proof and justified Windows/macOS checks; distinguish source, packed and published boundaries. No broad shared tmp cleanup, process killing by guessed PID, or use of another agent's consumer/candidate.",
+    "verify": "Fixture self-checks demonstrate that deliberate representative regressions fail. Final acceptance runs these against built/packed implementations; fixture preparation alone is not runtime or release success."
+  },
+  {
+    "slug": "zero-gate",
+    "title": "Prove zero canonical violations and zero governed import edges",
+    "deps": ["packaging", "retirement"],
+    "owner": "Boundary integration owner",
+    "scope": "Canonical gate, shrink-only divergence accounting, reviewed import allowance retirement and exact inventory reconciliation; uses existing issue modernjs-piop.",
+    "todos": [
+      [
+        "complete",
+        "Resolve every original and newly discovered inventory row and reconcile all upstream/native/fork ownership routes against the final integrated source; no residual historical exceptions may be waived."
+      ],
+      [
+        "lock",
+        "Run the full canonical checker and independently require zero current import edges, not merely zero added edges; retire stale import allowances and lock only genuine cumulative shrink through supported reviewed operations."
+      ],
+      [
+        "enforce",
+        "Verify normal CLI and CI cannot pass any current edge via an allowance, alternate roots, aliases, marker renaming or ignored categories; require zero divergence violations, zero current imports, zero active/stale import exemptions and valid per-file caps/ledger."
+      ]
+    ],
+    "notes": "Zero violations does not mean literally zero legitimate upstream diff: real neutral capped changes may remain within unchanged/lowered budgets with valid evidence. It does mean no additive fork subsystem in vanilla packages and no governed upstream-to-fork import edges. Preserve complete canonical scope, audited identities and exact ref validation. Do not mass-approve inherited excess or clear the ledger by changing a tag/base.",
+    "verify": "Exact committed head/base reports with violations=0, current import edges=0 and empty obsolete import allowance set. Re-run negative gate fixtures and prove all 447 initial union identities are reconciled or correctly superseded by fresh inventory evidence."
+  },
+  {
+    "slug": "integration",
+    "title": "Qualify one complete source and immutable package candidate",
+    "deps": [
+      "zero-gate",
+      "native-usage",
+      "legacy-migrations",
+      "regression-matrix"
+    ],
+    "owner": "Integration and release owner",
+    "scope": "Final shared changesets, quality gates, clean source commit, full cohort build and immutable staging; one owner controls source and artifact identity.",
+    "todos": [
+      [
+        "quality",
+        "Run affected component suites, generator and publication tooling tests, package/type/export checks, changesets/lint, canonical zero gates and required OS/native-runtime proofs on the complete final ref."
+      ],
+      [
+        "freeze",
+        "Commit and push the qualified source to bleedingdev, freeze the full package cohort and sidecars from clean built bytes, and record manifest/tarball/source/toolchain digests without reusing old accepted candidates."
+      ],
+      [
+        "handoff",
+        "Reserve target-private acceptance workspaces and hand identical immutable bytes to source and update acceptance owners; any source/package change creates a new candidate and invalidates dependent evidence."
+      ]
+    ],
+    "notes": "PR49 candidate7871954269 is historical source evidence, not approval of a later candidate. Its final tracking-only commit114047c57d contains no new framework source. Never silently merge another agent's work or take its release version/registry. Read-only upstream/fork discovery is allowed; release only after source integration and zero gates are green.",
+    "verify": "All required source checks pass with no waived/unchecked failures; frozen artifact identity and clean pushed source are independently recorded. No merge/release while canonical failures remain."
+  },
+  {
+    "slug": "source-acceptance",
+    "title": "Verify ERP and Tractor on exact source artifacts",
+    "deps": ["integration"],
+    "owner": "Source acceptance owner",
+    "scope": "Private ERP-10 and reviewed Tractor workspaces and their Node/workerd evidence.",
+    "todos": [
+      [
+        "erp",
+        "Run the complete supported ERP-10 source acceptance driver with matching source/version/manifest identity, including Node/workerd browser, API and operational-independence checks."
+      ],
+      [
+        "tractor",
+        "Use the required canonical Tractor repository if available and exclusively reserved, otherwise record absence and use the reviewed private baseline; run supported migration, explicit formatting/checks, Node/workerd SSR and visible shopping acceptance."
+      ],
+      [
+        "bind",
+        "Verify complete receipts and required check identities against the same manifest, preserve visible Tractor UI and capture source-versus-published status, failures and resource cleanup honestly."
+      ]
+    ],
+    "notes": "Existing full drivers cover both platforms; do not launch duplicate ERP suites under separate Node/Cloudflare labels. On one host, ERP and Tractor use shared default ports and run serially; parallelism requires truly isolated supported environments, not app config remapping. Reserve external TMPDIR roots so generated repos cannot inherit framework Git state. No consumer workaround, arbitrary hash approval or generated-output patch.",
+    "verify": "Fresh complete source receipt plus operational independence, Tractor exact report, real visible UI/search/API/SSR results on both platforms, and no leaked owned server/registry processes."
+  },
+  {
+    "slug": "update-acceptance",
+    "title": "Prove simple updates through two real candidate transitions",
+    "deps": ["integration"],
+    "owner": "Consumer update acceptance owner",
+    "scope": "Private neutral, historical, customized OntOS-style, bridge and Tractor-compatible update fixtures; separately reserved ports/artifacts.",
+    "todos": [
+      [
+        "forward",
+        "Run supported published-floor\u2192candidate and candidate\u2192next-compatible-candidate updates using real distinct tarballs/cohorts in an isolated registry; exercise the documented entrypoint without manual source/config edits."
+      ],
+      [
+        "diff",
+        "Assert same-contract updates change only dependency/lockfile and narrowly derived identity data, legacy transforms occur once, all first-party references match, custom files survive, and repeat invocation is a no-op."
+      ],
+      [
+        "failure",
+        "Inject ownership, install, check, interrupted-process and unavailable-registry failures; prove atomic rollback, actionable error classes, safe retry and a functional previously accepted version without bypassing hooks or provenance."
+      ]
+    ],
+    "notes": "An isolated next-version rehearsal must use distinct real package bytes and a clearly local identity; it is not a claim that the next version was published. Reuse the canonical transaction and registry/manifest helpers. Coordinate live OntOS with its owner and discover it via the project registry before reads; another agent's checkout, manifests or active .4 rehearsal is not a test fixture. Use user-owned deployment/database logic unchanged.",
+    "verify": "Machine-readable before/after file diffs, zero manual repair on the supported success matrix, complete cohort and runtime tests, and byte-exact rollback/idempotence receipts. Publish no invented time/RSS savings; compare actual observations with user-workflows baseline."
+  },
+  {
+    "slug": "publication",
+    "title": "Publish only the fully repaired and accepted cohort",
+    "deps": ["source-acceptance", "update-acceptance"],
+    "owner": "Release owner",
+    "scope": "Fork PR/main integration, trusted GitHub release workflow, immutable producer and full registry cohort.",
+    "todos": [
+      [
+        "promote",
+        "Recheck actual fork-main changes and zero gates, resolve integration without evading cumulative caps, and establish the final reviewed source on bleedingdev through the normal fork route after execution is authorized."
+      ],
+      [
+        "publish",
+        "Select a currently unused coherent version and run the canonical trusted producer/release workflow with full source qualification, source ERP/Tractor prerequisites, sidecars and OIDC publication; never reuse another agent's candidate or mismatched recovery run."
+      ],
+      [
+        "verify",
+        "Verify every published tarball, exact cohort version, provenance/source/digests and registry tags against the accepted producer, and hand immutable registry identity to published acceptance."
+      ]
+    ],
+    "notes": "This is a future plan, not permission to publish during planning. The former broad execution request is superseded by plan-only for this turn. When execution resumes, preserve the existing fork publication authorization unless the user changes it; upstream submission remains separately explicit. No main/ref/environment policy change, dry-run outcome relabeling or source receipt reuse as published proof.",
+    "verify": "Authenticated non-dry publication of all cohort members and sidecars through supported workflow; no partial success declared complete. Failure/recovery remains bound to the exact original producer and candidate identity."
+  },
+  {
+    "slug": "published-acceptance",
+    "title": "Verify exact published bytes in real downstream workflows",
+    "deps": ["publication"],
+    "owner": "Published acceptance owner",
+    "scope": "Clean registry-installed ERP/customized consumer and Tractor; final published receipts and operational proofs.",
+    "todos": [
+      [
+        "erp",
+        "Install the exact published cohort in a clean consumer and run the published ERP-10 Node/workerd driver with package/export/API/singleton and operational-independence checks."
+      ],
+      [
+        "consumers",
+        "Run published Tractor Node/workerd visible acceptance and the documented update journey in the reserved customized consumer, preserving native primitives, business behavior and Tractor visuals."
+      ],
+      [
+        "outcome",
+        "Verify publication outcome binds source, version, producer, cohort digests and all published receipts; retain failure classification and do not close work on a dry run or source-only pass."
+      ]
+    ],
+    "notes": "Use final workflow-reviewed consumer baselines and fresh artifacts; old green .3, .4 rehearsals and PR49 source candidate are supporting history only. Native platform differences and independent delivery-unit promotion/rollback remain part of acceptance. Do not deploy a live consumer beyond execution authorization just to obtain a green report.",
+    "verify": "Complete authenticated published outcome, exact ERP and Tractor reports, successful real update, zero canonical source violations/import edges, and preserved downstream UI."
+  },
+  {
+    "slug": "closeout",
+    "title": "Close only with zero debt and demonstrably simpler usage",
+    "deps": ["published-acceptance"],
+    "owner": "Integration owner",
+    "scope": "Final evidence, comparison report, br completion, committed/pushed handoff and owned resource cleanup.",
+    "todos": [
+      [
+        "compare",
+        "Compare final consumer artifacts, update file changes/manual steps, duplicated implementation/check execution, overall and production LOC and measured runtime/resource costs against the frozen baseline; explain genuine deletions versus relocations."
+      ],
+      [
+        "reconcile",
+        "Confirm every inventory identity, import edge and supported migration/retirement decision has its promised outcome; require zero canonical violations/current edges and full published acceptance before closing historical or release issues."
+      ],
+      [
+        "finish",
+        "Persist the exact plan/evidence/tracker state, commit and push authorized work, leave owned worktrees clean, release only owned temporary resources and provide a concise reproducible release/update handoff."
+      ]
+    ],
+    "notes": "The umbrella is a downstream rollup, never a runnable replacement for its children. A larger source tree caused by tests must be reported honestly; moving files alone does not satisfy the usage/update goal. No historical debt is deferred under a completed zero-debt milestone. External upstream delays remain explicit blockers rather than waived criteria.",
+    "verify": "All br execution issues legitimately complete, no orphaned plan nodes or unresolved required outcomes, published identity and reproducer linked, no source changes stranded locally or shared resources disrupted."
+  }
+]
