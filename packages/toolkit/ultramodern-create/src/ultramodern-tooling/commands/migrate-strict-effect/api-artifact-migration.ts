@@ -47,7 +47,11 @@ type ApiMigrationSourceScope = {
   workspacePatterns?: readonly string[];
 };
 
-function migrationSourceRoots(root: string, scope: ApiMigrationSourceScope) {
+function migrationSourceRoots(
+  root: string,
+  scope: ApiMigrationSourceScope,
+  retiringBaseline: boolean,
+) {
   const roots = new Set(['apps', 'verticals', 'packages', 'scripts']);
   const patterns: unknown[] = [...(scope.workspacePatterns ?? [])];
   for (const filename of ['package.json', 'pnpm-workspace.yaml']) {
@@ -92,6 +96,20 @@ function migrationSourceRoots(root: string, scope: ApiMigrationSourceScope) {
     // Negative selectors do not narrow the conservative migration preflight.
     if (pattern.startsWith('!')) continue;
     const normalized = normalizeRelativePath(pattern);
+    const configuredExternalBridge =
+      normalized.startsWith('../') &&
+      scope.workspacePatterns?.some(
+        declared => normalizeRelativePath(declared) === normalized,
+      );
+    if (configuredExternalBridge) {
+      if (retiringBaseline)
+        throw new Error(
+          `API migration conflict: cannot retire the API baseline while external bridge consumers (${pattern}) are outside this workspace's migration scope; migrate those consumers together before retrying.`,
+        );
+      // Normalized bridge configuration supports parent packages. A migration
+      // that removes no baseline has no authority or need to visit those files.
+      continue;
+    }
     const selected = new Set<string>();
     collectBridgeScanRoots(
       { bridge: { workspacePackages: [{ pattern: normalized }] } },
@@ -221,7 +239,11 @@ export function migratePackageOwnedApiArtifacts(
   }
   const files = workspaceFiles(
     io.workspaceRoot,
-    migrationSourceRoots(io.workspaceRoot, sourceScope),
+    migrationSourceRoots(
+      io.workspaceRoot,
+      sourceScope,
+      removals.has(baselinePath),
+    ),
   );
   const sharedManifest = files.includes(sharedManifestPath)
     ? readJsonFile(path.join(io.workspaceRoot, sharedManifestPath))

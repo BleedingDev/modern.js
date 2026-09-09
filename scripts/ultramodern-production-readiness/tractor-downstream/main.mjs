@@ -67,6 +67,9 @@ const nodeBackendProofPath =
   '.codex/reports/node-backend-federation-proof/proof.json';
 const requiredCommands = Object.freeze([
   Object.freeze(['pnpm', ['install', '--frozen-lockfile']]),
+  // Migration preserves authored formatting; install refreshes pinned skills.
+  // Run the consumer's standard formatter before its mandatory quality checks.
+  Object.freeze(['pnpm', ['format']]),
   Object.freeze(['pnpm', ['check']]),
   Object.freeze(['pnpm', ['build']]),
   Object.freeze(['pnpm', ['node:proof']]),
@@ -817,6 +820,26 @@ function readPassingNodeBackendProof(workspace) {
   };
 }
 
+function* executeTractorCommands({ workspace, env, report, runImpl = run }) {
+  for (const {
+    command: [command, args],
+    report: reportCommand,
+  } of executionCommands) {
+    if (args[0] === 'node:proof') {
+      fs.rmSync(path.join(workspace, nodeBackendProofPath), { force: true });
+    }
+    runImpl(command, args, { cwd: workspace, env });
+    if (reportCommand) {
+      report.checks.push({
+        id: args.join('-'),
+        status: 'passed',
+        detail: { command: [command, ...args].join(' ') },
+      });
+    }
+    yield args;
+  }
+}
+
 async function runTractorDownstreamAcceptance(
   options,
   {
@@ -923,23 +946,12 @@ async function runTractorDownstreamAcceptance(
       },
     });
 
-    for (const {
-      command: [command, args],
-      report: reportCommand,
-    } of executionCommands) {
-      if (args[0] === 'node:proof') {
-        fs.rmSync(path.join(options.workspace, nodeBackendProofPath), {
-          force: true,
-        });
-      }
-      runImpl(command, args, { cwd: options.workspace, env });
-      if (reportCommand) {
-        report.checks.push({
-          id: args.join('-'),
-          status: 'passed',
-          detail: { command: [command, ...args].join(' ') },
-        });
-      }
+    for (const args of executeTractorCommands({
+      workspace: options.workspace,
+      env,
+      report,
+      runImpl,
+    })) {
       if (args[0] === 'check') {
         const applicationSourceRevision = snapshotAcceptanceWorkspaceSource(
           options.workspace,
@@ -1204,6 +1216,7 @@ export {
   createReleaseBoundNodeSmokeTargets,
   createTractorPackageManagerContext,
   createTractorPnpmDlxArgs,
+  executeTractorCommands,
   executionCommands,
   launchWorkspaceBrowser,
   main,

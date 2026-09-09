@@ -325,6 +325,60 @@ test.each([
   expect(() => migrate()).toThrow('safe source root');
   expect(snapshot()).toEqual(before);
 });
+test.each([
+  'current',
+  'retiring',
+  'stale-local',
+  'undeclared',
+] as const)('external bridge scope preserves the %s baseline contract without visiting parent files', scenario => {
+  const external = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-api-bridge-parent-'),
+  );
+  try {
+    fs.writeFileSync(path.join(external, 'source.ts'), 'parent-owned source');
+    fs.symlinkSync('missing.ts', path.join(external, 'linked.ts'));
+    if (scenario !== 'retiring') migrate();
+    const pattern = path.relative(root, external).replaceAll(path.sep, '/');
+    const manifest = JSON.parse(read('package.json'));
+    manifest.workspaces = [pattern];
+    write('package.json', JSON.stringify(manifest));
+    write('pnpm-workspace.yaml', `packages:\n  - '${pattern}'\n`);
+    if (scenario === 'stale-local')
+      write(
+        'verticals/inventory/stale.ts',
+        "import { MicroVerticalReadinessSchema } from '@warehouse/shared-contracts/microvertical-api-baseline';\n",
+      );
+    const before = snapshot();
+    const run = () =>
+      migrate(false, {
+        workspacePatterns: scenario === 'undeclared' ? [] : [pattern],
+      });
+    if (scenario === 'current') {
+      run();
+      const after = snapshot();
+      run();
+      expect(snapshot()).toEqual(after);
+    } else {
+      expect(run).toThrow(
+        scenario === 'retiring'
+          ? 'cannot retire the API baseline while external bridge consumers'
+          : scenario === 'stale-local'
+            ? 'old baseline reference has no proven generated owner'
+            : 'safe source root',
+      );
+      expect(snapshot()).toEqual(before);
+    }
+    expect(fs.readFileSync(path.join(external, 'source.ts'), 'utf8')).toBe(
+      'parent-owned source',
+    );
+    expect(fs.readlinkSync(path.join(external, 'linked.ts'))).toBe(
+      'missing.ts',
+    );
+  } finally {
+    fs.rmSync(external, { recursive: true, force: true });
+  }
+});
+
 test('consumer path aliases are an explicit conflict before retiring the mapped module', () => {
   write(
     'tsconfig.json',

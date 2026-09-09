@@ -45,6 +45,7 @@ async function createEvidenceFixture({
   createSourceName = '@modern-js/ultramodern-create',
   createTargetName = '@bleedingdev/modern-js-ultramodern-create',
   includePublishedOperationalEvidence = false,
+  includeTractorFormattingEvidence = true,
   receiptApiOverride,
   releaseArtifactsApiOverride,
   releaseManifestApiOverride,
@@ -325,6 +326,7 @@ async function createEvidenceFixture({
         },
         ...[
           'install---frozen-lockfile',
+          ...(includeTractorFormattingEvidence ? ['format'] : []),
           'check',
           'promotable-application-source',
           'build',
@@ -722,6 +724,8 @@ test('backfill reconstructs schema-v4 outcomes with the archived historical crea
     createSourceName: '@modern-js/create',
     createTargetName: '@bleedingdev/modern-js-create',
     includePublishedOperationalEvidence: true,
+    // This archived contract predates the explicit formatter lifecycle step.
+    includeTractorFormattingEvidence: false,
     receiptApiOverride: historicalReceiptApi,
     releaseArtifactsApiOverride: historicalReleaseArtifactsApi,
     releaseManifestApiOverride: historicalReleaseManifestApi,
