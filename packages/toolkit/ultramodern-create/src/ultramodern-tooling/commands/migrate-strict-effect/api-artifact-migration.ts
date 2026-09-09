@@ -3,9 +3,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from '@babel/parser';
 import { modernPackageSpecifier } from '../../../ultramodern-package-source';
+import {
+  collectBridgeScanRoots,
+  normalizeRelativePath,
+} from '../../../ultramodern-workspace/mf-validation/path-utils';
 import type { ResolvedPackageSource } from '../../../ultramodern-workspace/types';
 import hashes from './api-artifact-hashes';
 import { type MigrationIo, readJsonFile } from './io';
+import { parsePnpmWorkspaceYaml } from './pnpm-yaml';
 
 const owner = '@modern-js/bff-effect/microvertical-api';
 const baselinePath =
@@ -37,10 +42,74 @@ export const retiredApiArtifacts = Object.entries(hashes).flatMap(
   ],
 );
 
+type ApiMigrationSourceScope = {
+  appDirectories?: readonly string[];
+  workspacePatterns?: readonly string[];
+};
+
+function migrationSourceRoots(root: string, scope: ApiMigrationSourceScope) {
+  const roots = new Set(['apps', 'verticals', 'packages', 'scripts']);
+  const patterns: unknown[] = [...(scope.workspacePatterns ?? [])];
+  for (const filename of ['package.json', 'pnpm-workspace.yaml']) {
+    const file = path.join(root, filename);
+    const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+    if (!stat) continue;
+    if (!stat.isFile())
+      throw new Error(
+        `API migration conflict: ${filename} is not a regular file.`,
+      );
+    const document =
+      filename === 'package.json'
+        ? readJsonFile(file)
+        : parsePnpmWorkspaceYaml(fs.readFileSync(file, 'utf8')).document;
+    const declared =
+      filename === 'package.json' ? document.workspaces : document.packages;
+    if (declared === undefined) continue;
+    if (!Array.isArray(declared))
+      throw new Error(
+        `API migration conflict: ${filename} workspace packages must be a string list.`,
+      );
+    patterns.push(...declared);
+  }
+  for (const directory of scope.appDirectories ?? []) {
+    const normalized = normalizeRelativePath(directory);
+    if (
+      normalized === '.' ||
+      path.isAbsolute(normalized) ||
+      normalized.split('/').includes('..') ||
+      /[*?[\]{}]/u.test(normalized)
+    )
+      throw new Error(
+        `API migration conflict: unsafe configured app path ${directory}.`,
+      );
+    roots.add(normalized);
+  }
+  for (const pattern of patterns) {
+    if (typeof pattern !== 'string')
+      throw new Error(
+        'API migration conflict: workspace package patterns must be strings.',
+      );
+    // Negative selectors do not narrow the conservative migration preflight.
+    if (pattern.startsWith('!')) continue;
+    const normalized = normalizeRelativePath(pattern);
+    const selected = new Set<string>();
+    collectBridgeScanRoots(
+      { bridge: { workspacePackages: [{ pattern: normalized }] } },
+      selected,
+    );
+    if (normalized.split('/').includes('..') || selected.size === 0)
+      throw new Error(
+        `API migration conflict: workspace pattern ${pattern} has no safe source root.`,
+      );
+    for (const directory of selected) roots.add(directory);
+  }
+  return [...roots];
+}
+
 function workspaceFiles(
   root: string,
+  sourceRoots: readonly string[],
   directory = '',
-  retiringBaseline = true,
 ): string[] {
   const excluded = new Set([
     '.git',
@@ -54,21 +123,27 @@ function workspaceFiles(
     .readdirSync(path.join(root, directory), { withFileTypes: true })
     .flatMap(entry => {
       if (excluded.has(entry.name)) return [];
-      const relativePath = path.join(directory, entry.name);
+      const relativePath = normalizeRelativePath(
+        path.join(directory, entry.name),
+      );
+      const governed = sourceRoots.some(
+        sourceRoot =>
+          relativePath === sourceRoot ||
+          relativePath.startsWith(`${sourceRoot}/`) ||
+          sourceRoot.startsWith(`${relativePath}/`),
+      );
+      const rootFile =
+        directory === '' &&
+        (entry.isFile() || /\.(?:[cm]?[jt]sx?|json|ya?ml)$/u.test(entry.name));
+      if (!governed && !rootFile) return [];
       if (entry.isSymbolicLink()) {
         // Never inspect or rewrite linked consumer source, even when its target is local.
-        if (
-          retiringBaseline ||
-          entry.name.match(/\.(?:[cm]?[jt]sx?|json)$/u) ||
-          ['apps', 'verticals', 'packages', 'scripts'].includes(entry.name)
-        )
-          throw new Error(
-            `API migration conflict: ${relativePath} is a symbolic link; consumer files were not changed.`,
-          );
-        return [];
+        throw new Error(
+          `API migration conflict: ${relativePath} is a symbolic link; consumer files were not changed.`,
+        );
       }
       return entry.isDirectory()
-        ? workspaceFiles(root, relativePath, retiringBaseline)
+        ? workspaceFiles(root, sourceRoots, relativePath)
         : [relativePath];
     });
 }
@@ -106,6 +181,7 @@ export function migratePackageOwnedApiArtifacts(
   io: MigrationIo,
   scope: string,
   packageSource: ResolvedPackageSource,
+  sourceScope: ApiMigrationSourceScope = {},
 ) {
   const removals = new Set<string>();
   const edits = new Map<string, string>();
@@ -145,8 +221,7 @@ export function migratePackageOwnedApiArtifacts(
   }
   const files = workspaceFiles(
     io.workspaceRoot,
-    '',
-    removals.has(baselinePath),
+    migrationSourceRoots(io.workspaceRoot, sourceScope),
   );
   const sharedManifest = files.includes(sharedManifestPath)
     ? readJsonFile(path.join(io.workspaceRoot, sharedManifestPath))

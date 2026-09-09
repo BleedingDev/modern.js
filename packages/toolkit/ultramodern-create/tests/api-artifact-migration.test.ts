@@ -27,10 +27,13 @@ const snapshot = () =>
       .filter(file => fs.statSync(path.join(root, String(file))).isFile())
       .map(file => [file, read(String(file))]),
   );
-const migrate = (dryRun = false) => {
+const migrate = (
+  dryRun = false,
+  scope?: Parameters<typeof migratePackageOwnedApiArtifacts>[3],
+) => {
   const io = createMigrationIo(root, dryRun);
   io.transaction(() =>
-    migratePackageOwnedApiArtifacts(io, 'warehouse', source),
+    migratePackageOwnedApiArtifacts(io, 'warehouse', source, scope),
   );
   return io.plan;
 };
@@ -199,14 +202,15 @@ test('failed downstream work rolls back removed files, imports and manifests', (
   ).toThrow('install failed');
   expect(snapshot()).toEqual(before);
 });
-test('linked source is rejected without following its target', () => {
+test.each([
+  'verticals/inventory/custom.ts',
+  'packages/shared-contracts/src/custom.ts',
+  'scripts/custom.mts',
+])('linked source %s is rejected without following its target', linkedPath => {
   const external = fs.mkdtempSync(path.join(os.tmpdir(), 'um-api-external-'));
   try {
     fs.writeFileSync(path.join(external, 'api.ts'), 'preserved');
-    fs.symlinkSync(
-      path.join(external, 'api.ts'),
-      path.join(root, 'verticals/inventory/custom.ts'),
-    );
+    fs.symlinkSync(path.join(external, 'api.ts'), path.join(root, linkedPath));
     expect(() => migrate()).toThrow('symbolic link');
     expect(fs.readFileSync(path.join(external, 'api.ts'), 'utf8')).toBe(
       'preserved',
@@ -215,6 +219,111 @@ test('linked source is rejected without following its target', () => {
   } finally {
     fs.rmSync(external, { recursive: true, force: true });
   }
+});
+
+test('unconfigured reference trees are untouched even when they contain source and directory links', () => {
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'um-api-reference-'));
+  try {
+    fs.writeFileSync(path.join(external, 'api.ts'), 'reference source');
+    write('research/vendor/package.json', '{"name":"reference-only"}');
+    write('research/vendor/untouched.ts', 'reference source');
+    fs.symlinkSync(
+      path.join(external, 'api.ts'),
+      path.join(root, 'research/vendor/linked.ts'),
+    );
+    fs.symlinkSync(external, path.join(root, 'research/vendor/tree'), 'dir');
+    migrate();
+    expect(fs.existsSync(path.join(root, baseline))).toBe(false);
+    expect(read('research/vendor/untouched.ts')).toBe('reference source');
+    expect(
+      fs
+        .lstatSync(path.join(root, 'research/vendor/linked.ts'))
+        .isSymbolicLink(),
+    ).toBe(true);
+    expect(
+      fs.lstatSync(path.join(root, 'research/vendor/tree')).isSymbolicLink(),
+    ).toBe(true);
+    expect(fs.readFileSync(path.join(external, 'api.ts'), 'utf8')).toBe(
+      'reference source',
+    );
+  } finally {
+    fs.rmSync(external, { recursive: true, force: true });
+  }
+});
+
+test.each([
+  'app',
+  'bridge',
+  'package',
+  'pnpm',
+] as const)('%s declarations keep custom consumer roots in the migration', kind => {
+  const directory = 'services/catalog';
+  write(`${directory}/package.json`, '{"name":"@warehouse/catalog"}');
+  write(
+    `${directory}/src/readiness.ts`,
+    "import { MicroVerticalReadinessSchema } from '@warehouse/shared-contracts/microvertical-api-baseline';\nexport const readiness = MicroVerticalReadinessSchema;\n",
+  );
+  if (kind === 'package') {
+    const manifest = JSON.parse(read('package.json'));
+    manifest.workspaces = ['services/*'];
+    write('package.json', JSON.stringify(manifest));
+  }
+  if (kind === 'pnpm')
+    write('pnpm-workspace.yaml', 'packages:\n  - services/*\n');
+  migrate(false, {
+    appDirectories: kind === 'app' ? [directory] : [],
+    workspacePatterns: kind === 'bridge' ? ['services/*'] : [],
+  });
+  expect(read(`${directory}/src/readiness.ts`)).toContain(
+    "from '@modern-js/bff-effect/microvertical-api'",
+  );
+  expect(JSON.parse(read(`${directory}/package.json`)).dependencies).toEqual({
+    '@modern-js/bff-effect': 'workspace:*',
+  });
+});
+
+test.each([
+  'app',
+  'bridge',
+  'package',
+] as const)('%s declarations reject a linked ancestor before changing consumer files', kind => {
+  const external = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-api-scoped-link-'),
+  );
+  try {
+    fs.mkdirSync(path.join(external, 'catalog'));
+    fs.writeFileSync(
+      path.join(external, 'catalog/package.json'),
+      '{"name":"linked"}',
+    );
+    fs.symlinkSync(external, path.join(root, 'services'), 'dir');
+    if (kind === 'package') {
+      const manifest = JSON.parse(read('package.json'));
+      manifest.workspaces = ['services/catalog'];
+      write('package.json', JSON.stringify(manifest));
+    }
+    const before = snapshot();
+    expect(() =>
+      migrate(false, {
+        appDirectories: kind === 'app' ? ['services/catalog'] : [],
+        workspacePatterns: kind === 'bridge' ? ['services/catalog/*'] : [],
+      }),
+    ).toThrow('services is a symbolic link');
+    expect(snapshot()).toEqual(before);
+  } finally {
+    fs.rmSync(external, { recursive: true, force: true });
+  }
+});
+
+test.each([
+  '**/*',
+  '../outside/*',
+  'services/../../outside/*',
+])('unsafe workspace selector %s fails before deleting the baseline', pattern => {
+  write('pnpm-workspace.yaml', `packages:\n  - '${pattern}'\n`);
+  const before = snapshot();
+  expect(() => migrate()).toThrow('safe source root');
+  expect(snapshot()).toEqual(before);
 });
 test('consumer path aliases are an explicit conflict before retiring the mapped module', () => {
   write(

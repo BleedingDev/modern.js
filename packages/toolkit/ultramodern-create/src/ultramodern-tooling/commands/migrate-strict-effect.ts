@@ -802,6 +802,12 @@ function migrateStrictEffect(
     io,
     migrated.workspace.packageScope,
     packageSource,
+    {
+      appDirectories: migratedWorkspace.apps.map(app => app.directory),
+      workspacePatterns: migratedWorkspace.config.bridge?.workspacePackages.map(
+        entry => entry.pattern,
+      ),
+    },
   );
 
   if (hasBackendSurface) {
