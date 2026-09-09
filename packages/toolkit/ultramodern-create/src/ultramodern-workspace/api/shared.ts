@@ -1,6 +1,6 @@
 import { resolveApiPrefix, resolveApiStem } from '../descriptors';
 import { renderTemplate } from '../fs-io';
-import { packageName, toPascalCase } from '../naming';
+import { toPascalCase } from '../naming';
 import type { WorkspaceApi } from '../types';
 import {
   createCheckoutCartApiContractFields,
@@ -293,8 +293,8 @@ export function createSharedApi(
   options?: { readonly scope: string },
 ): string {
   const imports = options
-    ? `import { MicroVerticalBuildMarkerSchema, MicroVerticalReadinessSchema, createMicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}/microvertical-api-baseline';
-import type { MicroVerticalBuildMarker, MicroVerticalReadiness, MicroVerticalOperationContext } from '${packageName(options.scope, 'shared-contracts')}/microvertical-api-baseline';
+    ? `import { MicroVerticalBuildMarkerSchema, MicroVerticalReadinessSchema, createMicroVerticalOperationContext } from '@modern-js/bff-effect/microvertical-api';
+import type { MicroVerticalBuildMarker, MicroVerticalReadiness, MicroVerticalOperationContext } from '@modern-js/bff-effect/microvertical-api';
 `
     : '';
   return `${createSharedApiImports()}

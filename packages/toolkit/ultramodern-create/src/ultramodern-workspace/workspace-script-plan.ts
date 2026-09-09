@@ -8,7 +8,13 @@ import {
 import type { WorkspaceApp } from './types';
 
 export const GENERATED_POSTINSTALL_SCRIPT =
-  'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .';
+  'node ./scripts/bootstrap-agent-skills.mts --postinstall';
+
+// Recognize only flat && chains with quoted or escaped arguments. A caller
+// must reconstruct the entire command before treating these matches as owned.
+// Substitutions, comments, pipelines and redirections remain opaque shell code.
+export const WORKSPACE_SCRIPT_SEGMENT_PATTERN =
+  /(?:'[^']*'|"(?:\\[^\r\n]|[^"\\`$]|\$(?![(']))*"|\\[^\r\n]|[^"'\\`&|;()<>\r\n^#$]|\$(?![('"]))+/gu;
 
 const toolingWrapperPath = (key: GeneratedToolingCommandKey) =>
   GENERATED_TOOLING_COMMANDS[key].wrapperPath;
@@ -297,7 +303,7 @@ export function createWorkspaceRootScriptPlan(
       `${rootToolingWrapperCommand('typecheck')} --build tsconfig.json`,
     // `check` is a static source/build gate. Runtime acceptance invokes the
     // read-only Node proof only after built servers are running.
-    check: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm skills:check && pnpm i18n:boundaries && pnpm api:check && pnpm contract:check && pnpm performance:readiness${bridgeCheck}`,
+    check: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm skills:check && pnpm i18n:boundaries && pnpm api:check:files && pnpm contract:check && pnpm performance:readiness${bridgeCheck}`,
   };
 }
 

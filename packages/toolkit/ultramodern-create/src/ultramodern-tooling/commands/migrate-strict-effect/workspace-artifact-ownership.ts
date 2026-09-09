@@ -49,8 +49,35 @@ function isLiteralData(
   );
 }
 
-function withoutGeneratedData(source: string, binding?: string) {
+function withoutGeneratedData(
+  source: string,
+  binding?: string,
+  currentGeneratedSource?: string,
+) {
   if (!binding) return source;
+  if (binding === 'workspaceValidationContract') {
+    source = source
+      .replace(/^\s*'scripts\/check-ultramodern-api-boundaries\.mts',\n/mu, '')
+      .replace(
+        /rootPackage\.scripts\?\.\['api:check'\]\s*===\s*'node \.\/scripts\/check-ultramodern-api-boundaries\.mts'/u,
+        "rootPackage.scripts?.['api:check'] === 'modern-api-check'",
+      );
+    // Only the exact historical assertion can adopt the current generated
+    // postinstall block. The entire remaining validator must still match.
+    const start = currentGeneratedSource?.indexOf(
+      'const postinstall = rootPackage.scripts?.postinstall;',
+    );
+    const end = currentGeneratedSource?.indexOf(
+      "assert(rootPackage.scripts?.['agents:refs:install']",
+      start,
+    );
+    if (start !== undefined && end !== undefined && start >= 0 && end > start) {
+      source = source.replace(
+        /assert\(\s*rootPackage\.scripts\?\.postinstall\s*===\s*'node \.\/scripts\/bootstrap-agent-skills\.mts --postinstall && oxfmt \.',\s*'Root postinstall must run the default-on Codex skills bootstrap, format installed skills through the cross-platform ignore configuration, and leave reference repository installs explicit',?\s*\);/u,
+        () => currentGeneratedSource!.slice(start, end).trimEnd(),
+      );
+    }
+  }
   const parsed = parse(source, {
     sourceType: 'module',
     plugins: ['typescript'],
@@ -203,6 +230,7 @@ export function preserveConsumerWorkspaceArtifacts(
   candidates: readonly ArtifactCandidate[],
 ) {
   const preservedPaths = new Set<string>();
+  const recognizedPaths = new Map<string, boolean>();
   const physicalRoot = fs.realpathSync(io.workspaceRoot);
   const canonicalSources = formatGeneratedSourceCandidates(
     candidates.map(
@@ -243,6 +271,7 @@ export function preserveConsumerWorkspaceArtifacts(
           const normalized = withoutGeneratedData(
             source,
             candidate.generatedDataBinding,
+            candidate.content,
           );
           const canonical = canonicalSources[index];
           recognized =
@@ -254,9 +283,20 @@ export function preserveConsumerWorkspaceArtifacts(
           // by its author, not an invitation to overwrite it.
         }
       }
-      if (!recognized) {
-        for (const pairedPath of paths) preservedPaths.add(pairedPath);
-      }
+      recognizedPaths.set(
+        relativePath,
+        recognizedPaths.get(relativePath) === true || recognized,
+      );
+    }
+  }
+  for (const candidate of candidates) {
+    const paths = [candidate.relativePath, candidate.legacyPath].filter(
+      (value): value is string => value !== undefined,
+    );
+    if (
+      paths.some(relativePath => recognizedPaths.get(relativePath) === false)
+    ) {
+      for (const pairedPath of paths) preservedPaths.add(pairedPath);
     }
   }
   const reported = new Set<string>();

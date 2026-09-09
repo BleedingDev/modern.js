@@ -77,6 +77,19 @@ function pendingSupplyChainBinding(release) {
   };
 }
 
+function releaseBinding(release) {
+  return {
+    source: { ...release.source },
+    release: { ...release.release },
+    manifest: {
+      sha256: release.manifestSha256,
+      cohortDigest: release.cohortDigest,
+      packageCount: release.packages.length,
+    },
+    artifacts: createReleaseArtifactBinding(release),
+  };
+}
+
 function createAcceptanceReceipt({
   release,
   mode,
@@ -95,14 +108,7 @@ function createAcceptanceReceipt({
     passed: false,
     mode,
     binding: {
-      source: { ...release.source },
-      release: { ...release.release },
-      manifest: {
-        sha256: release.manifestSha256,
-        cohortDigest: release.cohortDigest,
-        packageCount: release.packages.length,
-      },
-      artifacts: createReleaseArtifactBinding(release),
+      ...releaseBinding(release),
       create: {
         sourceName: release.createPackage.sourceName,
         targetName: createPackage.packageName,
@@ -314,14 +320,7 @@ function expectedBinding(
   runtimeIdentity,
 ) {
   return {
-    source: { ...release.source },
-    release: { ...release.release },
-    manifest: {
-      sha256: release.manifestSha256,
-      cohortDigest: release.cohortDigest,
-      packageCount: release.packages.length,
-    },
-    artifacts: createReleaseArtifactBinding(release),
+    ...releaseBinding(release),
     create: {
       sourceName: release.createPackage.sourceName,
       targetName: release.createPackage.targetName,

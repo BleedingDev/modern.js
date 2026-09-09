@@ -31,6 +31,9 @@
       ],
       "oxlint-plugin": [
         "./dist/types/oxlint-plugin.d.ts"
+      ],
+      "microvertical-api-boundary": [
+        "./dist/types/microvertical-api-boundary.d.ts"
       ]
     }
   },
@@ -57,10 +60,16 @@
         "require": "./dist/cjs/oxlint-plugin.cjs"
       },
       "default": "./dist/esm-node/oxlint-plugin.js"
+    },
+    "./microvertical-api-boundary": {
+      "types": "./dist/types/microvertical-api-boundary.d.ts",
+      "import": "./dist/esm-node/microvertical-api-boundary.js",
+      "require": "./dist/cjs/microvertical-api-boundary.cjs"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "build": "rm -rf dist && rslib build -c rslib.config.mts",
@@ -107,8 +116,17 @@
           "require": "./dist/cjs/oxlint-plugin.cjs"
         },
         "default": "./dist/esm-node/oxlint-plugin.js"
+      },
+      "./microvertical-api-boundary": {
+        "types": "./dist/types/microvertical-api-boundary.d.ts",
+        "import": "./dist/esm-node/microvertical-api-boundary.js",
+        "require": "./dist/cjs/microvertical-api-boundary.cjs"
       }
     }
   },
-  "modern:source": "./src/index.ts"
+  "modern:source": "./src/index.ts",
+  "bin": {
+    "modern-api-check": "./bin/modern-api-check.mjs",
+    "modern-api-check-files": "./bin/modern-api-check-files.mjs"
+  }
 }

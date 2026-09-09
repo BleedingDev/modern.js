@@ -91,6 +91,10 @@ export function appDependencies(
       '@modern-js/plugin-bff',
       packageSource,
     );
+    dependencies['@modern-js/bff-effect'] = modernPackageSpecifier(
+      '@modern-js/bff-effect',
+      packageSource,
+    );
     Object.assign(dependencies, ULTRAMODERN_PACKAGE_PINS.bffEffectDependencies);
   }
 
@@ -196,7 +200,8 @@ export function createRootPackageJson(
       'agents:refs:install': 'node ./scripts/setup-agent-reference-repos.mts',
       'agents:refs:check':
         'node ./scripts/setup-agent-reference-repos.mts --check',
-      'api:check': 'node ./scripts/check-ultramodern-api-boundaries.mts',
+      'api:check': 'modern-api-check',
+      'api:check:files': 'modern-api-check-files',
       'i18n:boundaries': 'node ./scripts/check-ultramodern-i18n-boundaries.mts',
       ...bridgeScripts,
       postinstall: GENERATED_POSTINSTALL_SCRIPT,
@@ -218,6 +223,10 @@ export function createRootPackageJson(
     },
     devDependencies: {
       ...ULTRAMODERN_PACKAGE_PINS.rootDevDependencies,
+      '@modern-js/bff-effect': modernPackageSpecifier(
+        '@modern-js/bff-effect',
+        packageSource,
+      ),
       '@modern-js/code-tools': modernPackageSpecifier(
         '@modern-js/code-tools',
         packageSource,
@@ -343,7 +352,6 @@ export function createSharedPackage(
   if (id === 'shared-contracts') {
     packageJson.exports = {
       '.': './src/index.ts',
-      './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
       './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
     };
     packageJson.dependencies = {

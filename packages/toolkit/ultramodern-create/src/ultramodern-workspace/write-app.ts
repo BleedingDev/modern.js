@@ -65,6 +65,8 @@ type WriteAppContext = {
   /** Whether this app emits browser/UI artifacts (false for `api-only`). */
   emitsUi: boolean;
   remotes: WorkspaceApp[];
+  /** Complete caller inventory for backend dependencies and API clients. */
+  availableRemotes: WorkspaceApp[];
   bridge: UltramodernBridgeConfig | undefined;
   devPorts: number[] | undefined;
   publicWeb: ReturnType<typeof createPublicWebAppArtifacts>;
@@ -109,6 +111,7 @@ export function writeApp(
     enableTailwind: appTailwind,
     emitsUi,
     remotes: resolvedRemotes,
+    availableRemotes: remotes,
     bridge,
     devPorts,
     publicWeb,
@@ -144,6 +147,7 @@ function writeAppConfigFiles({
   enableTailwind,
   emitsUi,
   remotes,
+  availableRemotes,
   bridge,
   devPorts,
   publicWeb,
@@ -156,7 +160,7 @@ function writeAppConfigFiles({
       resolvedApp,
       packageSource,
       enableTailwind,
-      remotes,
+      availableRemotes,
       bridge,
     ),
   );
@@ -305,6 +309,7 @@ function writeAppRouteAndShellFiles({
   resolvedApp,
   emitsUi,
   remotes,
+  availableRemotes,
   publicWeb,
   writeAppFile,
 }: WriteAppContext) {
@@ -358,7 +363,7 @@ function writeAppRouteAndShellFiles({
     writeFile(
       targetDir,
       `${resolvedApp.directory}/src/api/vertical-clients.ts`,
-      createShellApiClient(scope, remotes),
+      createShellApiClient(scope, availableRemotes),
     );
   } else {
     for (const expose of distributedSsrExposes(resolvedApp)) {

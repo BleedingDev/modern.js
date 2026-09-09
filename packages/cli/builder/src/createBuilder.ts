@@ -3,7 +3,7 @@ import type {
   RsbuildInstance,
   RsbuildPlugin,
 } from '@rsbuild/core';
-import { createRsbuild } from '@rsbuild/core';
+import { createRsbuild, mergeRsbuildConfig } from '@rsbuild/core';
 import { getRscPlugins } from './plugins/rscConfig';
 import { parseCommonConfig } from './shared/parseCommonConfig';
 import { rscDisabledRuntimePlugin } from './shared/rsc/rscDisabledRuntime';
@@ -96,7 +96,16 @@ export async function createRspackBuilder(
 
   const rsbuild = await createRsbuild({
     cwd,
-    rsbuildConfig,
+    rsbuildConfig: mergeRsbuildConfig(
+      {
+        tools: {
+          rspack: {
+            module: { parser: { javascript: { createRequire: true } } },
+          },
+        },
+      },
+      rsbuildConfig,
+    ),
   });
 
   return {

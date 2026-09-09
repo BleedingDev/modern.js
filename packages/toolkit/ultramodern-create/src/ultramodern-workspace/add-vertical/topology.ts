@@ -170,3 +170,37 @@ export function verticalsFromTopology(
     };
   }) as WorkspaceApp[];
 }
+
+export function createPrimaryShellDescriptor(
+  topology: Record<string, any>,
+  config: Record<string, any>,
+): WorkspaceApp {
+  const compactShell = config.topology?.apps?.find(
+    (app: { id?: unknown }) => app?.id === shellApp.id,
+  );
+  const verticalRefs = Array.isArray(topology.shell?.verticalRefs)
+    ? topology.shell.verticalRefs.filter(
+        (id: unknown): id is string => typeof id === 'string',
+      )
+    : Array.isArray(compactShell?.moduleFederation?.verticalRefs)
+      ? compactShell.moduleFederation.verticalRefs.filter(
+          (id: unknown): id is string => typeof id === 'string',
+        )
+      : [];
+  return {
+    ...shellApp,
+    verticalRefs,
+    ...(typeof compactShell?.path === 'string'
+      ? { directory: compactShell.path }
+      : {}),
+    ...(typeof compactShell?.port === 'number'
+      ? { port: compactShell.port }
+      : {}),
+    ...(typeof compactShell?.portEnv === 'string'
+      ? { portEnv: compactShell.portEnv }
+      : {}),
+    ...(typeof compactShell?.moduleFederation?.name === 'string'
+      ? { mfName: compactShell.moduleFederation.name }
+      : {}),
+  };
+}

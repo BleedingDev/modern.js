@@ -43,6 +43,10 @@ export function createWorkspace(
 export function listFiles(root: string, dir = root): string[] {
   const files: string[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    // Git metadata may change independently of generated workspace files.
+    if (entry.name === '.git') {
+      continue;
+    }
     const entryPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       files.push(...listFiles(root, entryPath));

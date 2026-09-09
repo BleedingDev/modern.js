@@ -1418,3 +1418,36 @@ test('artifact discovery fails closed for malformed, delayed, expired, and name-
     );
   }
 });
+
+test('canonical artifact verification retains outcome-specific expected identity and digest paths', async t => {
+  const api = await outcomeApi();
+  const fixture = await createEvidenceFixture();
+  t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
+  const artifactName = api.publishOutcomeArtifactName({
+    runAttempt: outcomeRunAttempt,
+    runId,
+  });
+  const options = createOptions(fixture, artifactName, true);
+  for (const overrides of [
+    { sourceCommit: 'f'.repeat(40) },
+    { version: '3.8.2-ultramodern.999' },
+    { tag: 'other-tag' },
+    {
+      repository: 'foreign/repository',
+      producerRunIdentity: `github:foreign/repository:run:${runId}:attempt:${producerRunAttempt}`,
+    },
+  ]) {
+    assert.throws(
+      () => api.createPublishOutcome({ ...options, ...overrides }),
+      /Release manifest does not match the expected source and version/u,
+    );
+  }
+  const foreignDigest = path.join(fixture.root, 'foreign-digest');
+  fs.writeFileSync(foreignDigest, `${'0'.repeat(64)}\n`);
+  for (const field of ['manifestDigestPath', 'cohortDigestPath']) {
+    assert.throws(
+      () => api.createPublishOutcome({ ...options, [field]: foreignDigest }),
+      /Detached release (?:manifest|cohort) digest is invalid/u,
+    );
+  }
+});

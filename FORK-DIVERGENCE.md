@@ -43,6 +43,15 @@ every PR.
 | `packages/cli/builder/package.json` | bleedingdev | Own the public Sass and CSS source-map declaration dependencies already used transitively by the build plugins | `capped-patch` |
 | `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Publish precompression configuration aliases with Rspack path data without leaking the plugin's Webpack compiler class | `extension-point` + `capped-patch` |
 
+### 2026-09-09 simplification and builder compatibility
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/builder/src/createBuilder.ts` | bleedingdev | Restore createRequire dependency bundling when creating the native builder, preserve explicit overrides and keep parseConfig's public shape unchanged | `capped-patch` |
+| `packages/cli/builder/tests/cache.test.ts` | bleedingdev | Replace implementation snapshots with persistent-cache assertions and real cold/warm environment isolation proof through a repository test helper | `capped-patch` |
+| `packages/cli/builder/tests/default.test.ts` | bleedingdev | Verify deployed createRequire output after removing source dependencies, including the explicit false override | `capped-patch` |
+| `packages/cli/builder/tests/environment.test.ts` | bleedingdev | Assert effective native cache storage isolation with compiled output rather than legacy storage-directory formatting | `capped-patch` |
+
 ## 1. Maintenance contract
 
 **Rows below that cover upstream-owned paths under `packages/**` are enforced

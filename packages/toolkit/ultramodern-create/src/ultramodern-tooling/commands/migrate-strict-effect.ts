@@ -13,21 +13,26 @@ import {
 import { stampDeliveryUnitIdentity } from '../../ultramodern-workspace/delivery-unit-stamp';
 import { ULTRAMODERN_WORKSPACE_POLICY } from '../../ultramodern-workspace/policy';
 import { createAdditionalShellConfigEntry } from '../../ultramodern-workspace/shells';
+import { generatedToolingCommands } from '../../ultramodern-workspace/tooling-command-catalog';
 import type { WorkspaceApp } from '../../ultramodern-workspace/types';
 import {
+  createWorkspaceScriptArtifacts,
   createWorkspaceValidationScript,
-  createZeropsRuntimeMaterializationScript,
-  migratedWorkspaceScriptArtifacts,
+  writeGeneratedWorkspaceScripts,
 } from '../../ultramodern-workspace/workspace-scripts';
 import { createZeropsYaml } from '../../ultramodern-workspace/zerops';
 import {
   additionalShellsFromToolingConfig,
   allWorkspaceAppsFromToolingConfig,
   normalizeCompactUltramodernConfig,
+  normalizeWorkspaceInputs,
+  preserveUnknownProjectionFields,
+  reconcileGeneratedOverlayUrls,
   synthesizeCompactUltramodernConfig,
   workspaceAppsFromToolingConfig,
 } from '../config';
 import type { CommandContext } from './context';
+import { migratePackageOwnedApiArtifacts } from './migrate-strict-effect/api-artifact-migration';
 import {
   reconcileCompactPackageSourceMetadata,
   reconcilePackageSourceMetadata,
@@ -99,16 +104,34 @@ function requireRecord(value: unknown, label: string): Record<string, any> {
   return value as Record<string, any>;
 }
 
+function migrationWorkspaceInputs(
+  workspaceRoot: string,
+  config: Record<string, any>,
+) {
+  const overlayPath = path.join(
+    workspaceRoot,
+    'topology/local-overlays/development.json',
+  );
+  return normalizeWorkspaceInputs(workspaceRoot, {
+    config,
+    overlay: fs.existsSync(overlayPath)
+      ? requireRecord(readJsonFile(overlayPath), 'Development topology overlay')
+      : undefined,
+  });
+}
+
 function synchronizeMigrationDeliveryUnitMetadata(
   io: MigrationIo,
   raw: Record<string, any>,
   packageSource: ReturnType<typeof createMigrationPackageSource>,
 ) {
-  const normalized = normalizeCompactUltramodernConfig(io.workspaceRoot, raw);
-  const apps = workspaceAppsFromToolingConfig(normalized);
+  const workspace = migrationWorkspaceInputs(io.workspaceRoot, raw);
+  const normalized = workspace.config;
+  const apps = workspace.apps.filter(app =>
+    normalized.topology.apps.some(entry => entry.id === app.id),
+  );
   const appById = new Map(apps.map(app => [app.id, app] as const));
   const scope = normalized.workspace.packageScope;
-  const remotes = apps.filter(app => app.kind !== 'shell');
   const primaryShell = apps.find(app => app.kind === 'shell');
   const canonicalCompact = requireRecord(
     createUltramodernConfig(
@@ -138,9 +161,12 @@ function synchronizeMigrationDeliveryUnitMetadata(
       stampDeliveryUnitIdentity(entry, scope, app);
       const canonicalEntry = canonicalCompactApps.get(app.id);
       if (canonicalEntry) {
-        entry.moduleFederation = canonicalEntry.moduleFederation;
-        entry.backendFederation = canonicalEntry.backendFederation;
-        entry.api = canonicalEntry.api;
+        for (const key of ['moduleFederation', 'backendFederation', 'api']) {
+          entry[key] = preserveUnknownProjectionFields(
+            entry[key],
+            canonicalEntry[key],
+          );
+        }
       }
     }
   }
@@ -158,11 +184,12 @@ function synchronizeMigrationDeliveryUnitMetadata(
     return;
   }
   const topology = readJsonFile(topologyPath);
-  const synchronizedConfig = normalizeCompactUltramodernConfig(
-    io.workspaceRoot,
-    raw,
+  const synchronizedWorkspace = migrationWorkspaceInputs(io.workspaceRoot, raw);
+  const synchronizedApps = synchronizedWorkspace.apps.filter(app =>
+    synchronizedWorkspace.config.topology.apps.some(
+      entry => entry.id === app.id,
+    ),
   );
-  const synchronizedApps = workspaceAppsFromToolingConfig(synchronizedConfig);
   const synchronizedRemotes = synchronizedApps.filter(
     app => app.kind !== 'shell',
   );
@@ -231,7 +258,10 @@ function synchronizeMigrationDeliveryUnitMetadata(
               canonicalValue &&
               typeof canonicalValue === 'object'
             ) {
-              const nextApi = { ...entry.api, ...canonicalValue };
+              const nextApi = preserveUnknownProjectionFields(
+                entry.api,
+                canonicalValue,
+              );
               // Demo domain operations are not evidence that a customized API
               // implements the generated sample business endpoints.
               if (!Object.hasOwn(entry.api, 'domainOperations'))
@@ -245,7 +275,10 @@ function synchronizeMigrationDeliveryUnitMetadata(
             ) {
               entry.cloudflare = { ...canonicalValue, ...entry.cloudflare };
             } else {
-              entry[key] = canonicalValue;
+              entry[key] = preserveUnknownProjectionFields(
+                entry[key],
+                canonicalValue,
+              );
             }
           } else {
             delete entry[key];
@@ -274,9 +307,11 @@ function synchronizeMigrationCompactPolicy(
   raw: Record<string, any>,
   packageSource: ReturnType<typeof createMigrationPackageSource>,
 ) {
-  const migrated = normalizeCompactUltramodernConfig(io.workspaceRoot, raw);
-  const apps = workspaceAppsFromToolingConfig(migrated);
-  const remotes = apps.filter(app => app.kind !== 'shell');
+  const workspace = migrationWorkspaceInputs(io.workspaceRoot, raw);
+  const migrated = workspace.config;
+  const apps = workspace.apps.filter(app =>
+    migrated.topology.apps.some(entry => entry.id === app.id),
+  );
   const canonical = requireRecord(
     createUltramodernConfig(
       migrated.workspace.packageScope,
@@ -293,10 +328,13 @@ function synchronizeMigrationCompactPolicy(
 
   for (const key of compactPolicyKeys) {
     if (key === 'workspace') {
-      canonical.workspace.packageManager.version =
-        raw.workspace.packageManager.version;
+      canonical.workspace.packageManager = {
+        ...raw.workspace.packageManager,
+        ...canonical.workspace.packageManager,
+        version: raw.workspace.packageManager.version,
+      };
     }
-    raw[key] = canonical[key];
+    raw[key] = preserveUnknownProjectionFields(raw[key], canonical[key]);
   }
   writeJsonFile(
     io,
@@ -514,7 +552,6 @@ function deriveValidationContractInputs(
 function reconcileAdditionalShellConfig(
   raw: Record<string, any>,
   migrated: ReturnType<typeof normalizeCompactUltramodernConfig>,
-  migratedApps: WorkspaceApp[],
   io: ReturnType<typeof createMigrationIo>,
 ) {
   const additionalShells = additionalShellsFromToolingConfig(migrated);
@@ -534,13 +571,15 @@ function reconcileAdditionalShellConfig(
       )
       .map((entry: Record<string, any>) => [entry.id, entry] as const),
   );
-  const remotes = migratedApps.filter(app => app.kind !== 'shell');
+  const remotes = migrationWorkspaceInputs(io.workspaceRoot, raw).verticals;
   raw.shells = additionalShells.map(shell => ({
-    ...existingShells.get(shell.id),
-    ...createAdditionalShellConfigEntry(
-      migrated.workspace.packageScope,
-      shell,
-      remotes,
+    ...preserveUnknownProjectionFields(
+      existingShells.get(shell.id),
+      createAdditionalShellConfigEntry(
+        migrated.workspace.packageScope,
+        shell,
+        remotes,
+      ),
     ),
   }));
   writeJsonFile(
@@ -564,15 +603,41 @@ function synchronizeMigrationDevelopmentOverlay(
   const existing = fs.existsSync(overlayPath)
     ? requireRecord(readJsonFile(overlayPath), 'Development topology overlay')
     : {};
-  const canonical = requireRecord(
+  const effective = normalizeWorkspaceInputs(io.workspaceRoot, {
+    config: migrated,
+    overlay: existing,
+  });
+  const previous = requireRecord(
     createDevelopmentOverlay(
       migrated.workspace.packageScope,
       migratedApps.filter(app => app.kind !== 'shell'),
     ),
+    'Previous development topology overlay',
+  );
+  const canonical = requireRecord(
+    createDevelopmentOverlay(
+      migrated.workspace.packageScope,
+      effective.verticals,
+    ),
     'Generated development topology overlay',
   );
-  canonical.ports = Object.fromEntries(
-    migratedApps.map(app => [app.id, app.port]),
+  canonical.ports = {
+    ...Object.fromEntries(
+      effective.apps
+        .filter(app =>
+          migrated.topology.apps.some(entry => entry.id === app.id),
+        )
+        .map(app => [app.id, app.port]),
+    ),
+    ...existing.ports,
+  };
+  Object.assign(
+    canonical,
+    reconcileGeneratedOverlayUrls(existing, previous, canonical),
+  );
+  canonical.serverExecution = preserveUnknownProjectionFields(
+    existing.serverExecution,
+    canonical.serverExecution,
   );
   const frameworkOwnedKeys = new Set(Object.keys(canonical));
   const reconciled = Object.fromEntries(
@@ -613,10 +678,13 @@ function migrateStrictEffect(
     }
   }
 
-  const current = normalizeCompactUltramodernConfig(io.workspaceRoot, raw);
+  const currentWorkspace = normalizeWorkspaceInputs(io.workspaceRoot, {
+    config: raw,
+  });
+  const current = currentWorkspace.config;
   preflightModuleFederationBridgeRouter(
     io.workspaceRoot,
-    allWorkspaceAppsFromToolingConfig(current),
+    currentWorkspace.apps,
   );
   const packageSource = createMigrationPackageSource(args, current);
   const result = (status: number) => ({
@@ -628,8 +696,7 @@ function migrateStrictEffect(
       ? readCreateReleaseCohort()
       : undefined;
 
-  const currentApps = workspaceAppsFromToolingConfig(current);
-  const allCurrentApps = allWorkspaceAppsFromToolingConfig(current);
+  const allCurrentApps = currentWorkspace.apps;
   const artifactOwnership = preserveConsumerWorkspaceArtifacts(io, [
     ...allCurrentApps.map(app => ({
       relativePath: `${app.directory}/src/modern-app-env.d.ts`,
@@ -639,35 +706,40 @@ function migrateStrictEffect(
         current.workspace.packageScope,
       ),
     })),
-    ...migratedWorkspaceScriptArtifacts({
+    ...createWorkspaceScriptArtifacts({
       shellOnly: false,
       hasBackendSurface: true,
-    }).filter(
-      artifact =>
-        artifact.relativePath !== 'scripts/validate-ultramodern-workspace.mts',
-    ),
-    {
-      relativePath: 'scripts/validate-ultramodern-workspace.mts',
-      legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
-      generatedDataBinding: 'workspaceValidationContract',
-      content: createWorkspaceValidationScript(
+      validationScript: createWorkspaceValidationScript(
         current.workspace.packageScope,
         current.features.tailwind,
-        currentApps.filter(app => app.kind !== 'shell'),
+        currentWorkspace.verticals,
         undefined,
-        additionalShellsFromToolingConfig(current),
-        currentApps.find(app => app.kind === 'shell'),
+        currentWorkspace.additionalShells,
+        currentWorkspace.primaryShell,
       ),
+    }),
+    {
+      relativePath: 'zerops.yaml',
+      content: `${createZeropsYaml(current.workspace.packageScope, currentWorkspace.apps)}\n`,
     },
     {
       relativePath: 'zerops.yaml',
-      content: `${createZeropsYaml(current.workspace.packageScope, allWorkspaceAppsFromToolingConfig(current))}\n`,
-    },
-    {
-      relativePath: 'scripts/materialize-zerops-runtime.mjs',
-      content: createZeropsRuntimeMaterializationScript(),
+      content: `${createZeropsYaml(current.workspace.packageScope, migrationWorkspaceInputs(io.workspaceRoot, raw).apps)}\n`,
     },
   ]);
+  for (const relativePath of artifactOwnership.preservedPaths) {
+    if (
+      relativePath.includes('validate-ultramodern-workspace') &&
+      fs.existsSync(path.join(io.workspaceRoot, relativePath)) &&
+      fs
+        .readFileSync(path.join(io.workspaceRoot, relativePath), 'utf8')
+        .includes('check-ultramodern-api-boundaries')
+    ) {
+      throw new Error(
+        `API migration conflict: ${relativePath} is customized and still requires the retired API checker; migrate its acceptance command to modern-api-check before retrying.`,
+      );
+    }
+  }
   io = artifactOwnership.io;
 
   // Establish both metadata shapes in memory before the first write. Invalid
@@ -698,19 +770,23 @@ function migrateStrictEffect(
   synchronizeMigrationDeliveryUnitMetadata(io, raw, packageSource);
   synchronizeMigrationCompactPolicy(io, raw, packageSource);
   let migrated = normalizeCompactUltramodernConfig(io.workspaceRoot, raw);
-  let migratedApps = workspaceAppsFromToolingConfig(migrated);
-  migrated = reconcileAdditionalShellConfig(raw, migrated, migratedApps, io);
-  migratedApps = workspaceAppsFromToolingConfig(migrated);
+  migrated = reconcileAdditionalShellConfig(raw, migrated, io);
   const allMigratedApps = allWorkspaceAppsFromToolingConfig(migrated);
   const developmentOverlay = synchronizeMigrationDevelopmentOverlay(
     io,
     migrated,
-    allMigratedApps,
+    allCurrentApps,
   );
+  const migratedWorkspace = normalizeWorkspaceInputs(io.workspaceRoot, {
+    config: raw,
+    overlay: developmentOverlay,
+  });
   const validationContractInputs = deriveValidationContractInputs(
     io.workspaceRoot,
-    migrated,
-    migratedApps,
+    migratedWorkspace.config,
+    migratedWorkspace.apps.filter(app =>
+      migrated.topology.apps.some(entry => entry.id === app.id),
+    ),
   );
   // Two independent gates (never conflate them): a BACKEND surface exists
   // only when some unit ships an API; DELIVERY UNITS exist whenever any
@@ -721,6 +797,12 @@ function migrateStrictEffect(
   );
   const hasBackendSurface = verticalApps.some(app => app.api);
   const shellOnly = verticalApps.length === 0;
+
+  migratePackageOwnedApiArtifacts(
+    io,
+    migrated.workspace.packageScope,
+    packageSource,
+  );
 
   if (hasBackendSurface) {
     ensureSharedApiInfrastructure(
@@ -739,10 +821,9 @@ function migrateStrictEffect(
     // may have emitted. This keeps the end state coherent with the gated
     // validator contract and prevents dangling script references.
     for (const relativePath of [
-      'scripts/generate-node-backend-federation.mts',
-      'scripts/generate-node-backend-federation.mjs',
-      'scripts/proof-node-backend-federation.mts',
-      'scripts/proof-node-backend-federation.mjs',
+      ...generatedToolingCommands
+        .filter(command => command.requiresBackendSurface)
+        .flatMap(command => [command.wrapperPath, command.legacyPath]),
       'scripts/materialize-zerops-runtime.mjs',
       'zerops.yaml',
     ]) {
@@ -755,10 +836,9 @@ function migrateStrictEffect(
     } else {
       // No backend surface: strip backend-federation wrappers, keep deploys.
       for (const relativePath of [
-        'scripts/generate-node-backend-federation.mts',
-        'scripts/generate-node-backend-federation.mjs',
-        'scripts/proof-node-backend-federation.mts',
-        'scripts/proof-node-backend-federation.mjs',
+        ...generatedToolingCommands
+          .filter(command => command.requiresBackendSurface)
+          .flatMap(command => [command.wrapperPath, command.legacyPath]),
       ]) {
         removeGeneratedFileIfExists(io, relativePath);
       }
@@ -766,40 +846,20 @@ function migrateStrictEffect(
     updateGeneratedZeropsArtifacts(io, migrated);
   }
 
-  // Materialize the full workspace-owned script/wrapper set migrate must
-  // converge to (agent skills bootstrap, reference-repo installer, i18n/api
-  // boundary checks, performance-readiness config, and every tool wrapper),
-  // gated on shell-only just like fresh scaffolds and the validator contract.
-  // Previously migrate only refreshed tool wrappers, leaving legacy .mjs
-  // agent/i18n scripts un-migrated and the stock contract:check unsatisfiable.
-  for (const artifact of migratedWorkspaceScriptArtifacts({
-    shellOnly,
-    hasBackendSurface,
-  })) {
-    if (
-      artifact.relativePath === 'scripts/validate-ultramodern-workspace.mts'
-    ) {
-      continue;
-    }
-    if (artifact.legacyPath) {
-      io.remove(path.join(io.workspaceRoot, artifact.legacyPath));
-    }
-    io.writeGenerated(
-      path.join(io.workspaceRoot, artifact.relativePath),
-      artifact.content,
-    );
-  }
-  io.writeGenerated(
-    path.join(io.workspaceRoot, 'scripts/validate-ultramodern-workspace.mts'),
-    createWorkspaceValidationScript(
-      validationContractInputs.scope,
-      validationContractInputs.enableTailwind,
-      validationContractInputs.remotes,
-      releaseCohort,
-      validationContractInputs.additionalShells,
-      validationContractInputs.primaryShell,
-      raw,
-      fs.existsSync(path.join(io.workspaceRoot, 'topology/ownership.json'))
+  writeGeneratedWorkspaceScripts(
+    io.workspaceRoot,
+    validationContractInputs.scope,
+    validationContractInputs.enableTailwind,
+    validationContractInputs.remotes,
+    releaseCohort,
+    validationContractInputs.additionalShells,
+    validationContractInputs.primaryShell,
+    {
+      io,
+      compactConfig: raw,
+      ownership: fs.existsSync(
+        path.join(io.workspaceRoot, 'topology/ownership.json'),
+      )
         ? requireRecord(
             readJsonFile(
               path.join(io.workspaceRoot, 'topology/ownership.json'),
@@ -808,7 +868,7 @@ function migrateStrictEffect(
           )
         : undefined,
       developmentOverlay,
-    ),
+    },
   );
   artifactOwnership.refreshReleaseCohort(releaseCohort);
 

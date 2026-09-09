@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { UltramodernReleaseCohort } from '../ultramodern-release-cohort';
+import type { MigrationIo } from '../ultramodern-tooling/commands/migrate-strict-effect/io';
 import { appHasApi } from './descriptors';
 import {
   readFileTemplate,
@@ -9,12 +10,11 @@ import {
   writeFileReplacing,
 } from './fs-io';
 import {
-  GENERATED_TOOLING_COMMANDS,
-  type GeneratedToolingCommandId,
-  type GeneratedToolingCommandKey,
   generatedToolingCommands,
+  selectGeneratedToolingCommands,
 } from './tooling-command-catalog';
 import type { WorkspaceApp } from './types';
+import { WORKSPACE_SCRIPT_SEGMENT_PATTERN } from './workspace-script-plan';
 import { createWorkspaceValidationContract } from './workspace-validation-contract';
 
 // Emitted wrapper source must satisfy the generated workspace's oxfmt config,
@@ -68,33 +68,6 @@ const result = createBin
 ${toolWrapperResultHandling}`;
 }
 
-function writeGeneratedToolWrapperScript(
-  targetDir: string,
-  key: GeneratedToolingCommandKey,
-) {
-  const command = GENERATED_TOOLING_COMMANDS[key];
-  writeWorkspaceOwnedMtsScript(
-    targetDir,
-    command.wrapperName,
-    createToolWrapperScript(command.command),
-  );
-}
-
-function writeGeneratedToolWrapperScripts(
-  targetDir: string,
-  options: { shellOnly?: boolean; hasBackendSurface?: boolean } = {},
-) {
-  // Backend-federation wrappers exist only for API-bearing workspaces —
-  // ui-only/horizontal-remote workspaces deploy but expose no backend surface.
-  const backendSurface = options.hasBackendSurface ?? !options.shellOnly;
-  for (const command of generatedToolingCommands) {
-    if (!backendSurface && BACKEND_FEDERATION_WRAPPER_IDS.has(command.id)) {
-      continue;
-    }
-    writeGeneratedToolWrapperScript(targetDir, command.id);
-  }
-}
-
 function createSkillsToolWrapperScript() {
   return `#!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
@@ -124,35 +97,6 @@ const result = createBin
 ${toolWrapperResultHandling}`;
 }
 
-function removeLegacyWorkspaceScript(targetDir: string, relativePath: string) {
-  fs.rmSync(path.join(targetDir, relativePath), { force: true });
-}
-
-function writeWorkspaceOwnedMtsScript(
-  targetDir: string,
-  name: string,
-  content: string,
-) {
-  writeFileReplacing(targetDir, `scripts/${name}.mts`, content);
-  removeLegacyWorkspaceScript(targetDir, `scripts/${name}.mjs`);
-}
-
-function migrateCopiedWorkspaceScriptToMts(targetDir: string, name: string) {
-  const legacyPath = path.join(targetDir, `scripts/${name}.mjs`);
-  const migratedPath = path.join(targetDir, `scripts/${name}.mts`);
-
-  if (!fs.existsSync(legacyPath)) {
-    return;
-  }
-
-  if (fs.existsSync(migratedPath)) {
-    fs.rmSync(legacyPath, { force: true });
-    return;
-  }
-
-  fs.renameSync(legacyPath, migratedPath);
-}
-
 export function createWorkspaceValidationScript(
   scope: string,
   enableTailwind: boolean,
@@ -180,6 +124,9 @@ export function createWorkspaceValidationScript(
     'workspace-scripts/validate-ultramodern-workspace.mjs',
     {
       workspaceValidationContractJson: JSON.stringify(contract, null, 2),
+      workspaceScriptSegmentPattern: JSON.stringify(
+        WORKSPACE_SCRIPT_SEGMENT_PATTERN.source,
+      ),
     },
   );
 }
@@ -190,21 +137,9 @@ function createWorkspaceI18nBoundaryValidationScript(): string {
   );
 }
 
-function createWorkspaceApiBoundaryValidationScript(): string {
-  return readFileTemplate(
-    'workspace-scripts/check-ultramodern-api-boundaries.mts',
-  );
-}
-
 function createPerformanceReadinessConfigScript(): string {
   return readFileTemplate(
     'workspace-scripts/ultramodern-performance-readiness.config.mjs',
-  );
-}
-
-function createNodeBackendFederationProofScript(): string {
-  return readFileTemplate(
-    'workspace-scripts/proof-node-backend-federation.mjs',
   );
 }
 
@@ -224,63 +159,43 @@ export function writeGeneratedWorkspaceScripts(
   releaseCohort?: UltramodernReleaseCohort,
   additionalShells: WorkspaceApp[] = [],
   primaryShell?: WorkspaceApp,
+  options: {
+    io?: MigrationIo;
+    compactConfig?: Record<string, unknown>;
+    ownership?: Record<string, unknown>;
+    developmentOverlay?: Record<string, unknown>;
+  } = {},
 ) {
-  const shellOnly = remotes.length === 0;
-  const hasBackendSurface = remotes.some(appHasApi);
-
-  writeWorkspaceOwnedMtsScript(
-    targetDir,
-    'check-ultramodern-i18n-boundaries',
-    createWorkspaceI18nBoundaryValidationScript(),
-  );
-  writeWorkspaceOwnedMtsScript(
-    targetDir,
-    'check-ultramodern-api-boundaries',
-    createWorkspaceApiBoundaryValidationScript(),
-  );
-  writeWorkspaceOwnedMtsScript(
-    targetDir,
-    'microvertical-api-baseline-boundary',
-    readFileTemplate(
-      'workspace-scripts/microvertical-api-baseline-boundary.mts',
-    ),
-  );
-  if (!shellOnly) {
-    writeFileReplacing(
-      targetDir,
-      'scripts/materialize-zerops-runtime.mjs',
-      createZeropsRuntimeMaterializationScript(),
-    );
-    writeWorkspaceOwnedMtsScript(
-      targetDir,
-      'proof-workerd-ssr',
-      createWorkerdSsrProofScript(),
-    );
-  }
-  writeFileReplacing(
-    targetDir,
-    'scripts/ultramodern-performance-readiness.config.mjs',
-    createPerformanceReadinessConfigScript(),
-  );
-  writeGeneratedToolWrapperScripts(targetDir, { shellOnly, hasBackendSurface });
-  writeWorkspaceOwnedMtsScript(
-    targetDir,
-    'validate-ultramodern-workspace',
-    createWorkspaceValidationScript(
+  for (const artifact of createWorkspaceScriptArtifacts({
+    shellOnly: remotes.length === 0,
+    hasBackendSurface: remotes.some(appHasApi),
+    validationScript: createWorkspaceValidationScript(
       scope,
       enableTailwind,
       remotes,
       releaseCohort,
       additionalShells,
       primaryShell,
+      options.compactConfig,
+      options.ownership,
+      options.developmentOverlay,
     ),
-  );
-  writeWorkspaceOwnedMtsScript(
-    targetDir,
-    'bootstrap-agent-skills',
-    createSkillsToolWrapperScript(),
-  );
-  migrateCopiedWorkspaceScriptToMts(targetDir, 'setup-agent-reference-repos');
+  })) {
+    if (options.io) {
+      if (artifact.legacyPath) {
+        options.io.remove(path.join(targetDir, artifact.legacyPath));
+      }
+      options.io.writeGenerated(
+        path.join(targetDir, artifact.relativePath),
+        artifact.content,
+      );
+    } else {
+      writeFileReplacing(targetDir, artifact.relativePath, artifact.content);
+      if (artifact.legacyPath) {
+        fs.rmSync(path.join(targetDir, artifact.legacyPath), { force: true });
+      }
+    }
+  }
 }
 
 // The canonical `setup-agent-reference-repos` script is vendored under
@@ -293,92 +208,86 @@ function createAgentReferenceReposSetupScript(): string {
   );
 }
 
-// Tool wrappers that only make sense when the workspace exposes API-bearing
-// verticals. Shell-only workspaces skip backend-federation materialization, so
-// their migrate must not inject these wrappers (kept consistent with the
-// validator contract, which gates the same requirements on full-stack
-// verticals).
-const BACKEND_FEDERATION_WRAPPER_IDS: ReadonlySet<GeneratedToolingCommandId> =
-  new Set(['backendFederationGenerate', 'backendFederationProof']);
+interface WorkspaceScriptDefinition {
+  relativePath: string;
+  legacyPath?: string;
+  createContent: () => string;
+  requiresRemotes?: boolean;
+}
 
-interface MigratedWorkspaceScriptArtifact {
+// These copied assets and the skills adapter are distinct from CLI wrappers.
+const workspaceScriptDefinitions: readonly WorkspaceScriptDefinition[] = [
+  {
+    relativePath: 'scripts/check-ultramodern-i18n-boundaries.mts',
+    legacyPath: 'scripts/check-ultramodern-i18n-boundaries.mjs',
+    createContent: createWorkspaceI18nBoundaryValidationScript,
+  },
+  {
+    relativePath: 'scripts/ultramodern-performance-readiness.config.mjs',
+    createContent: createPerformanceReadinessConfigScript,
+  },
+  {
+    relativePath: 'scripts/bootstrap-agent-skills.mts',
+    legacyPath: 'scripts/bootstrap-agent-skills.mjs',
+    createContent: createSkillsToolWrapperScript,
+  },
+  {
+    relativePath: 'scripts/setup-agent-reference-repos.mts',
+    legacyPath: 'scripts/setup-agent-reference-repos.mjs',
+    createContent: createAgentReferenceReposSetupScript,
+  },
+  {
+    relativePath: 'scripts/proof-workerd-ssr.mts',
+    legacyPath: 'scripts/proof-workerd-ssr.mjs',
+    createContent: createWorkerdSsrProofScript,
+    requiresRemotes: true,
+  },
+  {
+    relativePath: 'scripts/materialize-zerops-runtime.mjs',
+    createContent: createZeropsRuntimeMaterializationScript,
+    requiresRemotes: true,
+  },
+];
+
+export interface WorkspaceScriptArtifact {
   relativePath: string;
   content: string;
   legacyPath?: string;
+  generatedDataBinding?: string;
 }
 
-// Single source of truth for the workspace-owned scripts and tool wrappers that
-// both fresh scaffolds and migrate must materialize. Deriving migrate's set
-// from this list keeps it from drifting away from what the validator contract
-// requires (validate-ultramodern-workspace.mjs.handlebars).
-export function migratedWorkspaceScriptArtifacts(options: {
+export function createWorkspaceScriptArtifacts(options: {
   shellOnly: boolean;
   hasBackendSurface?: boolean;
-}): MigratedWorkspaceScriptArtifact[] {
-  const artifacts: MigratedWorkspaceScriptArtifact[] = [
-    {
-      relativePath: 'scripts/check-ultramodern-i18n-boundaries.mts',
-      content: createWorkspaceI18nBoundaryValidationScript(),
-      legacyPath: 'scripts/check-ultramodern-i18n-boundaries.mjs',
-    },
-    {
-      relativePath: 'scripts/microvertical-api-baseline-boundary.mts',
-      content: readFileTemplate(
-        'workspace-scripts/microvertical-api-baseline-boundary.mts',
-      ),
-    },
-    {
-      relativePath: 'scripts/check-ultramodern-api-boundaries.mts',
-      content: createWorkspaceApiBoundaryValidationScript(),
-      legacyPath: 'scripts/check-ultramodern-api-boundaries.mjs',
-    },
-    {
-      relativePath: 'scripts/ultramodern-performance-readiness.config.mjs',
-      content: createPerformanceReadinessConfigScript(),
-    },
-    {
-      relativePath: 'scripts/bootstrap-agent-skills.mts',
-      content: createSkillsToolWrapperScript(),
-      legacyPath: 'scripts/bootstrap-agent-skills.mjs',
-    },
-    {
-      relativePath: 'scripts/setup-agent-reference-repos.mts',
-      content: createAgentReferenceReposSetupScript(),
-      legacyPath: 'scripts/setup-agent-reference-repos.mjs',
-    },
-  ];
-
-  if (!options.shellOnly) {
-    artifacts.push({
-      relativePath: 'scripts/proof-workerd-ssr.mts',
-      content: createWorkerdSsrProofScript(),
-      legacyPath: 'scripts/proof-workerd-ssr.mjs',
-    });
-  }
-
-  const backendSurface = options.hasBackendSurface ?? !options.shellOnly;
-  for (const command of generatedToolingCommands) {
-    if (!backendSurface && BACKEND_FEDERATION_WRAPPER_IDS.has(command.id)) {
-      continue;
-    }
-    artifacts.push({
+  validationScript?: string;
+}): WorkspaceScriptArtifact[] {
+  return [
+    ...workspaceScriptDefinitions
+      .filter(definition => !options.shellOnly || !definition.requiresRemotes)
+      .map(({ createContent, requiresRemotes, ...definition }) => ({
+        ...definition,
+        content: createContent(),
+      })),
+    ...selectGeneratedToolingCommands(options).map(command => ({
       relativePath: command.wrapperPath,
-      content: createToolWrapperScript(command.command),
-      legacyPath: command.wrapperPath.replace(/\.mts$/u, '.mjs'),
-    });
-  }
-
-  return artifacts;
+      legacyPath: command.legacyPath,
+      content:
+        command.id === 'validate' && options.validationScript !== undefined
+          ? options.validationScript
+          : createToolWrapperScript(command.command),
+      ...(command.id === 'validate' && options.validationScript !== undefined
+        ? { generatedDataBinding: 'workspaceValidationContract' }
+        : {}),
+    })),
+  ];
 }
 
-// Basenames (under scripts/) of every workspace-owned script/wrapper that
-// migrate renames from .mjs to .mts. Used to rewrite dangling package.json
-// references so no script points at a deleted .mjs file after migrate.
+export const migratedWorkspaceScriptArtifacts = createWorkspaceScriptArtifacts;
+
+// Reference rewriting follows exactly the artifacts that have a legacy path.
 export const migratedWorkspaceScriptBasenames: readonly string[] = [
-  'check-ultramodern-i18n-boundaries',
-  'check-ultramodern-api-boundaries',
-  'bootstrap-agent-skills',
-  'setup-agent-reference-repos',
-  'proof-workerd-ssr',
+  ...workspaceScriptDefinitions
+    .filter(definition => definition.legacyPath !== undefined)
+    .map(definition => path.basename(definition.relativePath, '.mts')),
   ...generatedToolingCommands.map(command => command.wrapperName),
 ];

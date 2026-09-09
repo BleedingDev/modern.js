@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
+import { assertCreateRequireBundling } from '../../../../scripts/tests/fixture-builder-semantics';
 import { createBuilder } from '../src';
 
 const builderPath = join(__dirname, '..');
@@ -369,7 +370,7 @@ describe('builder rspack', () => {
     ).toBe(false);
   });
 
-  it('uses the native createRequire parsing default', async () => {
+  it('bundles createRequire dependencies by default and honors explicit opt-out', async () => {
     const rsbuild = await createBuilder({
       bundlerType: 'rspack',
       config: {},
@@ -381,6 +382,7 @@ describe('builder rspack', () => {
     } = await rsbuild.inspectConfig();
 
     expect(bundlerConfigs[0].module.parser.javascript.createRequire).toBe(true);
+    await assertCreateRequireBundling();
   });
 
   it('configures source phase imports through the native Rspack seam', async () => {

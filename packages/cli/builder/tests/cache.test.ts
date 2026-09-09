@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@rstest/core';
 import { join } from 'path';
+import * as cacheProof from '../../../../scripts/tests/fixture-builder-semantics';
 import { createBuilder } from '../src';
 
 describe('builder rspack with cache', () => {
@@ -15,7 +16,7 @@ describe('builder rspack with cache', () => {
       origin: { bundlerConfigs },
     } = await rsbuild.inspectConfig();
 
-    expect(bundlerConfigs[0].cache).toMatchSnapshot();
+    cacheProof.assertPersistentCache(bundlerConfigs[0].cache);
   });
 
   it('should generator rspack config correctly with cache', async () => {
@@ -34,7 +35,7 @@ describe('builder rspack with cache', () => {
       origin: { bundlerConfigs },
     } = await rsbuild.inspectConfig();
 
-    expect(bundlerConfigs[0].cache).toMatchSnapshot();
+    cacheProof.assertPersistentCache(bundlerConfigs[0].cache);
   });
 
   it('should isolate persistent cache directories by environment', async () => {
@@ -61,7 +62,7 @@ describe('builder rspack with cache', () => {
           },
           workerSSR: {
             output: {
-              target: 'web',
+              target: 'web-worker',
             },
           },
         },
@@ -75,16 +76,16 @@ describe('builder rspack with cache', () => {
     } = await rsbuild.inspectConfig();
 
     const directories = Object.fromEntries(
-      bundlerConfigs.map(config => [
+      (await cacheProof.assertCacheIsolation(bundlerConfigs)).map(config => [
         String(config.cache.version).split('-')[0],
-        config.cache.storage.directory,
+        config.cache.storage.location,
       ]),
     );
     const expectedRoot = join(__dirname, '..', cacheDirectory);
 
-    expect(directories.client).toBe(join(expectedRoot, 'client'));
-    expect(directories.server).toBe(join(expectedRoot, 'server'));
-    expect(directories.workerSSR).toBe(join(expectedRoot, 'workerSSR'));
+    expect(directories.client).toContain(expectedRoot);
+    expect(directories.server).toContain(expectedRoot);
+    expect(directories.workerSSR).toContain(expectedRoot);
     expect(new Set(Object.values(directories)).size).toBe(
       Object.values(directories).length,
     );

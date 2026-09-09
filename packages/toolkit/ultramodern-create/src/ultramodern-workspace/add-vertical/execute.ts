@@ -1,6 +1,13 @@
 import path from 'node:path';
+import { createMigrationIo } from '../../ultramodern-tooling/commands/migrate-strict-effect/io';
+import { preserveConsumerWorkspaceArtifacts } from '../../ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
+import {
+  preserveUnknownProjectionFields,
+  reconcileGeneratedOverlayUrls,
+} from '../../ultramodern-tooling/config';
 import { rpcPath } from '../api/rpc';
 import { createServerExecutionOverlay } from '../backend-federation';
+import { createDevelopmentOverlay } from '../contracts';
 import {
   createDeliveryUnitRecord,
   deliveryUnitContractBlock,
@@ -11,6 +18,7 @@ import {
   createModuleFederationRemoteContracts,
   resolveApiPrefix,
   resolveApiProtocol,
+  resolveRemoteRefs,
   shellApp,
   ULTRAMODERN_CONFIG_PATH,
 } from '../descriptors';
@@ -24,6 +32,7 @@ import {
   createGenerationResult,
   diffFileSnapshots,
 } from '../generation-result';
+import { createAppModernConfig } from '../module-federation';
 import { runCodeSmithOverlays } from '../overlays';
 import { createRootTsConfig } from '../package-json';
 import type {
@@ -31,8 +40,11 @@ import type {
   JsonValue,
   UltramodernGenerationResult,
 } from '../types';
-import { writeGeneratedWorkspaceScripts } from '../workspace-scripts';
-import { rewriteAppModernConfig } from '../write-app';
+import {
+  createWorkspaceScriptArtifacts,
+  createWorkspaceValidationScript,
+  writeGeneratedWorkspaceScripts,
+} from '../workspace-scripts';
 import { createCompactUltramodernConfig, writeApp } from '../write-workspace';
 import { createZeropsYaml } from '../zerops';
 import { prepareAddUltramodernVertical } from './preflight';
@@ -72,6 +84,7 @@ function executeAddUltramodernVertical(
   const beforeFiles = createFileSnapshot(options.workspaceRoot);
   const {
     scope,
+    config,
     topologyPath,
     ownershipPath,
     overlayPath,
@@ -88,6 +101,77 @@ function executeAddUltramodernVertical(
     vertical,
     updatedVerticals,
   } = prepareAddUltramodernVertical(options);
+
+  const previousTailwind = config.features?.tailwind !== false;
+  const existingVerticals = updatedVerticals.filter(
+    app => app.id !== vertical.id,
+  );
+  const previousApps = [
+    primaryShell,
+    ...existingVerticals,
+    ...additionalShells,
+  ].map(app => {
+    const compact = config.topology.apps.find(
+      (entry: Record<string, any>) => entry.id === app.id,
+    );
+    const refs = compact?.moduleFederation?.verticalRefs ?? app.verticalRefs;
+    return {
+      ...app,
+      port: typeof compact?.port === 'number' ? compact.port : app.port,
+      verticalRefs: refs?.filter((id: string) =>
+        existingVerticals.some(remote => remote.id === id),
+      ),
+    };
+  });
+  const previousDevPorts =
+    additionalShells.length > 0
+      ? previousApps
+          .map(app => app.port)
+          .toSorted((left, right) => left - right)
+      : undefined;
+  const { io: ownedIo } = preserveConsumerWorkspaceArtifacts(
+    createMigrationIo(options.workspaceRoot, false),
+    [
+      ...createWorkspaceScriptArtifacts({
+        shellOnly: false,
+        hasBackendSurface: true,
+        validationScript: createWorkspaceValidationScript(
+          scope,
+          enableTailwind,
+          existingVerticals,
+          undefined,
+          previousApps.filter(
+            app => app.kind === 'shell' && app.id !== primaryShell.id,
+          ),
+          previousApps.find(app => app.id === primaryShell.id),
+        ),
+      }),
+      {
+        relativePath: 'zerops.yaml',
+        content: `${createZeropsYaml(scope, previousApps)}\n`,
+      },
+      {
+        relativePath: 'zerops.yaml',
+        content: `${createZeropsYaml(scope, [primaryShell, ...existingVerticals, ...additionalShells])}\n`,
+      },
+      {
+        relativePath: 'tsconfig.json',
+        content: `${JSON.stringify(createRootTsConfig(previousApps), null, 2)}\n`,
+      },
+      ...previousApps.map(app => ({
+        relativePath: `${app.directory}/modern.config.ts`,
+        content: createAppModernConfig(
+          scope,
+          app,
+          app.kind === 'shell'
+            ? resolveRemoteRefs(app, existingVerticals)
+            : existingVerticals,
+          previousTailwind,
+          previousDevPorts,
+        ),
+      })),
+    ],
+  );
 
   const nextTargetShell = {
     ...targetShell,
@@ -145,9 +229,52 @@ function executeAddUltramodernVertical(
       }));
   }
   topology.verticals ??= [];
+  topology.verticals = topology.verticals.map((entry: Record<string, any>) => {
+    const app = existingVerticals.find(app => app.id === entry.id);
+    if (!app) return entry;
+    const projected = verticalTopologyEntry(
+      scope,
+      app,
+      updatedVerticals,
+    ) as Record<string, any>;
+    return {
+      ...entry,
+      moduleFederation: preserveUnknownProjectionFields(
+        entry.moduleFederation,
+        projected.moduleFederation,
+      ),
+      ...(projected.backendFederation
+        ? {
+            backendFederation: preserveUnknownProjectionFields(
+              entry.backendFederation,
+              projected.backendFederation,
+            ),
+          }
+        : {}),
+    };
+  });
   topology.verticals.push(verticalTopologyEntry(scope, vertical));
   ownership.owners ??= [];
   ownership.owners.push(ownershipEntry(scope, vertical));
+  const projectedOverlay = createDevelopmentOverlay(
+    scope,
+    existingVerticals,
+  ) as Record<string, any>;
+  Object.assign(
+    overlay,
+    reconcileGeneratedOverlayUrls(
+      overlay,
+      createDevelopmentOverlay(
+        scope,
+        previousApps.filter(app => app.kind !== 'shell'),
+      ) as Record<string, any>,
+      projectedOverlay,
+    ),
+  );
+  overlay.serverExecution = preserveUnknownProjectionFields(
+    overlay.serverExecution,
+    projectedOverlay.serverExecution,
+  );
   overlay.ports[vertical.id] = vertical.port;
   overlay.manifests ??= {};
   if (appEmitsBrowserUi(vertical)) {
@@ -174,32 +301,66 @@ function executeAddUltramodernVertical(
   writeJsonFile(topologyPath, topology as JsonValue);
   writeJsonFile(ownershipPath, ownership as JsonValue);
   writeJsonFile(overlayPath, overlay as JsonValue);
+  const generatedConfig = createCompactUltramodernConfig(
+    scope,
+    options.modernVersion,
+    packageSource,
+    [nextPrimaryShell, ...updatedVerticals],
+    enableTailwind,
+    bridge,
+    nextAdditionalShells,
+    nextPrimaryShell,
+  ) as Record<string, any>;
+  const newEntry = generatedConfig.topology.apps.find(
+    (app: Record<string, any>) => app.id === vertical.id,
+  );
+  // An add operation updates composition and appends one unit; the consumer's
+  // other compact choices and extensions remain the input, not a projection.
+  for (const key of ['moduleFederation', 'backendFederation']) {
+    config[key] = {
+      ...config[key],
+      apps: [
+        ...preserveUnknownProjectionFields(
+          config[key]?.apps,
+          generatedConfig[key].apps,
+        ),
+      ],
+    };
+  }
+  config.features = { ...config.features, tailwind: enableTailwind };
+  config.topology = {
+    ...config.topology,
+    apps: [
+      ...config.topology.apps.map((app: Record<string, any>) => {
+        const generated = generatedConfig.topology.apps.find(
+          (entry: Record<string, any>) => entry.id === app.id,
+        );
+        return app.id === primaryShell.id
+          ? updateShellComposition(app, generated)
+          : app;
+      }),
+      newEntry,
+    ],
+  };
+  if (Array.isArray(config.shells)) {
+    config.shells = config.shells.map((entry: Record<string, any>) =>
+      entry?.id === nextTargetShell.id
+        ? updateShellComposition(
+            entry,
+            generatedConfig.shells.find(
+              (shell: Record<string, any>) => shell.id === entry.id,
+            ),
+          )
+        : entry,
+    );
+  }
   writeJsonFile(
     path.join(options.workspaceRoot, ULTRAMODERN_CONFIG_PATH),
-    createCompactUltramodernConfig(
-      scope,
-      options.modernVersion,
-      packageSource,
-      [
-        {
-          ...nextPrimaryShell,
-        },
-        ...updatedVerticals,
-      ],
-      enableTailwind,
-      bridge,
-      nextAdditionalShells,
-      nextPrimaryShell,
-    ),
+    config as JsonValue,
   );
-  writeFileReplacing(
-    options.workspaceRoot,
-    'zerops.yaml',
-    `${createZeropsYaml(scope, [
-      nextPrimaryShell,
-      ...updatedVerticals,
-      ...nextAdditionalShells,
-    ])}\n`,
+  ownedIo.write(
+    path.join(options.workspaceRoot, 'zerops.yaml'),
+    `${createZeropsYaml(scope, [nextPrimaryShell, ...updatedVerticals, ...nextAdditionalShells])}\n`,
   );
   // Regenerate EVERY shell, not only the target: the API surface is full
   // mesh (CONTEXT.md), so each shell's vertical-clients re-exports and its
@@ -218,6 +379,12 @@ function executeAddUltramodernVertical(
         ? nextTargetShell
         : shellToRefresh,
       configuredDevPorts,
+      {
+        shell: previousApps.find(app => app.id === shellToRefresh.id)!,
+        remotes: existingVerticals,
+        devPorts: previousDevPorts,
+        enableTailwind: previousTailwind,
+      },
     );
   }
   writeGeneratedWorkspaceScripts(
@@ -228,6 +395,12 @@ function executeAddUltramodernVertical(
     undefined,
     nextAdditionalShells,
     nextPrimaryShell,
+    {
+      io: { ...ownedIo, writeGenerated: ownedIo.write },
+      compactConfig: config,
+      ownership,
+      developmentOverlay: overlay,
+    },
   );
   updateRootWorkspaceScripts(
     options.workspaceRoot,
@@ -236,14 +409,20 @@ function executeAddUltramodernVertical(
     updatedVerticals,
     bridge,
     nextAdditionalShells,
+    existingVerticals,
+    nextPrimaryShell,
   );
-  writeJsonFile(
+  ownedIo.write(
     path.join(options.workspaceRoot, 'tsconfig.json'),
-    createRootTsConfig([
-      nextPrimaryShell,
-      ...updatedVerticals,
-      ...nextAdditionalShells,
-    ]),
+    `${JSON.stringify(
+      createRootTsConfig([
+        nextPrimaryShell,
+        ...updatedVerticals,
+        ...nextAdditionalShells,
+      ]),
+      null,
+      2,
+    )}\n`,
   );
   if (configuredDevPorts) {
     for (const app of [
@@ -254,13 +433,17 @@ function executeAddUltramodernVertical(
       if (app.id === vertical.id || app.id === nextTargetShell.id) {
         continue;
       }
-      rewriteAppModernConfig(
-        options.workspaceRoot,
-        scope,
-        app,
-        updatedVerticals,
-        enableTailwind,
-        configuredDevPorts,
+      ownedIo.write(
+        path.join(options.workspaceRoot, app.directory, 'modern.config.ts'),
+        createAppModernConfig(
+          scope,
+          app,
+          app.kind === 'shell'
+            ? resolveRemoteRefs(app, updatedVerticals)
+            : updatedVerticals,
+          enableTailwind,
+          configuredDevPorts,
+        ),
       );
     }
   }
@@ -302,4 +485,31 @@ function executeAddUltramodernVertical(
     createdPaths,
     rewrittenPaths,
   });
+}
+
+function updateShellComposition(
+  current: Record<string, any>,
+  generated: Record<string, any>,
+) {
+  const previousRemotes = Array.isArray(current.moduleFederation?.remotes)
+    ? current.moduleFederation.remotes
+    : [];
+  return {
+    ...current,
+    ...(Array.isArray(generated.verticalRefs)
+      ? { verticalRefs: generated.verticalRefs }
+      : {}),
+    moduleFederation: {
+      ...current.moduleFederation,
+      verticalRefs: generated.moduleFederation.verticalRefs,
+      remotes: generated.moduleFederation.remotes.map(
+        (remote: Record<string, any>) => ({
+          ...previousRemotes.find(
+            (previous: Record<string, any>) => previous.id === remote.id,
+          ),
+          ...remote,
+        }),
+      ),
+    },
+  };
 }

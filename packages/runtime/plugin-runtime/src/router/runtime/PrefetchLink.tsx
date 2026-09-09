@@ -1,6 +1,9 @@
 // @effect-diagnostics asyncFunction:off globalConsole:off globalTimers:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 'use client';
-import { getNavigationWarmupCacheKey } from '@modern-js/runtime-extensions';
+import {
+  getNavigationWarmupCacheKey,
+  normalizePreloadBehavior as normalizeSharedPreloadBehavior,
+} from '@modern-js/runtime-extensions';
 import {
   matchRoutes,
   type Path,
@@ -535,19 +538,7 @@ const normalizePreloadBehavior = (
   preload: PreloadBehavior | undefined,
   prefetch: PrefetchBehavior,
 ) => {
-  if (preload === false || preload === 'none') {
-    return 'none';
-  }
-
-  if (typeof preload !== 'undefined') {
-    return preload;
-  }
-
-  if (prefetch === 'none') {
-    return 'none';
-  }
-
-  return prefetch;
+  return normalizeSharedPreloadBehavior(preload, prefetch);
 };
 
 type InputLinkProps<T> = T extends typeof RouterNavLink

@@ -57,6 +57,7 @@ const WORKSPACE_VALIDATION_CONTRACT_KIND =
   'modernjs.ultramodern-workspace-validation-contract';
 
 const modernPackageCohort = [
+  '@modern-js/bff-effect',
   ULTRAMODERN_CREATE_PACKAGE,
   '@modern-js/code-tools',
   '@modern-js/app-tools',

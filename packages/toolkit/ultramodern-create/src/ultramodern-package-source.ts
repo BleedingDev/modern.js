@@ -24,6 +24,7 @@ export const ULTRAMODERN_SINGLE_APP_MODERN_PACKAGES = [
 ] as const;
 
 export const ULTRAMODERN_WORKSPACE_MODERN_PACKAGES = [
+  '@modern-js/bff-effect',
   ULTRAMODERN_CREATE_PACKAGE,
   '@modern-js/code-tools',
   '@modern-js/app-tools',

@@ -263,7 +263,7 @@ function executeAddUltramodernShell(
     shell,
     packageSource,
     enableTailwind,
-    composedVerticals,
+    existingVerticals,
     bridge,
     configuredDevPorts,
   );

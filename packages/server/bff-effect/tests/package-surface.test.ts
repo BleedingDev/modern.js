@@ -73,6 +73,10 @@ const sourceLoaders = {
     target: './src/effect-client/index.ts',
     load: () => import('../src/effect-client'),
   },
+  './microvertical-api': {
+    target: './src/microvertical-api.ts',
+    load: () => import('../src/microvertical-api'),
+  },
   './effect-client-runtime': {
     target: './src/effect-client/runtime.ts',
     load: () => import('../src/effect-client/runtime'),

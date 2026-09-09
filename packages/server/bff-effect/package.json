@@ -66,6 +66,16 @@
       "import": "./dist/esm/effect-client/index.mjs",
       "default": "./dist/esm/effect-client/index.mjs"
     },
+    "./microvertical-api": {
+      "types": "./dist/types/microvertical-api.d.ts",
+      "modern:source": "./src/microvertical-api.ts",
+      "node": {
+        "import": "./dist/esm-node/microvertical-api.mjs",
+        "require": "./dist/cjs/microvertical-api.js"
+      },
+      "import": "./dist/esm/microvertical-api.mjs",
+      "default": "./dist/esm/microvertical-api.mjs"
+    },
     "./effect-client-runtime": {
       "types": "./dist/types/effect-client/runtime.d.ts",
       "modern:source": "./src/effect-client/runtime.ts",
@@ -95,6 +105,10 @@
       "effect-client": [
         "./dist/types/effect-client/index.d.ts",
         "./src/effect-client/index.ts"
+      ],
+      "microvertical-api": [
+        "./dist/types/microvertical-api.d.ts",
+        "./src/microvertical-api.ts"
       ],
       "effect-client-runtime": [
         "./dist/types/effect-client/runtime.d.ts",

@@ -82,4 +82,17 @@ describe('tanstack prefetch link adapter - preload mapping', () => {
 
     expect(capturedOptions.map(o => o.preload)).toEqual(['viewport']);
   });
+
+  it.each([
+    Link,
+    NavLink,
+  ])('lets explicit preload re-enable prefetch=none', Component => {
+    render(
+      <Component to="/settings" prefetch="none" preload="render">
+        Settings
+      </Component>,
+    );
+
+    expect(capturedOptions.map(o => o.preload)).toEqual(['render']);
+  });
 });

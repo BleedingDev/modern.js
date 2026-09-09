@@ -18,6 +18,8 @@ interface GeneratedToolingCommand {
   command: string;
   wrapperName: string;
   wrapperPath: `scripts/${string}.mts`;
+  legacyPath: `scripts/${string}.mjs`;
+  requiresBackendSurface: boolean;
   contractKey: string;
   rootScript?: string;
   templatePath?: `templates/workspace-scripts/${string}.mjs`;
@@ -25,9 +27,14 @@ interface GeneratedToolingCommand {
 }
 
 const defineToolingCommand = (
-  command: Omit<GeneratedToolingCommand, 'wrapperPath'>,
+  command: Omit<
+    GeneratedToolingCommand,
+    'wrapperPath' | 'legacyPath' | 'requiresBackendSurface'
+  > & { requiresBackendSurface?: boolean },
 ): GeneratedToolingCommand => ({
+  requiresBackendSurface: false,
   ...command,
+  legacyPath: `scripts/${command.wrapperName}.mjs`,
   wrapperPath: `scripts/${command.wrapperName}.mts`,
 });
 
@@ -65,6 +72,7 @@ export const generatedToolingCommands = [
   }),
   defineToolingCommand({
     id: 'backendFederationGenerate',
+    requiresBackendSurface: true,
     command: 'backend-federation-generate',
     wrapperName: 'generate-node-backend-federation',
     contractKey: 'backendFederationGenerate',
@@ -74,6 +82,7 @@ export const generatedToolingCommands = [
   }),
   defineToolingCommand({
     id: 'backendFederationProof',
+    requiresBackendSurface: true,
     command: 'backend-federation-proof',
     wrapperName: 'proof-node-backend-federation',
     contractKey: 'backendFederationProof',
@@ -119,6 +128,16 @@ export const generatedToolingCommands = [
     contractKey: 'routesGenerate',
   }),
 ] as const satisfies readonly GeneratedToolingCommand[];
+
+// An explicit backend-surface choice takes precedence over shell-only inference.
+export function selectGeneratedToolingCommands(
+  options: { shellOnly?: boolean; hasBackendSurface?: boolean } = {},
+) {
+  const backendSurface = options.hasBackendSurface ?? !options.shellOnly;
+  return generatedToolingCommands.filter(
+    command => backendSurface || !command.requiresBackendSurface,
+  );
+}
 
 const toolingCommandById = Object.fromEntries(
   generatedToolingCommands.map(command => [command.id, command]),

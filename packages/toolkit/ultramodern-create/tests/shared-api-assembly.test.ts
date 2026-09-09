@@ -45,9 +45,7 @@ describe('scope-aware native API scaffolding', () => {
   });
   test('shared API baseline retains owner metadata and custom prefixes', () => {
     const source = createSharedApi(service, { scope: 'warehouse' });
-    expect(source).toContain(
-      "from '@warehouse/shared-contracts/microvertical-api-baseline'",
-    );
+    expect(source).toContain("from '@modern-js/bff-effect/microvertical-api'");
     expect(source).toContain('= MicroVerticalReadinessSchema');
     expect(source).toContain('= MicroVerticalBuildMarkerSchema');
     expect(source).toContain('.addHttpApi(warehouseItemsFoundationApi)');
@@ -66,7 +64,6 @@ describe('scope-aware native API scaffolding', () => {
     );
     expect(manifest).toMatchObject({
       exports: {
-        './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
         './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
       },
       dependencies: {
@@ -92,12 +89,11 @@ describe('scope-aware native API scaffolding', () => {
           file.relativePath ===
           'scripts/microvertical-api-baseline-boundary.mts',
       ),
-    ).toBe(true);
+    ).toBe(false);
     const checker = artifacts.find(
       file =>
         file.relativePath === 'scripts/check-ultramodern-api-boundaries.mts',
     );
-    expect(checker?.content).toContain('strictEffectRuntimeTopologyViolation');
-    expect(checker?.content).toContain('microVerticalApiBaselineViolation');
+    expect(checker).toBeUndefined();
   });
 });

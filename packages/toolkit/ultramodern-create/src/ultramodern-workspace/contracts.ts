@@ -411,7 +411,7 @@ export function createUltramodernConfig(
       command: 'ultramodern-create ultramodern',
       wrappers: {
         ...createGeneratedToolingWrapperMap(),
-        apiBoundaries: 'scripts/check-ultramodern-api-boundaries.mts',
+        apiBoundaries: 'modern-api-check',
         skills: 'scripts/bootstrap-agent-skills.mts',
       },
     },

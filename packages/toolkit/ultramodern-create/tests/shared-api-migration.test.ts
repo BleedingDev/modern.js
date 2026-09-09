@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -57,14 +57,13 @@ test('shared API infrastructure is additive, byte-stable, and preserves consumer
   expect(read(root, `${shared}/src/effect-bff-runtime.ts`)).toContain(
     'defineEffectBff({ api, layer })',
   );
-  expect(read(root, `${shared}/src/microvertical-api-baseline.ts`)).toContain(
-    'MicroVerticalReadinessSchema',
-  );
+  expect(
+    fs.existsSync(path.join(root, shared, 'src/microvertical-api-baseline.ts')),
+  ).toBe(false);
   expect(JSON.parse(read(root, `${shared}/package.json`))).toMatchObject({
     exports: {
       '.': './src/index.ts',
       './business': './src/business.ts',
-      './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
       './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
     },
     dependencies: {
@@ -72,12 +71,7 @@ test('shared API infrastructure is additive, byte-stable, and preserves consumer
       '@modern-js/plugin-bff': 'workspace:*',
     },
   });
-  const files = [
-    'src/index.ts',
-    'src/effect-bff-runtime.ts',
-    'src/microvertical-api-baseline.ts',
-    'package.json',
-  ];
+  const files = ['src/index.ts', 'src/effect-bff-runtime.ts', 'package.json'];
   const first = files.map(file => read(root, `${shared}/${file}`));
   migrate();
   expect(files.map(file => read(root, `${shared}/${file}`))).toEqual(first);
@@ -104,7 +98,7 @@ test('dry-run plans missing shared infrastructure without changing consumer file
   );
   expect(
     io.plan.some(line => line.includes('src/microvertical-api-baseline.ts')),
-  ).toBe(true);
+  ).toBe(false);
   expect(read(root, `${shared}/src/index.ts`)).toBe(index);
   expect(fs.existsSync(path.join(root, shared, 'package.json'))).toBe(false);
 });
@@ -121,7 +115,6 @@ test('ambiguous consumer root exports fail closed before any infrastructure writ
 });
 
 test.each([
-  './microvertical-api-baseline',
   './server/effect-bff-runtime',
 ])('conflicting consumer %s export fails transactionally', subpath => {
   const manifest = JSON.stringify({
@@ -194,8 +187,10 @@ test('owning migration restores missing shared infrastructure without regenerati
     'defineEffectBff',
   );
   expect(
-    read(workspace, `${shared}/src/microvertical-api-baseline.ts`),
-  ).toContain('MicroVerticalBuildMarkerSchema');
+    fs.existsSync(
+      path.join(workspace, shared, 'src/microvertical-api-baseline.ts'),
+    ),
+  ).toBe(false);
   const require = createRequire(import.meta.url);
   for (const [name, target] of [
     [
@@ -209,9 +204,14 @@ test('owning migration restores missing shared infrastructure without regenerati
     fs.symlinkSync(target, destination, 'dir');
   }
   linkBuiltCodeTools(path.join(workspace, 'node_modules'));
+  fs.symlinkSync(
+    path.resolve(__dirname, '../../../server/bff-effect'),
+    path.join(workspace, 'node_modules/@modern-js/bff-effect'),
+    'dir',
+  );
   const checked = spawnSync(
     process.execPath,
-    ['scripts/check-ultramodern-api-boundaries.mts'],
+    [path.resolve(__dirname, '../../code-tools/bin/modern-api-check.mjs')],
     {
       cwd: workspace,
       encoding: 'utf8',
@@ -239,4 +239,93 @@ test.each([
   expect(fs.readFileSync(target, 'utf8')).toBe(content);
   expect(fs.readlinkSync(link)).toBe(destination);
   expect(fs.readdirSync(path.dirname(target))).toEqual(['preserved']);
+});
+
+test('a previous generated API workspace upgrades atomically to native package imports and validator-clean commands', async () => {
+  const workspace = path.join(root, 'historical');
+  generateUltramodernWorkspace({
+    targetDir: workspace,
+    packageName: 'warehouse',
+    modernVersion: '3.8.3',
+    enableTailwind: true,
+    packageSource: { strategy: 'workspace' },
+  });
+  addUltramodernVertical({
+    workspaceRoot: workspace,
+    name: 'inventory',
+    modernVersion: '3.8.3',
+  });
+  const files = [
+    [
+      'packages/microvertical-api-baseline.ts',
+      'packages/shared-contracts/src/microvertical-api-baseline.ts',
+    ],
+    [
+      'workspace-scripts/check-ultramodern-api-boundaries.mts',
+      'scripts/check-ultramodern-api-boundaries.mts',
+    ],
+    [
+      'workspace-scripts/microvertical-api-baseline-boundary.mts',
+      'scripts/microvertical-api-baseline-boundary.mts',
+    ],
+  ];
+  for (const [template, file] of files)
+    write(
+      workspace,
+      file,
+      execFileSync(
+        'git',
+        [
+          'show',
+          `88271e79effb674c1ca5b93a6dc962e2926b51b0:packages/toolkit/ultramodern-create/templates/${template}`,
+        ],
+        { cwd: path.resolve(__dirname, '../../../..'), encoding: 'utf8' },
+      ),
+    );
+  const contract = 'verticals/inventory/shared/api.ts';
+  write(
+    workspace,
+    contract,
+    read(workspace, contract).replaceAll(
+      '@modern-js/bff-effect/microvertical-api',
+      '@warehouse/shared-contracts/microvertical-api-baseline',
+    ),
+  );
+  const manifest = JSON.parse(read(workspace, `${shared}/package.json`));
+  manifest.exports['./microvertical-api-baseline'] =
+    './src/microvertical-api-baseline.ts';
+  write(workspace, `${shared}/package.json`, JSON.stringify(manifest));
+  const rootPackage = JSON.parse(read(workspace, 'package.json'));
+  rootPackage.scripts['api:check'] =
+    'node ./scripts/check-ultramodern-api-boundaries.mts';
+  delete rootPackage.scripts['api:check:files'];
+  write(workspace, 'package.json', JSON.stringify(rootPackage));
+  const validator = 'scripts/validate-ultramodern-workspace.mts';
+  write(
+    workspace,
+    validator,
+    read(workspace, validator).replace(
+      "'modern-api-check'",
+      "'node ./scripts/check-ultramodern-api-boundaries.mts'",
+    ),
+  );
+  const handler = read(workspace, 'verticals/inventory/api/index.ts');
+  expect(
+    await runUltramodernToolingCli(
+      ['migrate-strict-effect', '--skip-install'],
+      workspace,
+    ),
+  ).toBe(0);
+  expect(
+    files.every(([, file]) => !fs.existsSync(path.join(workspace, file))),
+  ).toBe(true);
+  expect(read(workspace, contract)).toContain(
+    '@modern-js/bff-effect/microvertical-api',
+  );
+  expect(read(workspace, 'verticals/inventory/api/index.ts')).toBe(handler);
+  const checked = spawnSync(process.execPath, [validator], {
+    cwd: workspace,
+    encoding: 'utf8',
+  });
+  expect(checked.status, checked.stdout + checked.stderr).toBe(0);
 });

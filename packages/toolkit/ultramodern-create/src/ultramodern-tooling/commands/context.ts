@@ -18,11 +18,18 @@ export type CommandContext = {
   invocationCwd: string;
 };
 
+// These CLI commands do not share the generated-wrapper contract.
+export const AD_HOC_TOOLING_COMMANDS = {
+  syncDeliveryUnit: 'sync-delivery-unit',
+  skills: 'skills',
+} as const;
+
 export function printHelp() {
   const commands = [
     ...generatedToolingCommandList().map(command => `  ${command}`),
-    '  skills install',
-    '  skills check',
+    `  ${AD_HOC_TOOLING_COMMANDS.syncDeliveryUnit}`,
+    `  ${AD_HOC_TOOLING_COMMANDS.skills} install`,
+    `  ${AD_HOC_TOOLING_COMMANDS.skills} check`,
   ].join('\n');
 
   process.stdout.write(`Usage:

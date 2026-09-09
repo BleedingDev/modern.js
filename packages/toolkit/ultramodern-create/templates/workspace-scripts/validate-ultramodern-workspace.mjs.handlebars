@@ -2046,8 +2046,18 @@ const synthesizeGeneratedContractFromCompact = config => {
     apps: apps.map(app => createAppContract(app, apps)),
   };
 };
-const readGeneratedContractView = config => {
-  return synthesizeGeneratedContractFromCompact(config);
+const readGeneratedContractView = (config, overlay) => {
+  const ports = overlay.ports ?? {};
+  return synthesizeGeneratedContractFromCompact({
+    ...config,
+    topology: {
+      ...config.topology,
+      apps: config.topology.apps.map(app => ({
+        ...app,
+        port: typeof ports[app.id] === 'number' ? ports[app.id] : app.port,
+      })),
+    },
+  });
 };
 const expectedManifestUrl = vertical =>
   `http://localhost:${vertical.port}/mf-manifest.json`;
@@ -3089,7 +3099,6 @@ const requiredPaths = [
   'topology/local-overlays/development.json',
   'scripts/assert-mf-types.mts',
   'scripts/bootstrap-agent-skills.mts',
-  'scripts/check-ultramodern-api-boundaries.mts',
   'scripts/check-ultramodern-i18n-boundaries.mts',
   ...(hasBackendSurfaces ? ['scripts/generate-node-backend-federation.mts'] : []),
   'scripts/generate-public-surface-assets.mts',
@@ -3285,7 +3294,7 @@ assertStructuredWorkspaceMetadata({
 const bridgeConfig =
   ultramodernConfig?.bridge?.enabled === true ? ultramodernConfig.bridge : undefined;
 const packageSource = createPackageSourceView(ultramodernConfig);
-const generatedContract = readGeneratedContractView(ultramodernConfig);
+const generatedContract = readGeneratedContractView(ultramodernConfig, overlay);
 const shellPackage = readJson('apps/shell-super-app/package.json');
 
 assertMicroVerticalContractGraph({
@@ -3617,7 +3626,7 @@ if (bridgeConfig) {
   assert(rootPackage.scripts?.typecheck === 'node ./scripts/ultramodern-typecheck.mts --build tsconfig.json', 'Root typecheck must run TS-Go across the root project reference graph');
 }
 assert(rootPackage.scripts?.['contract:check'] === 'node ./scripts/validate-ultramodern-workspace.mts', 'Root must expose contract:check');
-assert(rootPackage.scripts?.['api:check'] === 'node ./scripts/check-ultramodern-api-boundaries.mts', 'Root must expose api:check');
+assert(rootPackage.scripts?.['api:check'] === 'modern-api-check', 'Root must expose api:check');
 assert(rootPackage.scripts?.['i18n:boundaries'] === 'node ./scripts/check-ultramodern-i18n-boundaries.mts', 'Root must expose i18n:boundaries');
 assert(rootPackage.scripts?.['performance:readiness'] === 'node ./scripts/ultramodern-performance-readiness.mts', 'Root must expose default-on performance readiness diagnostics');
 if (hasBackendSurfaces) {
@@ -3687,7 +3696,17 @@ assert(rootPackage.scripts?.['cloudflare:proof'] === 'node ./scripts/proof-cloud
 assert(rootPackage.scripts?.['migrate:strict-effect'] === 'node ./scripts/migrate-strict-effect.mts', 'Root must expose migrate:strict-effect');
 assert(rootPackage.scripts?.['skills:install'] === 'node ./scripts/bootstrap-agent-skills.mts', 'Root must expose skills:install');
 assert(rootPackage.scripts?.['skills:check'] === 'node ./scripts/bootstrap-agent-skills.mts --check', 'Root must expose skills:check');
-assert(rootPackage.scripts?.postinstall === 'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .', 'Root postinstall must run the default-on Codex skills bootstrap, format installed skills through the cross-platform ignore configuration, and leave reference repository installs explicit');
+const postinstall = rootPackage.scripts?.postinstall;
+const postinstallSegments = typeof postinstall === 'string'
+  ? postinstall.match(new RegExp({{workspaceScriptSegmentPattern}}, 'gu'))
+  : undefined;
+assert(
+  Array.isArray(postinstallSegments) &&
+    postinstallSegments.join('&&') === postinstall &&
+    postinstallSegments.every(command => command.trim().length > 0) &&
+    postinstallSegments.some(command => command.trim() === 'node ./scripts/bootstrap-agent-skills.mts --postinstall'),
+  'Root postinstall must run the default-on Codex skills bootstrap; formatting and reference repository installs remain explicit commands',
+);
 assert(rootPackage.scripts?.['agents:refs:install'] === 'node ./scripts/setup-agent-reference-repos.mts', 'Root must expose agents:refs:install as the explicit reference repo installer');
 
 const expectedAppIds = ['shell-super-app', ...fullStackVerticals.map(vertical => vertical.id)];

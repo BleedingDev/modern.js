@@ -1,4 +1,8 @@
+import fs from 'node:fs';
 import path from 'node:path';
+import { createMigrationIo } from '../../ultramodern-tooling/commands/migrate-strict-effect/io';
+import { updateGeneratedPackageScripts } from '../../ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
+import { preserveConsumerWorkspaceArtifacts } from '../../ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
 import { createShellApiClient } from '../api';
 import {
   createAppEnvDts,
@@ -14,11 +18,10 @@ import {
 import {
   appEmitsBrowserUi,
   appI18nNamespace,
-  createShellHost,
   resolveRemoteRefs,
   shellApp,
 } from '../descriptors';
-import { readJsonFile, writeFileReplacing, writeJsonFile } from '../fs-io';
+import { readJsonFile, writeJsonFile } from '../fs-io';
 import { createAppPublicLocaleMessages } from '../locales';
 import {
   createAppModernConfig,
@@ -43,6 +46,8 @@ export function updateRootWorkspaceScripts(
   remotes: WorkspaceApp[],
   bridge?: UltramodernBridgeConfig,
   additionalShells: WorkspaceApp[] = [],
+  previousRemotes: WorkspaceApp[] = remotes,
+  primaryShell: WorkspaceApp = shellApp,
 ) {
   const packagePath = path.join(workspaceRoot, 'package.json');
   const rootPackage = readJsonFile(packagePath);
@@ -53,8 +58,114 @@ export function updateRootWorkspaceScripts(
     bridge,
     additionalShells,
   ) as Record<string, any>;
-  rootPackage.scripts = generatedRootPackage.scripts;
+  const previousRootPackage = createRootPackageJson(
+    scope,
+    packageSource,
+    previousRemotes,
+    bridge,
+    additionalShells,
+  ) as Record<string, any>;
+  const existingScripts = rootPackage.scripts ?? {};
+  rootPackage.scripts = { ...generatedRootPackage.scripts, ...existingScripts };
+  if (existingScripts.dev === previousRootPackage.scripts.dev) {
+    rootPackage.scripts.dev = generatedRootPackage.scripts.dev;
+  }
+  updateGeneratedPackageScripts(rootPackage, {
+    relativePackageFile: 'package.json',
+    apps: [primaryShell, ...remotes, ...additionalShells],
+  });
   writeJsonFile(packagePath, rootPackage as JsonValue);
+}
+
+function shellAppArtifacts(
+  scope: string,
+  packageSource: ResolvedPackageSource,
+  enableTailwind: boolean,
+  remotes: WorkspaceApp[],
+  bridge: UltramodernBridgeConfig | undefined,
+  shell: WorkspaceApp,
+  devPorts?: number[],
+) {
+  const shellHost = {
+    ...shell,
+    verticalRefs:
+      shell.verticalRefs ??
+      remotes.filter(appEmitsBrowserUi).map(remote => remote.id),
+  };
+  const shellRemotes = resolveRemoteRefs(shellHost, remotes);
+  const uiRemotes = shellRemotes.filter(appEmitsBrowserUi);
+  const publicWeb = createPublicWebAppArtifacts(shellHost);
+  const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+  const files: Record<string, string> = {
+    [`${shellHost.directory}/tsconfig.json`]: json(
+      createAppTsConfig(shellHost, shellRemotes),
+    ),
+    [`${shellHost.directory}/tsconfig.mf-types.json`]: json(
+      createAppMfTypesTsConfig(shellHost),
+    ),
+    [`${shellHost.directory}/src/modern-app-env.d.ts`]: createAppEnvDts(
+      shellHost,
+      shellRemotes,
+      scope,
+    ),
+    [`${shellHost.directory}/modern.config.ts`]: createAppModernConfig(
+      scope,
+      shellHost,
+      shellRemotes,
+      enableTailwind,
+      devPorts,
+    ),
+    [publicWeb.jsonLdHelperFile.path]: publicWeb.jsonLdHelperFile.content,
+    [publicWeb.routeMetadataFile.path]: publicWeb.routeMetadataFile.content,
+    [publicWeb.routeHeadFile.path]: publicWeb.routeHeadFile.content,
+    ...Object.fromEntries(
+      publicWeb.routeMetaFiles.map(file => [file.path, file.content]),
+    ),
+    [`${shellHost.directory}/src/modern.runtime.ts`]: createAppRuntimeConfig(
+      shellHost,
+      scope,
+      shellRemotes,
+    ),
+    ...Object.fromEntries(
+      (['en', 'cs'] as const).flatMap(language =>
+        ['translation', appI18nNamespace(shellHost)].map(namespace => [
+          `${shellHost.directory}/locales/${language}/${namespace}.json`,
+          json(
+            createAppPublicLocaleMessages(shellHost, language, shellRemotes),
+          ),
+        ]),
+      ),
+    ),
+    [`${shellHost.directory}/module-federation.config.ts`]:
+      createShellModuleFederationConfig(scope, shellHost, shellRemotes),
+    [`${shellHost.directory}/src/routes/[lang]/page.tsx`]: createShellPage(
+      shellHost,
+      uiRemotes,
+    ),
+    [`${shellHost.directory}/src/routes/vertical-components.tsx`]:
+      createShellRemoteComponents(shellHost, uiRemotes),
+    [`${shellHost.directory}/src/routes/vertical-components.worker.tsx`]:
+      createShellWorkerRemoteComponents(shellHost, uiRemotes),
+    [`${shellHost.directory}/src/routes/shell-frame.tsx`]:
+      createShellFrameComponent(shellHost),
+    [`${shellHost.directory}/src/api/vertical-clients.ts`]:
+      createShellApiClient(scope, remotes),
+  };
+  return {
+    shellHost,
+    packageJson: createAppPackage(
+      scope,
+      shellHost,
+      packageSource,
+      enableTailwind,
+      remotes,
+      bridge,
+    ) as Record<string, any>,
+    artifacts: Object.entries(files).map(([relativePath, content]) => ({
+      relativePath,
+      content,
+    })),
+  };
 }
 
 export function rewriteShellAppFiles(
@@ -66,143 +177,66 @@ export function rewriteShellAppFiles(
   bridge?: UltramodernBridgeConfig,
   shell: WorkspaceApp = shellApp,
   devPorts?: number[],
+  previous: {
+    shell: WorkspaceApp;
+    remotes: WorkspaceApp[];
+    devPorts?: number[];
+    enableTailwind?: boolean;
+  } = { shell, remotes, devPorts },
 ) {
-  // Preserve the CALLER-RESOLVED descriptor (overlay port, directory) for
-  // every shell — including the primary. Only the composition refs default is
-  // derived here (UI-emitting units) when the descriptor carries none.
-  const shellHost = {
-    ...shell,
-    verticalRefs:
-      shell.verticalRefs ??
-      remotes.filter(appEmitsBrowserUi).map(remote => remote.id),
-  };
-  const shellRemotes = resolveRemoteRefs(shellHost, remotes);
-  // Only UI-emitting remotes appear in the shell's visible page/components
-  // surface (G2a): headless api-only units are composed via API clients only.
-  const uiRemotes = shellRemotes.filter(appEmitsBrowserUi);
-  const publicWeb = createPublicWebAppArtifacts(shellHost);
-  writeJsonFile(
-    path.join(workspaceRoot, `${shellHost.directory}/package.json`),
-    createAppPackage(
-      scope,
-      shellHost,
-      packageSource,
-      enableTailwind,
-      // Pass the full vertical set so the shell declares plain workspace deps on
-      // headless api-only verticals (their API is re-exported by the shell's
-      // vertical-clients.ts) while MF/zephyr wiring stays verticalRefs-gated.
-      remotes,
-      bridge,
-    ),
+  const before = shellAppArtifacts(
+    scope,
+    packageSource,
+    previous.enableTailwind ?? enableTailwind,
+    previous.remotes,
+    bridge,
+    previous.shell,
+    previous.devPorts,
   );
-  writeJsonFile(
-    path.join(workspaceRoot, `${shellHost.directory}/tsconfig.json`),
-    createAppTsConfig(shellHost, shellRemotes),
+  const next = shellAppArtifacts(
+    scope,
+    packageSource,
+    enableTailwind,
+    remotes,
+    bridge,
+    shell,
+    devPorts,
   );
-  writeJsonFile(
-    path.join(workspaceRoot, `${shellHost.directory}/tsconfig.mf-types.json`),
-    createAppMfTypesTsConfig(shellHost),
+  const { io } = preserveConsumerWorkspaceArtifacts(
+    createMigrationIo(workspaceRoot, false),
+    before.artifacts,
   );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/src/modern-app-env.d.ts`,
-    createAppEnvDts(shellHost, shellRemotes, scope),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/modern.config.ts`,
-    createAppModernConfig(
-      scope,
-      shellHost,
-      shellRemotes,
-      enableTailwind,
-      devPorts,
-    ),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    publicWeb.jsonLdHelperFile.path,
-    publicWeb.jsonLdHelperFile.content,
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    publicWeb.routeMetadataFile.path,
-    publicWeb.routeMetadataFile.content,
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    publicWeb.routeHeadFile.path,
-    publicWeb.routeHeadFile.content,
-  );
-  for (const generatedFile of publicWeb.routeMetaFiles) {
-    writeFileReplacing(
-      workspaceRoot,
-      generatedFile.path,
-      generatedFile.content,
-    );
+  for (const artifact of next.artifacts) {
+    io.write(path.join(workspaceRoot, artifact.relativePath), artifact.content);
   }
-  rewriteWorkspaceAssetsForApp(workspaceRoot, shellHost);
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/src/modern.runtime.ts`,
-    createAppRuntimeConfig(shellHost, scope, shellRemotes),
-  );
-  writeJsonFile(
-    path.join(
-      workspaceRoot,
-      `${shellHost.directory}/locales/en/translation.json`,
-    ),
-    createAppPublicLocaleMessages(shellHost, 'en', shellRemotes),
-  );
-  writeJsonFile(
-    path.join(
-      workspaceRoot,
-      `${shellHost.directory}/locales/en/${appI18nNamespace(shellHost)}.json`,
-    ),
-    createAppPublicLocaleMessages(shellHost, 'en', shellRemotes),
-  );
-  writeJsonFile(
-    path.join(
-      workspaceRoot,
-      `${shellHost.directory}/locales/cs/translation.json`,
-    ),
-    createAppPublicLocaleMessages(shellHost, 'cs', shellRemotes),
-  );
-  writeJsonFile(
-    path.join(
-      workspaceRoot,
-      `${shellHost.directory}/locales/cs/${appI18nNamespace(shellHost)}.json`,
-    ),
-    createAppPublicLocaleMessages(shellHost, 'cs', shellRemotes),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/module-federation.config.ts`,
-    createShellModuleFederationConfig(scope, shellHost, shellRemotes),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/src/routes/[lang]/page.tsx`,
-    createShellPage(shellHost, uiRemotes),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/src/routes/vertical-components.tsx`,
-    createShellRemoteComponents(shellHost, uiRemotes),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/src/routes/vertical-components.worker.tsx`,
-    createShellWorkerRemoteComponents(shellHost, uiRemotes),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/src/routes/shell-frame.tsx`,
-    createShellFrameComponent(shellHost),
-  );
-  writeFileReplacing(
-    workspaceRoot,
-    `${shellHost.directory}/src/api/vertical-clients.ts`,
-    createShellApiClient(scope, remotes),
-  );
+  const packagePath = path.join(workspaceRoot, shell.directory, 'package.json');
+  const existing = fs.existsSync(packagePath) ? readJsonFile(packagePath) : {};
+  const packageJson = {
+    ...next.packageJson,
+    ...existing,
+    'zephyr:dependencies': {
+      ...next.packageJson['zephyr:dependencies'],
+      ...Object.fromEntries(
+        Object.entries(existing['zephyr:dependencies'] ?? {}).filter(
+          ([key, value]) =>
+            before.packageJson['zephyr:dependencies']?.[key] !== value,
+        ),
+      ),
+    },
+    dependencies: {
+      ...next.packageJson.dependencies,
+      ...existing.dependencies,
+    },
+    devDependencies: {
+      ...next.packageJson.devDependencies,
+      ...existing.devDependencies,
+    },
+    scripts: { ...next.packageJson.scripts, ...existing.scripts },
+  };
+  updateGeneratedPackageScripts(packageJson, {
+    relativePackageFile: `${shell.directory}/package.json`,
+    apps: [shell, ...remotes],
+  });
+  writeJsonFile(packagePath, packageJson as JsonValue);
+  rewriteWorkspaceAssetsForApp(workspaceRoot, next.shellHost);
 }

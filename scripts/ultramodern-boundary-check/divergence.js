@@ -34,8 +34,10 @@ const DEFAULT_DIVERGENCE_ALLOWLIST_PATH = path.join(
 const DEFAULT_PATHSPEC = Object.freeze(['packages']);
 const FORK_OWNED_PACKAGE_ROOTS = Object.freeze([
   'packages/cli/plugin-bff-extensions',
+  'packages/document/ultramodern-preset',
   'packages/runtime/i18n-extensions',
   'packages/runtime/plugin-tanstack',
+  'packages/runtime/runtime-extensions',
   'packages/server/bff-effect',
   'packages/server/runtime-extensions',
   'packages/sidecar/image-size',
@@ -43,6 +45,8 @@ const FORK_OWNED_PACKAGE_ROOTS = Object.freeze([
   'packages/sidecar/rsbuild-image-core',
   'packages/solutions/app-tools-extensions',
   'packages/toolkit/code-tools',
+  'packages/toolkit/ultramodern-create',
+  'packages/toolkit/ultramodern-sandpack-profile',
 ]);
 const DIVERGENCE_LEDGER_REPO_PATH = 'FORK-DIVERGENCE.md';
 const CAPPED_PATCH_LINES = 20;

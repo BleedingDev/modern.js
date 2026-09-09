@@ -207,9 +207,13 @@ function runGeneratedApiCheck(workspaceDir: string) {
     fs.mkdirSync(path.dirname(sharedLink), { recursive: true });
     fs.symlinkSync(sharedContracts, sharedLink, 'dir');
   }
-  const modules = path.join(workspaceDir, 'scripts/node_modules');
+  const modules = path.join(workspaceDir, 'node_modules');
   linkBuiltCodeTools(modules);
   for (const [name, target] of Object.entries({
+    '@modern-js/bff-effect': path.resolve(
+      __dirname,
+      '../../../server/bff-effect',
+    ),
     '@typescript/native': path.dirname(
       createRequire(import.meta.url).resolve('typescript/package.json'),
     ),
@@ -220,7 +224,7 @@ function runGeneratedApiCheck(workspaceDir: string) {
   }
   return spawnSync(
     process.execPath,
-    ['scripts/check-ultramodern-api-boundaries.mts'],
+    [path.resolve(__dirname, '../../code-tools/bin/modern-api-check.mjs')],
     {
       cwd: workspaceDir,
       encoding: 'utf8',
@@ -456,7 +460,7 @@ function assertGeneratedWorkspaceScriptBehavior(
         pnpm('typecheck'),
         pnpm('skills:check'),
         pnpm('i18n:boundaries'),
-        pnpm('api:check'),
+        pnpm('api:check:files'),
         pnpm('contract:check'),
         pnpm('performance:readiness'),
       ],
@@ -526,7 +530,7 @@ function assertGeneratedWorkspaceScriptBehavior(
         pnpm('typecheck'),
         pnpm('skills:check'),
         pnpm('i18n:boundaries'),
-        pnpm('api:check'),
+        pnpm('api:check:files'),
         pnpm('contract:check'),
       ],
     },
@@ -1845,17 +1849,17 @@ export const handler = async (request: Request) => Response.json(await request.j
     const failingResult = runGeneratedApiCheck(workspaceDir);
     const output = commandOutput(failingResult);
     assert.notEqual(failingResult.status, 0, output);
-    assert.match(output, /must not import Hono server helpers/);
+    assert.match(output, /use Effect HttpApi instead of Hono helpers/);
     assert.match(output, /must not hand-build Response objects/);
-    assert.match(output, /must not manually parse request bodies/);
+    assert.match(
+      output,
+      /must use endpoint payload\/query\/params schemas instead of parsing request bodies/,
+    );
     assert.match(output, /must not export raw request handlers/);
     assert.match(output, /must keep strictEffectApproach enabled/);
     assert.match(output, /must describe the MicroVertical server role/);
     assert.match(output, /must preserve strict Effect backend execution/);
-    assert.match(
-      output,
-      /must preserve the MicroVertical server contract version/,
-    );
+    assert.match(output, /must preserve the server contract version/);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -2377,7 +2381,7 @@ test('generated validator accepts a ui-only workspace and rejects planted API ar
     const failing = runGeneratedApiCheck(workspaceDir);
     const output = commandOutput(failing);
     assert.notEqual(failing.status, 0, output);
-    assert.match(output, /Unexpected .*shared\/api\.ts for a ui-only unit/);
+    assert.match(output, /shared\/api\.ts: unit has no API surface/);
     fs.rmSync(path.join(workspaceDir, 'verticals/surface/shared/api.ts'));
 
     // Planting an RPC contract into a ui-only unit must be rejected too: a
@@ -2390,7 +2394,7 @@ test('generated validator accepts a ui-only workspace and rejects planted API ar
     const failingRpc = runGeneratedApiCheck(workspaceDir);
     const rpcOutput = commandOutput(failingRpc);
     assert.notEqual(failingRpc.status, 0, rpcOutput);
-    assert.match(rpcOutput, /Unexpected .*shared\/rpc\.ts for a ui-only unit/);
+    assert.match(rpcOutput, /shared\/rpc\.ts: unit has no API surface/);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -2472,7 +2476,7 @@ test('generated validator accepts an rpc-protocol workspace and rejects a missin
     const structurallyInvalid = runGeneratedApiCheck(workspaceDir);
     const structurallyInvalidOutput = commandOutput(structurallyInvalid);
     assert.notEqual(structurallyInvalid.status, 0, structurallyInvalidOutput);
-    assert.match(structurallyInvalidOutput, /through RpcGroup\.make/);
+    assert.match(structurallyInvalidOutput, /must call RpcGroup\.make/);
     fs.writeFileSync(rpcContractPath, rpcContract, 'utf-8');
 
     // Planting the REST API client into an RPC unit must be rejected: an RPC
@@ -2505,7 +2509,7 @@ test('generated validator accepts an rpc-protocol workspace and rejects a missin
     assert.notEqual(failing.status, 0, output);
     assert.match(
       output,
-      /Missing verticals\/catalog\/src\/api\/catalog-rpc-client\.ts/,
+      /verticals\/catalog\/src\/api\/catalog-rpc-client\.ts: required API surface is missing/,
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -2539,10 +2543,7 @@ test('generated validator still accepts a rest full-stack workspace', () => {
     const missingApiMetadata = runGeneratedApiCheck(workspaceDir);
     const missingApiOutput = commandOutput(missingApiMetadata);
     assert.notEqual(missingApiMetadata.status, 0, missingApiOutput);
-    assert.match(
-      missingApiOutput,
-      /full-stack vertical must declare its Effect API/,
-    );
+    assert.match(missingApiOutput, /vertical must declare its Effect API/);
     catalogApp.api = catalogApi;
     writeJson(workspaceDir, '.modernjs/ultramodern.json', ultramodernConfig);
 
@@ -2556,7 +2557,7 @@ test('generated validator still accepts a rest full-stack workspace', () => {
     assert.notEqual(mixedProtocol.status, 0, mixedProtocolOutput);
     assert.match(
       mixedProtocolOutput,
-      /REST unit must not emit .*shared\/rpc\.ts/,
+      /shared\/rpc\.ts: must not emit a RPC contract/,
     );
     fs.rmSync(mixedRpcContract);
 

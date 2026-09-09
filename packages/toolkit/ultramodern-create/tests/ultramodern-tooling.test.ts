@@ -1447,9 +1447,8 @@ test('migrate materializes every validator-required wrapper and rewires legacy s
       if (scriptName === 'postinstall') {
         assert.deepEqual(
           execution.records.map(record => record.command),
-          ['node', 'oxfmt'],
+          ['node'],
         );
-        assert.deepEqual(execution.records.at(-1)?.args, ['.']);
       }
     }
     const after = readJson(workspaceDir, 'package.json');
@@ -1457,7 +1456,7 @@ test('migrate materializes every validator-required wrapper and rewires legacy s
     assert.equal(after.scripts['format:check'], 'oxfmt --check .');
     assert.equal(
       after.scripts.postinstall,
-      'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .',
+      'node ./scripts/bootstrap-agent-skills.mts --postinstall',
     );
     for (const [scriptName, expectedArgs] of [
       ['format', ['.']],

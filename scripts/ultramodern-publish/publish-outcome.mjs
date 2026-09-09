@@ -458,41 +458,7 @@ function readReleaseEvidence({
   tractorReportSha256,
   version,
 }) {
-  const manifest = readJson(manifestPath, 'Release manifest');
-  assertExactKeys(
-    manifest,
-    [
-      'aliases',
-      'cohortDigest',
-      'cohortProjection',
-      'dependencyGraph',
-      'packages',
-      'publishOrder',
-      'release',
-      'schema',
-      'schemaVersion',
-      'sidecars',
-      'source',
-      'tools',
-    ],
-    'Release manifest',
-  );
-  assertExactKeys(manifest.source, ['commit', 'repository'], 'Release source');
-  assertExactKeys(manifest.release, ['tag', 'version'], 'Release identity');
-  if (
-    manifest.schema !== 'bleedingdev.ultramodern.release-manifest' ||
-    manifest.schemaVersion !== 3 ||
-    !Array.isArray(manifest.packages) ||
-    manifest.packages.length === 0 ||
-    !Array.isArray(manifest.publishOrder)
-  ) {
-    throw new Error('Release manifest must use the strict v3 release schema');
-  }
-  assertRepository(manifest.source.repository, 'Release source repository');
-  assertSourceCommit(manifest.source.commit, 'Release source commit');
-  assertVersion(manifest.release.version, 'Release version');
-  assertNonEmptyString(manifest.release.tag, 'Release tag');
-  assertDigest(manifest.cohortDigest, 'Release cohort digest');
+  const manifest = readReleaseManifest({ manifestPath });
   if (
     manifest.source.repository !== repository ||
     manifest.source.commit !== sourceCommit ||
@@ -504,8 +470,7 @@ function readReleaseEvidence({
     );
   }
 
-  const manifestSha256 = sha256File(manifestPath);
-  const verifiedRelease = readReleaseManifest({ manifestPath });
+  const manifestSha256 = manifest.manifestSha256;
   const detachedManifest = fs.readFileSync(manifestDigestPath, 'utf8');
   const detachedCohort = fs.readFileSync(cohortDigestPath, 'utf8');
   if (detachedManifest !== `${manifestSha256}  manifest.json\n`) {
@@ -520,7 +485,7 @@ function readReleaseEvidence({
     assertAcceptanceReceipt(receipt, {
       expectedMode,
       profileId: 'erp-10',
-      release: verifiedRelease,
+      release: manifest,
       runIdentity,
     });
     if (
@@ -591,9 +556,8 @@ function readReleaseEvidence({
   const tractorAcceptance = readTractorAcceptanceEvidence({
     baselineRevision: tractorBaselineRevision,
     cohortDigest: manifest.cohortDigest,
-    expectedCreateSpecifier:
-      verifiedRelease.packageChecks.create.exactSpecifier,
-    expectedPackageCount: verifiedRelease.packages.length,
+    expectedCreateSpecifier: manifest.packageChecks.create.exactSpecifier,
+    expectedPackageCount: manifest.packages.length,
     manifestSha256,
     reportPath: tractorReportPath,
     reportSha256: tractorReportSha256,

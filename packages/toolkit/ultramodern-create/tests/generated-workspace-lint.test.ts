@@ -108,6 +108,10 @@ function provisionApiDependencies(workspaceDir: string, scope: string) {
     ],
     ['@modern-js/code-tools', path.resolve(packageRoot, '../code-tools')],
     [
+      '@modern-js/bff-effect',
+      path.resolve(packageRoot, '../../server/bff-effect'),
+    ],
+    [
       `@${scope}/shared-contracts`,
       path.join(workspaceDir, 'packages/shared-contracts'),
     ],
@@ -264,7 +268,7 @@ test('ten generated APIs pass real Oxlint after Oxfmt with the current preset an
           path.join(workspaceDir, `verticals/${name}/shared/api.ts`),
           'utf8',
         ),
-        /shared-contracts\/microvertical-api-baseline/u,
+        /bff-effect\/microvertical-api/u,
       );
     }
     assertGeneratedWorkspaceLintClean(
@@ -273,7 +277,7 @@ test('ten generated APIs pass real Oxlint after Oxfmt with the current preset an
     );
     const checked = spawnSync(
       process.execPath,
-      ['scripts/check-ultramodern-api-boundaries.mts'],
+      [path.resolve(packageRoot, '../code-tools/bin/modern-api-check.mjs')],
       {
         cwd: workspaceDir,
         encoding: 'utf8',
@@ -316,7 +320,6 @@ test('Tractor-shaped migration preserves the root barrel bytes and module graph 
     delete manifest.exports['./microvertical-api-baseline'];
     delete manifest.exports['./server/effect-bff-runtime'];
     fs.writeFileSync(manifestPath, JSON.stringify(manifest));
-    fs.rmSync(path.join(owner, 'src/microvertical-api-baseline.ts'));
     fs.rmSync(path.join(owner, 'src/effect-bff-runtime.ts'));
     const io = createMigrationIo(workspaceDir, false);
     io.transaction(() =>
@@ -330,28 +333,6 @@ test('Tractor-shaped migration preserves the root barrel bytes and module graph 
       workspaceDir,
       'additive migration with lightweight consumer root',
     );
-    // Positive control: the old export-star migration really exceeds the
-    // unchanged preset threshold when the actual Effect dependency is resolved.
-    fs.appendFileSync(
-      indexPath,
-      "\nexport * from './microvertical-api-baseline.ts';\n",
-    );
-    const result = spawnSync(
-      process.execPath,
-      [
-        path.join(workspaceDir, 'node_modules/oxlint/bin/oxlint'),
-        'packages/shared-contracts/src/index.ts',
-        '--format',
-        'json',
-      ],
-      { cwd: workspaceDir, encoding: 'utf8' },
-    );
-    assert.equal(result.error, undefined);
-    assert.match(result.stdout, /Barrel file detected/u);
-    assert.match(result.stdout, /exceeds the threshold of 100/u);
-    assert.notEqual(result.status, 0);
-    fs.writeFileSync(indexPath, before);
-    assert.deepEqual(fs.readFileSync(indexPath), before);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

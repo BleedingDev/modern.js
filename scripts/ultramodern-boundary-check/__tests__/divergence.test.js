@@ -1374,6 +1374,100 @@ test('added production source inside an explicit fork-owned package passes', () 
   }
 });
 
+for (const root of [
+  'packages/document/ultramodern-preset',
+  'packages/runtime/runtime-extensions',
+  'packages/toolkit/ultramodern-create',
+  'packages/toolkit/ultramodern-sandpack-profile',
+]) {
+  test(`${root} excludes fork additions but not adjacent upstream paths`, () => {
+    const fixture = makeGitFixture();
+    try {
+      writeSnapshot({
+        rootDir: fixture.rootDir,
+        baseRef: fixture.upstreamBase,
+      });
+      for (const suffix of [
+        'package.json',
+        'src/index.ts',
+        'tests/fixture.ts',
+      ]) {
+        writeRepoFile(fixture.rootDir, `${root}/${suffix}`, 'fork addition\n');
+      }
+      const neighbor = `${root}-neighbor/src/index.ts`;
+      writeRepoFile(fixture.rootDir, neighbor, 'governed addition\n');
+      runGit(fixture.rootDir, ['add', '-A']);
+      const report = checkForkDivergence({ rootDir: fixture.rootDir });
+      assert.equal(report.measuredFiles, 1);
+      assert.deepEqual(
+        report.violations.map(entry => entry.file),
+        [neighbor],
+      );
+    } finally {
+      cleanup(fixture.rootDir);
+    }
+  });
+
+  test(`${root} stays governed when introduced by reviewed upstream`, () => {
+    const fixture = makeGitFixture();
+    try {
+      writeRepoFile(fixture.rootDir, `${root}/package.json`, '{}\n');
+      const upstreamRef = commitAll(
+        fixture.rootDir,
+        'reviewed upstream package',
+      );
+      writeSnapshot({
+        rootDir: fixture.rootDir,
+        baseRef: fixture.upstreamBase,
+        upstreamRef,
+      });
+      const file = `${root}/src/added.ts`;
+      writeRepoFile(fixture.rootDir, file, 'governed addition\n');
+      runGit(fixture.rootDir, ['add', '-A']);
+      const report = checkForkDivergence({ rootDir: fixture.rootDir });
+      assert.equal(report.measuredFiles, 1);
+      assert.deepEqual(
+        report.violations.map(entry => entry.file),
+        [file],
+      );
+    } finally {
+      cleanup(fixture.rootDir);
+    }
+  });
+
+  test(`${root} cannot erase an audited identity through a rename`, () => {
+    const fixture = makeGitFixture();
+    try {
+      writeSnapshot({
+        rootDir: fixture.rootDir,
+        baseRef: fixture.upstreamBase,
+      });
+      const mergeBase = commitAll(fixture.rootDir, 'record empty allowance');
+      const original = 'packages/runtime/src/index.ts';
+      const destination = `${root}/src/moved.ts`;
+      const contents = fs.readFileSync(path.join(fixture.rootDir, original));
+      writeRepoFile(fixture.rootDir, destination, contents);
+      fs.unlinkSync(path.join(fixture.rootDir, original));
+      const headRef = commitAll(
+        fixture.rootDir,
+        'move audited source into fork',
+      );
+      const governance = loadGovernance({
+        rootDir: fixture.rootDir,
+        mergeBase,
+        headRef,
+      });
+      assert.equal(governance.ok, false);
+      assert.equal(governance.rule5Changes.length, 1);
+      assert.equal(governance.rule5Changes[0].file, original);
+      assert.equal(governance.rule5Changes[0].renamed, true);
+      assert.match(governance.errors.join('\n'), /requires a same-PR/);
+    } finally {
+      cleanup(fixture.rootDir);
+    }
+  });
+}
+
 test('app-tools extensions are excluded while neighboring app-tools stays audited', () => {
   const fixture = makeGitFixture({
     files: {

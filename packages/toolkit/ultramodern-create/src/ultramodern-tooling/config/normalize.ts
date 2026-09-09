@@ -1,5 +1,10 @@
 import path from 'node:path';
 
+import {
+  createPrimaryShellDescriptor,
+  verticalsFromTopology,
+} from '../../ultramodern-workspace/add-vertical/topology';
+
 import { normalizeUltramodernBridgeConfig } from '../../ultramodern-workspace/bridge-config';
 import {
   createNeutralOwnership,
@@ -351,4 +356,101 @@ export function allWorkspaceAppsFromToolingConfig(
     ...workspaceAppsFromToolingConfig(config),
     ...additionalShellsFromToolingConfig(config),
   ];
+}
+
+export type UltramodernWorkspaceInputs = {
+  config: Record<string, any>;
+  topology?: Record<string, any>;
+  overlay?: Record<string, any>;
+};
+
+/**
+ * Read projections from the existing consumer inputs without rewriting them.
+ * Raw inputs retain unknown fields; normalized descriptors are not a replacement
+ * for consumer-owned configuration. Additive shells retain their config ports.
+ */
+export function normalizeWorkspaceInputs(
+  workspaceRoot: string,
+  inputs: UltramodernWorkspaceInputs,
+  sourcePath = path.join(workspaceRoot, ULTRAMODERN_CONFIG_PATH),
+) {
+  const config = normalizeCompactConfig(
+    workspaceRoot,
+    sourcePath,
+    inputs.config,
+  );
+  const ports = inputs.overlay?.ports ?? {};
+  const additionalShells = additionalShellsFromToolingConfig(config);
+  const topologyApps = inputs.topology
+    ? [
+        createPrimaryShellDescriptor(inputs.topology, inputs.config),
+        ...verticalsFromTopology(inputs.topology, ports),
+      ]
+    : workspaceAppsFromToolingConfig(config);
+  const apps = [
+    ...topologyApps.map(app => ({
+      ...app,
+      port: typeof ports[app.id] === 'number' ? ports[app.id] : app.port,
+    })),
+    ...additionalShells,
+  ];
+  return {
+    raw: inputs,
+    config,
+    apps,
+    primaryShell: apps.find(app => app.id === shellApp.id),
+    verticals: apps.filter(app => app.kind === 'vertical'),
+    additionalShells,
+  };
+}
+
+/** Refresh only exact former generated URLs; authored overlay choices survive. */
+export function reconcileGeneratedOverlayUrls(
+  existing: Record<string, any>,
+  previous: Record<string, any>,
+  projected: Record<string, any>,
+) {
+  return Object.fromEntries(
+    ['manifests', 'apis'].map(key => {
+      const authored = { ...existing[key] };
+      for (const [id, value] of Object.entries(authored)) {
+        if (value === previous[key]?.[id]) delete authored[id];
+      }
+      return [key, { ...projected[key], ...authored }];
+    }),
+  );
+}
+
+// Projection keys remain framework-owned; fields outside that projection are
+// carried through at every nesting level, including app/remote records by id.
+export function preserveUnknownProjectionFields(
+  current: any,
+  projected: any,
+): any {
+  if (Array.isArray(projected)) {
+    return projected.map(entry => {
+      const previous =
+        entry &&
+        typeof entry === 'object' &&
+        typeof entry.id === 'string' &&
+        Array.isArray(current)
+          ? current.find(candidate => candidate?.id === entry.id)
+          : undefined;
+      return preserveUnknownProjectionFields(previous, entry);
+    });
+  }
+  if (!projected || typeof projected !== 'object') return projected;
+  const previous =
+    current && typeof current === 'object' && !Array.isArray(current)
+      ? current
+      : {};
+  return {
+    ...previous,
+    ...Object.fromEntries(
+      Object.entries(projected).map(([key, value]) => [
+        key,
+        preserveUnknownProjectionFields(previous[key], value),
+      ]),
+    ),
+  };
 }

@@ -6,10 +6,16 @@ import { createDeliveryUnitRecord } from '../delivery-unit';
 import { appEmitsBrowserUi, appHasApi } from '../descriptors';
 import type { WorkspaceApp } from '../types';
 
-function deliveryUnitRecordFor(scope: string, app: WorkspaceApp) {
-  return app.deliveryUnit
-    ? (app.deliveryUnit as unknown as DeliveryUnitRecord)
-    : createDeliveryUnitRecord(scope, app);
+function deliveryUnitRecordFor(
+  scope: string,
+  app: WorkspaceApp,
+): DeliveryUnitRecord {
+  // Persisted compact contracts omit appId and deployProfile. Restore their
+  // descriptor defaults while retaining any explicitly configured identity.
+  return {
+    ...createDeliveryUnitRecord(scope, app),
+    ...app.deliveryUnit,
+  };
 }
 
 export function createUltramodernBuildArtifactJson(

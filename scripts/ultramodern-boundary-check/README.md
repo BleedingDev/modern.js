@@ -43,6 +43,16 @@ executable/configuration inputs or shipped product documentation. Explicit
 fork-owned package roots are excluded only when they did not exist at the
 reviewed upstream provenance.
 
+The explicit inventory includes `packages/document/ultramodern-preset`,
+`packages/runtime/runtime-extensions`, `packages/toolkit/ultramodern-create`
+and `packages/toolkit/ultramodern-sandpack-profile`. All four roots are absent
+from both pinned upstream trees; their manifests first appear in fork commit
+`b6794e933d0bce99eb5c9324b0dc38b721ff2435`. Their inclusion corrects ownership
+accounting without changing the audited base, reviewed provenance, scope or
+stored budgets. An upstream-owned identity moved into any of these roots
+remains governed, and a listed package present in reviewed upstream is not
+exempt.
+
 ### Fail-closed recorded contract
 
 The allowlist, not the caller, owns verification context. Before diffing, the

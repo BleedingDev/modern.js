@@ -12,6 +12,7 @@ import {
   createWorkspaceAppPackageScripts,
   createWorkspaceRootPackageScripts,
   GENERATED_POSTINSTALL_SCRIPT,
+  WORKSPACE_SCRIPT_SEGMENT_PATTERN,
 } from '../../../ultramodern-workspace/workspace-script-plan';
 import { migratedWorkspaceScriptBasenames } from '../../../ultramodern-workspace/workspace-scripts';
 
@@ -220,13 +221,19 @@ const legacyPortableRootScripts = new Map([
   ['format:check', ["oxfmt --check . '!repos/**'", 'oxfmt --check .']],
 ] as const);
 
-// Split an aggregate script (`a && b && c`) into its `&&`-joined segments.
-
-const splitScriptSegments = (command: string): string[] =>
-  command
-    .split('&&')
-    .map(segment => segment.trim())
-    .filter(segment => segment.length > 0);
+// Only split a fully recognized flat chain. Opaque shell programs must remain
+// intact rather than exposing quoted or substituted text as generated commands.
+const splitScriptSegments = (command: string): string[] => {
+  const segments = command.match(WORKSPACE_SCRIPT_SEGMENT_PATTERN);
+  if (
+    !segments ||
+    segments.join('&&') !== command ||
+    segments.some(segment => segment.trim().length === 0)
+  ) {
+    return [command];
+  }
+  return segments.map(segment => segment.trim());
+};
 
 // The pnpm script target a segment invokes (e.g. `pnpm api:check --foo` -> `api:check`).
 
@@ -246,6 +253,7 @@ const FRAMEWORK_CHECK_TARGETS: ReadonlySet<string> = new Set([
   'skills:check',
   'i18n:boundaries',
   'api:check',
+  'api:check:files',
   'contract:check',
   'node:backend-federation:generate',
   'node:proof',
@@ -483,7 +491,22 @@ export function updateGeneratedPackageScripts(
       }
     }
 
-    const existingPostinstall = scripts.postinstall;
+    let existingPostinstall = scripts.postinstall;
+    if (typeof existingPostinstall === 'string') {
+      const segments = splitScriptSegments(existingPostinstall);
+      // The exact bootstrap proves this chain contains generated segments.
+      // Retire only its historical broad format commands; keep custom ones.
+      if (segments.includes(GENERATED_POSTINSTALL_SCRIPT)) {
+        existingPostinstall = segments
+          .filter(
+            segment =>
+              !legacyPortableRootScripts
+                .get('format')
+                ?.some(format => format === segment),
+          )
+          .join(' && ');
+      }
+    }
     const mergedPostinstall =
       typeof existingPostinstall === 'string'
         ? mergeGeneratedScript(

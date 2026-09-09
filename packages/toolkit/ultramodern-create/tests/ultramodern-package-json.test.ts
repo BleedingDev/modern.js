@@ -114,6 +114,7 @@ test('bridge dependencies are added after generated app deps and collisions fail
       ...installAppDependencies,
       '@tractor-store/bridge-kit': 'workspace:*',
       ...bffEffectDependencies,
+      '@modern-js/bff-effect': packageVersion,
       '@modern-js/plugin-bff': packageVersion,
     },
   );
@@ -156,6 +157,7 @@ test('workspace package source uses workspace versions for generated framework d
     react: '19.2.8',
     'react-dom': '19.2.8',
     ...bffEffectDependencies,
+    '@modern-js/bff-effect': 'workspace:*',
     '@modern-js/plugin-bff': 'workspace:*',
   });
   assert.equal(packageJson.devDependencies['cross-env'], '10.1.0');
@@ -221,13 +223,14 @@ test('root package json pins workspace package versions and bridge workspace glo
   assert.equal(rootScripts['format:check'], 'oxfmt --check .');
   assert.equal(
     rootScripts.postinstall,
-    'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .',
+    'node ./scripts/bootstrap-agent-skills.mts --postinstall',
   );
   assert.deepEqual(rootPackageJson.devDependencies, {
     '@types/node': '^26.4.1',
     '@effect/tsgo': '0.41.0',
     '@modern-js/code-tools': packageVersion,
     '@modern-js/ultramodern-create': packageVersion,
+    '@modern-js/bff-effect': packageVersion,
     '@modern-js/plugin-bff': packageVersion,
     ...bffEffectDependencies,
     '@typescript/native': 'npm:typescript@7.0.2',
