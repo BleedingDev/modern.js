@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import vm from 'node:vm';
 import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
 import { runSyncDeliveryUnit } from '../src/ultramodern-workspace/delivery-unit-sync';
-import { runStableTypeScript } from './helpers/stable-typescript';
+import { evaluateBuildModule } from './helpers/build-module';
 
 const TARGET_FILES = [
   '.modernjs/ultramodern.json',
@@ -77,35 +76,9 @@ function scaffoldWorkspace(): { tempRoot: string; workspaceDir: string } {
 }
 
 function executeBuildModule(workspaceDir: string, relativePath: string) {
-  const compilerRoot = path.join(workspaceDir, '.test-build-module');
-  const sourcePath = path.join(compilerRoot, 'ultramodern-build.ts');
-  const outputRoot = path.join(compilerRoot, 'dist');
-  fs.mkdirSync(compilerRoot, { recursive: true });
-  fs.copyFileSync(path.join(workspaceDir, relativePath), sourcePath);
-  const compiled = runStableTypeScript(
-    [
-      sourcePath,
-      '--ignoreConfig',
-      '--module',
-      'commonjs',
-      '--outDir',
-      outputRoot,
-      '--pretty',
-      'false',
-      '--skipLibCheck',
-      '--target',
-      'es2022',
-    ],
-    compilerRoot,
+  return evaluateBuildModule(
+    fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
   );
-  assert.equal(compiled.status, 0, compiled.output);
-
-  const module = { exports: {} as Record<string, any> };
-  vm.runInNewContext(
-    fs.readFileSync(path.join(outputRoot, 'ultramodern-build.js'), 'utf-8'),
-    { exports: module.exports, module },
-  );
-  return module.exports;
 }
 
 function stripDeliveryUnitIdentity(workspaceDir: string) {

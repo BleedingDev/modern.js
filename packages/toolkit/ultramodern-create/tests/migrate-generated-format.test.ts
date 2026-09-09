@@ -88,6 +88,15 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
       consumerProbe,
     );
 
+    const removedUiMarker = path.join(
+      workspaceRoot,
+      'verticals/catalog/src/ultramodern-build.ts',
+    );
+    fs.rmSync(removedUiMarker);
+    fs.writeFileSync(
+      path.join(workspaceRoot, 'verticals/catalog/src/routes/[lang]/page.tsx'),
+      'export default function Page() { return <main>Consumer UI</main>; }\n',
+    );
     assert.equal(
       await runUltramodernToolingCli(
         ['migrate-strict-effect', '--skip-install'],
@@ -106,7 +115,6 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
         'zerops.yaml',
         'apps/shell-super-app/modern.config.ts',
         'apps/shell-super-app/module-federation.config.ts',
-        'apps/shell-super-app/src/ultramodern-build.ts',
         'apps/shell-super-app/shared/ultramodern-build.ts',
         'apps/shell-super-app/src/routes/vertical-components.tsx',
         'apps/shell-super-app/src/routes/vertical-components.worker.tsx',
@@ -115,13 +123,13 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
         'verticals/catalog/modern.config.ts',
         'verticals/catalog/module-federation.config.ts',
         'verticals/catalog/backend-federation.config.ts',
-        'verticals/catalog/src/ultramodern-build.ts',
         'verticals/catalog/shared/ultramodern-build.ts',
         'verticals/catalog/api/backend-federation.ts',
         fragmentPath,
       ]),
     ].sort((left, right) => left.localeCompare(right));
 
+    assert.equal(fs.existsSync(removedUiMarker), false);
     assertGeneratedFilesAreFormatted(workspaceRoot, generatedPaths);
     assert.deepEqual(
       fs.readFileSync(path.join(workspaceRoot, consumerProbePath)),

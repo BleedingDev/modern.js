@@ -51,6 +51,15 @@
         "require": "./dist/cjs/safeFailure.js"
       },
       "default": "./dist/esm/safeFailure.mjs"
+    },
+    "./build-identity": {
+      "types": "./dist/types/buildIdentity.d.ts",
+      "modern:source": "./src/buildIdentity.ts",
+      "node": {
+        "import": "./dist/esm-node/buildIdentity.mjs",
+        "require": "./dist/cjs/buildIdentity.js"
+      },
+      "default": "./dist/esm/buildIdentity.mjs"
     }
   },
   "typesVersions": {
@@ -70,6 +79,10 @@
       "safe-failure": [
         "./dist/types/safeFailure.d.ts",
         "./src/safeFailure.ts"
+      ],
+      "build-identity": [
+        "./dist/types/buildIdentity.d.ts",
+        "./src/buildIdentity.ts"
       ]
     }
   },

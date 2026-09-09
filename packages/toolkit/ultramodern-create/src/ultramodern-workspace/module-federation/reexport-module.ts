@@ -1,9 +1,9 @@
 import {
   createUltramodernBuildArtifact,
   type DeliveryUnitRecord,
-  ULTRAMODERN_BUILD_ARTIFACT_FILE,
 } from '@modern-js/utils/universal';
 import { createDeliveryUnitRecord } from '../delivery-unit';
+import { appEmitsBrowserUi, appHasApi } from '../descriptors';
 import type { WorkspaceApp } from '../types';
 
 function deliveryUnitRecordFor(scope: string, app: WorkspaceApp) {
@@ -25,58 +25,25 @@ export function createUltramodernBuildModule(
   app: WorkspaceApp,
 ): string {
   const record = deliveryUnitRecordFor(scope, app);
-  return `declare const ULTRAMODERN_BUILD_MARKER: string;
-declare const ULTRAMODERN_SOURCE_REVISION: string;
+  return `import { resolveUltramodernBuildArtifact } from '@modern-js/runtime-extensions/build-identity';
 
-const ultramodernGeneratedBuildArtifact = ${JSON.stringify(
+const ultramodernBuildArtifact = resolveUltramodernBuildArtifact(${JSON.stringify(
     createUltramodernBuildArtifact(record),
     null,
     2,
-  )} as const;
-const ultramodernBuildMarker =
-  typeof ULTRAMODERN_BUILD_MARKER === 'string'
-    ? ULTRAMODERN_BUILD_MARKER
-    : ultramodernGeneratedBuildArtifact.deliveryUnit.buildMarker;
-const ultramodernSourceRevision =
-  typeof ULTRAMODERN_SOURCE_REVISION === 'string'
-    ? ULTRAMODERN_SOURCE_REVISION
-    : ultramodernGeneratedBuildArtifact.deliveryUnit.sourceRevision;
-const ultramodernBuildArtifact = {
-  ...ultramodernGeneratedBuildArtifact,
-  deliveryUnit: {
-    ...ultramodernGeneratedBuildArtifact.deliveryUnit,
-    build: ultramodernBuildMarker,
-    buildMarker: ultramodernBuildMarker,
-    sourceRevision: ultramodernSourceRevision,
-  },
-  surfaces: {
-    api: {
-      ...ultramodernGeneratedBuildArtifact.surfaces.api,
-      build: ultramodernBuildMarker,
-      buildMarker: ultramodernBuildMarker,
-      sourceRevision: ultramodernSourceRevision,
-    },
-    ui: {
-      ...ultramodernGeneratedBuildArtifact.surfaces.ui,
-      build: ultramodernBuildMarker,
-      buildMarker: ultramodernBuildMarker,
-      sourceRevision: ultramodernSourceRevision,
-    },
-  },
-} as const;
+  )} as const);
 
-export const ultramodernDeliveryUnit =
-  ultramodernBuildArtifact.deliveryUnit;
-export const ultramodernUiMarker = ultramodernBuildArtifact.surfaces.ui;
-export const ultramodernApiMarker = ultramodernBuildArtifact.surfaces.api;
-`;
+export const ultramodernDeliveryUnit = ultramodernBuildArtifact.deliveryUnit;
+${app.kind !== 'shell' && appEmitsBrowserUi(app) ? 'export const ultramodernUiMarker = ultramodernBuildArtifact.surfaces.ui;\n' : ''}${app.kind !== 'shell' && appHasApi(app) ? 'export const ultramodernApiMarker = ultramodernBuildArtifact.surfaces.api;\n' : ''}`;
 }
 
-export function createUltramodernBuildReexportModule(): string {
-  return `export {
-  ultramodernApiMarker,
-  ultramodernDeliveryUnit,
-  ultramodernUiMarker,
-} from '../shared/ultramodern-build';
-`;
+export function createUltramodernBuildReexportModule(
+  app: WorkspaceApp,
+): string {
+  const names = ['ultramodernDeliveryUnit'];
+  if (app.kind !== 'shell' && appEmitsBrowserUi(app))
+    names.push('ultramodernUiMarker');
+  if (app.kind !== 'shell' && appHasApi(app))
+    names.push('ultramodernApiMarker');
+  return `export { ${names.join(', ')} } from '../shared/ultramodern-build';\n`;
 }

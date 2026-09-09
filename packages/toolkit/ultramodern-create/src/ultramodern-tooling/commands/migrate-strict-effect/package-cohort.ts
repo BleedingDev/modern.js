@@ -62,6 +62,16 @@ export function updateModernDependencies(
   let changed = false;
   for (const section of ['dependencies', 'devDependencies']) {
     const dependencies = packageJson[section];
+    if (dependencies && Object.hasOwn(dependencies, '@modern-js/runtime')) {
+      const runtimeExtensions = modernPackageSpecifier(
+        '@modern-js/runtime-extensions',
+        packageSource,
+      );
+      if (dependencies['@modern-js/runtime-extensions'] !== runtimeExtensions) {
+        dependencies['@modern-js/runtime-extensions'] = runtimeExtensions;
+        changed = true;
+      }
+    }
     if (dependencies && Object.hasOwn(dependencies, '@modern-js/create')) {
       dependencies[ULTRAMODERN_CREATE_PACKAGE] = modernPackageSpecifier(
         ULTRAMODERN_CREATE_PACKAGE,

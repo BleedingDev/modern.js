@@ -3842,6 +3842,8 @@ test('migration replaces the retired create alias before regenerating the lockfi
   assert.deepEqual(packageJson.devDependencies, {
     '@modern-js/runtime':
       'npm:@bleedingdev/modern-js-runtime@3.8.3-ultramodern.2',
+    '@modern-js/runtime-extensions':
+      'npm:@bleedingdev/modern-js-runtime-extensions@3.8.3-ultramodern.2',
     '@modern-js/ultramodern-create':
       'npm:@bleedingdev/modern-js-ultramodern-create@3.8.3-ultramodern.2',
     eslint: 'consumer-selected-eslint',
