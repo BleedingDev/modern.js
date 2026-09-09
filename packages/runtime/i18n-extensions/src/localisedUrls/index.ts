@@ -14,6 +14,10 @@ export {
   shouldSkipLocaleRedirect,
 } from './redirect';
 export { resolveCanonicalLocalisedPath, resolveLocalisedPath } from './resolve';
+export {
+  canonicaliseLocalisedRoutes,
+  createLocalisedRouteRewrite,
+} from './routeIdentity';
 export { applyLocalisedUrlsToRoutes, validateLocalisedUrls } from './routes';
 export type {
   LocalisedRoute,

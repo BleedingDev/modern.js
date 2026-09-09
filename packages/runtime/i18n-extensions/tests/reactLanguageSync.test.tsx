@@ -49,7 +49,11 @@ test('an abandoned suspended render cannot publish an uncommitted target', async
   const container = document.createElement('div');
   const root = createRoot(container);
   await act(async () => {
-    root.render(<Harness target={first} />);
+    root.render(
+      <Suspense fallback={<p>loading</p>}>
+        <Harness target={first} />
+      </Suspense>,
+    );
   });
   expect(changes).toEqual(['first']);
 

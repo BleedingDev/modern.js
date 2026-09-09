@@ -1759,6 +1759,9 @@ importers:
 
   packages/runtime/plugin-tanstack:
     dependencies:
+      '@modern-js/i18n-runtime-extensions':
+        specifier: workspace:*
+        version: link:../i18n-extensions
       '@modern-js/plugin':
         specifier: workspace:*
         version: link:../../toolkit/plugin

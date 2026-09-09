@@ -31,6 +31,7 @@ export default {
         'tests/router/generateRouteArtifacts.test.ts',
         'tests/router/hooks.test.ts',
         'tests/router/loaderBridge.test.ts',
+        'tests/router/localisedIdentity.test.tsx',
         'tests/router/packageSurface.test.ts',
         'tests/router/preloadRedirect.test.ts',
         'tests/router/register.test.ts',

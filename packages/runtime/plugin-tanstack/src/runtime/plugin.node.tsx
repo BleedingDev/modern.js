@@ -134,7 +134,11 @@ export const tanstackRouterPlugin = (
           initialEntries: [initialHref],
         });
 
-        const rewrite = createModernBasepathRewrite(_basename);
+        const rewrite = createModernBasepathRewrite(
+          _basename,
+          false,
+          modifiedRouteObjects,
+        );
         const routerLifecycleContext: RouterLifecycleContext = {
           framework: 'tanstack',
           phase: 'ssr-prepare',
