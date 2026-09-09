@@ -12,7 +12,7 @@ bases and counts, §3 reconciliation, and every base-transition growth entry.
 
 **Re-verified 2026-08-25** for the upstream sync through `f4bc5ee335`: §2
 bases and counts and §3 reconciliation. The re-anchor changed no cumulative
-per-file divergence budget. The later RT-23 capped patch added five governed
+per-file divergence budget. The later RT-23 inline patch added five governed
 changed lines without changing the file or hunk totals.
 
 **Re-verified 2026-08-26** after restoring the fixed `eded841256` audited
@@ -37,20 +37,20 @@ every PR.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production after Rslib copies prebundles; retain watcher/glob/Inquirer runtime bytes while restoring the complete strict TS7/Node26 type closure | `extension-point` + `capped-patch` |
-| `packages/toolkit/utils/package.json` | bleedingdev | Declare build-only RxJS input for self-contained Inquirer 8 declaration production, without adding a consumer runtime dependency | `capped-patch` |
-| `packages/cli/builder/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production to isolate Sass/SVG/CSS options from loader, Babel, and Webpack implementation declarations | `extension-point` + `capped-patch` |
-| `packages/cli/builder/package.json` | bleedingdev | Own the public Sass and CSS source-map declaration dependencies already used transitively by the build plugins | `capped-patch` |
-| `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Publish precompression configuration aliases with Rspack path data without leaking the plugin's Webpack compiler class | `extension-point` + `capped-patch` |
+| `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production after Rslib copies prebundles; retain watcher/glob/Inquirer runtime bytes while restoring the complete strict TS7/Node26 type closure | `extension-point` + `inline-patch` |
+| `packages/toolkit/utils/package.json` | bleedingdev | Declare build-only RxJS input for self-contained Inquirer 8 declaration production, without adding a consumer runtime dependency | `inline-patch` |
+| `packages/cli/builder/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production to isolate Sass/SVG/CSS options from loader, Babel, and Webpack implementation declarations | `extension-point` + `inline-patch` |
+| `packages/cli/builder/package.json` | bleedingdev | Own the public Sass and CSS source-map declaration dependencies already used transitively by the build plugins | `inline-patch` |
+| `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Publish precompression configuration aliases with Rspack path data without leaking the plugin's Webpack compiler class | `extension-point` + `inline-patch` |
 
 ### 2026-09-09 simplification and builder compatibility
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/builder/src/createBuilder.ts` | bleedingdev | Restore createRequire dependency bundling when creating the native builder, preserve explicit overrides and keep parseConfig's public shape unchanged | `capped-patch` |
-| `packages/cli/builder/tests/cache.test.ts` | bleedingdev | Replace implementation snapshots with persistent-cache assertions and real cold/warm environment isolation proof through a repository test helper | `capped-patch` |
-| `packages/cli/builder/tests/default.test.ts` | bleedingdev | Verify deployed createRequire output after removing source dependencies, including the explicit false override | `capped-patch` |
-| `packages/cli/builder/tests/environment.test.ts` | bleedingdev | Assert effective native cache storage isolation with compiled output rather than legacy storage-directory formatting | `capped-patch` |
+| `packages/cli/builder/src/createBuilder.ts` | bleedingdev | Restore createRequire dependency bundling when creating the native builder, preserve explicit overrides and keep parseConfig's public shape unchanged | `inline-patch` |
+| `packages/cli/builder/tests/cache.test.ts` | bleedingdev | Replace implementation snapshots with persistent-cache assertions and real cold/warm environment isolation proof through a repository test helper | `inline-patch` |
+| `packages/cli/builder/tests/default.test.ts` | bleedingdev | Verify deployed createRequire output after removing source dependencies, including the explicit false override | `inline-patch` |
+| `packages/cli/builder/tests/environment.test.ts` | bleedingdev | Assert effective native cache storage isolation with compiled output rather than legacy storage-directory formatting | `inline-patch` |
 
 ## 1. Maintenance contract
 
@@ -81,8 +81,8 @@ is in exactly one bucket:
   one of three resolutions:
   1. a PR to upstream `web-infra-dev/modern.js`,
   2. use of an existing upstream extension point, or
-  3. a **capped patch of at most 20 added-plus-removed PR lines** per
-     audited-base-owned file, with a matching row in this ledger.
+  3. a **reviewed inline patch**, with a matching row in this ledger for
+     non-shrink changes. There is no fixed per-file PR line limit.
 
 Every `packages/**` row below is a Bucket-B divergence except TK-10, which the
 row itself flags as a fork-added directory carrying no budget; §4's root/infra
@@ -105,11 +105,10 @@ node scripts/ultramodern-boundary-check/check-fork-import-boundary.js \
   --merge-base "$PR_MERGE_BASE" --head "$COMMITTED_HEAD"
 ```
 
-That operation fails unless every raised audited-base-owned file has at most 20
-added-plus-removed lines in the PR and has its strict ledger row in the same
-committed range. CI independently resolves both refs, reads the committed
+That operation fails unless every raised audited-base-owned file has its
+strict ledger row in the same committed range. CI independently resolves both refs, reads the committed
 allowlists, semantically compares ledger rows, re-measures the full recorded
-scope, and re-derives the cap and ledger evidence; a hand-edited baseline cannot
+scope, and re-derives the measurement and ledger evidence; a hand-edited baseline cannot
 authorize growth by itself. Scope changes use
 `--rebase-divergence-allowlist` with the same refs and ledger evidence. The
 audited ownership and reviewed provenance SHAs are exact pins; provenance
@@ -163,39 +162,39 @@ fork audit passed. Owner: `bleedingdev`.
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/builder/package.json` | bleedingdev | Resolve disabled RSC browser runtimes from the fork-owned runtime package rather than the Builder Node output. | capped-patch |
+| `packages/cli/builder/package.json` | bleedingdev | Resolve disabled RSC browser runtimes from the fork-owned runtime package rather than the Builder Node output. | inline-patch |
 
 ### Deployed server plugin interop (2026-09-09)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/solutions/app-tools/src/plugins/deploy/utils/generator.ts` | bleedingdev | Resolve native ESM namespace wrappers around transpiled CommonJS default factories so Module Federation's Node server plugin starts. | capped-patch |
+| `packages/solutions/app-tools/src/plugins/deploy/utils/generator.ts` | bleedingdev | Resolve native ESM namespace wrappers around transpiled CommonJS default factories so Module Federation's Node server plugin starts. | inline-patch |
 
 ### Worker API implementation graph (2026-09-09)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/plugin-bff/src/loader.ts` | bleedingdev | Delegate the worker API implementation graph to the fork-owned source bundler so imported server helpers do not pass through client API generation. | capped-patch |
+| `packages/cli/plugin-bff/src/loader.ts` | bleedingdev | Delegate the worker API implementation graph to the fork-owned source bundler so imported server helpers do not pass through client API generation. | inline-patch |
 
 ### Localized server loader identity (2026-09-09)
 
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/plugin-data-loader/src/runtime/index.ts` | bleedingdev | Delegate canonical loader-ID resolution to the fork-owned runtime helper only after the router has matched the requested localized URL; retain cross-route rejection and deferred-data identity. | capped-patch |
-| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Declare the runtime-extensions dependency that owns localized loader identity mapping without coupling CLI builds to the React/i18n runtime. | capped-patch |
+| `packages/cli/plugin-data-loader/src/runtime/index.ts` | bleedingdev | Delegate canonical loader-ID resolution to the fork-owned runtime helper only after the router has matched the requested localized URL; retain cross-route rejection and deferred-data identity. | inline-patch |
+| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Declare the runtime-extensions dependency that owns localized loader identity mapping without coupling CLI builds to the React/i18n runtime. | inline-patch |
 
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/utils/src/cli/require.ts` | bleedingdev | Normalize Node's CJS import namespace and tagged transpiler defaults so ESM-built utils load server-plugin factories; retain genuine ESM payloads, named-only namespaces, raw interop, and development reload behavior. | capped-patch |
+| `packages/toolkit/utils/src/cli/require.ts` | bleedingdev | Normalize Node's CJS import namespace and tagged transpiler defaults so ESM-built utils load server-plugin factories; retain genuine ESM payloads, named-only namespaces, raw interop, and development reload behavior. | inline-patch |
 
 ### Standalone CLI type dependencies (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/types/cli/index.d.ts` | bleedingdev | Import React types explicitly so backend consumers with Node-only ambient types can resolve exported route declarations. | capped-patch |
-| `packages/toolkit/types/package.json` | bleedingdev | Publish the React and type-fest declaration dependencies referenced by the public CLI surface instead of relying on consumer ambient types or dev-only hoisting. | capped-patch |
+| `packages/toolkit/types/cli/index.d.ts` | bleedingdev | Import React types explicitly so backend consumers with Node-only ambient types can resolve exported route declarations. | inline-patch |
+| `packages/toolkit/types/package.json` | bleedingdev | Publish the React and type-fest declaration dependencies referenced by the public CLI surface instead of relying on consumer ambient types or dev-only hoisting. | inline-patch |
 
 ### Disposition vocabulary
 
@@ -203,7 +202,7 @@ fork audit passed. Owner: `bleedingdev`.
 | --- | --- |
 | `upstream-PR` | Bucket B resolution (1). Isolatable and PR-able to web-infra-dev/modern.js as-is. |
 | `extension-point` | Bucket B resolution (2). Logic should move out of the upstream file into a fork-owned module; budget shrinks when it does. |
-| `capped-patch` | Bucket B resolution (3). Stays inline, at most 20 added-plus-removed PR lines per audited-base-owned file, kept deliberately. |
+| `inline-patch` | Bucket B resolution (3). A reviewed inline change, kept deliberately with its ownership and reason recorded. |
 | `fixed-in-fork` | Upstream defect repaired in the fork. Keep the repair; add `upstream-PR` separately when the fix is queued upstream. |
 | `keep-deleted` | Upstream artifact intentionally deleted in the fork. Re-delete it on sync and port upstream changes to its replacement when applicable. |
 | `keep-[F]` | Permanent fork divergence. Only meaningful with the ultramodern lanes (Effect BFF, TanStack, Module Federation, telemetry, tsgo). Never resolved toward upstream. |
@@ -311,7 +310,7 @@ identified as a capped fork correction within the same four-line manifest delta.
 | --- | --- | --- | --- |
 | `packages/cli/adapter-rstest/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/cli/builder/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/cli/plugin-bff/package.json` | bleedingdev | Retain upstream Rslib 1.0.0 settings and align the app-tools workspace peer with the integrated Modern.js 3.9.0 baseline; four added-plus-removed PR lines | `upstream-PR` + `keep-[M]` + `capped-patch` |
+| `packages/cli/plugin-bff/package.json` | bleedingdev | Retain upstream Rslib 1.0.0 settings and align the app-tools workspace peer with the integrated Modern.js 3.9.0 baseline; four added-plus-removed PR lines | `upstream-PR` + `keep-[M]` + `inline-patch` |
 | `packages/cli/plugin-data-loader/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/cli/plugin-ssg/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/cli/plugin-styled-components/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
@@ -327,7 +326,7 @@ identified as a capped fork correction within the same four-line manifest delta.
 | `packages/server/prod-server/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/server/server-runtime/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/server/server/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/**/package.json` (2026-09-08 dependency cohort) | bleedingdev | Exact-version bumps of shared third-party dependencies to their newest matured releases (Rsbuild 2.2.3, SWC 1.16.2, Babel 8.0.4, cssnano 9, TanStack Router 1.170.33/1.171.28/1.162.2, i18next 26.4.2, Hono 4.13.7, Zod 4.5.4, OpenTelemetry 2.11, `@types/*`); every touched upstream-owned manifest stays within the 20-line cap and carries no fork behaviour | `keep-[M]` + `capped-patch` |
+| `packages/**/package.json` (2026-09-08 dependency cohort) | bleedingdev | Exact-version bumps of shared third-party dependencies to their newest matured releases (Rsbuild 2.2.3, SWC 1.16.2, Babel 8.0.4, cssnano 9, TanStack Router 1.170.33/1.171.28/1.162.2, i18next 26.4.2, Hono 4.13.7, Zod 4.5.4, OpenTelemetry 2.11, `@types/*`); every touched upstream-owned manifest carries no fork behaviour | `keep-[M]` + `inline-patch` |
 | `packages/server/utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/solutions/app-tools/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/toolkit/create/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
@@ -343,10 +342,10 @@ identified as a capped fork correction within the same four-line manifest delta.
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Copy the deployment entry templates into every compiled output so `createNodePreset` and the other runtime deployment readers receive the required CJS and ESM files; retain upstream #8819's duplicate-loader fix | `capped-patch` + `fixed-in-fork` + `upstream-PR` |
-| `packages/solutions/app-tools/tests/config/verify-public-surface.mjs` | bleedingdev | Verify both compiled formats contain the complete deployment-template set so an incomplete app-tools tarball fails during its producer build rather than clean-room application acceptance | `capped-patch` + `fixed-in-fork` + `upstream-PR` |
-| `packages/solutions/app-tools/tests/deploy/cloudflare.test.ts` | bleedingdev | Regress the fork-owned Cloudflare streaming stylesheet injector against route CSS already rendered before the distributed-SSR sentinel, preventing duplicate links in workerd output without changing app-tools runtime ownership | `capped-patch` + `fixed-in-fork` |
-| `packages/runtime/plugin-runtime/src/core/context/extensions.ts` | bleedingdev | Make the internal symbol slot enumerable so SSR object spreads preserve extension state while string-key enumeration and JSON remain unchanged | `capped-patch` + `fixed-in-fork` + `upstream-PR` |
+| `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Copy the deployment entry templates into every compiled output so `createNodePreset` and the other runtime deployment readers receive the required CJS and ESM files; retain upstream #8819's duplicate-loader fix | `inline-patch` + `fixed-in-fork` + `upstream-PR` |
+| `packages/solutions/app-tools/tests/config/verify-public-surface.mjs` | bleedingdev | Verify both compiled formats contain the complete deployment-template set so an incomplete app-tools tarball fails during its producer build rather than clean-room application acceptance | `inline-patch` + `fixed-in-fork` + `upstream-PR` |
+| `packages/solutions/app-tools/tests/deploy/cloudflare.test.ts` | bleedingdev | Regress the fork-owned Cloudflare streaming stylesheet injector against route CSS already rendered before the distributed-SSR sentinel, preventing duplicate links in workerd output without changing app-tools runtime ownership | `inline-patch` + `fixed-in-fork` |
+| `packages/runtime/plugin-runtime/src/core/context/extensions.ts` | bleedingdev | Make the internal symbol slot enumerable so SSR object spreads preserve extension state while string-key enumeration and JSON remain unchanged | `inline-patch` + `fixed-in-fork` + `upstream-PR` |
 
 ### Historical 2026-08-30 v3.8.3 transition: complete raised set
 
@@ -360,7 +359,7 @@ identified as a capped fork correction within the same four-line manifest delta.
 | `packages/runtime/plugin-i18n/package.json` | bleedingdev | Upstream 3.8.3 is adopted, including the `@modern-js/runtime` peer baseline; the fork retains its reviewed React 19 peer cohort (RT-22), producing two extra hunks but fewer changed lines | `keep-[F]` (dependency cohort) |
 | `packages/runtime/plugin-image/package.json` | bleedingdev | The v3.8.3 release baseline changes only mechanical manifest hunk shape and reduces the cumulative line delta | `keep-[M]` |
 | `packages/runtime/render/package.json` | bleedingdev | The v3.8.3 package baseline and retained fork RSC/toolchain metadata split the manifest delta while reducing cumulative lines | `keep-[M]` |
-| `packages/server/core/src/plugins/render/render.ts` | bleedingdev | #8836's monitor-native CSR fallback reporting is adopted and the obsolete plugin hook is removed; the fork retains only its existing `serverContext` propagation into `SSRRenderOptions` | `capped-patch` (existing render seam; 2 retained fork lines relative to upstream) |
+| `packages/server/core/src/plugins/render/render.ts` | bleedingdev | #8836's monitor-native CSR fallback reporting is adopted and the obsolete plugin hook is removed; the fork retains only its existing `serverContext` propagation into `SSRRenderOptions` | `inline-patch` (existing render seam; 2 retained fork lines relative to upstream) |
 
 No other raised/new path belongs to this transition.
 
@@ -369,7 +368,7 @@ No other raised/new path belongs to this transition.
 | Audited-base-owned path | Owner | Backward-base transition reason | Disposition |
 | --- | --- | --- | --- |
 | `packages/cli/adapter-rstest/package.json` | bleedingdev | The fully retained post-v3.8.2 upstream Rstest cohort changes are visible when the manifest is measured from the older fixed audit point; this is mechanical dependency metadata, not new PR-authored behavior | `keep-[M]` |
-| `packages/cli/builder/package.json` | bleedingdev | Retain the post-v3.8.2 upstream builder toolchain manifest and upgrade the fork's opt-in Rsdoctor diagnostics from 1.5.17 to 1.6.3 while the workspace override resolves its Socket.IO 4.8.1 chain to patched `socket.io-parser` 4.2.7 | `capped-patch` + `keep-[M]` |
+| `packages/cli/builder/package.json` | bleedingdev | Retain the post-v3.8.2 upstream builder toolchain manifest and upgrade the fork's opt-in Rsdoctor diagnostics from 1.5.17 to 1.6.3 while the workspace override resolves its Socket.IO 4.8.1 chain to patched `socket.io-parser` 4.2.7 | `inline-patch` + `keep-[M]` |
 | `packages/cli/builder/tests/__snapshots__/postcssLegacy.test.ts.snap` | bleedingdev | The synced upstream snapshot regeneration occurred after the fixed audit point, so measuring backward exposes its generated snapshot delta | `keep-[M]` |
 | `packages/cli/plugin-bff/package.json` | bleedingdev | The fully retained post-v3.8.2 upstream BFF manifest edits are newly measurable from the older base; this row records mechanical cohort identity rather than fork-side feature growth | `keep-[M]` |
 | `packages/cli/plugin-data-loader/package.json` | bleedingdev | The synced upstream data-loader manifest cohort is newer than the fixed audit point and therefore raises the cumulative older-base measurement | `keep-[M]` |
@@ -391,7 +390,7 @@ No other raised/new path belongs to this transition.
 
 The table is the same-PR ownership evidence for the complete base-transition
 increase. It does not claim that later upstream lines are fork-authored, and it
-must not be used to waive the 20-line cap for any unrelated change in those
+does not supply ownership evidence for unrelated later changes in those
 files.
 
 The seven entries that grew across the historical forward 2026-08-24 base
@@ -423,9 +422,9 @@ same-PR ownership and disposition evidence.
 | `packages/toolkit/create/README.md` | bleedingdev | Keep package documentation truthful to the fork's generated Effect, TanStack, Module Federation, and pnpm cohort | `keep-[F]` |
 | `packages/document/docs/en/components/prerequisites.mdx` | bleedingdev | Keep the documented pnpm bootstrap command aligned with the fork's generated and CI toolchain | `keep-[M]` |
 | `packages/document/docs/zh/components/prerequisites.mdx` | bleedingdev | Keep the translated pnpm bootstrap command aligned with the fork's generated and CI toolchain | `keep-[M]` |
-| `packages/toolkit/types/packages/hoist-non-react-statics.d.ts` | bleedingdev | Remove a redundant `declare` modifier from an already ambient module so the published declaration compiles under TypeScript without a diagnostic suppression | `capped-patch` + `fixed-in-fork` |
-| `packages/toolkit/utils/src/compiled.ts` | bleedingdev | Preserve the public `yaml.load` and `yaml.dump` namespace in native CommonJS and ESM after js-yaml 5 removed its generated default export | `capped-patch` + `fixed-in-fork` |
-| `packages/cli/plugin-styled-components/src/runtime.ts` | bleedingdev | Import the strongly typed runtime-plugin authoring contract so tsgo preserves the collector callback context instead of inferring an implicit `any` | `capped-patch` + `fixed-in-fork` |
+| `packages/toolkit/types/packages/hoist-non-react-statics.d.ts` | bleedingdev | Remove a redundant `declare` modifier from an already ambient module so the published declaration compiles under TypeScript without a diagnostic suppression | `inline-patch` + `fixed-in-fork` |
+| `packages/toolkit/utils/src/compiled.ts` | bleedingdev | Preserve the public `yaml.load` and `yaml.dump` namespace in native CommonJS and ESM after js-yaml 5 removed its generated default export | `inline-patch` + `fixed-in-fork` |
+| `packages/cli/plugin-styled-components/src/runtime.ts` | bleedingdev | Import the strongly typed runtime-plugin authoring contract so tsgo preserves the collector callback context instead of inferring an implicit `any` | `inline-patch` + `fixed-in-fork` |
 
 ### 2026-09-01 runtime cone non-shrinks
 
@@ -436,12 +435,12 @@ and disposition evidence.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/router/runtime/PrefetchLink.tsx` | bleedingdev | Read the Webpack-supplied `__webpack_public_path__` magic global inside `try`/`catch` so a non-Webpack realm returns an empty public path instead of throwing a `ReferenceError` on an undeclared identifier; RT-09 prefetch behavior is unchanged and RT-07/RT-08 remain scheduled | `capped-patch` + `fix` |
-| `packages/runtime/plugin-runtime/tests/router/prefetch.test.tsx` | bleedingdev | Extend the audited-base-owned router prefetch regression to cover the non-Webpack realm so the `PrefetchLink.tsx` public-path guard cannot regress silently | `capped-patch` + `fix` |
-| `packages/server/utils/src/compilers/typescript/index.ts` | bleedingdev | Resolve the generated stable `@typescript/native` alias and its `bin.tsc` entry before retaining the legacy native-preview fallback, so BFF/server compilation uses the compiler identity emitted by the UltraModern generator | `capped-patch` + `fixed-in-fork` |
-| `packages/server/utils/tests/tsgo.test.ts` | bleedingdev | Pin stable `@typescript/native` binary resolution while preserving the existing native-preview compatibility regressions | `capped-patch` + `fixed-in-fork` |
-| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Expose consumer-only i18n runtime declarations, including the generated no-react-i18next alias shape, so federated declaration generation does not enter plugin-authoring and build-tool declarations | `capped-patch` + `fixed-in-fork` |
-| `packages/runtime/plugin-i18n/tests/linkTypes.test.ts` | bleedingdev | Compile the emitted consumer declaration graph under tsgo and reject any path back into builder, app-tools, runtime-plugin internals, or toolkit utility declarations | `capped-patch` + `fixed-in-fork` |
+| `packages/runtime/plugin-runtime/src/router/runtime/PrefetchLink.tsx` | bleedingdev | Read the Webpack-supplied `__webpack_public_path__` magic global inside `try`/`catch` so a non-Webpack realm returns an empty public path instead of throwing a `ReferenceError` on an undeclared identifier; RT-09 prefetch behavior is unchanged and RT-07/RT-08 remain scheduled | `inline-patch` + `fix` |
+| `packages/runtime/plugin-runtime/tests/router/prefetch.test.tsx` | bleedingdev | Extend the audited-base-owned router prefetch regression to cover the non-Webpack realm so the `PrefetchLink.tsx` public-path guard cannot regress silently | `inline-patch` + `fix` |
+| `packages/server/utils/src/compilers/typescript/index.ts` | bleedingdev | Resolve the generated stable `@typescript/native` alias and its `bin.tsc` entry before retaining the legacy native-preview fallback, so BFF/server compilation uses the compiler identity emitted by the UltraModern generator | `inline-patch` + `fixed-in-fork` |
+| `packages/server/utils/tests/tsgo.test.ts` | bleedingdev | Pin stable `@typescript/native` binary resolution while preserving the existing native-preview compatibility regressions | `inline-patch` + `fixed-in-fork` |
+| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Expose consumer-only i18n runtime declarations, including the generated no-react-i18next alias shape, so federated declaration generation does not enter plugin-authoring and build-tool declarations | `inline-patch` + `fixed-in-fork` |
+| `packages/runtime/plugin-i18n/tests/linkTypes.test.ts` | bleedingdev | Compile the emitted consumer declaration graph under tsgo and reject any path back into builder, app-tools, runtime-plugin internals, or toolkit utility declarations | `inline-patch` + `fixed-in-fork` |
 
 ### 2026-09-01 skill-suite anchor repair
 
@@ -451,7 +450,7 @@ disposition evidence and no writer operation is run for it.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `tests/skill/run.mjs` | bleedingdev | Re-anchor the suite's esbuild `createRequire` at the fork-owned `ultramodern-create` package after the create extraction removed the vanilla `create` esbuild dependency, so the migrate-to-v3 regression suite can execute at all | `capped-patch` + `fix` |
+| `tests/skill/run.mjs` | bleedingdev | Re-anchor the suite's esbuild `createRequire` at the fork-owned `ultramodern-create` package after the create extraction removed the vanilla `create` esbuild dependency, so the migrate-to-v3 regression suite can execute at all | `inline-patch` + `fix` |
 
 The group breakdown below is the last hand-classified snapshot, taken at
 `dfcd414a`. It is advisory attribution only — the gate reads per-file budgets,
@@ -479,8 +478,8 @@ uses only its validated, canonical full scope; callers cannot narrow it with a
 pathspec, nested root, alternate file, or inherited Git context. Every entry,
 budget, total, base OID, and base-tree path is validated before measurement. A
 raised metric or new entry is accepted only when it exactly matches the
-committed-head measurement, its audited-base-owned PR delta is at most 20
-added-plus-removed lines, and `FORK-DIVERGENCE.md` changes in the same PR. Base
+committed-head measurement and `FORK-DIVERGENCE.md` supplies strict ownership
+evidence in the same PR. Base
 or scope transitions require the explicit reviewed re-record operation plus the
 same ledger evidence. Section 4 remains outside the divergence pathspec because
 it covers root and infrastructure files outside `packages/`.
@@ -498,7 +497,7 @@ it covers root and infrastructure files outside `packages/`.
 | ROOT-05 | `patchedDependencies` for MF 2.9.0 (`manifest`, `rspack`, `bridge-react`, `modern-js-v3`, `runtime-core`), msgpackr and zod CSP hardening | bleedingdev | MF lazy-DTS/SSR/topology and CSP/Worker-safe runtime lanes; the TanStack router-core declaration patch retired at 1.171.28 | keep-[F] | — |
 | ROOT-07 | `pnpm-workspace.yaml` negative globs `!tests/integration/**/{dist,node_modules}/**` | bleedingdev | Gitignored build output emits `package.json` files that match the positive globs and add phantom importers to the lockfile | keep-[F] | — |
 | ROOT-08 | 10 fork-owned workflows added | bleedingdev | Fork gates (boundary, contract, publish, certification, nightly, readiness, security), docs publishing (`docs-pages`), bun smoke (`bun-superapp-smoke`), and Tractor downstream acceptance (`ultramodern-tractor-downstream`) | keep-[F] | — |
-| ROOT-09 | Modified upstream workflows (dependency check, diff, integration, lint, type-check, unit, builder e2e, issue labels) | bleedingdev | Fork toolchain + gate wiring | capped-patch — reconcile upstream infra fixes by hand | — |
+| ROOT-09 | Modified upstream workflows (dependency check, diff, integration, lint, type-check, unit, builder e2e, issue labels) | bleedingdev | Fork toolchain + gate wiring | inline-patch — reconcile upstream infra fixes by hand | — |
 | ROOT-10 | Release tags namespaced `ultramodern-v<version>`, never `v<version>` | bleedingdev | 277 inherited upstream `v*` tags; `gh release create` reuses a pre-existing tag and silently ignores `--target` | keep-[F] — see note N3 | — |
 | ROOT-11 | `publish-change-record` is the only `contents: write` job, asserted as a closed set | bleedingdev | Publish-workflow privilege containment | keep-[F] | — |
 | ROOT-12 | Fork-owned script families (`boundary-guards`, `ultramodern-boundary-check`, `lib`, `release-gates`, `security`, `superapp-certification`, `ultramodern-production-readiness`, `ultramodern-publish`, `prepare-root.mjs`, tsgo helpers) | bleedingdev | Fork CI surface | keep-[F] | — |
@@ -531,7 +530,7 @@ it covers root and infrastructure files outside `packages/`.
 | CLI-09 | `builder` `dev.lazyCompilation` disabled unless set (`parseCommonConfig.ts:220`), paired with APP-07 route-eager `lazyCompilation.test` | bleedingdev | Deliberate dev-perf lane, broadened beyond stream-SSR | keep-[F], documented — see APP-07 | — |
 | CLI-10 | `plugin-bff` `./server` export repointed **Hono → Effect** (`dist/.../runtime/effect/index`) | bleedingdev | Product decision: Effect BFF is a blessed path in this fork | keep-[F] (product) | — |
 | CLI-11 | `packages/cli/plugin-bff/src/server.ts:47-50` — `resolveRuntimeFramework` defaults `bff.runtimeFramework` to `'effect'` (`=== 'hono' ? 'hono' : 'effect'`), pinned by `packages/cli/plugin-bff/tests/server.test.ts:131` (`should treat unresolved runtime framework as effect`) | bleedingdev | Effect HttpApi + Effect BFF is the single blessed authored HTTP path; Hono remains internal compatibility and is feature-frozen; upstream has only Hono | keep-[F] | — |
-| CLI-12 | `src/server.ts` loads the fork-owned `EffectAdapter` via **dynamic** `await import('@modern-js/plugin-bff-extensions/effect-adapter')` inside `onPrepare` | bleedingdev | A static import pulls `effect/*` into the eager module graph and crashes hono-only consumers with `ERR_MODULE_NOT_FOUND`; the adapter implementation now lives entirely outside the upstream package | extension-point (extracted) + capped-patch (dynamic import seam) — see note N4 | — |
+| CLI-12 | `src/server.ts` loads the fork-owned `EffectAdapter` via **dynamic** `await import('@modern-js/plugin-bff-extensions/effect-adapter')` inside `onPrepare` | bleedingdev | A static import pulls `effect/*` into the eager module graph and crashes hono-only consumers with `ERR_MODULE_NOT_FOUND`; the adapter implementation now lives entirely outside the upstream package | extension-point (extracted) + inline-patch (dynamic import seam) — see note N4 | — |
 | CLI-13 | `src/utils/{runtimeGenerator,pluginGenerator,crossProjectApiPlugin}.ts` retains audited generator compatibility seams while Effect client/source/runtime generation lives in `@modern-js/plugin-bff-extensions` (ADR-0005) | bleedingdev | Stable `plugin-bff` output paths and the compiled cross-project template remain compatible; the additive Effect generator subsystem no longer lives in upstream-owned package code | extension-point (extracted) + upstream-PR (generic fail-fast/merge behavior) | P3 |
 | CLI-14 | `plugin-bff/package.json` entirely fork-added optional `effect` / `@effect/opentelemetry` peer + mirrored devDep block | bleedingdev | Effect must resolve to one identity in the consumer graph; a `dependencies` entry lets pnpm install a second copy and the runtime barrels hand back services from the wrong instance | keep-[F] — see note N5 | — |
 | CLI-15 | `src/runtime/safe-failure.ts:71` builds the error envelope from `SAFE_FAILURE_MESSAGES[status] ?? 'Request failed'`, discarding `err.message` | bleedingdev | Not a deliberate divergence — real error detail is dropped on every BFF failure, including in development | **fix** (preserve `err.message` at least in dev / behind a flag) | **P2** |
@@ -540,9 +539,9 @@ it covers root and infrastructure files outside `packages/`.
 | CLI-18 | `plugin-styled-components` derives the styled interface from `typeof styledComponents.default` | bleedingdev | styled-components v6 no longer exports `StyledInterface`; coupled to the dependency migration | keep-[F] (coupled dep) | — |
 | CLI-19 | `plugin-bff/src/cli.ts` reduced to a 38-line plugin entry that delegates to fork-owned `src/cli/{generator,compress,prefix,watch}.ts`. Budget 216 → **218** lines at the 3.8.2 base | bleedingdev | Base-transition growth, not new fork code: upstream #8797 added `moduleType` and `apiFiles: apiRouter.getApiFiles()` to its inline `generator()` (4 lines). The fork already threads both from `src/cli/generator.ts:87,134` and `:253`, so the behavior is adopted — the upstream file simply grew underneath the extraction | extension-point (already extracted) | — |
 | CLI-20 | `plugin-bff/src/utils/clientGenerator.ts` is a re-export shim over fork-owned `src/utils/client-generator/`. Budget 291 → **338** lines at the 3.8.2 base | bleedingdev | Base-transition growth: upstream #8797 rewrote this file (+153 changed lines) to stop copying handler declarations into `dist/client`. The fork ports that behavior into `client-generator/{generate,type-facade,files,write-package}.ts`; a shim over a bigger upstream file measures as a bigger deletion | extension-point (already extracted) — see note N9 | — |
-| CLI-21 | `plugin-bff/src/loader.ts` delegates Effect client generation and worker-runtime rendering to `@modern-js/plugin-bff-extensions`, threads the configured `requestId`, and transpiles the worker runtime to ES2024 | bleedingdev | The upstream Rspack loader exposes no hook for the fork's Effect generators or request identity; this 14-line compatibility seam removes duplicate subsystem ownership while preserving the loader contract and stable public output paths | extension-point (extracted) + capped-patch (loader seam) | — |
-| CLI-22 | `plugin-bff/package.json` published-boundary wiring: edge-safe ESM conditions for Effect client/data-platform, no source export, direct dependencies on the extracted BFF owners, an optional `@modern-js/app-tools` declaration peer, and Node >=26.7 | bleedingdev | Package metadata has no extension hook: these declarations keep edge resolution out of CJS/source, make extracted runtime and generated declaration imports resolvable, and preserve the fork's modern Node baseline | extension-point (extracted owners) + capped-patch (17-line manifest seam) | — |
-| CLI-23 | `plugin-bff/package.json` root declaration mapping and dependency-ownership cleanup after the Effect/federation extraction | bleedingdev | The published root resolves to `cli.d.ts`; builder and esbuild are build-only; telemetry, federation, runtime-extension, and SWC-helper runtime dependencies no longer belong to this package after their consumers moved to fork-owned packages | extension-point (dependencies follow extracted owners) + capped-patch (19-line manifest cleanup) | — |
+| CLI-21 | `plugin-bff/src/loader.ts` delegates Effect client generation and worker-runtime rendering to `@modern-js/plugin-bff-extensions`, threads the configured `requestId`, and transpiles the worker runtime to ES2024 | bleedingdev | The upstream Rspack loader exposes no hook for the fork's Effect generators or request identity; this 14-line compatibility seam removes duplicate subsystem ownership while preserving the loader contract and stable public output paths | extension-point (extracted) + inline-patch (loader seam) | — |
+| CLI-22 | `plugin-bff/package.json` published-boundary wiring: edge-safe ESM conditions for Effect client/data-platform, no source export, direct dependencies on the extracted BFF owners, an optional `@modern-js/app-tools` declaration peer, and Node >=26.7 | bleedingdev | Package metadata has no extension hook: these declarations keep edge resolution out of CJS/source, make extracted runtime and generated declaration imports resolvable, and preserve the fork's modern Node baseline | extension-point (extracted owners) + inline-patch (17-line manifest seam) | — |
+| CLI-23 | `plugin-bff/package.json` root declaration mapping and dependency-ownership cleanup after the Effect/federation extraction | bleedingdev | The published root resolves to `cli.d.ts`; builder and esbuild are build-only; telemetry, federation, runtime-extension, and SWC-helper runtime dependencies no longer belong to this package after their consumers moved to fork-owned packages | extension-point (dependencies follow extracted owners) + inline-patch (19-line manifest cleanup) | — |
 
 ---
 
@@ -572,7 +571,7 @@ it covers root and infrastructure files outside `packages/`.
 | RT-20 | `render` (6 files) RSC adapter surface: `createFromFetch` export, `rscManifest` plumb-through, `react-server-dom-rspack.d.ts` | bleedingdev | Fork RSC lane; RSC stays disabled in the distribution | keep-[F] | — |
 | RT-21 | React Router / Remix compatibility surface (`plugin-runtime` router paths and related upstream-owned files) | bleedingdev | Maintenance-only: the compatibility surface is retained and takes regression fixes only, no new features or public surface. New routing work belongs to TanStack Router; RT-06/RT-16/RT-18 keep their own dispositions | keep-[F] (maintenance-only) | — |
 | RT-22 | `plugin-i18n/package.json` React and ReactDOM peer ranges match the required `@modern-js/runtime` React 19 cohort | bleedingdev | The plugin requires `@modern-js/runtime`, whose peers are `^19.2.8`; advertising React 18 was unsatisfiable in a supported install. i18next and react-i18next retain upstream floors because older versions are not exercised here | keep-[F] (dependency cohort) | — |
-| RT-23 | `plugin-runtime/src/cli/ssr/index.ts` disables Rsbuild 2.2 `splitChunks` only for Module Federation SSR server environments and emits `MODERN_MF_APP_SSR` with env-compatible string semantics | bleedingdev | Rsbuild 2.2's server default makes the CommonJS MF render entry resolve asynchronously without `requestHandler`; browser environments retain native chunk splitting. Serializing the config-derived marker as a string, paired with APP-09's ambient auto-injection exclusion, prevents conflicting DefinePlugin values while preserving the public `process.env` string contract | capped-patch | — |
+| RT-23 | `plugin-runtime/src/cli/ssr/index.ts` disables Rsbuild 2.2 `splitChunks` only for Module Federation SSR server environments and emits `MODERN_MF_APP_SSR` with env-compatible string semantics | bleedingdev | Rsbuild 2.2's server default makes the CommonJS MF render entry resolve asynchronously without `requestHandler`; browser environments retain native chunk splitting. Serializing the config-derived marker as a string, paired with APP-09's ambient auto-injection exclusion, prevents conflicting DefinePlugin values while preserving the public `process.env` string contract | inline-patch | — |
 
 ---
 
@@ -596,12 +595,12 @@ it covers root and infrastructure files outside `packages/`.
 | SRV-14 | `plugin-polyfill` migrates ua-parser-js `0.7` → `2.0` (`src/index.ts:34-36`) and lru-cache `6` → `11` (`src/libs/cache.ts:39-40`, `max`/`length` → `maxSize`/`sizeCalculation`) | bleedingdev | Breaking major runtime deps with call-site rewrites | keep-[F] — `package.json` + source must move together | — |
 | SRV-15 | `prod-server` telemetry re-export surface (`src/apply.ts:23`, `src/index.ts:17`), typed `createProdServer`, netlify entry | bleedingdev | Re-exported from `@modern-js/server-runtime-extensions` | keep-[F] | — |
 | SRV-16 | `prod-server/src/apply.ts` registers `injectTelemetryPlugin()`, `injectModuleFederationCssPlugin()`, `injectMfAssetCacheHeadersPlugin()` **unconditionally** in the shared prod+dev plugin assembly | bleedingdev | Fork telemetry + MF integration stays fork-owned, but registration must be gated on config (`server.telemetry`, MF SSR) so unconfigured consumers do not pay for the plugins | keep-[F] — add config gates | **P3** |
-| SRV-17 | `server` `src/helpers/mock.ts` drops `encode: encodeURI` from the path-to-regexp `match` options (`:149-151`) and adds `method ?? 'get'` / `pathname ?? '/'` fallbacks in `parseKey` (`:73-74`) | bleedingdev | Changes dev-mock route matching for non-ASCII paths. Dev tooling only, but it hides inside otherwise mechanical churn | capped-patch — on conflict keep the fork side or consciously re-add `encode` | — |
+| SRV-17 | `server` `src/helpers/mock.ts` drops `encode: encodeURI` from the path-to-regexp `match` options (`:149-151`) and adds `method ?? 'get'` / `pathname ?? '/'` fallbacks in `parseKey` (`:73-74`) | bleedingdev | Changes dev-mock route matching for non-ASCII paths. Dev tooling only, but it hides inside otherwise mechanical churn | inline-patch — on conflict keep the fork side or consciously re-add `encode` | — |
 | SRV-18 | `server` typed `CreateDevServerResult` and undefined-guards in watcher/fileReader | bleedingdev | Strictness fixes, same family as `render.ts` | upstream-PR | P3 |
 | SRV-19 | `server-runtime` export reordering | bleedingdev | Import hygiene | keep-[M] | — |
 | SRV-20 | `utils` TypeScript compiler path rebuilt around tsgo (spawned `tsgo`, tsconfig-paths matcher, import-specifier rewriting; `src/compilers/typescript/index.ts` 454 → **482** changed lines, 15 → **17** hunks) | bleedingdev | Toolchain divergence; upstream `typescriptLoader.ts` deleted (Appendix A). The 2026-08-16 growth is a capped Bucket-B patch (20 insertions / 4 deletions) porting #8797: `declaration` is no longer forced to `false`, `OUTPUT_SOURCE_EXTENSIONS` maps `.d.ts`/`.d.mts`/`.d.cts` back to their sources, `getSourceFileForOutput` splits the double extension (`path.parse('index.d.ts').name` is `index.d`), and the output collector accepts `.d.(c\|m)?ts` so declarations reach the specifier rewriter | keep-[F]; **extension-point** for the budget | P3 |
 | SRV-21 | `utils` `src/compilers/typescript/tsconfigPathsPlugin.ts` hosts only the `before` transform. Budget 203 → **325** lines, 24 → **22** hunks at the 3.8.2 base | bleedingdev | Base-transition growth: upstream #8797 added `tsconfigPathsAfterDeclarationsHookFactory`, a `ts.TransformerFactory` run through the tsc `afterDeclarations` hook (~130 lines). The fork has no tsc `Program` — it spawns `tsgo` — so there is no `afterDeclarations` hook to register (`grep -rn afterDeclarations packages/server/utils/src/` is empty). The same alias-stripping is achieved post-emit in fork-owned `importRewriter.ts`, verified against all four specifier kinds by `packages/server/utils/tests/ts.test.ts` | keep-[F] (no upstream extension point exists under tsgo) | — |
-| SRV-22 | `utils` `tests/ts.test.ts` asserts rewritten declaration specifiers with quote-agnostic regexes (`/from ["']\.\.\/shared\/types\.js["']/`) instead of upstream's double-quoted `toContain` literals. Budget 216 → **230** lines, 16 → **20** hunks | bleedingdev | Capped Bucket-B patch (8 insertions / 6 deletions). Upstream's assertions encode `tsc`'s emitter, which normalises specifiers to double quotes; tsgo preserves the quote style of the source. The assertion is loosened on quoting only — the specifier text itself, which is what #8797 fixes, stays exact | capped-patch | — |
+| SRV-22 | `utils` `tests/ts.test.ts` asserts rewritten declaration specifiers with quote-agnostic regexes (`/from ["']\.\.\/shared\/types\.js["']/`) instead of upstream's double-quoted `toContain` literals. Budget 216 → **230** lines, 16 → **20** hunks | bleedingdev | Reviewed Bucket-B patch (8 insertions / 6 deletions). Upstream's assertions encode `tsc`'s emitter, which normalises specifiers to double quotes; tsgo preserves the quote style of the source. The assertion is loosened on quoting only — the specifier text itself, which is what #8797 fixes, stays exact | inline-patch | — |
 | SRV-23 | `utils` `tests/fixtures/ts-declaration/api/declaration.ts` carries one extra blank line versus upstream's new #8797 fixture | bleedingdev | Repo formatter output: `biome check --write` inserts a blank line between the leading comment/`import type` pair and the next comment. Take upstream's fixture on sync and re-run biome rather than hand-reverting the line | keep-[M] | — |
 
 ---
@@ -612,14 +611,14 @@ it covers root and infrastructure files outside `packages/`.
 | --- | --- | --- | --- | --- | --- |
 | APP-01 | `config/initialize`, `src/index.ts`, types wire fork-added `src/presetUltramodern.ts` (telemetry, MF SSR defaults) | bleedingdev | Fork preset entry point. **Corrected 2026-08-11:** the old ledger named `src/baseline.ts`; that file and its alias shim were deleted in `5f8230e055` | keep-[F] | — |
 | APP-02 | `package.json`, `src/index.ts`, `src/builder/shared/builderPlugins/adapterSSR.ts`, and `tests/index.test.ts` register fork-owned `@modern-js/app-tools-extensions` plugins; `src/builder/generator/getBuilderEnvironments.ts` and the former in-package CSS runtime plugin are now genuine removals | bleedingdev | Keep only capped package/plugin registration seams in upstream-owned app-tools while Cloudflare worker entries, bundler policy, provider detection, CSS runtime normalization, templates, and tests live in the fork package | extension-point | — |
-| APP-03 | `src/plugins/deploy/index.ts` and `src/types/config/deploy.ts` import public `@modern-js/app-tools-extensions` owners; the only retained Cloudflare facade backs the published `@modern-js/app-tools/cloudflare-output-verifier` compatibility contract, while the other former platform files are genuine removals | bleedingdev | Preserve the established app-tools deploy target, configuration types, and unavoidable published verifier path while keeping additive Cloudflare delivery, output verification, release-envelope, security, i18n, and worker-manifest behavior in the fork package | extension-point | — |
+| APP-03 | `src/plugins/deploy/index.ts` and `src/types/config/deploy.ts` import public `@modern-js/app-tools-extensions` owners; former platform wrappers and the old app-tools config/verifier exports are retired | bleedingdev | Preserve native deploy targets and configuration types while consumers use the fork-owned config and Cloudflare verifier directly. Native build composition, deployment aliases, and release ordering live in fork packages. The app-tools manifest retirement is 18 total PR lines; config API behavior and public declarations are verified in the owning package | extension-point | — |
 | APP-04 | `src/commands/*` dev/build/serve/deploy/info/inspect hooks | bleedingdev | Fork CLI surface. **Corrected 2026-08-11:** the old ledger claimed `modern runtime status` / `fallback-signal` registration (EPIC-7); those commands were deleted in `5f8230e055` and `src/commands/` no longer contains them | keep-[F] | — |
 | APP-05 | `src/plugins/analyze/*` entry/routes-owner integration | bleedingdev | Pairs with RT-18 | keep-[F] | — |
 | APP-06 | `src/rsbuild.ts:19,58-60` adds `disableReactCompiler?: boolean` to `ResolveModernRsbuildConfigOptions` | bleedingdev | Exists only to let callers opt out of CLI-04's default; disappears if CLI-04 reverts | **revert** with CLI-02 / CLI-04 | **P1** |
 | APP-07 | `src/plugins/initialize/index.ts:36-43` defaults `dev.lazyCompilation` to `{ imports: true, entries: false }` when unset, plus `src/builder/shared/lazyCompilation.ts` route-eager `lazyCompilation.test` | bleedingdev | Deliberate dev-perf divergence, broadened beyond stream-SSR to all route component modules. Low priority so an explicit user `dev.lazyCompilation` always wins | keep-[F], documented | — |
 | APP-08 | esm register hooks, utils, tests | bleedingdev | tsgo toolchain + track the above | keep-[M] | — |
-| APP-09 | `src/utils/env.ts` excludes `MODERN_MF_APP_SSR` from ambient `MODERN_*` auto-injection; `tests/utils/env.test.ts` pins the exclusion | bleedingdev | The variable controls config selection before normalization, while plugin-runtime publishes the resolved SSR mode. Compiling the ambient value through a second DefinePlugin conflicts with the config-derived marker and can mislabel client bundles | capped-patch | — |
-| APP-10 | `src/builder/shared/bundlerPlugins/RouterPlugin.ts`, `src/bundleDocs.ts`, and `src/plugins/analyze/{getServerRoutes,isDefaultExportFunction}.ts` carry capped Node 26 / TS7 / Rspack 2 / Babel 8 compatibility repairs | bleedingdev | Keep automatic public paths truthfully narrowed, use Node 26 `Dirent.parentPath`, restore the canonical main-entry constant import, and remove syntax plugins Babel 8 parses by default. Each upstream-owned file stays within the 20-line PR cap; no legacy Node support, casts, or diagnostic suppression are introduced | fixed-in-fork + upstream-PR | P1 |
+| APP-09 | `src/utils/env.ts` excludes `MODERN_MF_APP_SSR` from ambient `MODERN_*` auto-injection; `tests/utils/env.test.ts` pins the exclusion | bleedingdev | The variable controls config selection before normalization, while plugin-runtime publishes the resolved SSR mode. Compiling the ambient value through a second DefinePlugin conflicts with the config-derived marker and can mislabel client bundles | inline-patch | — |
+| APP-10 | `src/builder/shared/bundlerPlugins/RouterPlugin.ts`, `src/bundleDocs.ts`, and `src/plugins/analyze/{getServerRoutes,isDefaultExportFunction}.ts` carry reviewed Node 26 / TS7 / Rspack 2 / Babel 8 compatibility repairs | bleedingdev | Keep automatic public paths truthfully narrowed, use Node 26 `Dirent.parentPath`, restore the canonical main-entry constant import, and remove syntax plugins Babel 8 parses by default. No legacy Node support, casts, or diagnostic suppression are introduced | fixed-in-fork + upstream-PR | P1 |
 
 ---
 
@@ -632,7 +631,7 @@ it covers root and infrastructure files outside `packages/`.
 | TK-03 | `create` public generator API subpaths (`./ultramodern-workspace`, `./ultramodern-workspace/codesmith`) | bleedingdev | Public generator seam; `exports` and `publishConfig.exports` must stay mirrored with runtime files | keep-[F] | — |
 | TK-04 | `create` MicroVertical dry-run/preflight validation + explicit CodeSmith overlay hook; tooling commands split under `src/ultramodern-tooling/commands/` | bleedingdev | Fork generator validation | keep-[F] | — |
 | TK-05 | `create` workspace content migrating from TypeScript strings to `templates/workspace/` shipped file templates; shared patches gated by `tests/patch-sync.test.ts` | bleedingdev | Replaces the deleted upstream handlebars single-app template (Appendix A) | keep-[F] | — |
-| TK-06 | `toolkit/plugin` (27 files) import/type re-export hygiene + fork duplicate-plugin detection across internal and config plugins | bleedingdev | Mostly mechanical; the duplicate detection is fork behavior | keep-[M] + capped-patch (detection) | — |
+| TK-06 | `toolkit/plugin` (27 files) import/type re-export hygiene + fork duplicate-plugin detection across internal and config plugins | bleedingdev | Mostly mechanical; the duplicate detection is fork behavior | keep-[M] + inline-patch (detection) | — |
 | TK-07 | `runtime-utils` `nestedRoutes` browser export, `url` `normalizePathname`, `loaderContext`, async storage, `fileReader`; rstest config on happy-dom | bleedingdev | Support the fork router/runtime lanes | keep-[F] / keep-[M] | — |
 | TK-08 | `toolkit/utils` `compiled/pkg-up/*` vendored compiled blob replaced by a readable reimplementation (same API) | bleedingdev | Auditability of vendored blobs | keep-[F] | — |
 | TK-09 | `toolkit/utils` `src/cli/constants.ts` fork constants (`NESTED_ROUTE_SPEC_FILE`, …) | bleedingdev | Fork routing constants | keep-[F] | — |
@@ -903,17 +902,25 @@ current evidence — do not cite it.
 
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/core/context/public.ts` (split from audited `runtime.ts`) | bleedingdev | Delegate public React context identity to the fork-owned runtime helper so independently bundled federation runtime paths read the current SSR provider instead of stale context. | capped-patch |
-| `packages/runtime/plugin-runtime/src/core/context/runtime.ts` | bleedingdev | Delegate the separate internal React context identity to the same fork-owned helper; React providers continue to own per-request values. | capped-patch |
+| `packages/runtime/plugin-runtime/src/core/context/public.ts` (split from audited `runtime.ts`) | bleedingdev | Delegate public React context identity to the fork-owned runtime helper so independently bundled federation runtime paths read the current SSR provider instead of stale context. | inline-patch |
+| `packages/runtime/plugin-runtime/src/core/context/runtime.ts` | bleedingdev | Delegate the separate internal React context identity to the same fork-owned helper; React providers continue to own per-request values. | inline-patch |
 
 ### Streaming hydration identity (2026-09-09)
 
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Preserve the streaming server's end-marker sibling slot during hydration so React-generated input IDs and accessibility references use the same tree positions. | capped-patch |
+| `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Preserve the streaming server's end-marker sibling slot during hydration so React-generated input IDs and accessibility references use the same tree positions. | inline-patch |
 
 ### Eager SSR bootstrap rejection (2026-09-09)
 
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/cli/code.ts` | bleedingdev | Observe the eager SSR handler promise before a renderer consumes it, preventing remote startup failures from terminating Node while preserving the original rejection for request error handling. | capped-patch |
+| `packages/runtime/plugin-runtime/src/cli/code.ts` | bleedingdev | Observe the eager SSR handler promise before a renderer consumes it, preventing remote startup failures from terminating Node while preserving the original rejection for request error handling. | inline-patch |
+
+### Explicit native response and stream conditions (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/server/requestResponse.ts` | bleedingdev | Make missing and empty redirect-header checks explicit in the existing helper extracted from audited source packages/runtime/plugin-runtime/src/core/server/requestHandler.tsx. Git records the helper as an added path with its original source retained, so the checker governs this helper identity separately. Complete PR delta: six lines; body disposal, cleanup and rejection behavior remain unchanged. | inline-patch |
+| `packages/runtime/plugin-runtime/src/core/server/stream/deferredScript.ts` | bleedingdev | Make native thenable, error-object and nonce conditions explicit while retaining falsy-value and empty-nonce behavior. Complete PR delta: ten lines, including removal of the previous diagnostic pragma. | inline-patch |
+| `packages/runtime/plugin-runtime/src/router/runtime/redirect.ts` | bleedingdev | Make null and empty Location-header checks explicit in the existing redirect helper extracted from audited source packages/runtime/plugin-runtime/src/router/runtime/rsc-router.tsx. Git records the helper as an added path with its original source retained, so the checker governs this helper identity separately. Complete PR delta: three lines; basename and redirect behavior remain unchanged. | inline-patch |

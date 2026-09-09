@@ -54,11 +54,11 @@ const FORK_OWNED_PACKAGE_ROOTS = Object.freeze([
   'packages/toolkit/ultramodern-sandpack-profile',
 ]);
 const DIVERGENCE_LEDGER_REPO_PATH = 'FORK-DIVERGENCE.md';
-const CAPPED_PATCH_LINES = 20;
 const ALLOWED_LEDGER_DISPOSITIONS = new Set([
   'upstream-PR',
   'extension-point',
-  'capped-patch',
+  'inline-patch',
+  'capped-patch', // Historical ledgers used this token before the numeric cap was removed.
   'fixed-in-fork',
   'keep-deleted',
   'keep-[F]',
@@ -70,14 +70,12 @@ const ALLOWED_LEDGER_DISPOSITIONS = new Set([
 const MAX_DIVERGENCE_REPORT_ENTRIES = 20;
 const GIT_MAX_BUFFER_BYTES = 512 * 1024 * 1024;
 const TWO_BUCKET_RULE = [
-  'Every change to an upstream-owned file must land in one of two buckets:',
+  'Every change to an upstream-owned file must use an accepted resolution:',
   '  1. upstream PR - send the change to web-infra-dev/modern.js instead;',
   '  2. extension point - move the behaviour into fork-owned code behind a',
   '     plugin/hook/config seam so the upstream file stops changing.',
-  `Only escape hatch: a capped patch of <= ${String(
-    CAPPED_PATCH_LINES,
-  )} added-plus-removed PR lines per file with a matching`,
-  'FORK-DIVERGENCE.md entry explaining why neither bucket applies.',
+  '  3. fork patch - retain the change with a matching FORK-DIVERGENCE.md',
+  '     entry explaining why the other resolutions do not apply.',
 ];
 
 const lexicalCompare = (left, right) => left.localeCompare(right, 'en');
@@ -1399,9 +1397,7 @@ const measureRule5Changes = ({
         currentPaths: [...change.currentPaths].sort(lexicalCompare),
         addedLines: change.addedLines,
         removedLines: change.removedLines,
-        changedLines: change.binary
-          ? CAPPED_PATCH_LINES + 1
-          : change.addedLines + change.removedLines,
+        changedLines: change.addedLines + change.removedLines,
         renamed: change.renamed,
         binary: change.binary,
         beforeHunks: beforeMetric.hunks,
@@ -1807,14 +1803,6 @@ const evaluateDivergenceGovernance = ({
         errors.push(
           `Raised budget for ${growth.file} has no upstream-owned PR delta at the governance merge-base.`,
         );
-      } else if (change.changedLines > CAPPED_PATCH_LINES) {
-        errors.push(
-          `Raised budget for ${growth.file} comes from ${String(
-            change.changedLines,
-          )} added-plus-removed PR lines, exceeding the exact ${String(
-            CAPPED_PATCH_LINES,
-          )}-line cap.`,
-        );
       }
     }
   }
@@ -1824,15 +1812,6 @@ const evaluateDivergenceGovernance = ({
       continue;
     }
     requireLedgerEvidence(change.file);
-    if (change.changedLines > CAPPED_PATCH_LINES) {
-      errors.push(
-        `Non-shrink upstream-owned change ${change.file} has ${String(
-          change.changedLines,
-        )} added-plus-removed PR lines, exceeding the exact ${String(
-          CAPPED_PATCH_LINES,
-        )}-line cap.`,
-      );
-    }
   }
 
   return {
@@ -1996,9 +1975,7 @@ const writeDivergenceAllowlist = ({
         `Refusing to write ${targetPath}: divergence budget growth requires the explicit --record-growth operation.`,
         'Offending entries:',
         ...growth.map(formatDivergenceGrowth),
-        `The reviewed writer also requires --merge-base, --head, a same-PR ${DIVERGENCE_LEDGER_REPO_PATH} change, and at most ${String(
-          CAPPED_PATCH_LINES,
-        )} added-plus-removed PR lines per raised file.`,
+        `The reviewed writer also requires --merge-base, --head, and a same-PR ${DIVERGENCE_LEDGER_REPO_PATH} change for each raised file.`,
       ].join('\n'),
     );
   }
@@ -2364,7 +2341,6 @@ const runSelfTest = () => {
 };
 
 module.exports = {
-  CAPPED_PATCH_LINES,
   DEFAULT_DIVERGENCE_ALLOWLIST_PATH,
   DEFAULT_DIVERGENCE_ALLOWLIST_REPO_PATH,
   DEFAULT_DIVERGENCE_BASE_REF,

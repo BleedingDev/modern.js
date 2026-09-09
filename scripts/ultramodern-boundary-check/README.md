@@ -151,9 +151,8 @@ must exactly equal the immutable audited identity, including the old path of a
 rename; owner and reason must be nonempty; and disposition must consist of the
 ledger's allowed full tokens. Whitespace/reformatting, unrelated rows, grouped
 paths, broad advisory tables, duplicates, and pre-existing historical rows do
-not count. Each file also has an exact hard maximum of **20
-added-plus-removed PR lines**. To record a legitimate capped increase after the
-source and strict ledger row exist:
+not count. To record a reviewed increase after the source and strict ledger row
+exist:
 
 ```bash
 node scripts/ultramodern-boundary-check/check-fork-import-boundary.js \
@@ -162,10 +161,10 @@ node scripts/ultramodern-boundary-check/check-fork-import-boundary.js \
 ```
 
 The reviewed writer rejects missing/unresolvable refs, absent ledger evidence,
-over-cap changes, noncanonical targets, and budgets that do not exactly match
+noncanonical targets, and budgets that do not exactly match
 the committed-head measurement. CI then independently reads both committed
 allowlists with `git show`, re-measures the head, reconstructs rename ownership,
-and re-derives the same cap and ledger evidence. Editing the baseline alone
+and re-derives the same PR delta and ledger evidence. Editing the baseline alone
 cannot sanction growth.
 
 ### Scope migration
@@ -221,6 +220,6 @@ node --test scripts/ultramodern-boundary-check/__tests__/*.test.js
 
 The behavior suite uses temporary Git repositories to exercise scope attacks,
 strict schema validation, committed-ref governance, strict semantic ledger-row
-correlation, lexical test/fixture/docs escape attempts, capped growth, semantic
+correlation, lexical test/fixture/docs escape attempts, reviewed growth, semantic
 replacement, renames, genuine shrink, and reviewed migrations through the
 public API and CLI.

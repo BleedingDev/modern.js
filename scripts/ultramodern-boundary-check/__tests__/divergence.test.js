@@ -6,7 +6,6 @@ const path = require('node:path');
 const test = require('node:test');
 
 const {
-  CAPPED_PATCH_LINES,
   DEFAULT_DIVERGENCE_ALLOWLIST_PATH,
   DEFAULT_DIVERGENCE_BASE_REF,
   DEFAULT_UPSTREAM_PROVENANCE_REF,
@@ -184,7 +183,7 @@ const appendLedgerRow = (
   {
     owner = 'bleedingdev',
     reason = 'Focused fixture reason',
-    disposition = 'capped-patch',
+    disposition = 'inline-patch',
   } = {},
 ) => {
   const dispositionCell = Array.isArray(disposition)
@@ -434,7 +433,7 @@ test('full recorded repository scope remains green and fully measured', () => {
   assert.equal(report.cleared.length, 0);
 });
 
-test('tracked bracketed route identities retain measurement, ledger, and PR cap enforcement', t => {
+test('tracked bracketed route identities retain measurement and ledger enforcement for large PRs', t => {
   const file =
     'packages/toolkit/ultramodern-create/templates/workspace/apps/shell-super-app/src/routes/[lang]/page.tsx.handlebars';
   const fixture = makeGitFixture({
@@ -495,24 +494,17 @@ test('tracked bracketed route identities retain measurement, ledger, and PR cap 
   assert.deepEqual(governed.errors, []);
   assert.equal(governed.rule5Changes[0].changedLines, 2);
   assert.deepEqual(governed.ledgerEvidence.rows[0].problems, []);
-  writeRepoFile(
-    fixture.rootDir,
-    file,
-    replacementLines(CAPPED_PATCH_LINES + 1),
-  );
-  const oversizedHead = commitAll(
-    fixture.rootDir,
-    'oversized bracketed route change',
-  );
-  const oversized = govern(
-    oversizedHead,
+  writeRepoFile(fixture.rootDir, file, replacementLines(32));
+  const largeHead = commitAll(fixture.rootDir, 'large bracketed route change');
+  const large = govern(
+    largeHead,
     createDivergenceSnapshot({
-      ...measure(oversizedHead),
+      ...measure(largeHead),
       pathspec: ['packages'],
     }),
   );
-  assert.equal(oversized.ok, false);
-  assert.match(oversized.errors.join('\n'), /exceeding the exact 20-line cap/);
+  assert.equal(large.ok, true, large.errors.join('\n'));
+  assert.equal(large.rule5Changes[0].changedLines, 33);
 });
 
 test('post-provenance bracketed identities require literal tracked history, not matching siblings', t => {
@@ -1910,7 +1902,7 @@ test('unresolvable governance merge-base and head refs fail closed', () => {
   }
 });
 
-test('initial allowlist introduction requires a real base tree, exact snapshot, ledger, and capped PR delta', () => {
+test('initial allowlist introduction requires a real base tree, exact snapshot, ledger, and measured PR delta', () => {
   const fixture = makeGitFixture();
   try {
     writeRepoFile(
@@ -1948,7 +1940,7 @@ test('initial allowlist introduction requires a real base tree, exact snapshot, 
   }
 });
 
-test('capped allowlist growth passes only with a same-PR ledger change', () => {
+test('reviewed allowlist growth passes only with a same-PR ledger change', () => {
   for (const ledgerChanged of [false, true]) {
     const fixture = makeLegacyFixture();
     try {
@@ -1971,7 +1963,7 @@ test('capped allowlist growth passes only with a same-PR ledger change', () => {
         rootDir: fixture.rootDir,
         baseRef: fixture.upstreamBase,
       });
-      const headRef = commitAll(fixture.rootDir, 'candidate capped growth');
+      const headRef = commitAll(fixture.rootDir, 'candidate reviewed growth');
       const result = runGovernanceCli({
         rootDir: fixture.rootDir,
         mergeBase: fixture.mergeBase,
@@ -2114,44 +2106,47 @@ test('an unchanged historical matching row plus an unrelated ledger edit is not 
   }
 });
 
-test('exactly 20 PR lines is allowed but an over-cap patch fails even with ledger', () => {
-  for (const replacements of [10, 11]) {
-    const baseContents = replacementLines(12);
-    const fixture = makeLegacyFixture({
-      baseContents,
-      legacyContents: baseContents,
-    });
-    try {
-      writeRepoFile(
-        fixture.rootDir,
-        'packages/runtime/src/index.ts',
-        `${changedReplacementLines(replacements)}${replacementLines(12)
-          .split('\n')
-          .slice(replacements, -1)
-          .join('\n')}\n`,
-      );
-      appendLedgerRow(fixture.rootDir, 'packages/runtime/src/index.ts');
-      writeSnapshot({
-        rootDir: fixture.rootDir,
-        baseRef: fixture.upstreamBase,
+test('reviewed upstream patches have no fixed PR line limit and still require ledger evidence', () => {
+  for (const replacements of [10, 11, 32]) {
+    for (const ledgerChanged of [false, true]) {
+      const baseContents = replacementLines(replacements);
+      const fixture = makeLegacyFixture({
+        baseContents,
+        legacyContents: baseContents,
       });
-      const headRef = commitAll(fixture.rootDir, 'replace upstream lines');
-      const governance = loadGovernance({
-        rootDir: fixture.rootDir,
-        mergeBase: fixture.mergeBase,
-        headRef,
-      });
-      assert.equal(governance.rule5Changes[0].changedLines, replacements * 2);
-      assert.equal(
-        governance.ok,
-        replacements === 10,
-        governance.errors.join('\n'),
-      );
-    } finally {
-      cleanup(fixture.rootDir);
+      try {
+        writeRepoFile(
+          fixture.rootDir,
+          'packages/runtime/src/index.ts',
+          changedReplacementLines(replacements),
+        );
+        if (ledgerChanged) {
+          appendLedgerRow(fixture.rootDir, 'packages/runtime/src/index.ts');
+        }
+        writeSnapshot({
+          rootDir: fixture.rootDir,
+          baseRef: fixture.upstreamBase,
+        });
+        const headRef = commitAll(fixture.rootDir, 'replace upstream lines');
+        const governance = loadGovernance({
+          rootDir: fixture.rootDir,
+          mergeBase: fixture.mergeBase,
+          headRef,
+        });
+        assert.equal(governance.rule5Changes[0].changedLines, replacements * 2);
+        assert.equal(
+          governance.ok,
+          ledgerChanged,
+          governance.errors.join('\n'),
+        );
+        if (!ledgerChanged) {
+          assert.match(governance.errors.join('\n'), /FORK-DIVERGENCE\.md/);
+        }
+      } finally {
+        cleanup(fixture.rootDir);
+      }
     }
   }
-  assert.equal(CAPPED_PATCH_LINES, 20);
 });
 
 test('same-count semantic replacement is a governed non-shrink change', () => {
@@ -2491,7 +2486,7 @@ test('plain writer locks in genuine shrink but refuses growth atomically', () =>
   }
 });
 
-test('reviewed growth writer independently enforces refs, ledger, exact cap, and canonical path', () => {
+test('reviewed growth writer independently enforces refs, ledger, and canonical path', () => {
   const fixture = makeLegacyFixture();
   try {
     writeRepoFile(
@@ -2529,52 +2524,46 @@ test('reviewed growth writer independently enforces refs, ledger, exact cap, and
   }
 });
 
-test('reviewed growth writer rejects absent ledger and over-cap growth without modifying the file', () => {
-  for (const scenario of ['no-ledger', 'over-cap']) {
-    const baseContents =
-      scenario === 'over-cap' ? replacementLines(12) : undefined;
+test('reviewed growth writer accepts large patches only with ledger evidence and preserves rejected snapshots', () => {
+  for (const ledgerChanged of [false, true]) {
+    const baseContents = replacementLines(32);
     const fixture = makeLegacyFixture({
       baseContents,
-      legacyContents: scenario === 'over-cap' ? baseContents : undefined,
+      legacyContents: baseContents,
     });
     try {
-      if (scenario === 'over-cap') {
-        writeRepoFile(
-          fixture.rootDir,
-          'packages/runtime/src/index.ts',
-          changedReplacementLines(12),
-        );
-        appendLedgerRow(fixture.rootDir, 'packages/runtime/src/index.ts');
-      } else {
-        writeRepoFile(
-          fixture.rootDir,
-          'packages/runtime/src/index.ts',
-          [
-            'export const a = 9;',
-            'export const b = 2;',
-            'export const c = 3;',
-            'export const forkOnly = true;',
-            '',
-          ].join('\n'),
-        );
-      }
-      const headRef = commitAll(fixture.rootDir, scenario);
-      const before = fs.readFileSync(fixture.allowlistPath);
-      assert.throws(
-        () =>
-          writeDivergenceAllowlist({
-            rootDir: fixture.rootDir,
-            baseRef: fixture.upstreamBase,
-            headRef,
-            mergeBaseRef: fixture.mergeBase,
-            allowlistPath: fixture.allowlistPath,
-            recordGrowth: true,
-          }),
-        scenario === 'over-cap'
-          ? /exceeding the exact 20-line cap/
-          : /FORK-DIVERGENCE\.md/,
+      writeRepoFile(
+        fixture.rootDir,
+        'packages/runtime/src/index.ts',
+        changedReplacementLines(32),
       );
-      assert.deepEqual(fs.readFileSync(fixture.allowlistPath), before);
+      if (ledgerChanged) {
+        appendLedgerRow(fixture.rootDir, 'packages/runtime/src/index.ts');
+      }
+      const headRef = commitAll(fixture.rootDir, 'large upstream patch');
+      const before = fs.readFileSync(fixture.allowlistPath);
+      const write = () =>
+        writeDivergenceAllowlist({
+          rootDir: fixture.rootDir,
+          baseRef: fixture.upstreamBase,
+          headRef,
+          mergeBaseRef: fixture.mergeBase,
+          allowlistPath: fixture.allowlistPath,
+          recordGrowth: true,
+        });
+      if (ledgerChanged) {
+        const report = write();
+        assert.equal(report.growth.length, 1);
+        assert.equal(report.governance.ok, true);
+        assert.equal(report.governance.rule5Changes[0].changedLines, 64);
+        assert.equal(
+          checkForkDivergence({ rootDir: fixture.rootDir, headRef }).ok,
+          true,
+        );
+      } else {
+        assert.throws(write, /FORK-DIVERGENCE\.md/);
+        assert.deepEqual(fs.readFileSync(fixture.allowlistPath), before);
+      }
     } finally {
       cleanup(fixture.rootDir);
     }

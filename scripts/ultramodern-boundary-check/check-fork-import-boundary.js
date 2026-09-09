@@ -11,7 +11,6 @@ const {
 } = require('./checker');
 
 const {
-  CAPPED_PATCH_LINES,
   DEFAULT_DIVERGENCE_BASE_REF,
   DEFAULT_UPSTREAM_PROVENANCE_REF,
   checkForkDivergence,
@@ -267,11 +266,9 @@ const main = () => {
     });
     if (report.growth.length > 0) {
       console.warn(
-        `[ultramodern-divergence] reviewed capped growth is raising ${String(
+        `[ultramodern-divergence] reviewed growth is raising ${String(
           report.growth.length,
-        )} budget(s), each independently checked against the exact ${String(
-          CAPPED_PATCH_LINES,
-        )}-line Rule 5 cap:`,
+        )} budget(s), each independently checked against its PR delta and ledger evidence:`,
       );
       report.growth.forEach(entry => {
         console.warn(
