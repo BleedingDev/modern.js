@@ -14,15 +14,29 @@ export const CLOUDFLARE_WORKER_NODE_BUILTINS = [
   'async_hooks',
   'buffer',
   'crypto',
+  'dns',
   'events',
+  'fs',
   'fs/promises',
+  'http',
+  'http2',
   'module',
+  'net',
+  'os',
   'path',
   'process',
   'stream',
   'string_decoder',
+  'tls',
   'url',
   'util',
+  'util/types',
+  'zlib',
+] as const;
+// Platform imports available with the default 2026-06-02 nodejs_compat target.
+// Import availability does not imply support for every Node API operation.
+export const CLOUDFLARE_WORKER_PLATFORM_MODULES = [
+  'cloudflare:sockets',
 ] as const;
 export const CLOUDFLARE_REQUIRED_COMPATIBILITY_FLAGS = [
   'nodejs_compat',
