@@ -1,0 +1,22 @@
+{
+  "graph_id": "um-parallel-20260909",
+  "selection_hash": "c4b9ebfc51",
+  "snapshot_path": "/Users/satan/workspace/bleedingdev/projects/modernjs/code/modernjs-simplification-20260909/.codex/plan-graphs/um-parallel-20260909/snapshot.json",
+  "state_dir": "/Users/satan/workspace/bleedingdev/projects/modernjs/code/modernjs-simplification-20260909/.codex/plan-graphs/um-parallel-20260909",
+  "exact_selection": "selection.json",
+  "limits": {
+    "max_threads": 50,
+    "max_depth": 3,
+    "active_leaf_cap": 40,
+    "reserved_capacity": 10,
+    "leaf_only": true
+  },
+  "initial_frontier": [
+    "um-parallel-20260909-cw-artifact-contract",
+    "um-parallel-20260909-cw-historical-fixtures",
+    "um-parallel-20260909-cw-journeys",
+    "um-parallel-20260909-cw-metrics",
+    "um-parallel-20260909-cw-retirement-contract",
+    "um-parallel-20260909-gate-baseline-freeze"
+  ]
+}

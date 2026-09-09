@@ -1,0 +1,154 @@
+{
+  "lane": "runtime-ssr",
+  "shards": [
+    {
+      "id": "ssr-composition",
+      "title": "HTML composition, hydration assets and string rendering",
+      "files": [
+        "packages/runtime/plugin-runtime/src/core/server/federatedCss.ts",
+        "packages/runtime/plugin-runtime/src/core/server/helmet.ts",
+        "packages/runtime/plugin-runtime/src/core/server/scriptOrder.ts",
+        "packages/runtime/plugin-runtime/src/core/server/string/index.ts",
+        "packages/runtime/plugin-runtime/src/core/server/utils.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/helmet.test.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/moduleFederation.test.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToString/buildTemplate.test.tsx",
+        "packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToString/entry.test.ts"
+      ],
+      "purpose": "Give HTML/head assembly, native hydration script order, federated CSS and shared render utilities one owner; repair the two governed edges in string/index.ts and utils.ts.",
+      "target_scope": "Own only these nine inventory identities and subsequently reserved fork-owned composition destinations. Audit string collector hooks and existing HTML composition seams; extraction is a candidate, not proof that an adequate hook exists. Keep shared helpers with the string consumer because scriptOrder, helmet and utils directly participate in that path.",
+      "prerequisites": [
+        "Start immediately with an independent read-only audit of these exact identities, audited-base ancestry, full eventual-PR added-plus-removed deltas, current callers and native extension points. No other shard completion is needed for this audit. Writes require only this shard's evidence-backed legal route and the specific interfaces it consumes. Fork-created behavior must move to genuinely fork-owned packages. Audited identities remain governed across moves; each complete-PR patch is capped at 20 added-plus-removed lines and each accepted non-shrink requires the same-PR ledger. If the legal behavior-preserving route needs a neutral upstream seam, prepare the handoff and wait for actual authorized upstream work; do not assume a proposal is merged.",
+        "Coordinate only the router matched-route/runtime-context interface actually consumed by scriptOrder and utilities with runtime-router, and the server federation asset contract consumed by federatedCss with server. Freeze composition/escaping/helmet helper contracts for ssr-streaming; do not wait for that shard to finish."
+      ],
+      "handoffs": [
+        "Packaging owner: packages/runtime/plugin-runtime/package.json, packages/runtime/render/package.json, packages/runtime/runtime-extensions/package.json and their export maps; send exact proposed edits without writing these shared files.",
+        "Integration owner: pnpm-lock.yaml, package cohort/release identity files, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/divergence-allowlist.json; provide identity-preserving evidence and exact patches, never increase allowances locally.",
+        "Destination source/test files in packages/runtime/runtime-extensions must receive an exact disjoint reservation before extraction writes; its shared entrypoints stay with their designated integration owner.",
+        "ssr-streaming: this shard owns src/core/server/helmet.ts, scriptOrder.ts, federatedCss.ts and utils.ts under plugin-runtime; provide signatures and behavior fixtures, accept consumer changes through the streaming owner.",
+        "Unassigned audited HTML/stream callers and shared runtime hook/type declarations remain with ownership-contract/upstream or explicitly designated owners; hand off exact caller edits instead of expanding this reservation."
+      ],
+      "verification": [
+        "Existing focused string-render, helmet and module-federation suites plus concrete Node/workerd HTML output checks.",
+        "Assert escaping, early scripts before hydration, stable hydration IDs, matched-route CSS, public assets and federated composition; preserve native router/runtime identity.",
+        "Measure complete-PR and cumulative deltas for all assigned audited identities; canonical divergence/import verification must prove both governed source edges are removed without indirection."
+      ],
+      "stop_condition": "Stop this shard's affected writes when its route exceeds the audited-file 20-line complete-PR cap, requires an unavailable upstream seam or lacks a reserved destination/interface; continue its independent read-only audit. Finish only with an exact deletion/move/retention map, no residual assigned violations or governed edges, relevant behavior evidence and complete-PR/cumulative identity deltas. Do not claim release readiness from source mocks or a prepared upstream proposal."
+    },
+    {
+      "id": "ssr-streaming",
+      "title": "Node and workerd streaming transports and templates",
+      "files": [
+        "packages/runtime/plugin-runtime/src/core/server/stream/beforeTemplate.worker.ts",
+        "packages/runtime/plugin-runtime/src/core/server/stream/createReadableStream.ts",
+        "packages/runtime/plugin-runtime/src/core/server/stream/createReadableStream.worker.ts",
+        "packages/runtime/plugin-runtime/src/core/server/stream/deferredScript.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/beforeTemplate.test.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToStream/buildTemplate.after.test.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToStream/buildTemplate.before.test.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToStream/helmet.test.tsx"
+      ],
+      "purpose": "Repair both streaming adapters, worker shell construction and deferred scripts as one semantic unit; remove both createReadableStream governed edges.",
+      "target_scope": "Own only these eight inventory identities and subsequently reserved fork-owned streaming destinations. Keep Node pipeable and workerd readable implementations in the same worker because shell markers, deferred enqueueing, error/completion semantics and template tests constrain both. Preserve meaningful platform differences.",
+      "prerequisites": [
+        "Start immediately with an independent read-only audit of these exact identities, audited-base ancestry, full eventual-PR added-plus-removed deltas, current callers and native extension points. No other shard completion is needed for this audit. Writes require only this shard's evidence-backed legal route and the specific interfaces it consumes. Fork-created behavior must move to genuinely fork-owned packages. Audited identities remain governed across moves; each complete-PR patch is capped at 20 added-plus-removed lines and each accepted non-shrink requires the same-PR ledger. If the legal behavior-preserving route needs a neutral upstream seam, prepare the handoff and wait for actual authorized upstream work; do not assume a proposal is merged.",
+        "ssr-composition interface only: escaping/redaction, helmet replacement, federated CSS and hydration ordering contracts used by the adapters and worker before-template path. Audit and adapter-local work can proceed before the whole composition shard completes.",
+        "Coordinate runtime-router deferred-data and matched-route contract, and ssr-render-rsc renderSSRStream export/runtime identity only where consumed. Existing extendStreamSSR behavior must be audited for adequacy; a new neutral hook is an actual upstream dependency if required."
+      ],
+      "handoffs": [
+        "Packaging owner: packages/runtime/plugin-runtime/package.json, packages/runtime/render/package.json, packages/runtime/runtime-extensions/package.json and their export maps; send exact proposed edits without writing these shared files.",
+        "Integration owner: pnpm-lock.yaml, package cohort/release identity files, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/divergence-allowlist.json; provide identity-preserving evidence and exact patches, never increase allowances locally.",
+        "Destination source/test files in packages/runtime/runtime-extensions must receive an exact disjoint reservation before extraction writes; its shared entrypoints stay with their designated integration owner.",
+        "ssr-composition owns shared helmet.ts, utils.ts, scriptOrder.ts and federatedCss.ts; submit exact required changes there.",
+        "Existing stream/template.ts, stream/shared.ts, Node before-template/after-template callers and hook/type declarations outside these inventory rows need a designated owner and legal route before any edits."
+      ],
+      "verification": [
+        "Run existing focused before-template, stream before/after-template and stream helmet suites on actual changed artifacts.",
+        "Exercise split shell markers and multibyte chunks, early/deferred script order, hydration stability, cancellation, late errors, all-ready behavior, CSP/escaping and exactly-once termination on both Node and native workerd.",
+        "Prove workerd output uses native supported Web Streams and valid runtime imports; no Node-only polyfill or client-only fallback. Recheck both governed edges and full-PR/cumulative audited identity deltas."
+      ],
+      "stop_condition": "Stop this shard's affected writes when its route exceeds the audited-file 20-line complete-PR cap, requires an unavailable upstream seam or lacks a reserved destination/interface; continue its independent read-only audit. Finish only with an exact deletion/move/retention map, no residual assigned violations or governed edges, relevant behavior evidence and complete-PR/cumulative identity deltas. Do not claim release readiness from source mocks or a prepared upstream proposal."
+    },
+    {
+      "id": "ssr-request-lifecycle",
+      "title": "SSR response projection and router cleanup lifetime",
+      "files": [
+        "packages/runtime/plugin-runtime/src/core/server/requestResponse.ts",
+        "packages/runtime/plugin-runtime/src/core/server/routerCleanup.ts",
+        "packages/runtime/plugin-runtime/tests/ssr/serverRender/requestHandler.test.tsx"
+      ],
+      "purpose": "Move fork-owned request/response and cleanup policy to its legal owner while preserving native response status, redirects, headers and cleanup lifetime across string and streamed responses.",
+      "target_scope": "Own only these three inventory identities and subsequently reserved fork-owned request-lifecycle destinations. Keep requestResponse and routerCleanup together because response finalization delegates body/discard/error lifetime to the cleanup contract.",
+      "prerequisites": [
+        "Start immediately with an independent read-only audit of these exact identities, audited-base ancestry, full eventual-PR added-plus-removed deltas, current callers and native extension points. No other shard completion is needed for this audit. Writes require only this shard's evidence-backed legal route and the specific interfaces it consumes. Fork-created behavior must move to genuinely fork-owned packages. Audited identities remain governed across moves; each complete-PR patch is capped at 20 added-plus-removed lines and each accepted non-shrink requires the same-PR ledger. If the legal behavior-preserving route needs a neutral upstream seam, prepare the handoff and wait for actual authorized upstream work; do not assume a proposal is merged.",
+        "runtime-router interface only: getRouterServerSnapshot/getRouterRuntimeState, native redirects and cleanup lifecycle; server owner interface only: native request-handler integration and error reporting. No dependency on completion of HTML, streaming or RSC shards.",
+        "Before caller integration, establish an existing lawful request-handler seam or the exact required upstream proposal. Request-handler tests do not prove that such a seam already exists."
+      ],
+      "handoffs": [
+        "Packaging owner: packages/runtime/plugin-runtime/package.json, packages/runtime/render/package.json, packages/runtime/runtime-extensions/package.json and their export maps; send exact proposed edits without writing these shared files.",
+        "Integration owner: pnpm-lock.yaml, package cohort/release identity files, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/divergence-allowlist.json; provide identity-preserving evidence and exact patches, never increase allowances locally.",
+        "Destination source/test files in packages/runtime/runtime-extensions must receive an exact disjoint reservation before extraction writes; its shared entrypoints stay with their designated integration owner.",
+        "packages/runtime/plugin-runtime/src/core/server/requestHandler.tsx is outside this exact inventory reservation; hand off its required caller changes to a designated integration/upstream owner with audited identity and complete-PR delta evidence.",
+        "runtime-router owner receives changes needed in router/runtime lifecycle or redirect files; server owner receives server adapter integration patches.",
+        "ssr-streaming receives response-body ownership and cancellation contract; neither worker edits the other's files."
+      ],
+      "verification": [
+        "Focused requestHandler coverage for loader and RSC redirects, null-body statuses, merged headers, router status/error projection and response discard.",
+        "Exercise cleanup exactly once after normal body exhaustion, explicit cancellation, render failure and body-reader failure, preserving original error reporting.",
+        "Use native Node/workerd request/response behavior and the same runtime identity; report extraction deletion map and canonical boundary evidence."
+      ],
+      "stop_condition": "Stop this shard's affected writes when its route exceeds the audited-file 20-line complete-PR cap, requires an unavailable upstream seam or lacks a reserved destination/interface; continue its independent read-only audit. Finish only with an exact deletion/move/retention map, no residual assigned violations or governed edges, relevant behavior evidence and complete-PR/cumulative identity deltas. Do not claim release readiness from source mocks or a prepared upstream proposal."
+    },
+    {
+      "id": "ssr-render-rsc",
+      "title": "Render/RSC stream, actions and platform artifact surface",
+      "files": [
+        "packages/runtime/render/rslib.config.mts",
+        "packages/runtime/render/src/client.ts",
+        "packages/runtime/render/src/rsc-html-stream/server.ts",
+        "packages/runtime/render/src/rsc.ts",
+        "packages/runtime/render/src/rsc.worker.ts",
+        "packages/runtime/render/src/server/rsc/csr.shared.tsx",
+        "packages/runtime/render/src/server/rsc/handle-action.ts",
+        "packages/runtime/render/src/server/rsc/rsc.worker.tsx",
+        "packages/runtime/render/src/ssr.ts",
+        "packages/runtime/render/tests/build-artifact/ssr-externals.test.ts",
+        "packages/runtime/render/tests/rsc-html-stream/server.test.ts",
+        "packages/runtime/render/tests/rsc/handle-action.test.ts",
+        "packages/runtime/render/tsconfig.json"
+      ],
+      "purpose": "Repair render-owned RSC payload/CSS injection, bounded action handling, worker runtime adapters and public artifact entrypoints together; remove the rsc-html-stream/server.ts governed edge.",
+      "target_scope": "Own only these thirteen inventory identities and subsequently reserved fork-owned render/RSC destinations. Keep thin entrypoints, rslib configuration, externalization tests and RSC implementation in one worker because build externalization and platform resolution determine React/RSC runtime identity; separating them would create artificial parallelism.",
+      "prerequisites": [
+        "Start immediately with an independent read-only audit of these exact identities, audited-base ancestry, full eventual-PR added-plus-removed deltas, current callers and native extension points. No other shard completion is needed for this audit. Writes require only this shard's evidence-backed legal route and the specific interfaces it consumes. Fork-created behavior must move to genuinely fork-owned packages. Audited identities remain governed across moves; each complete-PR patch is capped at 20 added-plus-removed lines and each accepted non-shrink requires the same-PR ledger. If the legal behavior-preserving route needs a neutral upstream seam, prepare the handoff and wait for actual authorized upstream work; do not assume a proposal is merged.",
+        "Packaging/build interface only: exact client, ssr, rsc and worker export/condition and externalization contracts. Packaging owner owns manifest/export writes; this shard owns the listed rslib.config.mts and tsconfig.json subject to their distinct legal ownership routes.",
+        "ssr-streaming needs only the renderSSRStream platform contract, not this shard's full completion. Upstream RSC injection/caller seams must be proved where required; preparation against a proposal cannot satisfy integration/release dependency."
+      ],
+      "handoffs": [
+        "Packaging owner: packages/runtime/plugin-runtime/package.json, packages/runtime/render/package.json, packages/runtime/runtime-extensions/package.json and their export maps; send exact proposed edits without writing these shared files.",
+        "Integration owner: pnpm-lock.yaml, package cohort/release identity files, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/divergence-allowlist.json; provide identity-preserving evidence and exact patches, never increase allowances locally.",
+        "Destination source/test files in packages/runtime/runtime-extensions must receive an exact disjoint reservation before extraction writes; its shared entrypoints stay with their designated integration owner.",
+        "Build/packaging owners receive export-condition and externalization requirements and exact shared manifest/lockfile patches.",
+        "Existing render server/client callers outside these thirteen inventory identities require designated ownership before edits; preserve their audited identity even if a move is proposed.",
+        "ssr-streaming receives the stable SSR stream adapter contract and actual built artifact evidence; runtime-router/server receive RSC action and response contract changes only where used."
+      ],
+      "verification": [
+        "Focused rsc-html-stream/server and handle-action suites plus build-artifact/ssr-externals verification against actual built bytes.",
+        "Assert RSC payload/CSS injection across chunk boundaries, escaping and stream finalization; action body limits, invalid UTF-8/content input, cancellation/errors and supported response behavior.",
+        "Resolve and execute client/SSR/RSC/workerd entrypoints with native React/RSC runtime identity and platform dependencies; no duplicated runtime implementation or client-only rendering workaround.",
+        "Verify the governed RSC edge is removed and report complete-PR/cumulative deltas for audited server.ts, its existing test and tsconfig.json; source tests alone cannot establish artifact identity."
+      ],
+      "stop_condition": "Stop this shard's affected writes when its route exceeds the audited-file 20-line complete-PR cap, requires an unavailable upstream seam or lacks a reserved destination/interface; continue its independent read-only audit. Finish only with an exact deletion/move/retention map, no residual assigned violations or governed edges, relevant behavior evidence and complete-PR/cumulative identity deltas. Do not claim release readiness from source mocks or a prepared upstream proposal."
+    }
+  ],
+  "notes": [
+    "Planning-only proposal. No implementation, source edits, br/git mutations, upstream submission, merge or release is authorized by this artifact.",
+    "Coverage uses the union of runtime-ssr violation identities and runtime-ssr import-edge sources: 33 unique files, each assigned once. All five import sources already occur among the 33 violations; there are zero additional import-only identities in this lane. Counts: composition 9, streaming 8, request lifecycle 3, render/RSC 13.",
+    "All four route audits can start immediately and independently. Write readiness is per shard and per real consumed seam, not a blanket lane-wide ownership-contract completion barrier. Shared helper/API contracts create targeted handoffs; final combined runtime acceptance still follows integration.",
+    "Recorded cumulative excess is not the eventual PR delta and does not grant an extra budget. The audited mainline base is eded841256a7cffdaa622e3889fc83407debd3e4; include PR49 and later edits in the eventual merge range. Retain the 20 added-plus-removed line hard cap and non-shrink ledger obligations for every audited identity, including tests and configuration.",
+    "This is a natural four-worker split, not a Node-versus-workerd split or a source-versus-tests split. Platform streaming behavior is tightly coupled; render artifact identity is tightly coupled to its entrypoints and build configuration. Independent request lifecycle work does not require either rendering implementation to finish.",
+    "After lawful extraction, package manifests, exports, lockfile, ledger, boundary allowance records and package cohort remain single-owner integration handoffs. New destinations are not implicit write permission; allocate exact files without overlapping existing runtime-extensions ownership.",
+    "Preserve Node and native workerd streaming, hydration, early-script order, runtime and complete delivery-unit identity, RSC boundaries, public assets and federation composition. No app shims, wrappers, generated edits, alias hiding, allowance resets or synthetic green tests.",
+    "Program acceptance still requires source then published-byte ERP and Tractor checks with visible Tractor UI preserved. Shared-port downstream runs remain serial unless actual supported isolated environments are available; this module split does not invent host-level runtime isolation."
+  ]
+}

@@ -1,5 +1,7 @@
 # Zero boundary debt and simpler UltraModern.js usage
 
+> Execution topology superseded by [the parallel graph](um-parallel-20260909-overview.md). This document remains the accepted scope and acceptance contract. Do not launch the old 27-plan selection.
+
 **Plan only — implementation has not started.** This program extends the previous simplification work to all historical debt and to observable improvements in everyday usage and updates. Every implementation todo is pending; execution issues are deferred. Existing historical issue `modernjs-piop` remains the canonical zero-debt milestone. No subagents, framework changes, consumer migrations, upstream submissions, merge or publication are part of this planning turn.
 
 ## Acceptance contract

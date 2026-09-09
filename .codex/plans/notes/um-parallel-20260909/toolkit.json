@@ -1,0 +1,215 @@
+{
+  "lane": "toolkit",
+  "shards": [
+    {
+      "id": "toolkit-delivery-contracts",
+      "title": "Backend federation and delivery-unit contracts",
+      "files": [
+        "packages/toolkit/utils/src/universal/backend-federation-contract/build-artifact.ts",
+        "packages/toolkit/utils/src/universal/backend-federation-contract/constants.ts",
+        "packages/toolkit/utils/src/universal/backend-federation-contract/delivery-unit.ts",
+        "packages/toolkit/utils/src/universal/backend-federation-contract/index.ts",
+        "packages/toolkit/utils/src/universal/backend-federation-contract/metadata.ts",
+        "packages/toolkit/utils/src/universal/backend-federation-contract/types.ts",
+        "packages/toolkit/utils/src/universal/backend-federation-contract/validation-core.ts",
+        "packages/toolkit/utils/src/universal/index.ts",
+        "packages/toolkit/utils/tests/backendFederationContract.test.ts",
+        "packages/toolkit/utils/tests/backendFederationContractMatrix.test.ts"
+      ],
+      "purpose": "Give build-artifact metadata, validation and complete delivery-unit identity one real fork owner; eliminate the active allowlisted universal-barrel edge and map every transitive public export and consumer.",
+      "target_scope": "Reserve only a dedicated backend-federation-contract subtree in the genuine fork contract owner selected by this route audit. Provisional physical reservation: packages/toolkit/backend-federation-contracts/src/backend-federation-contract/** and its tests/backend-federation-contract/**; package existence/name is unproved and must be reconciled to an existing narrowly responsible fork owner before source writes. Own the inventory universal barrel as the sole integration seam writer; no surface-resolution or utils build-config writes.",
+      "prerequisites": [
+        "Independent read-only route audit starts after the actual integration baseline is available; it does not wait for other toolkit shard audits.",
+        "Source writes await this shard's evidence-backed legal route and the specific native interface needed by each identity.",
+        "Freeze schema/export identity with BFF contract consumers and builder artifact consumers; only consumer integration waits for their exact accepted API handoff. Audit/extraction design proceeds independently.",
+        "Removing the barrel export waits for the verified external consumer-import migration map and a lawful <=20-line complete-PR route for that audited barrel."
+      ],
+      "handoffs": [
+        "packages/toolkit/utils/src/universal/index.ts is owned only by this shard; receive any surface-resolution or wait export edits as exact patches.",
+        "Request entrypoint removals/project-reference changes from toolkit-module-loading, sole owner of packages/toolkit/utils/rslib.config.mts and packages/toolkit/utils/tsconfig.json.",
+        "BFF/build/server/generated-surface owners receive exact canonical import/export and schema handoffs and edit their own consumers.",
+        "Single packaging/integration owner writes package manifests/exports, pnpm-lock.yaml, package cohort, FORK-DIVERGENCE.md and both boundary allowance files; submit exact proposed changes and identity/cap evidence without writing those files. Changelogs remain docs-owned."
+      ],
+      "verification": [
+        "Run existing backendFederationContract and backendFederationContractMatrix behavior against the real owner; preserve malformed-record failures, metadata validation and full delivery-unit identity across built Node/workerd-compatible imports.",
+        "Verify the old implementation is gone, the public export migration is complete, and the exact ./backend-federation-contract governed barrel edge is removed through real ownership repair.",
+        "Regenerate baseline-qualified per-identity evidence; report complete eventual-PR added-plus-removed lines against its actual PR base and cumulative hunks/lines against eded841256a7cffdaa622e3889fc83407debd3e4. Run canonical full-scope divergence and import gates through the integration owner; local checks are diagnostic, never a narrowed substitute."
+      ],
+      "stop_condition": "Stop source writes for an identity whose native seam, genuine fork owner, or complete-PR <=20-line upstream-owned patch is unproved; supply an exact neutral upstream proposal and external dependency where needed. A rename retains audited ownership. No implementation deletion without preserved behavior and replacement proof; no marker hiding, allowance reset, wrapper or facade that retains the old subsystem."
+    },
+    {
+      "id": "toolkit-surface-resolution",
+      "title": "Surface references and environment-static resolution",
+      "files": [
+        "packages/toolkit/utils/src/universal/surface-resolution/env-static-provider.ts",
+        "packages/toolkit/utils/src/universal/surface-resolution/index.ts",
+        "packages/toolkit/utils/src/universal/surface-resolution/surface-ref.ts",
+        "packages/toolkit/utils/src/universal/surface-resolution/types.ts",
+        "packages/toolkit/utils/src/universal/surface-resolution/validation.ts",
+        "packages/toolkit/utils/tests/surfaceResolutionEnvStatic.test.ts",
+        "packages/toolkit/utils/tests/surfaceResolutionRecord.test.ts",
+        "packages/toolkit/utils/tests/surfaceResolutionRef.test.ts"
+      ],
+      "purpose": "Extract surface reference parsing, record validation and environment-static provider behavior as a coherent owner, with no duplicate provider/checker copied into apps.",
+      "target_scope": "Reserve only packages/toolkit/surface-resolution/src/surface-resolution/** and tests/surface-resolution/** as a provisional distinct fork module; reconcile with an existing narrow fork owner and verify audited-base absence before edits. Do not use the delivery-contracts subtree or own shared barrels/build configs.",
+      "prerequisites": [
+        "Independent read-only route audit starts after the actual integration baseline is available; it does not wait for other toolkit shard audits.",
+        "Source writes await this shard's evidence-backed legal route and the specific native interface needed by each identity.",
+        "Freeze actual provider/reference API and the consuming runtime/server interface; only affected consumer integration waits for their seam.",
+        "If the route audit finds a real dependency on delivery-contract schemas, depend on toolkit-delivery-contracts' exact schema/export handoff, not completion of its unrelated implementation."
+      ],
+      "handoffs": [
+        "Send any packages/toolkit/utils/src/universal/index.ts export removal to toolkit-delivery-contracts.",
+        "Send packages/toolkit/utils/rslib.config.mts and packages/toolkit/utils/tsconfig.json changes to toolkit-module-loading.",
+        "Runtime/server and generated-surface owners migrate their own consumers using this shard's exact provider/record contract.",
+        "Single packaging/integration owner writes package manifests/exports, pnpm-lock.yaml, package cohort, FORK-DIVERGENCE.md and both boundary allowance files; submit exact proposed changes and identity/cap evidence without writing those files. Changelogs remain docs-owned."
+      ],
+      "verification": [
+        "Run surfaceResolutionEnvStatic, surfaceResolutionRecord and surfaceResolutionRef coverage against the real extracted owner, including invalid refs/records/environment failures and deterministic accepted resolution.",
+        "Verify browser/workerd-compatible entrypoints do not accidentally acquire Node-only resolution behavior; compare canonical reference and record identity before/after.",
+        "Regenerate baseline-qualified per-identity evidence; report complete eventual-PR added-plus-removed lines against its actual PR base and cumulative hunks/lines against eded841256a7cffdaa622e3889fc83407debd3e4. Run canonical full-scope divergence and import gates through the integration owner; local checks are diagnostic, never a narrowed substitute."
+      ],
+      "stop_condition": "Stop source writes for an identity whose native seam, genuine fork owner, or complete-PR <=20-line upstream-owned patch is unproved; supply an exact neutral upstream proposal and external dependency where needed. A rename retains audited ownership. No implementation deletion without preserved behavior and replacement proof; no marker hiding, allowance reset, wrapper or facade that retains the old subsystem."
+    },
+    {
+      "id": "toolkit-scaffold-templates",
+      "title": "Create and Sandpack template production",
+      "files": [
+        "packages/toolkit/create/rslib.config.mts",
+        "packages/toolkit/create/template/biome.json",
+        "packages/toolkit/create/template/src/routes/index.css",
+        "packages/toolkit/sandpack-react/scripts/template.mts",
+        "packages/toolkit/sandpack-react/src/templates/index.ts",
+        "packages/toolkit/sandpack-react/tsconfig.json"
+      ],
+      "purpose": "Resolve template production, starter style/config and create build-file ownership while keeping native generated entrypoints and the supported visual/application contract.",
+      "target_scope": "Reserve only template production subtrees of the approved fork generator owner: provisional packages/toolkit/ultramodern-tooling/src/template-production/** and tests/template-production/**. The existing fork generator owner/location must be confirmed; this reservation excludes general command/update/migration code owned by generated-surface lanes. Audited templates and Sandpack index retain identity even if moved.",
+      "prerequisites": [
+        "Independent read-only route audit starts after the actual integration baseline is available; it does not wait for other toolkit shard audits.",
+        "Source writes await this shard's evidence-backed legal route and the specific native interface needed by each identity.",
+        "Freeze create/Sandpack output-consumption interface with generated-surface owner; generated output changes wait only for that contract.",
+        "Determine whether scripts/template.mts is a fork subsystem or a neutral upstream generator before selecting extraction versus an upstream proposal; no generated-file hand edits."
+      ],
+      "handoffs": [
+        "Generated-surface owner receives template-generation contract and exact shared generator entrypoint changes; this shard keeps only the listed source identities and reserved template-production subtree.",
+        "Any Sandpack/create manifest, exports or build cohort edits go to packaging; generated artifacts are regenerated only through the approved owning generator.",
+        "Report the three stale create import allowances to the single gate owner for revalidation and removal; create/src/index.ts is not added to this shard's inventory ownership.",
+        "Single packaging/integration owner writes package manifests/exports, pnpm-lock.yaml, package cohort, FORK-DIVERGENCE.md and both boundary allowance files; submit exact proposed changes and identity/cap evidence without writing those files. Changelogs remain docs-owned."
+      ],
+      "verification": [
+        "Build create/Sandpack from their real source entrypoints; regenerate and compare outputs for supported templates without copying framework implementations or hiding lint/framework defects.",
+        "Check starter/template visual and native route behavior; downstream release acceptance includes Tractor when generator/runtime/tooling changes, preserving its visible UI.",
+        "Regenerate baseline-qualified per-identity evidence; report complete eventual-PR added-plus-removed lines against its actual PR base and cumulative hunks/lines against eded841256a7cffdaa622e3889fc83407debd3e4. Run canonical full-scope divergence and import gates through the integration owner; local checks are diagnostic, never a narrowed substitute."
+      ],
+      "stop_condition": "Stop source writes for an identity whose native seam, genuine fork owner, or complete-PR <=20-line upstream-owned patch is unproved; supply an exact neutral upstream proposal and external dependency where needed. A rename retains audited ownership. No implementation deletion without preserved behavior and replacement proof; no marker hiding, allowance reset, wrapper or facade that retains the old subsystem. The CSS row lowers lines from 116 to 17 but raises hunks from 1 to 2; biome lowers lines from 37 to 16 but raises hunks from 1 to 4. Neither recorded row establishes componentwise shrink or a fresh complete-PR cap allowance."
+    },
+    {
+      "id": "toolkit-lifecycle-primitives",
+      "title": "Plugin lifecycle and runtime primitive qualification",
+      "files": [
+        "packages/toolkit/plugin/tests/createConfigOptions.test.ts",
+        "packages/toolkit/plugin/tests/createFileWatcher.test.ts",
+        "packages/toolkit/plugin/tsconfig.json",
+        "packages/toolkit/runtime-utils/tests/build-artifact/async-storage-externals.test.ts",
+        "packages/toolkit/runtime-utils/tests/node/serialize.test.ts",
+        "packages/toolkit/runtime-utils/tsconfig.json",
+        "packages/toolkit/utils/src/universal/wait.ts"
+      ],
+      "purpose": "Preserve configuration hook, file-watcher, async-storage, serialization and scheduling contracts while routing additive tests/helper ownership lawfully.",
+      "target_scope": "Reserve tests/toolkit-boundary/lifecycle-primitives/** for external regressions against actual native plugin/runtime artifacts, not facade implementations. If wait is required fork behavior, reserve only src/lifecycle-primitives/wait.ts in the approved narrow fork runtime owner (provisional packages/runtime/runtime-extensions/src/lifecycle-primitives/wait.ts); do not add a catch-all toolkit utility package. Native upstream corrections use approved patches/proposals.",
+      "prerequisites": [
+        "Independent read-only route audit starts after the actual integration baseline is available; it does not wait for other toolkit shard audits.",
+        "Source writes await this shard's evidence-backed legal route and the specific native interface needed by each identity.",
+        "Identify wait's real consumers and whether an existing native timer primitive makes it redundant; source writes wait for that actual consumer-owner handoff.",
+        "Qualify existing plugin hook and runtime artifact APIs independently; any neutral upstream test/source proposal is an external landing dependency for integration, not for unrelated route audits."
+      ],
+      "handoffs": [
+        "Send wait export changes in packages/toolkit/utils/src/universal/index.ts to toolkit-delivery-contracts.",
+        "Give build/runtime owners async-storage externalization and emitted-artifact expectations; any out-of-reservation build/source fix goes to its actual owner.",
+        "This shard alone owns the listed plugin and runtime-utils tsconfig identities; manifest/cohort changes still go to packaging.",
+        "Single packaging/integration owner writes package manifests/exports, pnpm-lock.yaml, package cohort, FORK-DIVERGENCE.md and both boundary allowance files; submit exact proposed changes and identity/cap evidence without writing those files. Changelogs remain docs-owned."
+      ],
+      "verification": [
+        "Preserve createConfigOptions and createFileWatcher lifecycle coverage; verify watcher shutdown and configuration behavior against native plugin APIs.",
+        "Run serialize behavior and async-storage build-artifact tests against every actual ESM artifact; preserve request context across awaits rather than testing a mock.",
+        "If wait is moved or removed, verify its actual callers retain scheduling semantics without native API wrappers.",
+        "Regenerate baseline-qualified per-identity evidence; report complete eventual-PR added-plus-removed lines against its actual PR base and cumulative hunks/lines against eded841256a7cffdaa622e3889fc83407debd3e4. Run canonical full-scope divergence and import gates through the integration owner; local checks are diagnostic, never a narrowed substitute."
+      ],
+      "stop_condition": "Stop source writes for an identity whose native seam, genuine fork owner, or complete-PR <=20-line upstream-owned patch is unproved; supply an exact neutral upstream proposal and external dependency where needed. A rename retains audited ownership. No implementation deletion without preserved behavior and replacement proof; no marker hiding, allowance reset, wrapper or facade that retains the old subsystem."
+    },
+    {
+      "id": "toolkit-public-types",
+      "title": "Native CLI route declarations and shipped reexports",
+      "files": [
+        "packages/toolkit/types/cli/index.d.ts",
+        "packages/toolkit/types/tests/reexports.test.ts",
+        "packages/toolkit/types/tests/tsconfig.json"
+      ],
+      "purpose": "Keep CLI route declarations and published declaration resolution complete without inventing alternate native router or Effect API identities.",
+      "target_scope": "Reserve tests/toolkit-boundary/public-types/** for qualification of shipped native declarations; fork-specific declaration extensions may occupy only a types/cli-route-contract/** subtree in the actual fork owner chosen by the route audit. Do not take ownership of runtime-router source or regenerate audited CLI declarations under a new identity.",
+      "prerequisites": [
+        "Independent read-only route audit starts after the actual integration baseline is available; it does not wait for other toolkit shard audits.",
+        "Source writes await this shard's evidence-backed legal route and the specific native interface needed by each identity.",
+        "Freeze the exact route/type contract with runtime-router and builder owners; type integration waits only for their accepted native declaration seam.",
+        "Decide whether each CLI declaration delta is upstream-neutral and cap-eligible, an existing extension-point use, or requires actual upstream landing."
+      ],
+      "handoffs": [
+        "Runtime-router/build owners receive exact declaration signatures and consumer compile expectations; they own their consumer files.",
+        "Packaging owns exports/types entrypoints and project-wide package references; this shard supplies the exact shipped declaration inventory and requested patches.",
+        "Single packaging/integration owner writes package manifests/exports, pnpm-lock.yaml, package cohort, FORK-DIVERGENCE.md and both boundary allowance files; submit exact proposed changes and identity/cap evidence without writing those files. Changelogs remain docs-owned."
+      ],
+      "verification": [
+        "Run the reexports regression over actual shipped .d.ts files with NodeNext module resolution, not only source project compilation.",
+        "Compile representative supported native route declarations and preserve upstream/native package type identity; no duplicate router/Effect contract facade.",
+        "Regenerate baseline-qualified per-identity evidence; report complete eventual-PR added-plus-removed lines against its actual PR base and cumulative hunks/lines against eded841256a7cffdaa622e3889fc83407debd3e4. Run canonical full-scope divergence and import gates through the integration owner; local checks are diagnostic, never a narrowed substitute."
+      ],
+      "stop_condition": "Stop source writes for an identity whose native seam, genuine fork owner, or complete-PR <=20-line upstream-owned patch is unproved; supply an exact neutral upstream proposal and external dependency where needed. A rename retains audited ownership. No implementation deletion without preserved behavior and replacement proof; no marker hiding, allowance reset, wrapper or facade that retains the old subsystem."
+    },
+    {
+      "id": "toolkit-module-loading",
+      "title": "Module resolution and compiled utility packaging",
+      "files": [
+        "packages/toolkit/utils/compiled/js-yaml/index.js",
+        "packages/toolkit/utils/compiled/js-yaml/index.mjs",
+        "packages/toolkit/utils/rslib.config.mts",
+        "packages/toolkit/utils/src/cli/modulePath.ts",
+        "packages/toolkit/utils/src/cli/require.ts",
+        "packages/toolkit/utils/tests/alias.test.ts",
+        "packages/toolkit/utils/tests/compiledYamlExports.test.ts",
+        "packages/toolkit/utils/tsconfig.json"
+      ],
+      "purpose": "Repair CLI require/module-path/alias behavior and compiled YAML artifact contracts; coordinate the utils build and project references after extraction without becoming a generic utility owner.",
+      "target_scope": "Reserve tests/toolkit-boundary/module-loading/** for actual loader/compiled-artifact regressions. Own only listed audited utils loader/build/config identities and compiled YAML identities; fork-only loader additions, if proved necessary, get only a module-loading/** subtree in the actual fork tooling owner (provisional packages/toolkit/ultramodern-tooling/src/module-loading/**). No contract/provider implementation belongs here.",
+      "prerequisites": [
+        "Independent read-only route audit starts after the actual integration baseline is available; it does not wait for other toolkit shard audits.",
+        "Source writes await this shard's evidence-backed legal route and the specific native interface needed by each identity.",
+        "Audit modulePath/require native behavior and generated YAML provenance independently of contract/surface extraction.",
+        "Final utils rslib/tsconfig edits wait only for exact entrypoint/project-reference handoffs from toolkit-delivery-contracts and toolkit-surface-resolution; other loader route work does not wait.",
+        "Identify the actual owning YAML compilation recipe; regeneration/source correction waits for that recipe owner and its legal route, never hand-edit compiled output."
+      ],
+      "handoffs": [
+        "This shard is the sole writer for packages/toolkit/utils/rslib.config.mts and packages/toolkit/utils/tsconfig.json; other toolkit shards send exact entrypoint/reference changes.",
+        "Build lane owns any out-of-reservation compiler recipe or shared build implementation; this shard provides the artifact contract and exact requested fix.",
+        "Aliases/module-path consumers remain with their component owners; supply unchanged native resolution contract and migration data.",
+        "Single packaging/integration owner writes package manifests/exports, pnpm-lock.yaml, package cohort, FORK-DIVERGENCE.md and both boundary allowance files; submit exact proposed changes and identity/cap evidence without writing those files. Changelogs remain docs-owned."
+      ],
+      "verification": [
+        "Run alias resolution positives/negatives and native require/module-path behavior against built exports, including supported ESM/CJS identity and error paths.",
+        "Run compiledYamlExports against generated artifacts and confirm both formats expose the required native API after reproducible regeneration.",
+        "Check utils build/project references after handoffs so removing extracted entrypoints creates no missing declaration or transitive export.",
+        "Regenerate baseline-qualified per-identity evidence; report complete eventual-PR added-plus-removed lines against its actual PR base and cumulative hunks/lines against eded841256a7cffdaa622e3889fc83407debd3e4. Run canonical full-scope divergence and import gates through the integration owner; local checks are diagnostic, never a narrowed substitute."
+      ],
+      "stop_condition": "Stop source writes for an identity whose native seam, genuine fork owner, or complete-PR <=20-line upstream-owned patch is unproved; supply an exact neutral upstream proposal and external dependency where needed. A rename retains audited ownership. No implementation deletion without preserved behavior and replacement proof; no marker hiding, allowance reset, wrapper or facade that retains the old subsystem. require.ts records cumulative 36 lines versus a 16-line allowance; that 20-line excess is not proof that a proposed restoration fits the complete-PR 20-line cap. rslib records 7 hunks/14 lines versus 2/3. Recompute actual eventual-PR evidence before any patch route."
+    }
+  ],
+  "notes": [
+    "Planning reservations only; no legal source route, package creation, upstream submission or release is authorized by this artifact. Six independent route audits can begin together after baseline qualification; only real per-identity seam/route dependencies gate source writes.",
+    "Coverage is exactly 41 divergence identities plus one import-only source identity, packages/toolkit/utils/src/universal/index.ts; all 42 appear once. Existing current import edge is active allowlisted, not solved. The three stale create allowances are separate integration handoffs, not invented debt identities.",
+    "Provisional target paths provide nonoverlapping future ownership, not claims that named packages already exist or that creating them is appropriate. Reconcile each with actual narrowly responsible fork packages and reserve exact directories during its own route audit. If changed, update this ownership map before implementation; do not assign overlapping entire extension packages.",
+    "Audited base remains eded841256a7cffdaa622e3889fc83407debd3e4 and canonical scope packages. The earlier PR base 810b57d93b0fec1a6a65f051d322141a0be8a4ae does not reset when work is sharded. Measure the complete eventual merge range including PR49 and subsequent changes; cumulative inventory figures are not per-PR costs.",
+    "Every audited identity keeps its <=20 added-plus-removed full-PR limit unless using an existing extension point or real upstream PR route. Equal-count replacement/rename is non-shrink and needs same-PR ledger evidence. Genuine componentwise shrink may omit ledger ceremony; a lower line count alone is insufficient.",
+    "Moving tests can preserve lawful fork qualification only when they exercise real owning/native artifacts and leave no fork subsystem in upstream packages; neutral upstream fixes/tests may require accepted upstream work. Test deletion, wrapper facades and shifted attribution do not establish debt removal.",
+    "Native router/Effect identity, delivery-unit identity, plugin lifecycle semantics and complete shipped type/project references are acceptance constraints. Focused shard proof is followed by canonical gates and integrated Node/workerd source and exact published-byte downstream acceptance.",
+    "Source read for planning confirmed CLI Route/NestedRoute native declarations, shipped NodeNext .d.ts reexport checking, async-storage ESM artifact qualification, and the four-line wait helper; consumer graphs and exact destination ownership remain explicit audit work."
+  ]
+}

@@ -1,0 +1,273 @@
+{
+  "lane": "build",
+  "shards": [
+    {
+      "id": "build-route-assets",
+      "title": "Route compilation, asset manifests and disabled-RSC runtime",
+      "files": [
+        "packages/cli/builder/src/shared/rsc/rscDisabledClientBrowserRuntime.ts",
+        "packages/cli/builder/src/shared/rsc/rscDisabledClientEdgeRuntime.ts",
+        "packages/cli/builder/src/shared/rsc/rscDisabledClientNodeRuntime.ts",
+        "packages/cli/builder/src/shared/rsc/rscDisabledRuntime.ts",
+        "packages/cli/builder/src/shared/rsc/rscDisabledRuntimeError.ts",
+        "packages/cli/builder/src/shared/rsc/rscDisabledServerEdgeRuntime.ts",
+        "packages/cli/builder/src/shared/rsc/rscDisabledServerNodeRuntime.ts",
+        "packages/cli/builder/tests/rscDisabledRuntime.test.ts",
+        "packages/solutions/app-tools/src/builder/shared/bundlerPlugins/RouterPlugin.ts",
+        "packages/solutions/app-tools/src/plugins/analyze/getServerRoutes.ts",
+        "packages/solutions/app-tools/src/plugins/analyze/isDefaultExportFunction.ts",
+        "packages/solutions/app-tools/tests/builder/routerPlugin.test.ts"
+      ],
+      "purpose": "Keep route manifest construction, worker/server route discovery and RSC-off behavior together because they describe the same compiled route artifacts. Extract genuine additions while treating RouterPlugin and analyze helpers as audited upstream identities.",
+      "target_scope": [
+        "Prospective fork module packages/solutions/app-tools-extensions/src/route-build/ and its route-build tests/fixtures; this worker alone owns new paths in this subtree.",
+        "Prospective fork module packages/solutions/app-tools-extensions/src/route-build/rsc-disabled/ for the RSC runtime family; no runtime shims in consumer apps."
+      ],
+      "prerequisites": [
+        "Audit: none; this shard independently identifies its legal routes and required hooks.",
+        "Writes: this shard's legal-route audit; runtime-router route-manifest/native-router consumer contract only for changed artifact fields, and runtime-ssr RSC/worker entry contract only for changed runtime entry resolution. An unavailable native builder hook blocks that specific integration until a genuine upstream proposal lands, not unrelated audits."
+      ],
+      "handoffs": [
+        "Runtime-router and runtime-ssr owners receive the exact route-manifest/public-path and RSC entry contracts; share schemas or proposal patches without editing their source.",
+        "Any builder plugin registration site outside the listed source identities goes to its designated owner; no second writer or fork import introduced into an upstream caller.",
+        "Integrator owns existing and prospective package.json manifests and public export maps; provide exact proposed patches without editing those files.",
+        "Integrator owns pnpm-lock.yaml, release cohort/version metadata, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/{divergence-allowlist.json,allowlist.json}; return per-identity evidence and required patches, never shared-file writes."
+      ],
+      "verification": [
+        "Read-only audit may start immediately: regenerate owned identity/edge evidence against the selected integration head, fixed audited base eded841256a7cffdaa622e3889fc83407debd3e4 and actual complete PR merge range, including prior unmerged work. Classify fork additions versus audited identities; prove the native extension route or record the exact upstream blocker.",
+        "After later implementation authorization, run focused existing behavior tests plus the listed real-output regressions, record deletion/move/retention and complete-PR/cumulative added-plus-removed line and hunk counts, and hand integration the evidence for the full canonical divergence/import gates. Moving an audited identity never resets its cap.",
+        "Compile actual route assets for normal/automatic publicPath, hashed/unhashed assets and browser/server/worker outputs; verify RSC-disabled client/server entrypoints fail with the intended error while enabled RSC behavior remains native. Run routerPlugin and RSC tests under the new owner and relevant existing analyze tests."
+      ],
+      "stop_condition": "All 12 reserved identities have an evidence-backed legal disposition and preserved route/RSC output; unlanded upstream seam requirements remain explicit blockers. No route-manifest rewrite or consumer navigation wrapper hides a defect."
+    },
+    {
+      "id": "build-compiler-environment",
+      "title": "Compiler environment, native build options and precompression",
+      "files": [
+        "packages/cli/builder/tests/fixtures/postcss-user-config/postcss.config.cjs",
+        "packages/cli/builder/tests/postcss.test.ts",
+        "packages/cli/builder/tests/reactCompiler.test.ts",
+        "packages/cli/builder/tests/rsdoctor.test.ts",
+        "packages/cli/builder/tests/tsgo.test.ts",
+        "packages/solutions/app-tools/src/builder/shared/builderPlugins/adapterPrecompress.ts",
+        "packages/solutions/app-tools/src/config/build-environment.ts",
+        "packages/solutions/app-tools/src/config/public.ts",
+        "packages/solutions/app-tools/src/types/config/precompress.ts",
+        "packages/solutions/app-tools/tests/builder/adapterPrecompress.test.ts",
+        "packages/solutions/app-tools/tests/config/build-environment.test.ts",
+        "packages/solutions/app-tools/tests/config/public-surface-consumer.ts",
+        "packages/solutions/app-tools/tests/config/public-surface-private-create-default-consumer.ts",
+        "packages/solutions/app-tools/tests/config/public-surface-private-initial-config-consumer.ts",
+        "packages/solutions/app-tools/tests/config/public-surface-private-set-environment-consumer.ts",
+        "packages/solutions/app-tools/tests/config/tsconfig.public-surface-consumer.json",
+        "packages/solutions/app-tools/tests/config/verify-public-surface.mjs"
+      ],
+      "purpose": "Own the build-config public API, environment leases and compiler-tool resolution together with Rsbuild option regressions and precompression. They share native builder configuration and lifecycle hooks, but do not require deployment or release-envelope implementation to start.",
+      "target_scope": [
+        "Prospective fork module packages/solutions/app-tools-extensions/src/build-config/ and tests/build-config/ for environment/compiler/public-surface behavior.",
+        "Prospective fork module packages/solutions/app-tools-extensions/src/build-config/precompress/ for the Rsbuild compression plugin and its types."
+      ],
+      "prerequisites": [
+        "Audit: none; inspect native Rsbuild configuration and lifecycle extension points independently.",
+        "Writes: this shard's legal-route audit and the exact public build-config API contract needed by generated-surface consumers. Existing Rsbuild plugin/lifecycle contracts can be used immediately after local audit; no blanket dependency on build-preset-release or the complete ownership-contract lane."
+      ],
+      "handoffs": [
+        "Generated-surface owner receives public build-config import/type signatures and migration requirements; packaging integrator owns public export map edits.",
+        "build-preset-release receives option/default and environment-lifetime signatures if its composition calls them; only dependent composition waits for that interface.",
+        "Integrator owns existing and prospective package.json manifests and public export maps; provide exact proposed patches without editing those files.",
+        "Integrator owns pnpm-lock.yaml, release cohort/version metadata, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/{divergence-allowlist.json,allowlist.json}; return per-identity evidence and required patches, never shared-file writes."
+      ],
+      "verification": [
+        "Read-only audit may start immediately: regenerate owned identity/edge evidence against the selected integration head, fixed audited base eded841256a7cffdaa622e3889fc83407debd3e4 and actual complete PR merge range, including prior unmerged work. Classify fork additions versus audited identities; prove the native extension route or record the exact upstream blocker.",
+        "After later implementation authorization, run focused existing behavior tests plus the listed real-output regressions, record deletion/move/retention and complete-PR/cumulative added-plus-removed line and hunk counts, and hand integration the evidence for the full canonical divergence/import gates. Moving an audited identity never resets its cap.",
+        "Run build-environment concurrency/conflict/release tests, compiler resolution tests, positive public-type consumer and negative private-import probes, PostCSS user-config, React compiler, rsdoctor, tsgo and precompression behavior tests. Verify user Rsbuild/Rspack overrides and real compressed outputs; use separate processes for tests mutating process environment or cwd."
+      ],
+      "stop_condition": "Every assigned identity has a lawful disposition; environment leases clean up on success/failure/watch shutdown, compiler selection and user overrides remain correct, and generated consumers import only the intended public API. No config suppression masks a framework error."
+    },
+    {
+      "id": "build-cli-loading",
+      "title": "CLI startup, TypeScript loading and emitted loader artifacts",
+      "files": [
+        "packages/solutions/app-tools/bin/modern-bundle-docs.js",
+        "packages/solutions/app-tools/bin/modern.js",
+        "packages/solutions/app-tools/rslib.config.mts",
+        "packages/solutions/app-tools/src/bundleDocs.ts",
+        "packages/solutions/app-tools/src/run/index.ts",
+        "packages/solutions/app-tools/src/utils/register.ts",
+        "packages/solutions/app-tools/tests/initAppContext.test.ts",
+        "packages/solutions/app-tools/tests/rslib-template-output.test.ts",
+        "packages/solutions/app-tools/tests/utils/register-esm.test.ts",
+        "packages/solutions/app-tools/tests/utils/register.test.ts"
+      ],
+      "purpose": "Keep bin/run/register changes and app-tools rslib output in one worker because runtime loading depends on correctly emitted .mjs loaders and there must be a single writer for the build config. Audit upstream startup fixes without assuming they can be moved as new fork code.",
+      "target_scope": [
+        "Prospective fork module packages/solutions/app-tools-extensions/src/cli-loading/ and tests/cli-loading/ for genuine fork-owned loader composition.",
+        "Audited bin, run, register, bundleDocs and app-tools rslib identities keep upstream provenance; neutral fixes use upstream or demonstrably lawful capped edits."
+      ],
+      "prerequisites": [
+        "Audit: none; independently calculate complete-PR deltas for register/run/bin/rslib identities and inspect native CLI loading seams.",
+        "Writes: this shard's legal-route audit; toolkit server-tsconfig/alias resolver signature only if that call contract changes. Existing resolver behavior can be consumed without waiting for toolkit implementation."
+      ],
+      "handoffs": [
+        "build-package-output receives app-tools emitted loader/declaration artifact paths and required output contract; that worker does not edit app-tools/rslib.config.mts.",
+        "Toolkit owner receives required resolveServerTsconfig/alias behavior and exact shared-helper patch request; integrator owns scripts/prebundle changes if an output recipe needs shared updates.",
+        "Integrator owns existing and prospective package.json manifests and public export maps; provide exact proposed patches without editing those files.",
+        "Integrator owns pnpm-lock.yaml, release cohort/version metadata, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/{divergence-allowlist.json,allowlist.json}; return per-identity evidence and required patches, never shared-file writes."
+      ],
+      "verification": [
+        "Read-only audit may start immediately: regenerate owned identity/edge evidence against the selected integration head, fixed audited base eded841256a7cffdaa622e3889fc83407debd3e4 and actual complete PR merge range, including prior unmerged work. Classify fork additions versus audited identities; prove the native extension route or record the exact upstream blocker.",
+        "After later implementation authorization, run focused existing behavior tests plus the listed real-output regressions, record deletion/move/retention and complete-PR/cumulative added-plus-removed line and hunk counts, and hand integration the evidence for the full canonical divergence/import gates. Moving an audited identity never resets its cap.",
+        "Run register and register-esm, initAppContext, rslib-template-output and relevant CLI startup tests; build and execute actual CJS/ESM artifacts in type:module and CommonJS consumers with custom server tsconfig/aliases. Prove .mjs outputs have one producer and are never truncated; preserve createRequire bundling and native CLI startup."
+      ],
+      "stop_condition": "All assigned startup/output identities have legal routes and real CJS/ESM loader proof. Oversized audited startup fixes wait on their specific upstream disposition; no generated-loader edits or app bootstrap shim substitutes for the owning-layer fix."
+    },
+    {
+      "id": "build-package-output",
+      "title": "Builder and plugin declaration/output contracts",
+      "files": [
+        "packages/cli/adapter-rstest/rslib.config.mts",
+        "packages/cli/builder/rslib.config.mts",
+        "packages/cli/plugin-data-loader/tsconfig.json",
+        "packages/cli/plugin-ssg/tsconfig.json",
+        "packages/cli/plugin-styled-components/src/runtime.ts",
+        "packages/runtime/plugin-image/rslib.config.mts"
+      ],
+      "purpose": "Audit the small cross-package rslib/tsconfig/runtime-entry debt as one output-contract worker. These files control package build/declaration boundaries; splitting one worker per tiny config would create coordination overhead without independent module work.",
+      "target_scope": [
+        "Prospective fork-owned build recipe submodule packages/solutions/app-tools-extensions/build/package-output/ only where a genuine fork recipe is needed and supported by native build invocation.",
+        "Audited builder/adapter/image/plugin build configurations and styled-components runtime entry retain identity and require their individual lawful route; relocation alone is not a repair."
+      ],
+      "prerequisites": [
+        "Audit: none; independently inspect audited changes and published runtime/declaration expectations.",
+        "Writes: this shard's legal-route audit; packaging integrator public declaration/output contract only for altered exports. app-tools loader paths from build-cli-loading are needed only for combined package-output verification, not for independent audits or other plugin repairs."
+      ],
+      "handoffs": [
+        "Integrator owns scripts/prebundle/ultramodern/public-declarations.mjs and shared rslib tooling changes; provide exact requests against existing owner instead of adding parallel declaration tooling.",
+        "build-cli-loading exclusively owns packages/solutions/app-tools/rslib.config.mts; reconcile emitted output expectations through a contract handoff.",
+        "Integrator owns existing and prospective package.json manifests and public export maps; provide exact proposed patches without editing those files.",
+        "Integrator owns pnpm-lock.yaml, release cohort/version metadata, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/{divergence-allowlist.json,allowlist.json}; return per-identity evidence and required patches, never shared-file writes."
+      ],
+      "verification": [
+        "Read-only audit may start immediately: regenerate owned identity/edge evidence against the selected integration head, fixed audited base eded841256a7cffdaa622e3889fc83407debd3e4 and actual complete PR merge range, including prior unmerged work. Classify fork additions versus audited identities; prove the native extension route or record the exact upstream blocker.",
+        "After later implementation authorization, run focused existing behavior tests plus the listed real-output regressions, record deletion/move/retention and complete-PR/cumulative added-plus-removed line and hunk counts, and hand integration the evidence for the full canonical divergence/import gates. Moving an audited identity never resets its cap.",
+        "Build adapter-rstest, builder, plugin-data-loader, plugin-ssg, plugin-styled-components and plugin-image as affected; inspect emitted entrypoints/declarations and perform real consumer imports/typechecks. No declaration-error suppression, widened tsconfig exclusions or reduced test scope qualifies as repair."
+      ],
+      "stop_condition": "All six assigned audited identities have evidence-backed dispositions and valid published output contracts; existing image/styled-components runtime behavior and type consumers are preserved."
+    },
+    {
+      "id": "build-backend-artifacts",
+      "title": "Backend federation code generation and artifact emission",
+      "files": [
+        "packages/solutions/app-tools/src/plugins/backend-federation/codegen.ts",
+        "packages/solutions/app-tools/src/plugins/backend-federation/config.ts",
+        "packages/solutions/app-tools/src/plugins/backend-federation/emit.ts",
+        "packages/solutions/app-tools/src/plugins/backendFederationBuild.ts",
+        "packages/solutions/app-tools/tests/plugins/backendFederationBuild.test.ts",
+        "packages/solutions/app-tools/tests/plugins/backendFederationBuildMatrix.test.ts"
+      ],
+      "purpose": "Keep codegen, compact-config interpretation and artifact emission with their matrix tests as one cohesive pipeline. It consumes shared delivery-unit identity and server integrity contracts but can audit and extract against those stable signatures independently of deployment.",
+      "target_scope": [
+        "Prospective fork module packages/solutions/app-tools-extensions/src/backend-federation-build/ and tests/backend-federation-build/; do not split config/codegen/emit into mutually dependent writers."
+      ],
+      "prerequisites": [
+        "Audit: none; map emission hook, ownership and existing cross-package imports.",
+        "Writes: this shard's legal-route audit; toolkit delivery-unit/build-artifact schema and server/BFF backend-entry-integrity function contracts only where imports or signatures change. Existing app-tools-extensions release-identity API is reusable immediately; wait on build-preset-release only if that API actually changes."
+      ],
+      "handoffs": [
+        "Toolkit owner receives consumed delivery-unit/build-artifact symbol list and schema tests; BFF/server owner receives createBackendFederationEntryIntegrity requirements.",
+        "build-deploy-output and build-preset-release receive emitted paths, manifest/container types and complete immutable identity contract; they need the interface before consuming changed output, not this entire shard before starting.",
+        "Integrator owns existing and prospective package.json manifests and public export maps; provide exact proposed patches without editing those files.",
+        "Integrator owns pnpm-lock.yaml, release cohort/version metadata, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/{divergence-allowlist.json,allowlist.json}; return per-identity evidence and required patches, never shared-file writes."
+      ],
+      "verification": [
+        "Read-only audit may start immediately: regenerate owned identity/edge evidence against the selected integration head, fixed audited base eded841256a7cffdaa622e3889fc83407debd3e4 and actual complete PR merge range, including prior unmerged work. Classify fork additions versus audited identities; prove the native extension route or record the exact upstream blocker.",
+        "After later implementation authorization, run focused existing behavior tests plus the listed real-output regressions, record deletion/move/retention and complete-PR/cumulative added-plus-removed line and hunk counts, and hand integration the evidence for the full canonical divergence/import gates. Moving an audited identity never resets its cap.",
+        "Run backendFederationBuild and matrix tests; generate and load actual backend container/manifest artifacts, reject mismatched compact/build identities, and verify integrity metadata plus native Effect API identity. Test absent/partial backend config and Node/worker artifact distinctions."
+      ],
+      "stop_condition": "All six assigned additions/tests are in lawful fork ownership with old duplicate implementations removed and backend identity/integrity behavior proven; no indirect alias hides the old ownership edge."
+    },
+    {
+      "id": "build-deploy-output",
+      "title": "Deployment resolution, Cloudflare output and validation",
+      "files": [
+        "packages/solutions/app-tools/src/plugins/deploy/platforms/cloudflare-output-verifier/index.ts",
+        "packages/solutions/app-tools/src/plugins/deploy/utils/npmAliases.ts",
+        "packages/solutions/app-tools/tests/deploy/cloudflare-delivery-unit-profile.test.ts",
+        "packages/solutions/app-tools/tests/deploy/cloudflare-output-contract.test.ts",
+        "packages/solutions/app-tools/tests/deploy/cloudflare-output-verifier.test.ts",
+        "packages/solutions/app-tools/tests/deploy/cloudflare.test.ts",
+        "packages/solutions/app-tools/tests/deploy/npm-aliases.test.ts",
+        "packages/solutions/app-tools/tests/deploy/target.test.ts",
+        "packages/solutions/app-tools/tests/deploy/utils-resolver-referrer.test.ts",
+        "packages/solutions/app-tools/tests/deploy/utils.test.ts",
+        "packages/solutions/app-tools/tests/fixtures/cloudflare/worker-sources.ts"
+      ],
+      "purpose": "Own Cloudflare deploy tests/fixtures, the verifier forwarding file and npm alias/output resolver additions together. The dominant Cloudflare test file remains one owner because its shared fixture setup and deployment assertions are tightly coupled.",
+      "target_scope": [
+        "Prospective fork module packages/solutions/app-tools-extensions/src/deploy-output/ and tests/deploy-output/ for deployment resolution/alias behavior.",
+        "Existing packages/solutions/app-tools-extensions cloudflare-output-verifier implementation remains its owner; this worker proposes changes there only through a reservation agreed with integration, or consumes it unchanged. Move upstream-path forwarding tests to the fork test surface."
+      ],
+      "prerequisites": [
+        "Audit: none; inspect deployment hooks, existing fork verifier and retained upstream deployment implementations.",
+        "Writes: this shard's legal-route audit; backend-artifact output schema from build-backend-artifacts and release-envelope staging/identity contract from build-preset-release only for changed consumed artifacts. Audit/resolver work and unchanged-contract test relocation do not wait for either implementation."
+      ],
+      "handoffs": [
+        "build-preset-release owns release-envelope integration tests; exchange staging path/profile contracts without sharing test-file writes.",
+        "Deployment implementations outside the listed inventory paths, including existing fork verifier submodules, require explicit reservation or an exact patch handoff to their current owner before any write.",
+        "Integrator owns existing and prospective package.json manifests and public export maps; provide exact proposed patches without editing those files.",
+        "Integrator owns pnpm-lock.yaml, release cohort/version metadata, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/{divergence-allowlist.json,allowlist.json}; return per-identity evidence and required patches, never shared-file writes."
+      ],
+      "verification": [
+        "Read-only audit may start immediately: regenerate owned identity/edge evidence against the selected integration head, fixed audited base eded841256a7cffdaa622e3889fc83407debd3e4 and actual complete PR merge range, including prior unmerged work. Classify fork additions versus audited identities; prove the native extension route or record the exact upstream blocker.",
+        "After later implementation authorization, run focused existing behavior tests plus the listed real-output regressions, record deletion/move/retention and complete-PR/cumulative added-plus-removed line and hunk counts, and hand integration the evidence for the full canonical divergence/import gates. Moving an audited identity never resets its cap.",
+        "Run Cloudflare output verifier/contract/profile, deploy target, npm aliases and ESM referrer/resolver tests. Build actual workerd-compatible output, validate both positive and malformed artifacts, preserve complete delivery-unit identity, and execute Node/workerd checks through the central downstream acceptance owner. Do not parallelize shared-port ERP/Tractor drivers on this host."
+      ],
+      "stop_condition": "All 11 assigned paths have legal ownership and preserved deployment/output behavior with actual artifact proof; no app deployment config suppression, generated output patch or duplicate validator hides a failure."
+    },
+    {
+      "id": "build-preset-release",
+      "title": "Native preset composition and release-envelope integration",
+      "files": [
+        "packages/solutions/app-tools/src/index.ts",
+        "packages/solutions/app-tools/src/plugins/ultramodernReleaseEnvelope.ts",
+        "packages/solutions/app-tools/src/presetUltramodern.ts",
+        "packages/solutions/app-tools/tests/index.test.ts",
+        "packages/solutions/app-tools/tests/presetUltramodern.test.ts",
+        "packages/solutions/app-tools/tests/ultramodern-release-envelope-integration.test.ts",
+        "packages/solutions/app-tools/tests/ultramodern-release-envelope.test.ts",
+        "packages/solutions/app-tools/tests/ultramodern-release-identity.test.ts"
+      ],
+      "purpose": "Own the import-only app-tools entrypoint together with preset forwarding/composition and release integration tests so the sole governed build edge is removed through the fork entrypoint. Keep release identity/envelope behavior in its existing fork owner and remove duplicated upstream wrappers.",
+      "target_scope": [
+        "Prospective fork module packages/solutions/app-tools-extensions/src/native-composition/ and tests/native-composition/ for preset/native CLI plugin composition.",
+        "Existing release-identity and release-envelope fork submodules are consumed through their public contracts; any required changes are reserved with integration before writing."
+      ],
+      "prerequisites": [
+        "Audit: none; independently prove removal of packages/solutions/app-tools/src/index.ts -> ./presetUltramodern without losing native composition.",
+        "Writes: this shard's legal-route audit; exact required build-config option signatures, backend artifact identity/schema and deployment resolveDeployTarget/staging contracts. Only call sites consuming changed contracts wait for their respective handoffs; existing stable signatures permit independent work."
+      ],
+      "handoffs": [
+        "Integrator owns the fork public entrypoint/export map and removes the active ./presetUltramodern allowance plus stale ./plugins/ultramodernReleaseEnvelope allowance only after real repairs.",
+        "Generated-surface/native-usage owners receive the native fork composition imports and supported options; BFF owner receives release-envelope integration plugin fixture needs.",
+        "build-deploy-output owns Cloudflare deployment tests; this shard owns ultramodern-release-envelope-integration.test.ts and related release tests, preventing fixture/write overlap.",
+        "Integrator owns existing and prospective package.json manifests and public export maps; provide exact proposed patches without editing those files.",
+        "Integrator owns pnpm-lock.yaml, release cohort/version metadata, FORK-DIVERGENCE.md and scripts/ultramodern-boundary-check/{divergence-allowlist.json,allowlist.json}; return per-identity evidence and required patches, never shared-file writes."
+      ],
+      "verification": [
+        "Read-only audit may start immediately: regenerate owned identity/edge evidence against the selected integration head, fixed audited base eded841256a7cffdaa622e3889fc83407debd3e4 and actual complete PR merge range, including prior unmerged work. Classify fork additions versus audited identities; prove the native extension route or record the exact upstream blocker.",
+        "After later implementation authorization, run focused existing behavior tests plus the listed real-output regressions, record deletion/move/retention and complete-PR/cumulative added-plus-removed line and hunk counts, and hand integration the evidence for the full canonical divergence/import gates. Moving an audited identity never resets its cap.",
+        "Run presetUltramodern, index, release identity/envelope and envelope integration tests against the genuine fork entrypoint. Verify user override precedence, endpoint-driven telemetry defaults, MF types/SSR behavior and identical browser/SSR/API/backend delivery-unit identity. Confirm canonical import scan finds no remaining governed app-tools preset edge, including hidden re-exports."
+      ],
+      "stop_condition": "All reserved paths, including the one import-only identity, have legal disposition; native composition and release integration tests pass and the governed edge is actually removed. No app config wrapper or import-marker renaming is accepted."
+    }
+  ],
+  "notes": [
+    "Planning-only partition of the recorded 69 build divergence rows plus one distinct import-only source identity: 70 exact paths, each assigned once. Inventory is a reservation, not proof that a legal patch is available. No implementation, git, br or upstream action is authorized by this artifact.",
+    "All seven per-shard read-only legal-route audits are immediately launchable. Later implementation requires authorization plus only the local audit and actual consumed contracts. Do not serialize every shard behind a global ownership freeze or another shard's completed implementation.",
+    "Fork-created additions move into genuinely fork-owned modules and lose the old implementations; existing audited identities remain governed across renames. Respect complete-PR <=20 added-plus-removed lines per audited file and same-PR ledger for non-shrinks. Required upstream landings are precise external blockers, never reasons to raise budgets or narrow scope.",
+    "Target subtrees are prospective exclusive reservations, not a claim that new modules are needed where an existing fork API already satisfies the requirement. Shared existing app-tools-extensions release-identity, release-envelope and Cloudflare verifier modules require explicit reservation/handoff before changing; no duplicate implementation should be invented.",
+    "True coupling: route compilation owns its RSC entry family; CLI loading owns app-tools rslib because loader emission and startup are inseparable; backend config/codegen/emit stays one pipeline; the large Cloudflare fixture/test module stays one writer. Other contracts are interface handoffs and do not impose whole-lane barriers.",
+    "Seven workers are justified by distinct artifact owners, not equal file counts. Package-output groups the small declaration/configuration residue; splitting each config further would be artificial. No shared manifests, lockfile, cohort or ledger writes belong to these workers.",
+    "Focused evidence is a handoff, not a substitute for the integrator's complete canonical gates and exact source/published downstream acceptance. Preserve Tractor UI; actual ERP/Tractor drivers with shared ports run serially unless supported environments are genuinely isolated. No framework configuration suppressions or upstream-cap workarounds."
+  ]
+}

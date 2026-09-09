@@ -1,0 +1,218 @@
+{
+  "configured_max_threads": 50,
+  "configured_max_depth": 3,
+  "active_leaf_worker_cap": 40,
+  "reserved_capacity": 10,
+  "workers_must_be_leaves": true,
+  "node_count": 127,
+  "task_count": 338,
+  "edge_count": 266,
+  "independent_roots": [
+    "cw-journeys",
+    "cw-artifact-contract",
+    "cw-metrics",
+    "cw-historical-fixtures",
+    "cw-retirement-contract",
+    "gate-baseline-freeze"
+  ],
+  "audit_nodes": 45,
+  "component_source_workers": 39,
+  "initial_inventory_identities": 447,
+  "dag_maximum_antichain": 55,
+  "structural_longest_path_nodes": 12,
+  "old_unit_layer_widths": [2, 1, 12, 3, 1, 1, 1, 1, 2, 1, 1, 1],
+  "capped_unit_simulation": [
+    {
+      "ready_count": 6,
+      "active_count": 6,
+      "nodes": [
+        "gate-baseline-freeze",
+        "cw-journeys",
+        "cw-artifact-contract",
+        "cw-historical-fixtures",
+        "cw-retirement-contract",
+        "cw-metrics"
+      ]
+    },
+    {
+      "ready_count": 50,
+      "active_count": 40,
+      "nodes": [
+        "gate-shared-service",
+        "cw-update-contract",
+        "gate-acceptance-contract",
+        "audit-bff-cli",
+        "audit-bff-client-generation",
+        "audit-bff-effect-runtime",
+        "audit-bff-policy-adapters",
+        "audit-bff-request",
+        "audit-browser-debugger",
+        "audit-build-backend-artifacts",
+        "audit-build-cli-loading",
+        "audit-build-compiler-environment",
+        "audit-build-deploy-output",
+        "audit-build-package-output",
+        "audit-build-preset-release",
+        "audit-build-route-assets",
+        "audit-cli-rsc-harness",
+        "audit-context-head",
+        "audit-docs-auth-example",
+        "audit-docs-framework-guides",
+        "audit-docs-site",
+        "audit-federation-surfaces",
+        "audit-localization-cli-server",
+        "audit-localization-detection",
+        "audit-localization-navigation",
+        "audit-localization-providers",
+        "audit-router-realms-prefetch",
+        "audit-server-compiler",
+        "audit-server-lifecycle",
+        "audit-server-request-contracts",
+        "audit-server-static",
+        "audit-ssr-browser-proofs",
+        "audit-ssr-composition",
+        "audit-ssr-render-rsc",
+        "audit-ssr-request-lifecycle",
+        "audit-ssr-streaming",
+        "audit-toolkit-delivery-contracts",
+        "audit-toolkit-lifecycle-primitives",
+        "audit-toolkit-module-loading",
+        "audit-toolkit-public-types"
+      ]
+    },
+    {
+      "ready_count": 53,
+      "active_count": 40,
+      "nodes": [
+        "cw-legacy",
+        "audit-toolkit-scaffold-templates",
+        "audit-toolkit-surface-resolution",
+        "cw-generator",
+        "cw-native",
+        "cw-projection-fixtures",
+        "cw-transaction",
+        "cw-transition-fixtures",
+        "audit-docs-generated-changelogs",
+        "audit-packaging-cli-evidence",
+        "audit-packaging-docs-evidence",
+        "audit-packaging-runtime-evidence",
+        "audit-packaging-server-evidence",
+        "audit-packaging-toolkit-evidence",
+        "gate-checker-preparation",
+        "gate-receipt-fixtures",
+        "repair-bff-cli",
+        "repair-bff-client-generation",
+        "repair-bff-effect-runtime",
+        "repair-bff-policy-adapters",
+        "repair-bff-request",
+        "repair-browser-debugger",
+        "repair-build-backend-artifacts",
+        "repair-build-cli-loading",
+        "repair-build-compiler-environment",
+        "repair-build-deploy-output",
+        "repair-build-package-output",
+        "repair-build-preset-release",
+        "repair-build-route-assets",
+        "repair-cli-rsc-harness",
+        "repair-context-head",
+        "repair-docs-auth-example",
+        "repair-docs-framework-guides",
+        "repair-docs-site",
+        "repair-federation-surfaces",
+        "repair-localization-cli-server",
+        "repair-localization-detection",
+        "repair-localization-navigation",
+        "repair-localization-providers",
+        "repair-router-realms-prefetch"
+      ]
+    },
+    {
+      "ready_count": 17,
+      "active_count": 17,
+      "nodes": [
+        "cw-retirement-resolution",
+        "repair-server-compiler",
+        "repair-server-lifecycle",
+        "repair-server-request-contracts",
+        "repair-server-static",
+        "repair-ssr-browser-proofs",
+        "repair-ssr-composition",
+        "repair-ssr-render-rsc",
+        "repair-ssr-request-lifecycle",
+        "repair-ssr-streaming",
+        "repair-toolkit-delivery-contracts",
+        "repair-toolkit-lifecycle-primitives",
+        "repair-toolkit-module-loading",
+        "repair-toolkit-public-types",
+        "repair-toolkit-scaffold-templates",
+        "repair-toolkit-surface-resolution",
+        "cw-projection-proof"
+      ]
+    },
+    {
+      "ready_count": 1,
+      "active_count": 1,
+      "nodes": ["gate-source-assembly"]
+    },
+    {
+      "ready_count": 1,
+      "active_count": 1,
+      "nodes": ["gate-final-zero"]
+    },
+    {
+      "ready_count": 13,
+      "active_count": 13,
+      "nodes": [
+        "verify-component-bff",
+        "verify-component-build",
+        "verify-component-docs",
+        "verify-component-localization",
+        "verify-component-runtime-router",
+        "verify-component-runtime-ssr",
+        "verify-component-server",
+        "verify-component-toolkit",
+        "verify-generator",
+        "verify-platform-runtime",
+        "verify-publish-tooling",
+        "verify-style-ledger",
+        "verify-types-exports"
+      ]
+    },
+    {
+      "ready_count": 1,
+      "active_count": 1,
+      "nodes": ["gate-candidate-freeze"]
+    },
+    {
+      "ready_count": 3,
+      "active_count": 3,
+      "nodes": [
+        "gate-source-erp",
+        "gate-source-tractor",
+        "gate-update-acceptance"
+      ]
+    },
+    {
+      "ready_count": 1,
+      "active_count": 1,
+      "nodes": ["gate-publication"]
+    },
+    {
+      "ready_count": 3,
+      "active_count": 3,
+      "nodes": [
+        "gate-published-erp",
+        "gate-published-tractor",
+        "gate-published-update"
+      ]
+    },
+    {
+      "ready_count": 1,
+      "active_count": 1,
+      "nodes": ["gate-closeout"]
+    }
+  ],
+  "simulated_max_active": 40,
+  "concurrent_literal_source_collisions": [],
+  "limits": "Structural readiness only; no duration/speedup claim. Source writes require actual accepted local routes, interface delivery and exact new-destination grants. Host locks and external upstream dependencies may reduce the real frontier."
+}

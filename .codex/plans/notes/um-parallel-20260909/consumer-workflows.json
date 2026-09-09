@@ -1,0 +1,377 @@
+{
+  "nodes": [
+    {
+      "id": "cw-journeys",
+      "title": "Freeze native consumer journeys and success criteria",
+      "mode": "read-only evidence; independently launchable after execution authorization",
+      "source_plans": ["um-zero-20260909-user-workflows"],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/consumer-journeys.json (reserved evidence output)",
+        "docs/ultramodern-api-tooling.md (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/tooling-command-catalog.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands.ts (read)"
+      ],
+      "purpose": "Record existing public create, install, add-vertical, add-shell, API, format, check, build, delivery-unit, Node/workerd, update and rollback commands for shell-only, API, headless, multiple-shell and customized consumers. Separate upstream framework refresh from consumer cohort update.",
+      "dependencies": [],
+      "output": "Version/ref-qualified journey matrix: one documented existing update entry; dependencies+lockfile+narrow release identity only for same-contract changes; zero manual source/config repair; zero copied runtime/checker implementations. Preserve native Effect identity, TanStack, React/Tailwind/i18n, independent delivery units and consumer business/topology choices.",
+      "verification": "Replay current help/dispatch and record exact commands and starting identities in disposable fixtures. Do not claim future behavior or percentage savings.",
+      "stop_condition": "Any command requiring hidden setup or lacking an identified native primitive is recorded as a concrete gap before its success contract is frozen.",
+      "out_of_scope": "No source edits, live consumer writes, new public command facade, release or blanket ownership-contract dependency."
+    },
+    {
+      "id": "cw-artifact-contract",
+      "title": "Classify generated artifacts and freeze the shared projection interface",
+      "mode": "read-only evidence and interface proposal; independent root",
+      "source_plans": [
+        "um-zero-20260909-generated-surface",
+        "um-zero-20260909-user-workflows"
+      ],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/consumer-artifact-contract.json (reserved evidence output)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/write-workspace.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/write-app.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/app-files.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/workspace-scripts.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/tooling-command-catalog.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/config.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-build-identity.ts (read)"
+      ],
+      "purpose": "Inventory fresh/add-shell/add-vertical/migrate outputs as authored business source, necessary native wrapper, contract data or copied implementation. Reuse PR49 normalizeWorkspaceInputs, command catalog, packaged microvertical-api and code-tools. Specify the minimal release identity data and stable projection APIs before source owners diverge.",
+      "dependencies": [],
+      "output": "Exact path-by-path artifact classification; owned field and unknown-field preservation contract; stable generator/update leaf signatures; runtime/package API handoff requests with named legal owner and required symbol. No new persisted master configuration or registry of internal functions.",
+      "verification": "Compare all four producers and five consumer shapes, including raw/unknown metadata, live ports, empty references, additive shells and complete delivery-unit identity. Verify actual current source rather than trusting PR49 counts.",
+      "stop_condition": "Unresolved package destination or upstream-owned identity is a named local source blocker; it does not block unrelated evidence or fixture preparation.",
+      "out_of_scope": "No framework source writes, manifest/exports/cohort/lockfile/ledger writes, implementation retirement or arbitrary consumer-tree inference."
+    },
+    {
+      "id": "cw-metrics",
+      "title": "Capture reproducible consumer cost and code-size baselines",
+      "mode": "read-only measurements in private fixtures; independent root",
+      "source_plans": ["um-zero-20260909-user-workflows"],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/consumer-metrics-baseline.json (reserved evidence output)",
+        ".codex/plans/notes/um-parallel-20260909/consumer-metrics-method.md (reserved evidence output)"
+      ],
+      "purpose": "Measure command count, manual interventions, generated artifacts and wrappers, exact changed files, duplicate validation executions, implementation/test/total LOC and time/RSS. Keep removal distinct from movement and test growth.",
+      "dependencies": [],
+      "output": "Raw samples and measurement recipe bound to source, hardware/toolchain, command and fixture identity; baseline and comparison schema for later parity/transition proofs.",
+      "verification": "Use repeated comparable runs where timing warrants it, preserve raw measurements, and mark unavailable values explicitly. Record existing install/bootstrap/format behavior without changing it.",
+      "stop_condition": "Noncomparable measurements or concurrent resource interference invalidate a sample; defer only the affected measurement.",
+      "out_of_scope": "No benchmark-driven source tuning, fabricated savings, common mutable runtime resources or live consumer mutation."
+    },
+    {
+      "id": "cw-historical-fixtures",
+      "title": "Collect real historical cohorts and customized migration fixtures",
+      "mode": "read-only artifact/consumer evidence and private fixture preparation; independent root",
+      "source_plans": [
+        "um-zero-20260909-legacy-migrations",
+        "um-zero-20260909-update-transaction",
+        "um-zero-20260909-retirement"
+      ],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/consumer-historical-cohorts.json (reserved evidence output)",
+        ".codex/plans/notes/um-parallel-20260909/consumer-fixtures/ (reserved private fixture definitions and hashes only)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/api-artifact-hashes.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership.ts (read)",
+        "packages/toolkit/ultramodern-create/tests/migrate-consumer-config-preservation.test.ts (read)",
+        "packages/toolkit/ultramodern-create/tests/migrate-io-security.test.ts (read)"
+      ],
+      "purpose": "Identify actual published old cohorts and customized OntOS-style consumer obligations, including historical validators, then define current/next candidate fixture requirements. Freeze the migration floor from versioned schema/API and packed-byte evidence, never age or assumed absence of users.",
+      "dependencies": [],
+      "output": "Exact old artifact versions/integrities and immutable fixture hashes; ownership/conflict expectations for custom ports, shells, TS/MF/Modern configs, scripts, patches, newer package-manager settings, reference repositories, symlinks and nested external bridges. Current and next candidates remain explicit external inputs until produced.",
+      "verification": "Each supported transition has an actual old cohort and native expected target; fixture copies preserve source bytes and link relationships. Record whether external bridges are coordinated or must fail before promotion.",
+      "stop_condition": "Missing artifacts or uncertain external ownership produce unsupported/conflict rows, not guessed replacements. Never reuse another agent's live registry, cache, candidate or consumer worktree.",
+      "out_of_scope": "No live OntOS/Tractor updates, synthetic version relabeling, source-format ownership guesses or guessed migration floor."
+    },
+    {
+      "id": "cw-retirement-contract",
+      "title": "Decide each compatibility path from consumer obligations",
+      "mode": "read-only decision evidence; independent root",
+      "source_plans": [
+        "um-zero-20260909-retirement",
+        "um-zero-20260909-legacy-migrations"
+      ],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/consumer-retirement-decisions.json (reserved evidence output)",
+        "packages/runtime/plugin-runtime/src/router/runtime/provider.ts (read)",
+        "packages/runtime/plugin-runtime/src/cli/ssr/index.ts (read)",
+        "packages/runtime/plugin-tanstack/src/runtime/router.ts (read)",
+        "packages/runtime/plugin-tanstack/src/runtime/register.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/policy.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/pnpm-policy.ts (read)",
+        "scripts/ultramodern-publish/release-age-exceptions-2026-08-10.json (read)"
+      ],
+      "purpose": "Refresh modernjs-gt5t and modernjs-jle1 decisions for v2 registry reads, marker SSR discovery, published-wrapper/localDefault fallback and emergency-age recognition. Inventory evidence now; supported floor is rechecked before any deletion.",
+      "dependencies": [],
+      "output": "Every path receives retain-current-contract, retire-if-proven, or unresolved-external-obligation disposition with owner, tests and exact missing evidence. Retained required behavior still needs lawful boundary ownership. Optional emergency-age retirement remains separate from mandatory zero-debt repair.",
+      "verification": "Retirement requires exact realm-aware and explicit MF SSR coverage across packed supported wrappers and Node/workerd; empty approvals do not prove historical recognition dead. Preserve 1440-minute third-party floor, authenticated first-party exemption and current emergency contract without an explicit policy decision.",
+      "stop_condition": "Missing support-floor proof means retain/defer the optional deletion; do not serialize unrelated repairs or infer approval from elapsed time.",
+      "out_of_scope": "No runtime/policy edits, extra compatibility toggle, app aliases or approval request on behalf of another owner."
+    },
+    {
+      "id": "cw-update-contract",
+      "title": "Freeze update classification and transaction handoff contracts",
+      "mode": "read-only contract design after bounded evidence inputs",
+      "source_plans": [
+        "um-zero-20260909-update-transaction",
+        "um-zero-20260909-legacy-migrations",
+        "um-zero-20260909-generated-surface"
+      ],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/consumer-update-contract.json (reserved evidence output)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/io.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/install.ts (read)",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/api-artifact-migration.ts (read)"
+      ],
+      "purpose": "Define versioned same-contract versus breaking-schema/API classification, exact dependency/lock/narrow-identity allowlist, structured change/preserve/conflict result and existing MigrationIo staging/promotion semantics. Freeze a stable leaf transformation interface so transaction and legacy source owners can work independently.",
+      "dependencies": [
+        "cw-journeys",
+        "cw-artifact-contract",
+        "cw-historical-fixtures"
+      ],
+      "output": "Reviewable schema and signatures for existing CLI/transaction/leaf boundaries, no second transaction engine. Include installation/check failure, interruption/retry, Git/index/symlink snapshot rules and distinct analyzer/runtime/ownership/network errors; reserve orchestrator writes exclusively to cw-transaction.",
+      "verification": "Walk success, no-op, dry-run, preflight conflict, validation failure, install failure and interrupt states against byte-preservation requirements. Record which source APIs are already usable and which require generator/package handoff.",
+      "stop_condition": "A mere proposed signature cannot authorize source that calls an absent package API. Any unresolved prerequisite names the exact symbol/provider and blocks only the dependent edit.",
+      "out_of_scope": "No CLI alias, doctor/governance system, broad application reconstruction or source implementation."
+    },
+    {
+      "id": "cw-generator",
+      "title": "Implement minimal generation through one projection owner",
+      "mode": "source implementation after local legal API and projection contracts",
+      "source_plans": [
+        "um-zero-20260909-generated-surface",
+        "um-zero-20260909-native-usage"
+      ],
+      "files": [
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/config.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/write-workspace.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/write-app.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/app-files.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/workspace-scripts.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/workspace-script-plan.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/tooling-command-catalog.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/add-shell.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/add-vertical/execute.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/add-vertical/shell-files.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/delivery-unit-stamp.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/api.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/module-federation/config.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-build-identity.ts",
+        "packages/toolkit/ultramodern-create/templates/workspace-scripts/validate-ultramodern-workspace.mjs.handlebars",
+        "packages/toolkit/ultramodern-create/templates/workspace-scripts/generate-public-surface-assets.mjs",
+        "packages/toolkit/ultramodern-create/templates/workspace-scripts/generate-node-backend-federation.mjs",
+        "packages/toolkit/ultramodern-create/templates/workspace-scripts/check-ultramodern-i18n-boundaries.mts",
+        "packages/toolkit/ultramodern-create/templates/workspace-scripts/ultramodern-typecheck.mjs",
+        "packages/toolkit/ultramodern-create/templates/packages/effect-bff-runtime.ts",
+        "packages/toolkit/ultramodern-create/templates/packages/shared-contracts-index.ts"
+      ],
+      "purpose": "Single owner for shared fresh/add/migrate projection files, catalog, release identity projection and template deletions. Replace only inventoried copied implementation with minimal native entries/data referencing stable versioned fork package APIs; do not recreate PR49 or move copies between app directories.",
+      "dependencies": [
+        "cw-artifact-contract",
+        "cw-journeys",
+        "external fact: cw-artifact-contract's exact fork package API signatures exist and their local legal ownership route is accepted; only affected edits wait for unavailable provider APIs"
+      ],
+      "output": "Bounded generator patch and exact interface handoff; generated runtime/checker copies eliminated, unknown/raw fields and authored topology preserved. Any extra file discovered by inventory requires an explicit exact reservation before editing. New packaged implementation is delivered by its existing component owner, not inserted into an upstream package.",
+      "verification": "Focused generator, add-shell/add-vertical, normalization, catalog and identity tests; record actual remaining artifact counts and a strict reduction in avoidable consumer implementation. Full cross-producer proof belongs to cw-projection-proof.",
+      "stop_condition": "Absent lawful package destination, changed shared signature or unknown artifact classification stops only that change until the graph/reservation is amended.",
+      "out_of_scope": "No migration orchestrator/io/cohort/legacy-leaf changes, package manifests/exports/lockfile/ledger writes, direct generated-output edits, new DSL or app wrappers."
+    },
+    {
+      "id": "cw-transaction",
+      "title": "Implement same-contract updates and atomic existing transaction behavior",
+      "mode": "source implementation behind frozen contract; runs beside generator and legacy leaves when APIs already exist",
+      "source_plans": [
+        "um-zero-20260909-update-transaction",
+        "um-zero-20260909-native-usage"
+      ],
+      "files": [
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/io.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/install.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/package-source.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/same-contract.ts (reserved new narrow classifier only if existing module cannot hold it)",
+        "packages/toolkit/ultramodern-create/tests/migrate-dependency-cohort.test.ts",
+        "packages/toolkit/ultramodern-create/tests/migrate-idempotence.test.ts",
+        "packages/toolkit/ultramodern-create/tests/migrate-io-security.test.ts"
+      ],
+      "purpose": "Own all updater orchestration, MigrationIo, installation and consumer cohort edits. Select same-contract path from versioned evidence; limit its write set to dependency fields, package-manager lock and frozen narrow release identity data. Integrate legacy leaf handoffs without transferring orchestrator ownership.",
+      "dependencies": [
+        "cw-update-contract",
+        "external fact: any new generator identity reader invoked by this patch has actually been delivered by cw-generator; independent transaction safety edits need only the frozen existing MigrationIo interface"
+      ],
+      "output": "Existing public command with structured dry-run/change/preserve/conflict behavior, complete atomic stage/check/install/promote/rollback and interrupted retry; repeat application no-op. Consumer TS/JS, deployment config, topology, scripts, patches and compatible newer package manager settings remain byte-for-byte unchanged for same-contract success.",
+      "verification": "Meaningful unit/injection proofs for every mutation boundary, install/check failure and interruption; snapshot bytes/modes/symlinks, Git metadata and index before/after; no shared mutable test roots. Real tarball proof remains downstream.",
+      "stop_condition": "Any same-contract source/config diff or incomplete rollback is a defect; do not relabel it as migration or accept manual repair.",
+      "out_of_scope": "No hand-edited repository lockfile, generator/catalog/template writes, independent second updater or legacy transformation edits."
+    },
+    {
+      "id": "cw-legacy",
+      "title": "Implement exact one-time native schema and API transformations",
+      "mode": "source implementation for migration leaves after contracts; parallel with transaction owner",
+      "source_plans": [
+        "um-zero-20260909-legacy-migrations",
+        "um-zero-20260909-generated-surface",
+        "um-zero-20260909-retirement"
+      ],
+      "files": [
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/api-artifact-migration.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/api-artifact-hashes.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/api-metadata.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-modern-configs.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-typescript.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-backend-federation.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-zerops.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-removal.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-ui-source.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/generated-patches.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/shared-api-infrastructure.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/react-router-retirement.ts",
+        "packages/toolkit/ultramodern-create/tests/shared-api-migration.test.ts",
+        "packages/toolkit/ultramodern-create/tests/migrate-consumer-config-preservation.test.ts",
+        "packages/toolkit/ultramodern-create/tests/migrate-react-router.test.ts"
+      ],
+      "purpose": "Reuse historical recognizers and scope guards for each proven supported schema/API transition. Replace recognized owned code with native imports; preserve authored source and reject unknown/custom baselines before promotion. Provide leaf invocation patches to cw-transaction, never edit its orchestrator.",
+      "dependencies": [
+        "cw-update-contract",
+        "cw-historical-fixtures",
+        "external fact: exact native target APIs required by each transformation are implemented by their legal component owners; absent APIs block only that transformation"
+      ],
+      "output": "Version-bounded transformations and ownership/conflict receipts including old validators, explicit native MF SSR where contract requires it, nested bridge coordination and historical configuration preservation. No migration of arbitrary reference repositories.",
+      "verification": "Focused historical packed fixtures verify owned/custom baseline distinction, raw metadata, custom scripts/config/patches, symlinks, preflight conflicts, dry-run and repeated application. Transaction-integration and actual old\u2192current\u2192next acceptance remain cw-transition-proof.",
+      "stop_condition": "Unknown ownership, external bridge outside coordinated scope or unsupported version causes actionable atomic preflight failure; do not add compatibility wrappers.",
+      "out_of_scope": "No source/config changes in same-contract path, generator shared files/build identity writer, MigrationIo/orchestrator/cohort ownership, live application edits or global-hook bypass."
+    },
+    {
+      "id": "cw-native",
+      "title": "Write executable native user guidance and minimal examples",
+      "mode": "documentation and fixture source after public contracts; parallel with framework source implementation",
+      "source_plans": [
+        "um-zero-20260909-native-usage",
+        "um-zero-20260909-user-workflows"
+      ],
+      "files": [
+        "docs/ultramodern-api-tooling.md",
+        "docs/ultramodern-native-workflows.md (reserved new fork-owned public guide)",
+        "skills/README.md",
+        "skills/modernjs-feature-enable/SKILL.md",
+        "skills/modernjs-feature-enable/references/enable-bff.md",
+        "skills/modernjs-migrate-to-v3/SKILL.md",
+        "skills/modernjs-migrate-to-v3/references/migrate-entry.md",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/help.ts",
+        "packages/toolkit/ultramodern-create/tests/fixtures/native-workflows/ (reserved narrow authored example inputs, not generated outputs)"
+      ],
+      "purpose": "Align create/add/update/format/check/build/delivery-unit instructions with actual dispatch/catalog metadata. Show direct native Effect APIs, TanStack Link/search/navigation, localized routes, thin shells, headless verticals and Node/workerd. Explain genuine migrations and actionable conflicts with minimum user steps.",
+      "dependencies": [
+        "cw-journeys",
+        "cw-artifact-contract",
+        "cw-update-contract"
+      ],
+      "output": "User-facing content, migration help and executable example inputs; exact catalog/dispatch change requests delivered to their sole owners. Replace obsolete API guidance directly. Generate skill mirrors with pnpm sync:skills through integration ownership.",
+      "verification": "Prepare command/help assertions now; execute journeys against delivered code in cw-projection-proof and cw-transition-proof. Count required user actions and duplicate checks; include no hidden agent-only preparation.",
+      "stop_condition": "Unimplemented proposed behavior must be marked pending qualification and cannot be published as supported guidance.",
+      "out_of_scope": "No generator/catalog/dispatch source writes, hand-edited skill mirrors, upstream-owned documentation edits without legal owner, app navigation wrappers or documentation deployment."
+    },
+    {
+      "id": "cw-projection-proof",
+      "title": "Prove all generators and native fresh journeys share the minimal contract",
+      "mode": "independent focused test ownership and private acceptance runs after generator delivery",
+      "source_plans": [
+        "um-zero-20260909-generated-surface",
+        "um-zero-20260909-native-usage",
+        "um-zero-20260909-user-workflows"
+      ],
+      "files": [
+        "packages/toolkit/ultramodern-create/tests/workspace-integration.test.ts",
+        "packages/toolkit/ultramodern-create/tests/add-shell.test.ts",
+        "packages/toolkit/ultramodern-create/tests/add-vertical-transaction.test.ts",
+        "packages/toolkit/ultramodern-create/tests/tooling-command-catalog.test.ts",
+        "packages/toolkit/ultramodern-create/tests/migration-build-identity.test.ts",
+        ".codex/plans/notes/um-parallel-20260909/consumer-projection-proof.json (reserved evidence output)"
+      ],
+      "purpose": "Validate fresh/add-shell/add-vertical/migrate projection parity and documented native fixtures without requiring completion of unrelated runtime boundary lanes. Use cw-artifact-contract fixture cases; count generated copies and wrappers, manual actions and actual implementation reduction.",
+      "dependencies": [
+        "cw-generator",
+        "cw-native",
+        "cw-metrics",
+        "external fact: tested native runtime/package seams used by these fixture cases are delivered; final ERP/Tractor source and published acceptance remain external downstream milestones"
+      ],
+      "output": "Exact per-case generated diff and command transcript; zero copied framework runtime/checker implementations; preserved raw metadata/live ports/empty references/additive shells; native API and complete delivery-unit identity proof.",
+      "verification": "Shell-only/API/headless/multiple-shell/customized fixtures; check/build and relevant isolated Node/workerd cases with same candidate bytes. Retain failing fixture evidence; no edits to generated outputs.",
+      "stop_condition": "Any copied implementation, native wrapper workaround, metadata loss or manual source/config repair leaves affected contract unqualified.",
+      "out_of_scope": "No changing source to make tests green, global full-suite barrier, live Tractor redesign or source proof substituted for published bytes."
+    },
+    {
+      "id": "cw-transition-proof",
+      "title": "Prove real old\u2192current\u2192next updates and recovery",
+      "mode": "private consumer acceptance after source implementations and immutable cohorts",
+      "source_plans": [
+        "um-zero-20260909-update-transaction",
+        "um-zero-20260909-legacy-migrations",
+        "um-zero-20260909-native-usage",
+        "um-zero-20260909-user-workflows"
+      ],
+      "files": [
+        "packages/toolkit/ultramodern-create/tests/migrate-real-cohort-transitions.test.ts (reserved new focused acceptance test)",
+        ".codex/plans/notes/um-parallel-20260909/consumer-transition-proof.json (reserved evidence output)",
+        ".codex/plans/notes/um-parallel-20260909/consumer-metrics-after.json (reserved evidence output)"
+      ],
+      "purpose": "Run documented update entry through actual old\u2192current migration and current\u2192next same-contract cohort transition for fresh and real customized consumer copies. Bind both transitions to real complete tarball cohorts and capture exact file diffs, user actions and failure/retry evidence.",
+      "dependencies": [
+        "cw-transaction",
+        "cw-legacy",
+        "cw-generator",
+        "cw-native",
+        "cw-historical-fixtures",
+        "cw-metrics",
+        "external fact: release/integration owner supplies real immutable complete current and next tarball cohorts plus old published cohort; version renaming or mocked registries without real cohort bytes is insufficient"
+      ],
+      "output": "Source qualification receipts for both transitions; exact dependency/lock/narrow-identity allowlist diff for same-contract; zero consumer TS/JS/deployment-config changes and zero manual repairs; no-op rerun and before/after measurements. Published-byte rerun is handed to final published acceptance owner.",
+      "verification": "Dry-run zero mutation; failed install/check, interruption and retry preserve/restore bytes, modes, symlinks, Git metadata and index; preserve custom ports/shells/configs/scripts/patches/reference repos. Coordinated bridges migrate atomically, other bridges fail before promotion. Node/workerd use identical package/source artifacts.",
+      "stop_condition": "One real cohort, relabeled versions, source-only happy path, partial rollback or manual fixes cannot satisfy this node. Shared ERP/Tractor ports require serial runs or genuinely isolated supported environments.",
+      "out_of_scope": "No live consumer changes in this node, public release, custom port-remapping config, independent release/cohort owner or rewriting generated apps."
+    },
+    {
+      "id": "cw-retirement-resolution",
+      "title": "Integrate bounded retirement decisions through existing legal owners",
+      "mode": "conditional policy leaf changes and read-only runtime handoff verification; no second runtime writer",
+      "source_plans": ["um-zero-20260909-retirement"],
+      "files": [
+        "packages/toolkit/ultramodern-create/src/ultramodern-workspace/policy.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/pnpm-policy.ts",
+        "packages/toolkit/ultramodern-create/src/ultramodern-tooling/commands/migrate-strict-effect/policy-constants.ts",
+        "packages/toolkit/ultramodern-create/tests/migrate-release-age-policy.test.ts",
+        ".codex/plans/notes/um-parallel-20260909/consumer-retirement-resolution.json (reserved evidence output)"
+      ],
+      "purpose": "Remove only proven obsolete duplicate policy/recognition branches or retain the smallest current native contract; send exact v2/marker/published-wrapper decision patches to existing runtime router/SSR owners. Current emergency-age/security behavior remains intact without required product approval.",
+      "dependencies": [
+        "cw-retirement-contract",
+        "cw-historical-fixtures",
+        "cw-legacy",
+        "external fact: each affected runtime legal owner incorporates or explicitly retains its exact decision and supplies current-contract tests; only those component handoffs are required, not all localization/router/SSR work",
+        "external fact: emergency-age behavior retirement requires explicit user decision and proven supported migration floor; absent decision selects retained-current behavior and does not block mandatory boundary repair"
+      ],
+      "output": "No unclassified legacy paths; every retained capability has owner/current requirement/tests and zero-debt disposition handoff. Record exact deleted/retained/deferred outcomes and same-full-PR budget/ledger requests through integration owner; retain modernjs-gt5t/jle1 follow-up when genuinely unresolved.",
+      "verification": "Supported historical/current policies, exact identity, release age/cohort integrity, explicit MF SSR and realm-isolation receipts from responsible owners. Check required retained compatibility survives legally and optional retention never excuses a boundary violation.",
+      "stop_condition": "Unsupported consumer floor prevents deletion; unresolved optional retirement can close as explicit retain/defer only while mandatory zero-debt repairs remain tracked and required. Never claim retained behavior was removed.",
+      "out_of_scope": "No direct runtime/router/SSR writes, app aliases, new compatibility toggles, weakened age/authentication security, publication-policy files or competing ledger/manifest edits."
+    }
+  ],
+  "notes": [
+    "Planning proposal only. All source/test execution nodes remain pending and require later execution authorization. Only this proposal file is written in the current task.",
+    "Thirteen nodes; five independent evidence/measurement/fixture roots. Shared upstream ownership-contract completion is not a global barrier: local legal identity/API facts gate only affected source edits.",
+    "Source ownership is exclusive: cw-generator owns shared generator/config/catalog/templates and build identity projection; cw-transaction owns migrate-strict-effect.ts, io.ts, install.ts, package-cohort.ts and dispatch; cw-legacy owns only enumerated migration leaf transforms; cw-native owns help/content/authored example inputs; cw-retirement-resolution owns only enumerated policy leaves. Read-only references do not grant write ownership.",
+    "Generator scope is deliberately one owner rather than parallel file writers. Additional template/module paths discovered by cw-artifact-contract must be enumerated and assigned once before source edits. Existing package manifests/exports/root lockfile/release cohorts/FORK-DIVERGENCE.md stay with program integration owners; provide exact requested patches rather than competing writes.",
+    "Source predecessor contracts allow disjoint work, but a frozen proposal is not proof an API exists: each source node records concrete provider handoffs and stops its dependent edits until delivery. Cross-producer and real-cohort proofs wait for actual implementations.",
+    "Coverage: user-workflows journeys/acceptance\u2192cw-journeys, artifact contract and update contract; metrics\u2192cw-metrics with after measurements in proofs. generated-surface inventory\u2192cw-artifact-contract, package\u2192cw-generator plus legal provider handoffs, parity\u2192cw-projection-proof. update-transaction classify/minimal/atomic\u2192cw-update-contract and cw-transaction, tarball/no-op/failure proof\u2192cw-transition-proof. legacy-migrations floor\u2192cw-historical-fixtures, transform\u2192cw-legacy, regressions\u2192cw-transition-proof. native-usage commands/examples/instructions\u2192cw-native, generator/dispatch sole-owner handoffs and both proofs. retirement decide\u2192cw-retirement-contract, simplify/prove\u2192cw-retirement-resolution and existing runtime owners.",
+    "Source update proof never replaces final whole-candidate integration, real ERP-10/customized/Tractor source acceptance or exact published-byte acceptance. If canonical Tractor exists at implementation time, downstream release owner must update/validate it and preserve visible UI. Existing source/published acceptance and publication plans remain mandatory downstream gates.",
+    "Reuse accepted PR49 normalizer/catalog, packaged microvertical-api/code-tools and historical migration ownership recognizers. No app shims, native-API wrappers, synthetic links, copied checkers, second updater/master config, hook bypasses, generated output edits, manual lockfile edits, widened boundary scope or audited identity reset.",
+    "Retirement decisions can be gathered at the root; migration proof and affected runtime handoffs gate implementation. Optional emergency policy uncertainty never blocks unrelated mandatory repairs, and retained required capability still must have a lawful zero-debt owner.",
+    "Exploration confirmed runMigrateStrictEffect(args, context) in src/ultramodern-tooling/commands/migrate-strict-effect.ts and MigrationIo transaction/withStagedWorkspace in its io.ts through TraceDecay and direct current-source verification. Graph was stale, so exact paths were verified; no semantic conclusions rely on stale symbol bodies."
+  ]
+}

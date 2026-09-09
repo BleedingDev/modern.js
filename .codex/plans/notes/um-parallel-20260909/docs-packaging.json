@@ -1,0 +1,300 @@
+{
+  "lane": "docs-packaging",
+  "shards": [
+    {
+      "id": "docs-site",
+      "title": "Bilingual onboarding, navigation destinations and operational guidance",
+      "files": [
+        "packages/document/docs/en/community/showcase.mdx",
+        "packages/document/docs/en/components/init-app.mdx",
+        "packages/document/docs/en/components/init-rspack-app.mdx",
+        "packages/document/docs/en/guides/basic-features/deploy.mdx",
+        "packages/document/docs/en/guides/get-started/ultramodern.mdx",
+        "packages/document/docs/en/guides/troubleshooting/cli.mdx",
+        "packages/document/docs/zh/community/showcase.mdx",
+        "packages/document/docs/zh/components/init-rspack-app.mdx",
+        "packages/document/docs/zh/guides/basic-features/deploy.mdx",
+        "packages/document/docs/zh/guides/get-started/ultramodern.mdx",
+        "packages/document/docs/zh/guides/troubleshooting/cli.mdx"
+      ],
+      "purpose": "Audit each public route and provenance independently; prepare bounded restoration, upstream adoption or fork-owned documentation registration proposals. Once its route is approved, remediate only this shard.",
+      "target_scope": "Paired English/Chinese showcase, initialization, deployment, troubleshooting and UltraModern getting-started pages. Preserve existing public URLs through proven tooling; moving audited pages does not erase their identity.",
+      "prerequisites": [],
+      "handoffs": [
+        "packages/document/package.json -> packaging-integration for exact dependency/registration fields",
+        "FORK-DIVERGENCE.md -> ledger integration owner for each required disposition",
+        "Shared site route/sidebar registration -> exact path and patch identified during audit, then assigned to one integration owner before mutation"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Check bilingual route continuity, page links and documentation build output; verify native initialization instructions against the corresponding approved generator contract. Report per-identity deletion/move/retention evidence.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete only when every reserved route has a lawful disposition, focused docs verification and exact shared-file handoffs; an unavailable route extension leaves that identity blocked."
+    },
+    {
+      "id": "docs-framework-guides",
+      "title": "BFF, Effect, data-platform and profiling documentation",
+      "files": [
+        "packages/document/docs/en/configure/app/bff/effect.mdx",
+        "packages/document/docs/en/configure/app/bff/runtime-framework.mdx",
+        "packages/document/docs/en/configure/app/performance/rsdoctor.mdx",
+        "packages/document/docs/en/guides/advanced-features/bff/data-platform.mdx",
+        "packages/document/docs/zh/configure/app/bff/effect.mdx",
+        "packages/document/docs/zh/configure/app/bff/runtime-framework.mdx",
+        "packages/document/docs/zh/configure/app/performance/rsdoctor.mdx",
+        "packages/document/docs/zh/guides/advanced-features/bff/data-platform.mdx"
+      ],
+      "purpose": "Audit fork-created guide provenance and public URLs; identify genuine fork owners and supported documentation extension points. Remediate approved guide moves without copying implementation into documentation packages.",
+      "target_scope": "English/Chinese pairs for Effect, runtime-framework, data-platform and rsdoctor guidance; discovery can run beside runtime and tooling design, while final instructions wait only for their concrete public contract.",
+      "prerequisites": [],
+      "handoffs": [
+        "packages/document/package.json -> packaging-integration for dependency/registration fields",
+        "Shared site route/sidebar registration -> same single owner as docs-site, after exact path discovery",
+        "Public API guidance -> relevant BFF or build contract owner for factual approval; no ownership transfer of their source files"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Build relocated pages through the supported docs path; check bilingual route/link parity and examples against actual accepted public API exports. Confirm old fork implementations disappear from governed document paths.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete when all eight fork-created guide identities have proven destinations/deletions and preserved routes; stop individual moves if destination ownership or route registration is unproved."
+    },
+    {
+      "id": "docs-auth-example",
+      "title": "Native authentication tutorial and sandbox consistency",
+      "files": [
+        "packages/document/docs/en/tutorials/examples/csr-auth.mdx",
+        "packages/document/docs/zh/tutorials/examples/csr-auth.mdx",
+        "packages/document/src/sandbox/csr-auth/src/routes/Auth-tsx.txt",
+        "packages/document/src/sandbox/csr-auth/src/routes/layout-tsx.txt",
+        "packages/document/src/sandbox/csr-auth/src/routes/login/page-tsx.txt"
+      ],
+      "purpose": "Audit tutorial/sandbox identity and native router behavior together; propose lawful paired edits. Remediation follows the exact approved native router contract.",
+      "target_scope": "Bilingual CSR authentication tutorials plus Auth, layout and login route sandbox text sources. Preserve native framework/router primitives and usable documentation examples.",
+      "prerequisites": [],
+      "handoffs": [
+        "packages/document/package.json -> packaging-integration only if package fields are needed",
+        "packages/toolkit/sandpack-react/package.json -> packaging-integration for sandbox dependency fields",
+        "FORK-DIVERGENCE.md -> ledger integration owner for non-shrink audited changes",
+        "Native router contract -> runtime-router owner; return over-cap upstream changes as a proposal"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Exercise the documented sandbox flow and both tutorial variants against the approved router contract; no synthetic links, click interception, custom navigation wrappers or local suppressions. Measure complete-PR and cumulative audited deltas.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete when tutorial and sandbox behavior agree and all five audited identities have lawful dispositions; stop on an upstream defect requiring an unavailable native seam."
+    },
+    {
+      "id": "docs-generated-changelogs",
+      "title": "Generated changelog provenance and lawful release regeneration",
+      "files": [
+        "packages/cli/builder/CHANGELOG.md",
+        "packages/cli/plugin-bff/CHANGELOG.md",
+        "packages/cli/plugin-data-loader/CHANGELOG.md",
+        "packages/cli/plugin-ssg/CHANGELOG.md",
+        "packages/document/CHANGELOG.md",
+        "packages/runtime/plugin-runtime/CHANGELOG.md",
+        "packages/runtime/render/CHANGELOG.md",
+        "packages/server/bff-core/CHANGELOG.md",
+        "packages/server/bff-runtime/CHANGELOG.md",
+        "packages/server/core/CHANGELOG.md",
+        "packages/server/create-request/CHANGELOG.md",
+        "packages/server/plugin-polyfill/CHANGELOG.md",
+        "packages/server/prod-server/CHANGELOG.md",
+        "packages/server/server-runtime/CHANGELOG.md",
+        "packages/server/server/CHANGELOG.md",
+        "packages/server/utils/CHANGELOG.md",
+        "packages/solutions/app-tools/CHANGELOG.md",
+        "packages/toolkit/plugin/CHANGELOG.md",
+        "packages/toolkit/runtime-utils/CHANGELOG.md",
+        "packages/toolkit/sandpack-react/CHANGELOG.md",
+        "packages/toolkit/types/CHANGELOG.md",
+        "packages/toolkit/utils/CHANGELOG.md",
+        "packages/tsconfig/CHANGELOG.md"
+      ],
+      "purpose": "Perform read-only provenance and generator-input audit for every assigned changelog; determine an upstream incorporation or owning changeset/release-generator route. Supply evidence and generator-input proposals to the integration owner.",
+      "target_scope": "All assigned generated CHANGELOG.md identities across CLI, document, runtime, server, solutions and toolkit/tsconfig. Generated ownership permits no hand-editing, even for apparent restoration or budget cleanup.",
+      "prerequisites": [],
+      "handoffs": [
+        "Generated CHANGELOG.md files listed in this shard -> packaging-integration schedules the owning release pipeline after legal routes are approved; shard owns evidence and verification, not manual output writes",
+        "pnpm-lock.yaml -> packaging-integration only",
+        "FORK-DIVERGENCE.md -> ledger integration owner",
+        "Changeset/release generator inputs -> exact files identified during audit and separately reserved before any edit"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Validate reproducibility through the owning generator or accepted upstream adoption; review generated per-identity diffs and provenance under unchanged caps. Do not regenerate a full release solely to fabricate local shard success.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete only when all reserved generated identities have lawful generated/adopted outputs and traceable inputs. If the generator path cannot meet the cap, keep the identity blocked pending a genuine upstream route; never hand-edit it."
+    },
+    {
+      "id": "packaging-cli-evidence",
+      "title": "CLI, builder and app-tools package evidence",
+      "files": [
+        "packages/cli/adapter-rstest/package.json",
+        "packages/cli/builder/package.json",
+        "packages/cli/builder/tests/fixtures/postcss-user-config/package.json",
+        "packages/cli/plugin-bff/package.json",
+        "packages/cli/plugin-data-loader/package.json",
+        "packages/cli/plugin-ssg/package.json",
+        "packages/cli/plugin-styled-components/package.json",
+        "packages/solutions/app-tools/package.json"
+      ],
+      "purpose": "Read-only package route and export/dependency audit; prepare exact field-level patches, ownership proof and focused verification instructions. This shard never writes manifests, shared exports, release metadata or lockfiles; packaging-integration is their sole mutation owner.",
+      "target_scope": "Builder/CLI manifests, app-tools manifest and the fork-created postcss-user-config fixture manifest; classify fixture relocation separately from published package export changes.",
+      "prerequisites": [],
+      "handoffs": [
+        "All package.json identities in files -> packaging-integration with exact before/after fields, baseline hash, legal route and evidence",
+        "Approved build/BFF public contracts -> evidence dependency only for affected fields",
+        "Root scripts/cohort definitions and app-tools-extensions inclusion -> packaging-integration; exact paths reserved after discovery"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Inspect package fields and native extension registration; propose focused packed CLI/build tests and fixture resolution checks. Root dependencies must not conceal undeclared consumer requirements.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete evidence handoff when every reserved identity has either a concrete lawful field patch with tests or an explicit unresolved legal dependency. Evidence completion does not close unresolved debt, qualify the full cohort, or authorize integration of pending upstream work."
+    },
+    {
+      "id": "packaging-runtime-evidence",
+      "title": "Runtime export and singleton package evidence",
+      "files": [
+        "packages/runtime/plugin-i18n/package.json",
+        "packages/runtime/plugin-image/package.json",
+        "packages/runtime/plugin-runtime/package.json",
+        "packages/runtime/render/package.json"
+      ],
+      "purpose": "Read-only package route and export/dependency audit; prepare exact field-level patches, ownership proof and focused verification instructions. This shard never writes manifests, shared exports, release metadata or lockfiles; packaging-integration is their sole mutation owner.",
+      "target_scope": "i18n, image, plugin-runtime and render manifests; partition read-only evidence from the runtime-router, runtime-SSR and localization source owners.",
+      "prerequisites": [],
+      "handoffs": [
+        "All package.json identities in files -> packaging-integration with exact before/after fields, baseline hash, legal route and evidence",
+        "Approved runtime-router/runtime-SSR/localization interfaces -> field-specific handoffs to packaging-integration"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Check ESM/CJS/browser/Node/workerd/type export claims where supported, native entrypoints and singleton identity. Define isolated packed tests without claiming the entire release candidate passes.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete evidence handoff when every reserved identity has either a concrete lawful field patch with tests or an explicit unresolved legal dependency. Evidence completion does not close unresolved debt, qualify the full cohort, or authorize integration of pending upstream work."
+    },
+    {
+      "id": "packaging-server-evidence",
+      "title": "Server and BFF package dependency evidence",
+      "files": [
+        "packages/server/bff-core/package.json",
+        "packages/server/bff-runtime/package.json",
+        "packages/server/core/package.json",
+        "packages/server/create-request/package.json",
+        "packages/server/plugin-polyfill/package.json",
+        "packages/server/prod-server/package.json",
+        "packages/server/server-runtime/package.json",
+        "packages/server/server/package.json",
+        "packages/server/utils/package.json"
+      ],
+      "purpose": "Read-only package route and export/dependency audit; prepare exact field-level patches, ownership proof and focused verification instructions. This shard never writes manifests, shared exports, release metadata or lockfiles; packaging-integration is their sole mutation owner.",
+      "target_scope": "Nine server/BFF/request/polyfill manifests and their dependency/export closure; inspect owning fork server extensions through source-owner handoffs without mutating them.",
+      "prerequisites": [],
+      "handoffs": [
+        "All package.json identities in files -> packaging-integration with exact before/after fields, baseline hash, legal route and evidence",
+        "Approved server and BFF interfaces -> exact dependency/export proposals to packaging-integration"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Check Node/workerd supported export conditions, request/backend federation dependency closure and native registration. Preserve complete delivery-unit and Effect API identity in proposed packed tests.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete evidence handoff when every reserved identity has either a concrete lawful field patch with tests or an explicit unresolved legal dependency. Evidence completion does not close unresolved debt, qualify the full cohort, or authorize integration of pending upstream work."
+    },
+    {
+      "id": "packaging-toolkit-evidence",
+      "title": "Toolkit, i18n utilities and compiled dependency package evidence",
+      "files": [
+        "packages/toolkit/i18n-utils/package.json",
+        "packages/toolkit/plugin/package.json",
+        "packages/toolkit/runtime-utils/package.json",
+        "packages/toolkit/types/package.json",
+        "packages/toolkit/utils/compiled/js-yaml/package.json",
+        "packages/toolkit/utils/package.json"
+      ],
+      "purpose": "Read-only package route and export/dependency audit; prepare exact field-level patches, ownership proof and focused verification instructions. This shard never writes manifests, shared exports, release metadata or lockfiles; packaging-integration is their sole mutation owner.",
+      "target_scope": "Toolkit i18n-utils, plugin, runtime-utils, types and utils manifests including compiled/js-yaml/package.json. Determine whether compiled dependency metadata is generator-owned before proposing any change.",
+      "prerequisites": [],
+      "handoffs": [
+        "All package.json identities in files -> packaging-integration with exact before/after fields, baseline hash, legal route and evidence",
+        "Approved toolkit/localization interfaces -> field-specific proposals to packaging-integration",
+        "Compiled dependency metadata generator inputs -> identify exact lawful owning path; no hand-edited generated/vendor metadata"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Check public/deep import closure, type exports, stable sidecar identity and generator provenance for compiled metadata; identify dependencies requiring source-owner work without taking its file ownership.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete evidence handoff when every reserved identity has either a concrete lawful field patch with tests or an explicit unresolved legal dependency. Evidence completion does not close unresolved debt, qualify the full cohort, or authorize integration of pending upstream work."
+    },
+    {
+      "id": "packaging-docs-evidence",
+      "title": "Documentation, sandbox and tsconfig package evidence",
+      "files": [
+        "packages/document/package.json",
+        "packages/toolkit/sandpack-react/package.json",
+        "packages/tsconfig/package.json"
+      ],
+      "purpose": "Read-only package route and export/dependency audit; prepare exact field-level patches, ownership proof and focused verification instructions. This shard never writes manifests, shared exports, release metadata or lockfiles; packaging-integration is their sole mutation owner.",
+      "target_scope": "Documentation, sandpack-react and tsconfig manifests; coordinate page registration and sandbox behavior contracts with docs shards.",
+      "prerequisites": [],
+      "handoffs": [
+        "All package.json identities in files -> packaging-integration with exact before/after fields, baseline hash, legal route and evidence",
+        "docs-site, docs-framework-guides and docs-auth-example -> exact approved registration/sandbox requirements",
+        "docs-generated-changelogs -> generator-input/provenance evidence, not manual metadata patches"
+      ],
+      "verification": [
+        "Begin independent read-only route audit against the pinned inventory immediately. Before remediation, reconcile the exact integration baseline; obtain an identity-specific lawful route and any required native interface from ownership-contract. Actual audited upstream incorporation additionally requires the accepted upstream commit and reviewed provenance transaction. No pending proposal authorizes integration.",
+        "Inspect docs/sandbox package exports and configuration consumer resolution; define a focused documentation/sandbox build and packed tsconfig resolution check.",
+        "Track audited identity through moves and renames against eded841256a7cffdaa622e3889fc83407debd3e4; preserve the full combined-PR 20 added-plus-removed line cap and cumulative budgets. A non-shrink requires the same-PR ledger disposition. Stop the affected identity if a lawful route is unproved; do not block independent audits."
+      ],
+      "stop_condition": "Complete evidence handoff when every reserved identity has either a concrete lawful field patch with tests or an explicit unresolved legal dependency. Evidence completion does not close unresolved debt, qualify the full cohort, or authorize integration of pending upstream work."
+    },
+    {
+      "id": "packaging-integration",
+      "title": "Single package mutation owner with incremental verified batches",
+      "files": [],
+      "purpose": "Sole writer for approved package manifest/export handoffs, shared cohort and root scripts, package-manager-generated lockfile, and coordinated generated release metadata. The five packaging evidence shards reserve all 30 debt identities exactly once; their reservation is for investigation, with mutation delegated here.",
+      "target_scope": "Incremental integration of legal component/manifest handoffs into one package graph. Each accepted batch can land and receive focused validation independently; completion of the whole cohort remains a later barrier.",
+      "prerequisites": [
+        "For the first batch only: at least one complete field-level handoff from packaging-cli-evidence, packaging-runtime-evidence, packaging-server-evidence, packaging-toolkit-evidence or packaging-docs-evidence; exact reconciled baseline and legal route for every file touched by that batch",
+        "For each affected batch only: actual required component seam and accepted upstream commit plus reviewed provenance transaction if its route depends on adoption; an unrelated pending lane does not block a lawful batch",
+        "For generated metadata batches: docs-generated-changelogs owning-generator route, approved inputs and exclusive release-generator resource ownership",
+        "For final closure only: all five package evidence shards and their actual required component/upstream/provenance handoffs are integrated; all four docs shards have lawful dispositions"
+      ],
+      "handoffs": [
+        "package.json -> exclusively reserve root script/dependency edits here",
+        "pnpm-lock.yaml -> this owner alone invokes package-manager generation in the integration checkout; no hand-editing and no concurrent lockfile writers",
+        "All 30 package.json identities reserved by packaging evidence shards -> this owner applies reviewed field patches sequentially",
+        "Shared exports/cohort definitions -> this owner discovers and records exact paths before mutation; no wildcard ownership expansion",
+        "FORK-DIVERGENCE.md -> separate ledger integration owner for exact same-PR dispositions; serialize commit assembly with that owner",
+        "Generated CHANGELOG.md identities reserved by docs-generated-changelogs -> owning generator/upstream path only; generation is serialized here and reviewed by that shard"
+      ],
+      "verification": [
+        "For each batch: verify its exact input SHA, legal-route evidence, accepted source/interface dependencies and per-file full-PR/cumulative deltas; apply fields once, generate lockfile once for the combined ready batch, run affected package build/packed-export/resolution tests and record resulting SHA plus invalidated downstream evidence.",
+        "For later batches: revalidate changed dependency closure and any earlier evidence they invalidate; do not repeatedly run every acceptance suite absent a material change.",
+        "For final closure: prove ESM/CJS/browser/Node/workerd/type closure where supported, singleton identity, no hidden governed edges, one coherent selected cohort including app-tools-extensions and exact stable sidecars, and no stale mixed aliases.",
+        "A focused batch pass establishes only the recorded package/source scope. Source candidate qualification, real ERP/Tractor/update acceptance, publication and exact published-byte proof remain separate downstream gates. No early version selection or publishing to demonstrate incremental progress."
+      ],
+      "stop_condition": "Final integration completes only after all actual required handoffs and legal upstream/provenance dependencies are incorporated and whole-cohort closure passes. A blocked batch stays explicit while independent lawful batches continue. Shared-file contention, generator ownership ambiguity or unproved cap compliance stops the affected mutation."
+    }
+  ],
+  "notes": [
+    "Planning artifact only; no implementation, upstream submission, git/br mutation or release is authorized. Initial input is the assigned docs-ownership (47) and packaging (30) rows of um-zero-20260909/debt-inventory.json; neither lane has recorded import-edge rows. Reconcile new evidence without silently reallocating other lanes.",
+    "files is the unique debt-identity partition, not blanket write permission: four docs shards own 47 route/generator investigations; five read-only packaging evidence shards own 30 manifest investigations; packaging-integration has no duplicate files reservation and is the sole package mutation owner.",
+    "All nine identity shards can start route discovery independently. Their empty prerequisites apply to discovery only. Remediation is conditional on that identity's legal route and actual native seam; legal means genuine fork ownership for additions, accepted upstream source, existing extension point or a compliant capped patch.",
+    "Audited identity and unchanged canonical packages scope survive renames and generated rewrites. The full eventual combined PR includes PR49 and later edits; a new shard/worktree never refreshes the cap. Preserve audited base eded841256a7cffdaa622e3889fc83407debd3e4 and reviewed provenance rules.",
+    "Packaging integration is a ready-handoff queue rather than an all-components launch barrier: independent evidence arrives in parallel, sole-owner mutations and lockfile generation occur in bounded batches, and only final cohort closure waits for every actual required component/upstream/provenance dependency.",
+    "Changelogs are generated identities. Their shard audits and verifies provenance/output; only the owning changeset/release generator or accepted upstream incorporation produces changes, under one coordinated mutation owner. Generator output does not waive the 20-line cap.",
+    "Exact destinations, shared route configuration paths, root cohort paths and generator input paths are deliberately discovery outputs. Before mutation, name and reserve each concrete path and preserve other owners' edits; inferred fork-owner names or pending proposals are not authority.",
+    "No source qualification substitutes for complete release qualification or published-byte acceptance. Keep shared consumer acceptance drivers serialized unless their supported environments are genuinely isolated; this partition adds no application config or navigation shims."
+  ]
+}

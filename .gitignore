@@ -74,6 +74,16 @@ dist-ssg
 !.codex/plans/notes/
 .codex/plans/notes/*
 !.codex/plans/notes/um-zero-20260909/
+!.codex/plans/um-parallel-20260909*.md
+!.codex/plans/notes/um-parallel-20260909/
+.codex/plans/notes/um-parallel-20260909/*
+!.codex/plans/notes/um-parallel-20260909/*.md
+!.codex/plans/notes/um-parallel-20260909/*.json
+!.codex/plans/notes/um-parallel-20260909/*.mmd
+# Rebuildable local graph output; the exact selection/handoff is tracked.
+.codex/plans/notes/um-parallel-20260909/component-nodes.json
+.codex/plans/notes/um-parallel-20260909/summary.json
+.codex/plans/notes/um-parallel-20260909/frontier.json
 !packages/toolkit/ultramodern-create/template-workspace/.codex/
 !packages/toolkit/ultramodern-create/template-workspace/.codex/**
 .fastcontext/

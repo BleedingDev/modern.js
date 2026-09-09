@@ -1,0 +1,354 @@
+{
+  "nodes": [
+    {
+      "id": "gate-baseline-freeze",
+      "title": "Pin the integration refs and canonical inventory inputs",
+      "mode": "single-owner read-only root",
+      "source_plans": ["um-zero-20260909-baseline"],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/execution-baseline.json (reserved evidence)"
+      ],
+      "purpose": "Freeze the execution checkout, eventual combined-PR base, source SHA, audited base eded841256a7cffdaa622e3889fc83407debd3e4, reviewed upstream ref, canonical packages scope and allowance hashes. Generate raw complete divergence/import inventories without waiting for every legal design.",
+      "dependencies": [
+        "external: execution has been authorized and the isolated execution checkout is reserved"
+      ],
+      "output": "Immutable ref/hash tuple plus complete machine-readable raw inventories for independently allocated audits.",
+      "verification": "Resolve every ref; reconcile PR49/intervening fork-main work; preserve 440 initial failures, 21 current edges and 447 union identities as reconciliation anchors rather than forcing stale counts.",
+      "stop_condition": "Unresolved refs, unknown combined-PR base, mutable/unowned checkout or canonical input discrepancy remains explicit; do not manufacture a fresh 20-line budget.",
+      "out_of_scope": "No source edits, upstream submission, allowance writers or full-program design barrier."
+    },
+    {
+      "id": "gate-legal-audit",
+      "title": "Audit debt identities in independent ownership shards",
+      "mode": "parameterized fan-out by disjoint identity set; one coordinator merges evidence only",
+      "source_plans": [
+        "um-zero-20260909-baseline",
+        "um-zero-20260909-ownership-contract"
+      ],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/legal-audits/<shard>.json (reserved; one unique file per shard)"
+      ],
+      "purpose": "For each audited/fork-created identity and import edge, prove actual ownership, callers, destinations, existing seam or missing neutral seam, full combined-PR capacity and test obligations. Release each lawful component packet immediately when its own rows/contracts are ready.",
+      "dependencies": ["gate-baseline-freeze"],
+      "output": "Per-identity dispositions and per-seam contracts with explicit blocked rows; exact aggregate set reconciliation is a final join rather than a prerequisite for unrelated source repairs.",
+      "verification": "Account for all 440 initial failures, all 21 current edges including five currently allowed edges, four stale allowances and newly discovered debt; retain rename identity and cumulative accounting. No unassigned or multiply assigned rows.",
+      "stop_condition": "A row lacking a legal route blocks only that row/seam's dependent implementation; unresolved rows also block final zero qualification.",
+      "out_of_scope": "No source implementation, shared ledger/manifests/allowlists edits or assumption that a large measured excess proves every possible repair is over cap."
+    },
+    {
+      "id": "gate-upstream-seam",
+      "title": "Prepare and track genuinely upstream fixes per missing seam",
+      "mode": "parameterized independent upstream checkout per seam; external review wait",
+      "source_plans": [
+        "um-zero-20260909-upstream-patches",
+        "um-zero-20260909-ownership-contract"
+      ],
+      "files": [
+        "<reserved-clean-upstream-checkout-for-seam>/<exact-audited-files-from-that-seam-packet>",
+        "<reserved-clean-upstream-checkout-for-seam>/<exact-upstream-regression-test-files>"
+      ],
+      "purpose": "Prepare minimal generic fixes/extension points and reproductions on genuine pinned upstream source. Submission follows separately explicit authorization; record actual accepted commits and semantics for each seam.",
+      "dependencies": [
+        "gate-legal-audit: only the completed identity/seam packet for this instance; other audit shards are not prerequisites"
+      ],
+      "output": "Reviewed patch packet, upstream test evidence and eventually actual accepted upstream commit(s), or an explicit unresolved/rejected route.",
+      "verification": "Native upstream usefulness, identity mapping, exact merged commit/source proof and no fork-specific loader or artificial PR splitting.",
+      "stop_condition": "No submission without explicit authorization; proposed/unmerged code cannot satisfy a landing dependency. Rejection triggers lawful redesign, never waived debt.",
+      "out_of_scope": "No fork-lane source edits or global wait imposed on unrelated seams, existing extension-point repairs, fixtures or provenance implementation."
+    },
+    {
+      "id": "gate-checker-preparation",
+      "title": "Implement provenance and strict zero-gate proof machinery early",
+      "mode": "single boundary-governance code owner; preparation only",
+      "source_plans": [
+        "um-zero-20260909-provenance",
+        "um-zero-20260909-zero-gate",
+        "um-zero-20260909-regression-matrix"
+      ],
+      "files": [
+        "scripts/ultramodern-boundary-check/check-fork-import-boundary.js",
+        "scripts/ultramodern-boundary-check/<provenance-helper-and-tests-reserved-by-boundary-owner>"
+      ],
+      "purpose": "Implement a reviewed atomic genuine-upstream transition and strict zero-current-edge enforcement with adversarial fixture repositories. Keep shared checker modifications under one owner rather than competing provenance and zero-gate patches.",
+      "dependencies": [
+        "gate-baseline-freeze",
+        "external: provenance invariants and zero-edge contract are frozen; no need for all component audit packets or real upstream landings to prepare fixture-based code"
+      ],
+      "output": "Tested checker/transition contract, atomic-failure proofs and negative bypass cases ready for final source application.",
+      "verification": "Budget/identity preservation; reverse/failed transitions; identity collision; partial fork overlap; non-ancestor/forged refs; residual fork edit accounting; import alias/barrel/dynamic/type edges; malformed inputs and analyzer failures. Normal CLI/CI must reject current governed edges despite allowances.",
+      "stop_condition": "Any classifier correction lacking proof of an ownership error, transition that erases residual debt, or unproven rollback blocks checker handoff.",
+      "out_of_scope": "Preparation is not zero debt or source acceptance. Do not repoint live provenance before actual upstream commits exist; do not use growth/rebase writers as a provenance workaround."
+    },
+    {
+      "id": "gate-fixture-preparation",
+      "title": "Prepare independent runtime, update and release evidence fixtures",
+      "mode": "parallel fixture preparation with disjoint files and private mutable resources",
+      "source_plans": [
+        "um-zero-20260909-regression-matrix",
+        "um-zero-20260909-source-acceptance",
+        "um-zero-20260909-update-acceptance",
+        "um-zero-20260909-published-acceptance"
+      ],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/acceptance-resource-contract.json (reserved)",
+        "<private-fixture-root>/um-parallel-20260909/<fixture-owner>/ (reserved outside framework Git ancestry)",
+        "scripts/ultramodern-production-readiness/<explicit-new-regression-files-reserved-before-edit>"
+      ],
+      "purpose": "Reuse substantive existing drivers and transaction helpers; prepare neutral/customized/legacy fixtures, before/after measurement collection, rollback and cohort mismatch cases, platform matrix and receipt identity validation against stable contracts.",
+      "dependencies": [
+        "external: user-workflows acceptance contract, supported runtime/migration floor and baseline measurements are frozen",
+        "external: each fixture's relevant seam/update contract is stable; unrelated component implementations and upstream landings are not prerequisites"
+      ],
+      "output": "Self-checked fixtures, exact required check IDs, runtime/OS requirements and resource reservations for source, packed and published phases.",
+      "verification": "Deliberate representative regressions fail; prove private workspace/TMPDIR/artifact/process ownership. Existing ERP and Tractor full drivers already cover Node and workerd; do not duplicate them under platform labels.",
+      "stop_condition": "Unknown fixture ownership/floor or missing resource isolation blocks the affected fixture/run. Shared default ports require a real mutex or separately isolated supported hosts, never app-config remapping.",
+      "out_of_scope": "No component source/test ownership theft, live OntOS changes, consumer shims, final source qualification or claim that fixture preparation is runtime success."
+    },
+    {
+      "id": "gate-source-assembly",
+      "title": "Assemble all lawful source handoffs and genuine upstream source",
+      "mode": "single integration owner; final source join",
+      "source_plans": [
+        "um-zero-20260909-integration",
+        "um-zero-20260909-upstream-patches",
+        "um-zero-20260909-provenance",
+        "um-zero-20260909-zero-gate"
+      ],
+      "files": [
+        "FORK-DIVERGENCE.md (single ledger owner: integration)",
+        "pnpm-lock.yaml (generated by integration only)",
+        "<exact-package-manifests-exports-cohort-and-changesets-from-packaging-handoff>"
+      ],
+      "purpose": "Integrate completed source lanes, actual required upstream source and shared package/export/lockfile/cohort/ledger handoffs into one reviewable candidate ref. Freeze final source semantics before authoritative gates.",
+      "dependencies": [
+        "gate-checker-preparation",
+        "external: all component, generated-surface, native-usage, update-transaction, supported legacy-migration and mandatory retirement handoffs integrated through packaging",
+        "external: every required seam has actual accepted upstream commits, or its debt has a separately proved lawful alternative",
+        "external: exact complete debt-route reconciliation from all gate-legal-audit instances; shared file handoffs have one named owner each"
+      ],
+      "output": "Complete proposed source ref and immutable handoff of actual upstream incorporation/conflicts to the boundary-governance owner.",
+      "verification": "No missing seam, incomplete cohort or unowned shared writes; full combined-PR cap/ledger evidence; optional product retirement decisions block only when they affect mandatory debt or supported acceptance.",
+      "stop_condition": "Missing required upstream landing/source handoff or over-cap unresolved identity prevents final assembly; keep independent work runnable while waiting.",
+      "out_of_scope": "No attribution inferred from proposed PRs, boundary allowance edits by integration, publication or accepted-candidate reuse."
+    },
+    {
+      "id": "gate-final-zero",
+      "title": "Apply reviewed accounting and prove complete canonical zero debt",
+      "mode": "single boundary-governance metadata owner followed by exact-ref verification",
+      "source_plans": [
+        "um-zero-20260909-provenance",
+        "um-zero-20260909-zero-gate",
+        "um-zero-20260909-baseline"
+      ],
+      "files": [
+        "scripts/ultramodern-boundary-check/divergence-allowlist.json (single boundary owner including provenance data)",
+        "scripts/ultramodern-boundary-check/allowlist.json (same single boundary owner)",
+        "<private-evidence-root>/um-parallel-20260909/final-zero/ (reserved)"
+      ],
+      "purpose": "Apply only the reviewed identity/budget-preserving upstream transition, retire active/stale import allowances after actual repairs, lock genuine shrink through supported operations, then commit with integration and run canonical checks on that resulting exact source ref.",
+      "dependencies": ["gate-source-assembly"],
+      "output": "Exact head/base reports with zero divergence violations, zero current governed import edges, zero active/stale import exemptions, and complete reconciliation of every initial/new debt identity.",
+      "verification": "Re-run negative checker fixtures and independent CI re-derivation. Resolve all 440 initial failures and all 21 current imports, not merely newly added edges; account for all 447 original union identities. Fixed audited base and full packages scope remain unchanged; legitimate capped neutral diffs may remain with required ledger.",
+      "stop_condition": "Any residual current edge, unresolved historical identity, accounting growth disguised as shrink, invalid cap/ledger, alternate scope or unverified provenance blocks qualification.",
+      "out_of_scope": "No mass approval, budget reset, hiding via aliases/renames/dynamic import, silent classifier exception or blanket deletion of meaningful tests."
+    },
+    {
+      "id": "gate-final-platform-proofs",
+      "title": "Run required final-ref quality and platform proofs in isolated jobs",
+      "mode": "fan-out matrix on immutable final ref; no concurrent mutation",
+      "source_plans": [
+        "um-zero-20260909-integration",
+        "um-zero-20260909-regression-matrix"
+      ],
+      "files": [
+        "<private-ci-artifact-root>/um-parallel-20260909/<final-source-sha>/<linux|windows|macos>/<job>/ (reserved)"
+      ],
+      "purpose": "Run affected component suites, generator/publication tooling, lint/changesets, type/export/package checks and required Linux runtime/native-analyzer evidence. Independently run justified Windows/macOS obligations on genuinely separate OS environments.",
+      "dependencies": [
+        "gate-final-zero",
+        "gate-fixture-preparation",
+        "external: supported isolated OS runners and per-job workspace/artifact/process reservations exist"
+      ],
+      "output": "Complete required check matrix bound to the same clean final source SHA and exact toolchain identities.",
+      "verification": "No waived/skipped required failures; Linux native/runtime checks are not replaced by macOS results. Each job has independent mutable checkout/build/output resources. Separate pure checks may run in parallel; ERP/Tractor default-port suites remain in their later full-driver nodes.",
+      "stop_condition": "Unavailable required OS evidence stays blocked. Any source mutation invalidates affected downstream evidence and requires a new ref; fixture self-checks or prior PR49 results cannot substitute.",
+      "out_of_scope": "No blanket worker cap, duplicated complete ERP runs or synthetic platform success based only on mocked tests."
+    },
+    {
+      "id": "gate-candidate-freeze",
+      "title": "Freeze and distribute one qualified immutable package candidate",
+      "mode": "single source/artifact identity owner",
+      "source_plans": ["um-zero-20260909-integration"],
+      "files": [
+        "<private-candidate-root>/um-parallel-20260909/<source-sha>/manifest-and-tarballs/ (reserved)"
+      ],
+      "purpose": "After final-ref checks pass, verify clean committed/pushed bleedingdev source; build/pack the complete cohort and sidecars and freeze source, manifest, tarball and toolchain digests for all acceptance lanes.",
+      "dependencies": ["gate-final-platform-proofs"],
+      "output": "Immutable full-cohort candidate plus target-private source/update acceptance workspaces consuming identical accepted bytes.",
+      "verification": "Packed type/export/cohort checks against actual produced bytes; producer/manifest/source linkage; new artifacts rather than another agent's registry/candidate or historical accepted bundle.",
+      "stop_condition": "Uncommitted source, mismatched bytes, partial cohort, failed packed checks or unavailable publication identity cannot be treated as accepted candidate. Any content change creates a new candidate and reruns relevant qualification.",
+      "out_of_scope": "No public publication or assumption that source checks prove registry-installed behavior."
+    },
+    {
+      "id": "gate-source-erp",
+      "title": "Accept ERP-10 on exact source candidate bytes",
+      "mode": "independent acceptance job; acquires host-default-runtime-ports mutex",
+      "source_plans": ["um-zero-20260909-source-acceptance"],
+      "files": [
+        "<private-source-erp-root>/um-parallel-20260909/<candidate-id>/ (reserved)"
+      ],
+      "purpose": "Run the existing complete ERP-10 driver once, covering Node/workerd browser, API, native Effect identity, package/export/singletons and delivery-unit operational independence against the candidate manifest.",
+      "dependencies": [
+        "gate-candidate-freeze",
+        "external: exclusive supported runtime environment lease; on a shared host serialize ERP/Tractor and any conflicting update runtime phase"
+      ],
+      "output": "Complete fresh source ERP receipt with required check identities and candidate-bound operational evidence.",
+      "verification": "Identical source/version/manifest/cohort identity, real browser/API/runtime results and cleanup of only owned processes/resources.",
+      "stop_condition": "Port lease unavailable queues the run, not a fabricated graph dependency; incomplete or mismatched receipt/failure blocks publication.",
+      "out_of_scope": "No duplicate Node/Cloudflare full ERP jobs, generated-output fixes or source receipt relabeling as published proof."
+    },
+    {
+      "id": "gate-source-tractor",
+      "title": "Accept Tractor on exact source candidate bytes",
+      "mode": "independent acceptance job; acquires host-default-runtime-ports mutex",
+      "source_plans": ["um-zero-20260909-source-acceptance"],
+      "files": [
+        "/Users/satan/side/experiments/tractor-store-vertical (only when present and exclusively reserved at execution)",
+        "<private-reviewed-tractor-root>/um-parallel-20260909/<candidate-id>/ (fallback only when canonical repository is absent)"
+      ],
+      "purpose": "Update and validate the required canonical Tractor repository when present; run supported migration, explicit formatting/checks, Node/workerd SSR and visible shopping acceptance while preserving the Tractor UI and native framework/router behavior.",
+      "dependencies": [
+        "gate-candidate-freeze",
+        "external: canonical Tractor existence checked and exclusive repository lease granted; if present but busy, wait rather than silently substitute a clone",
+        "external: exclusive supported runtime environment lease; shared host uses same mutex as source ERP"
+      ],
+      "output": "Candidate-bound Tractor report, supported migration evidence, visible shopping/search/API/SSR results and unchanged intended visuals.",
+      "verification": "Complete receipt identity, explicit checks and owner-scoped process cleanup. If canonical repository is absent, record absence and qualify the reviewed private baseline.",
+      "stop_condition": "A present but unreserved canonical repository, runtime lease conflict, UI regression or any failed required check blocks this acceptance.",
+      "out_of_scope": "No custom navigation wrapper, click interception, synthetic anchor handler, local config remapping/suppression or user-business/deployment logic workaround."
+    },
+    {
+      "id": "gate-update-acceptance",
+      "title": "Prove two real update transitions and failure recovery",
+      "mode": "independent acceptance job with private registry and fixtures; runtime phases lease conflicting ports",
+      "source_plans": ["um-zero-20260909-update-acceptance"],
+      "files": [
+        "<private-update-root>/um-parallel-20260909/<candidate-id>/{neutral,historical,customized,bridge,tractor-compatible}/ (reserved)",
+        "<private-registry-root>/um-parallel-20260909/<candidate-id>/ (reserved)"
+      ],
+      "purpose": "Exercise supported published-floor to candidate and candidate to distinct real next-compatible local cohort using the documented entrypoint; run update success/idempotence, ownership/install/check/interruption/registry failure and rollback proofs.",
+      "dependencies": [
+        "gate-candidate-freeze",
+        "external: real distinct next-compatible rehearsal tarballs/cohort prepared through canonical helpers and explicitly local identity; its changes have relevant validation",
+        "external: private registry/workspace/resource leases; runtime phases acquire shared host port mutex if needed"
+      ],
+      "output": "Machine-readable diffs, byte-exact rollback/no-op receipts, cohort/runtime results and observed elapsed/RSS comparisons.",
+      "verification": "Same-contract success changes only dependencies, lockfile and narrowly derived release identity data; zero consumer TS/JS or deployment-config edits and zero manual repair. Legacy native migrations execute once; custom files survive; prior accepted version works after failure.",
+      "stop_condition": "Reused identical bytes with a fake next-version label, missing supported floor proof, failed rollback or manual/config repair blocks acceptance.",
+      "out_of_scope": "No other agent's OntOS checkout/candidate/active rehearsal, invented savings, hook bypasses or claim that the next local version was published."
+    },
+    {
+      "id": "gate-publication",
+      "title": "Publish the fully accepted exact cohort through the trusted fork workflow",
+      "mode": "single release owner; externally visible execution only under applicable authorization",
+      "source_plans": ["um-zero-20260909-publication"],
+      "files": [
+        ".github/workflows/publish-bleedingdev.yml (consume existing trusted workflow; no policy changes implied)",
+        "<private-release-evidence-root>/um-parallel-20260909/<producer-id>/ (reserved)"
+      ],
+      "purpose": "Reconcile actual fork-main changes, select an unused coherent version and publish all cohort packages/sidecars using the canonical trusted producer and OIDC workflow; verify registry/source/provenance/digest identity.",
+      "dependencies": [
+        "gate-source-erp",
+        "gate-source-tractor",
+        "gate-update-acceptance",
+        "external: every required upstream landing is actually incorporated and final zero/quality/candidate receipts remain valid for release source",
+        "external: execution has resumed and applicable fork publication authorization still covers the release; planning itself grants none"
+      ],
+      "output": "Authenticated non-dry publication outcome and exact complete registry cohort tied to the accepted producer/candidate.",
+      "verification": "Recheck fork-main/ref/cap changes; if promotion changes source/package contents, return to final source assembly/qualification/acceptance before publishing. Registry tags and all tarball digests match the producer; recovery stays bound to original producer identity.",
+      "stop_condition": "Source drift, incomplete prerequisites/cohort, already-used conflicting version, unlanded required upstream code or partial publish prevents success declaration.",
+      "out_of_scope": "No origin publish/push, workflow policy weakening, dry-run relabeling or use of old source acceptance as proof for new bytes."
+    },
+    {
+      "id": "gate-published-erp",
+      "title": "Verify ERP from exact registry-installed bytes",
+      "mode": "independent published acceptance job; supported runtime environment lease",
+      "source_plans": ["um-zero-20260909-published-acceptance"],
+      "files": [
+        "<private-published-erp-root>/um-parallel-20260909/<producer-id>/ (reserved)"
+      ],
+      "purpose": "Clean-install exact published cohort and run full ERP-10 Node/workerd checks including exports/API/singletons and operational independence.",
+      "dependencies": [
+        "gate-publication",
+        "external: exclusive supported runtime environment; shared host acquires the default-runtime-ports mutex"
+      ],
+      "output": "Authenticated published ERP receipt tied to registry digests/source/version/producer.",
+      "verification": "Actual installed tarballs match published identity; all required driver checks pass on both runtimes and owned resources are released.",
+      "stop_condition": "Registry inconsistency, incomplete checks or receipt identity mismatch blocks closeout.",
+      "out_of_scope": "No packed/source substitution, duplicate complete platform-labeled drivers or concurrent use of Tractor's ports."
+    },
+    {
+      "id": "gate-published-consumers",
+      "title": "Verify published Tractor and the real customized update journey",
+      "mode": "independent published acceptance lane; separate private consumers and resource leases",
+      "source_plans": [
+        "um-zero-20260909-published-acceptance",
+        "um-zero-20260909-update-acceptance"
+      ],
+      "files": [
+        "/Users/satan/side/experiments/tractor-store-vertical (same conditional exclusive canonical ownership contract)",
+        "<private-published-customized-root>/um-parallel-20260909/<producer-id>/ (reserved)"
+      ],
+      "purpose": "Run exact published Tractor Node/workerd visible acceptance and documented published update journey in the reserved customized consumer using workflow-reviewed baselines.",
+      "dependencies": [
+        "gate-publication",
+        "external: exclusive canonical Tractor/consumer reservation and supported runtime environment; shared host serializes conflicting ERP/Tractor/update phases"
+      ],
+      "output": "Published Tractor and customized-update receipts with native behavior/UI preservation, cohort identity and actual update outcomes.",
+      "verification": "Registry-installed bytes and complete receipt identities; zero same-contract consumer source/config repair, successful no-op retry, user business/deployment behavior intact and required runtime/visible checks passed.",
+      "stop_condition": "Unreserved consumer, manual repair, UI/runtime regression, mismatched cohort or incomplete published receipts blocks closeout.",
+      "out_of_scope": "No unauthorized live deployment, fixture substitution for a present required canonical Tractor repository, app workaround or source-only pass."
+    },
+    {
+      "id": "gate-closeout",
+      "title": "Reconcile zero debt, measured simplification and published outcomes",
+      "mode": "single integration evidence/tracker closeout owner",
+      "source_plans": ["um-zero-20260909-closeout"],
+      "files": [
+        ".codex/plans/notes/um-parallel-20260909/final-outcome.json (reserved)",
+        ".beads/ (execution only; sole tracker owner)"
+      ],
+      "purpose": "Bind final published ERP/Tractor/customized outcomes to the producer, reconcile all historical/new identities and current imports, compare measured user/update/LOC/resource outcomes to baseline, and complete authorized committed/pushed handoff.",
+      "dependencies": [
+        "gate-published-erp",
+        "gate-published-consumers",
+        "external: final complete source zero-gate identity remains the source behind the published producer"
+      ],
+      "output": "Reproducible final evidence bundle, measured comparison, truthful plan/br completion and bleedingdev push verification; release only owned temporary resources.",
+      "verification": "All 440 initial failures and all 21 initial current edges fully resolved, new inventory reconciled, zero canonical violations/current edges/obsolete exemptions. Report actual generated artifacts, changed files/manual steps, duplicate checks, implementation/test/total LOC and time/RSS; distinguish relocation from deletion.",
+      "stop_condition": "Any required outcome, historical debt, upstream dependency, published receipt or authorized push remains incomplete; keep associated issues open rather than declaring the zero-debt milestone complete.",
+      "out_of_scope": "No historical-debt deferral under a completed milestone, invented savings, removal of another agent's resources or broad stash/branch cleanup."
+    }
+  ],
+  "critical_path": [
+    "This is a structural route, not a claimed measured longest path: gate-baseline-freeze -> relevant gate-legal-audit instance -> required gate-upstream-seam instance -> actual accepted upstream landing (external) -> affected seam implementation/packaging (external) -> gate-source-assembly -> gate-final-zero -> gate-final-platform-proofs -> gate-candidate-freeze.",
+    "Candidate fan-out join: gate-candidate-freeze -> max completion of gate-source-erp, gate-source-tractor, gate-update-acceptance -> gate-publication.",
+    "Published fan-out join: gate-publication -> max completion of gate-published-erp, gate-published-consumers -> gate-closeout.",
+    "The slower actual component/update/mandatory-retirement handoff may dominate instead of upstream review. Independent audit shards, lawful existing-seam implementations, checker preparation and fixture preparation do not wait on unrelated upstream landings.",
+    "On one shared host, ERP/Tractor default-port mutex contention contributes real elapsed time even without a semantic DAG edge. Separate genuinely isolated supported hosts can remove that resource bottleneck; local config shims cannot."
+  ],
+  "notes": [
+    "Planning artifact only. Nodes describe future authorized execution; this turn does not implement, submit upstream, merge, publish, mutate br or launch workers.",
+    "The source_plans values name the existing um-zero slugs. Parameterized nodes are templates: final graph expansion gives each shard/seam a distinct node and dependency only on its exact packet. Colon-qualified instance dependencies must be resolved to concrete node IDs by the integrating planner.",
+    "The small root freezes refs and emits raw inventories. Full per-file legal classification and capacity allocation fan out; neither all 447 audits nor every seam decision is a global source-start barrier.",
+    "Checker/provenance preparation uses fixture repositories before upstream landings exist. Only the final accounting node may apply a live reviewed transition after genuine upstream incorporation. One boundary-governance owner controls checker/provenance code and both allowance files; integration alone owns FORK-DIVERGENCE.md, package/shared cohort files and generated lockfile changes.",
+    "Do not grant wildcard source ownership from placeholders. Reserved targets require exact file reservations before implementation; existing component files stay with component owners. All named artifact roots must be unique and outside other agents' resources.",
+    "Fixture preparation and local package rehearsals establish readiness only. Authoritative quality checks require the complete final ref; acceptance requires immutable candidate bytes; published acceptance requires exact registry bytes. Source/package drift invalidates dependent evidence.",
+    "gate-final-platform-proofs expands independent Linux/Windows/macOS jobs only when actual isolated runners exist and each OS obligation is justified by the contract. Missing required environments are explicit blockers, never paper parallelism or silent skips.",
+    "The existing ERP and Tractor full drivers each cover Node and workerd. Do not split each full suite into duplicate runtime labels. Encode one shared default-port mutex per host; pure update/fixture work can run while it is held, and runtime update phases acquire it when they conflict.",
+    "Canonical Tractor must be updated and validated when present. A present busy repository is a lease blocker, not permission to replace its required proof with a private clone. Reviewed private fallback applies only to actual absence.",
+    "Publication is a real join on source ERP, source Tractor and two-transition update acceptance, plus actual incorporated upstream landings and still-valid final source qualification. External upstream review delays remain visible; release never completes with mandatory historical debt.",
+    "No allowance reset, alternate canonical scope/base, audited-identity rename laundering, import indirection, package alias or app/config shim counts as a repair. Same-contract updates require zero consumer TS/JS/deployment-config edits and zero manual repair; fresh apps retain native entrypoints/data but no copied runtime/checker implementation.",
+    "Future task tracking uses br with existing historical modernjs-piop as the zero-debt milestone; parent program/closeout are evidence joins rather than runnable umbrella workers."
+  ]
+}
