@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from '@babel/parser';
+import type { UltramodernReleaseCohort } from '../../../ultramodern-release-cohort';
 import { formatGeneratedSourceCandidates } from '../../../ultramodern-workspace/fs-io';
 import type { MigrationIo } from './io';
 
@@ -11,8 +12,13 @@ type ArtifactCandidate = {
   generatedDataBinding?: string;
 };
 
-function isLiteralData(node: any): boolean {
+function isLiteralData(
+  node: any,
+  literalIdentifiers?: ReadonlySet<string>,
+): boolean {
   if (!node) return false;
+  if (node.type === 'Identifier')
+    return literalIdentifiers?.has(node.name) ?? false;
   if (
     [
       'StringLiteral',
@@ -25,7 +31,9 @@ function isLiteralData(node: any): boolean {
   if (node.type === 'UnaryExpression')
     return node.operator === '-' && node.argument.type === 'NumericLiteral';
   if (node.type === 'ArrayExpression')
-    return node.elements.every(isLiteralData);
+    return node.elements.every((element: any) =>
+      isLiteralData(element, literalIdentifiers),
+    );
   return (
     node.type === 'ObjectExpression' &&
     node.properties.every(
@@ -36,7 +44,7 @@ function isLiteralData(node: any): boolean {
         ['Identifier', 'StringLiteral', 'NumericLiteral'].includes(
           property.key.type,
         ) &&
-        isLiteralData(property.value),
+        isLiteralData(property.value, literalIdentifiers),
     )
   );
 }
@@ -66,6 +74,127 @@ function withoutGeneratedData(source: string, binding?: string) {
     }
   }
   return source;
+}
+
+function staticPropertyValue(node: any, name: string) {
+  if (node?.type !== 'ObjectExpression') return undefined;
+  const keys = new Set<string>();
+  let value;
+  for (const property of node.properties) {
+    if (
+      property.type !== 'ObjectProperty' ||
+      property.computed ||
+      property.shorthand ||
+      !['Identifier', 'StringLiteral'].includes(property.key.type)
+    )
+      return undefined;
+    const key = property.key.name ?? property.key.value;
+    if (keys.has(key)) return undefined;
+    keys.add(key);
+    if (key === name) value = property.value;
+  }
+  return value;
+}
+
+/** Replace only authenticated release data, never the surrounding authored program. */
+function refreshValidatorReleaseCohort(
+  source: string,
+  releaseCohort: UltramodernReleaseCohort,
+) {
+  try {
+    const parsed = parse(source, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+      tokens: true,
+    });
+    const constants = parsed.program.body.flatMap(statement =>
+      statement.type === 'VariableDeclaration' && statement.kind === 'const'
+        ? statement.declarations
+        : [],
+    );
+    const matches = [];
+    for (const statement of parsed.program.body) {
+      if (
+        statement.type !== 'VariableDeclaration' ||
+        statement.kind !== 'const'
+      )
+        continue;
+      for (const declaration of statement.declarations) {
+        const kind = staticPropertyValue(declaration.init, 'kind');
+        if (
+          kind?.type !== 'StringLiteral' ||
+          kind.value !== 'modernjs.ultramodern-workspace-validation-contract'
+        )
+          continue;
+        const cohort = staticPropertyValue(
+          staticPropertyValue(declaration.init, 'cohort'),
+          'releaseCohort',
+        );
+        const schema = staticPropertyValue(cohort, 'schema');
+        const schemaVersion = staticPropertyValue(cohort, 'schemaVersion');
+        const version = staticPropertyValue(
+          staticPropertyValue(cohort, 'release'),
+          'version',
+        );
+        const versionConstant =
+          version?.type === 'Identifier'
+            ? constants.find(
+                declaration =>
+                  declaration.id.type === 'Identifier' &&
+                  declaration.id.name === version.name &&
+                  declaration.init?.type === 'StringLiteral',
+              )
+            : undefined;
+        if (
+          schema?.type === 'StringLiteral' &&
+          schema.value === 'bleedingdev.ultramodern.release-cohort' &&
+          schemaVersion?.type === 'NumericLiteral' &&
+          schemaVersion.value === 1 &&
+          isLiteralData(
+            cohort,
+            versionConstant ? new Set([version.name]) : undefined,
+          )
+        )
+          matches.push({ cohort, version, versionConstant });
+      }
+    }
+    if (matches.length !== 1) return source;
+    const { cohort, version, versionConstant } = matches[0];
+    let content = JSON.stringify(releaseCohort, null, 2);
+    const edits = [];
+    // A factored version constant remains authored if anything else uses it.
+    // When the cohort is its sole reader, retain the binding and update its
+    // literal value instead of leaving an unused declaration behind.
+    if (
+      versionConstant &&
+      !parsed.tokens?.some(
+        token =>
+          token.type.label === 'name' &&
+          token.value === version.name &&
+          token.start !== versionConstant.id.start &&
+          (token.start < cohort.start || token.end > cohort.end),
+      )
+    ) {
+      content = content.replaceAll(
+        `"version": ${JSON.stringify(releaseCohort.release.version)}`,
+        `"version": ${version.name}`,
+      );
+      edits.push({
+        start: versionConstant.init!.start!,
+        end: versionConstant.init!.end!,
+        content: JSON.stringify(releaseCohort.release.version),
+      });
+    }
+    edits.push({ start: cohort.start, end: cohort.end, content });
+    for (const edit of edits.toSorted(
+      (left, right) => right.start - left.start,
+    ))
+      source =
+        source.slice(0, edit.start) + edit.content + source.slice(edit.end);
+    return source;
+  } catch {
+    return source;
+  }
 }
 
 /** Protect authored replacements before any stage can delete or regenerate them. */
@@ -147,6 +276,26 @@ export function preserveConsumerWorkspaceArtifacts(
   };
   return {
     preservedPaths,
+    refreshReleaseCohort(releaseCohort?: UltramodernReleaseCohort) {
+      if (!releaseCohort) return;
+      for (const candidate of candidates) {
+        if (candidate.generatedDataBinding !== 'workspaceValidationContract')
+          continue;
+        for (const relativePath of [
+          candidate.relativePath,
+          candidate.legacyPath,
+        ]) {
+          if (!relativePath || !preservedPaths.has(relativePath)) continue;
+          const filePath = path.join(io.workspaceRoot, relativePath);
+          if (!fs.existsSync(filePath)) continue;
+          const source = fs.readFileSync(filePath, 'utf8');
+          io.write(
+            filePath,
+            refreshValidatorReleaseCohort(source, releaseCohort),
+          );
+        }
+      }
+    },
     io: {
       ...io,
       write: (filePath: string, content: string) =>

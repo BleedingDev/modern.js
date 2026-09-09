@@ -56,3 +56,142 @@ test('generated contract data can refresh without treating authored behavior as 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('preserved validators refresh only literal authenticated cohort data, including renamed bindings and legacy paths', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-authored-cohort-'));
+  const oldCohort = {
+    aliases: { '@modern-js/runtime': '@bleedingdev/modern-js-runtime' },
+    packages: [
+      {
+        sourceName: '@modern-js/runtime',
+        targetName: '@bleedingdev/modern-js-runtime',
+        version: '3.9.0-ultramodern.2',
+      },
+    ],
+    release: { tag: 'latest', version: '3.9.0-ultramodern.2' },
+    schema: 'bleedingdev.ultramodern.release-cohort',
+    schemaVersion: 1,
+    source: { commit: 'old-source', repository: 'BleedingDev/ultramodern.js' },
+  };
+  const nextCohort = {
+    ...oldCohort,
+    packages: oldCohort.packages.map(member => ({
+      ...member,
+      version: '3.9.0-ultramodern.4',
+    })),
+    release: { ...oldCohort.release, version: '3.9.0-ultramodern.4' },
+    source: { ...oldCohort.source, commit: 'new-source' },
+  };
+  const prefix =
+    "// Authored validator: keep this exact program.\nconst retainedPolicy = 'consumer authorization';\nconst renamedContractDefinition = {kind: 'modernjs.ultramodern-workspace-validation-contract', policy: retainedPolicy, cohort: {releaseCohort: ";
+  const suffix =
+    "}};\nthrow new Error('The migration must never execute this source');\n";
+  const source = prefix + JSON.stringify(oldCohort) + suffix;
+  try {
+    fs.mkdirSync(path.join(root, 'scripts'));
+    for (const extension of ['mts', 'mjs']) {
+      const relativePath = `scripts/validate-ultramodern-workspace.${extension}`;
+      const filePath = path.join(root, relativePath);
+      fs.writeFileSync(filePath, source);
+      const io = createMigrationIo(root, false);
+      const guarded = preserveConsumerWorkspaceArtifacts(io, [
+        {
+          relativePath: 'scripts/validate-ultramodern-workspace.mts',
+          legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
+          generatedDataBinding: 'workspaceValidationContract',
+          content: 'const workspaceValidationContract = {};\n',
+        },
+      ]);
+      assert.equal(guarded.preservedPaths.has(relativePath), true);
+      guarded.refreshReleaseCohort(nextCohort);
+      const expected = prefix + JSON.stringify(nextCohort, null, 2) + suffix;
+      assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
+      guarded.refreshReleaseCohort(nextCohort);
+      assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
+      fs.writeFileSync(filePath, source);
+      assert.throws(
+        () =>
+          io.transaction(() => {
+            guarded.refreshReleaseCohort(nextCohort);
+            throw new Error('later migration failed');
+          }),
+        /later migration failed/,
+      );
+      assert.equal(fs.readFileSync(filePath, 'utf8'), source);
+      fs.rmSync(filePath);
+    }
+    const filePath = path.join(
+      root,
+      'scripts/validate-ultramodern-workspace.mts',
+    );
+    const factoredSource = `const versionPin = '${oldCohort.release.version}';\n${source.replaceAll(JSON.stringify(oldCohort.release.version), 'versionPin')}`;
+    for (const hasOtherReader of [false, true]) {
+      const otherReader = hasOtherReader ? '\nconsole.log(versionPin);\n' : '';
+      fs.writeFileSync(filePath, factoredSource + otherReader);
+      const guarded = preserveConsumerWorkspaceArtifacts(
+        createMigrationIo(root, false),
+        [
+          {
+            relativePath: 'scripts/validate-ultramodern-workspace.mts',
+            generatedDataBinding: 'workspaceValidationContract',
+            content: 'const workspaceValidationContract = {};\n',
+          },
+        ],
+      );
+      guarded.refreshReleaseCohort(nextCohort);
+      const nextLiteral = JSON.stringify(nextCohort, null, 2);
+      const expected = hasOtherReader
+        ? `const versionPin = '${oldCohort.release.version}';\n${prefix}${nextLiteral}${suffix}${otherReader}`
+        : `const versionPin = ${JSON.stringify(nextCohort.release.version)};\n${prefix}${nextLiteral.replaceAll(`"version": ${JSON.stringify(nextCohort.release.version)}`, '"version": versionPin')}${suffix}`;
+      assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
+      guarded.refreshReleaseCohort(nextCohort);
+      assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
+    }
+    const ambiguous = [
+      factoredSource.replace(
+        `'${oldCohort.release.version}'`,
+        'readConsumerVersion()',
+      ),
+      factoredSource.replace('const versionPin', 'let versionPin'),
+      source.replace(JSON.stringify(oldCohort), 'consumerReleasePolicy()'),
+      source.replace(
+        JSON.stringify(oldCohort),
+        `{...${JSON.stringify(oldCohort)}}`,
+      ),
+      source.replace('cohort: {', '...consumerPolicy, cohort: {'),
+      source.replace('cohort: {', 'cohort: {}, cohort: {'),
+      source.replace('releaseCohort: ', '[releaseKey]: '),
+      source.replace(
+        'modernjs.ultramodern-workspace-validation-contract',
+        'consumer-policy',
+      ),
+      source.replace(
+        'const renamedContractDefinition',
+        'let renamedContractDefinition',
+      ),
+      source.replace('"schemaVersion":1', '"schemaVersion":2'),
+      source +
+        source
+          .replaceAll('retainedPolicy', 'otherPolicy')
+          .replaceAll('renamedContractDefinition', 'otherDefinition'),
+      'unparseable consumer source {',
+    ];
+    for (const variant of ambiguous) {
+      fs.writeFileSync(filePath, variant);
+      const guarded = preserveConsumerWorkspaceArtifacts(
+        createMigrationIo(root, false),
+        [
+          {
+            relativePath: 'scripts/validate-ultramodern-workspace.mts',
+            generatedDataBinding: 'workspaceValidationContract',
+            content: 'const workspaceValidationContract = {};\n',
+          },
+        ],
+      );
+      guarded.refreshReleaseCohort(nextCohort);
+      assert.equal(fs.readFileSync(filePath, 'utf8'), variant);
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
