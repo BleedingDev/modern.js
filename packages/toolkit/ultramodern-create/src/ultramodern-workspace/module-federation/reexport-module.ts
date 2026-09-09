@@ -28,11 +28,17 @@ export function createUltramodernBuildModule(
   const record = deliveryUnitRecordFor(scope, app);
   return `import { resolveUltramodernBuildArtifact } from '@modern-js/runtime-extensions/build-identity';
 
+declare const ULTRAMODERN_BUILD_MARKER: string;
+declare const ULTRAMODERN_SOURCE_REVISION: string;
+
 const ultramodernBuildArtifact = resolveUltramodernBuildArtifact(${JSON.stringify(
     createUltramodernBuildArtifact(record),
     null,
     2,
-  )} as const);
+  )} as const, {
+  buildMarker: () => ULTRAMODERN_BUILD_MARKER,
+  sourceRevision: () => ULTRAMODERN_SOURCE_REVISION,
+});
 
 export const ultramodernDeliveryUnit = ultramodernBuildArtifact.deliveryUnit;
 ${includeUiMarker ? 'export const ultramodernUiMarker = ultramodernBuildArtifact.surfaces.ui;\n' : ''}${app.kind !== 'shell' && appHasApi(app) ? 'export const ultramodernApiMarker = ultramodernBuildArtifact.surfaces.api;\n' : ''}`;

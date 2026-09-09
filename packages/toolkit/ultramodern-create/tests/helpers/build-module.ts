@@ -51,7 +51,7 @@ export function evaluateBuildModule(
     const runtimeModule = { exports: {} as Record<string, any> };
     vm.runInNewContext(
       fs.readFileSync(path.join(outputRoot, 'buildIdentity.js'), 'utf8'),
-      { ...globals, exports: runtimeModule.exports, module: runtimeModule },
+      { exports: runtimeModule.exports, module: runtimeModule },
     );
     const module = { exports: {} as Record<string, any> };
     vm.runInNewContext(
