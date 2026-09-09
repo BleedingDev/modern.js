@@ -40,16 +40,16 @@ every PR.
 | `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Run fork-owned declaration production through the Rslib plugin point after prebundle copies, preserving watcher/glob/Inquirer runtime bytes and strict TS7/Node26 type closure. Retain upstream Rslib 1.0 externals-callback and optional-library compatibility so emitted module formats remain correct. | `extension-point` + `inline-patch` + `upstream-PR` + `keep-[M]` |
 | `packages/toolkit/utils/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 and post-audit native utils cohort, public exports and declaration metadata. Keep RxJS build-only for self-contained Inquirer 8 declaration production. | `inline-patch` + `upstream-PR` + `keep-[M]` |
 | `packages/cli/builder/rslib.config.mts` | bleedingdev | Use the existing Rslib plugin point for fork-owned declaration production, isolating public Sass, SVG and CSS options from loader, Babel and Webpack implementation declarations. | `extension-point` + `inline-patch` |
-| `packages/cli/builder/package.json` | bleedingdev | Retain the integrated native Rsbuild/Rslib/SWC toolchain, declared Sass and source-map dependencies, optional RSC peers, and Rsdoctor1.6.3 cohort. Remove the runtime-extensions dependency when the higher solution injects disabled-RSC runtime targets through existing builder plugin composition; package metadata no longer selects a fork runtime. | `inline-patch` + `keep-[M]` + `upstream-PR` |
+| `packages/cli/builder/package.json` | bleedingdev | Retain the integrated native Rsbuild/Rslib/SWC toolchain, declared Sass and source-map dependencies, optional RSC peers, and Rsdoctor1.6.3 cohort. Remove the runtime-extensions dependency after the higher solution moves disabled-RSC policy into its existing builder-plugin composition; package metadata no longer selects a fork runtime. | `inline-patch` + `keep-[M]` + `upstream-PR` |
 | `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Publish precompression types with Rspack path data without leaking the Webpack compiler class. Preserve upstream #8819 single-writer ESM loaders, CJS loader copies and deployment templates in every compiled output required by createNodePreset and other deployment readers. | `extension-point` + `inline-patch` + `upstream-PR` + `fixed-in-fork` |
 
 ### 2026-09-09 simplification and builder compatibility
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/builder/src/createBuilder.ts` | bleedingdev | Restore createRequire dependency bundling when creating the native builder, preserve explicit overrides and keep parseConfig's public shape unchanged | `inline-patch` |
+| `packages/cli/builder/src/createBuilder.ts` | bleedingdev | Restore createRequire dependency bundling in the native builder, preserve explicit overrides and the public parseConfig shape. Restore the audited disabled-RSC fallback import and registration after moving the broader five-entry disabled-runtime policy to higher solution composition. | `inline-patch` |
 | `packages/cli/builder/tests/cache.test.ts` | bleedingdev | Replace implementation snapshots with persistent-cache assertions and real cold/warm environment isolation proof through a repository test helper | `inline-patch` |
-| `packages/cli/builder/tests/default.test.ts` | bleedingdev | Verify deployed createRequire output after removing source dependencies, including the explicit false override | `inline-patch` |
+| `packages/cli/builder/tests/default.test.ts` | bleedingdev | Verify deployed createRequire output after removing source dependencies, including the explicit false override. Restore the audited native fallback plugin name and position; higher composition tests independently execute the broader disabled-RSC contracts. | `inline-patch` |
 | `packages/cli/builder/tests/environment.test.ts` | bleedingdev | Assert effective native cache storage isolation with compiled output rather than legacy storage-directory formatting | `inline-patch` |
 
 ### Native ownership reconciliation (2026-09-09)
@@ -62,8 +62,7 @@ Fork implementation and mixed-file ownership work remain separate.
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
 | `packages/cli/builder/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 4d698ae3300827ae26785eb55033820d6e745d29 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
-| `packages/cli/builder/src/shared/rsc/rscDisabledRuntime.ts` | bleedingdev | 72acde41a7 deletes the audited fallback plugin and adds the broader disabled-runtime replacement. Same RSC-disabled build responsibility; current runtime implementations already live in runtime-extensions. Preserve alias conflict handling, all five subpaths and late-compiler enforcement when restoring audited identity; do not blindly restore the broken fallback behavior. Evidence: CLI per-file classification packet. | `inline-patch` |
-| `packages/cli/builder/tests/rscDisabledRuntime.test.ts` | bleedingdev | Companion compiler execution regressions for the replacement of audited RSC fallback; not evidence of a separate application feature. Evidence: CLI per-file classification packet. | `inline-patch` |
+| `packages/cli/builder/src/shared/rsc/rscClientBrowserFallback.ts` | bleedingdev | Restore the audited native disabled-RSC fallback implementation and registration after moving the broader five-entry runtime policy to higher solution composition. The only retained difference in this file is Biome import ordering; its two changed lines occupy two hunks, so componentwise governance requires explicit evidence despite the large line-count shrink. | `inline-patch` + `keep-[M]` |
 | `packages/cli/plugin-bff/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 931f0349a577c15d949d40ccb55fe17b903757be from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
 | `packages/cli/plugin-bff/src/cli/compress.ts` | bleedingdev | 792894ba57 extracts existing CLI behavior. Audit pin has compression prefix filter, prefix list construction and .ts/.js watch handling; fork broadens normalization/extensions. Preserve needed correctness inline in native CLI, not an entire fork subsystem. Evidence: CLI per-file classification packet. | `inline-patch` |
 | `packages/cli/plugin-bff/src/cli/prefix.ts` | bleedingdev | 792894ba57 extracts existing CLI behavior. Audit pin has compression prefix filter, prefix list construction and .ts/.js watch handling; fork broadens normalization/extensions. Preserve needed correctness inline in native CLI, not an entire fork subsystem. Evidence: CLI per-file classification packet. | `inline-patch` |
@@ -195,6 +194,7 @@ Fork implementation and mixed-file ownership work remain separate.
 | `packages/solutions/app-tools/tests/utils/register-esm.test.ts` | bleedingdev | Ensure existing config registration prefers Node registerHooks over deprecated module.register. | `inline-patch` |
 | `packages/solutions/app-tools/tests/utils/register.test.ts` | bleedingdev | Verify Node native TypeScript capability, absence handling and config-loading behavior. | `inline-patch` |
 | `packages/toolkit/create/rslib.config.mts` | bleedingdev | Retain exact upstream blob d3fe8c92df8c6925d644242de45a5f52f7d96454 from upstream b6f784095994; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/create/rslibconfig.mts` | bleedingdev | Record the canonical audited identity of the superseded minimal native Rslib configuration; create now retains the accepted upstream rslib.config.mts replacement recorded above. Git identity tracking pairs the old four-line template with the fork-owned plugin-bff-extensions/rslib.config.mts, whose reviewed PR change excludes the Node-only Hono binder from browser output. The build customization remains in its fork package; this explicit identity row does not restore native create policy or change audited pins. | `inline-patch` |
 | `packages/toolkit/plugin/CHANGELOG.md` | bleedingdev | Retain exact upstream blob c5f32f1a7af21d30bd28b84fb0c24b16e77fef5b from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
 | `packages/toolkit/plugin/tests/createConfigOptions.test.ts` | bleedingdev | Native public API/build-artifact regression; toolkit identity packet confirms existing native behavior and no additive subsystem. | `inline-patch` |
 | `packages/toolkit/plugin/tests/createFileWatcher.test.ts` | bleedingdev | Native public API/build-artifact regression; toolkit identity packet confirms existing native behavior and no additive subsystem. | `inline-patch` |
@@ -697,24 +697,24 @@ it covers root and infrastructure files outside `packages/`.
 | CLI-03 | `builder` `performance.rsdoctor` opt-in surface (`RsdoctorUserConfig`) in `createBuilder.ts`, `parseCommonConfig.ts`, `types.ts` | bleedingdev | RsDoctor config surface; defaults OFF after the ADR-0001 revert (`a210ac658d`), pinned by `tests/rsdoctor.test.ts` | extension-point (plugin split already in fork-owned `plugins/rsdoctor.ts`, `rsdoctorConfig.ts`) | P3 |
 | CLI-04 | `builder/src/shared/parseCommonConfig.ts:305` sets `reactCompiler: reactCompiler ?? true` | bleedingdev | Upstream ships React Compiler **opt-in**; the fork enables it by default for every vanilla build. Fork's own rstest adapter then hardcodes an opt-out (CLI-02), i.e. the default is not trusted internally | **revert to opt-in, or move to `presetUltramodern` only** | **P1** |
 | CLI-05 | `builder/src/plugins/postcss.ts` resolves postcss/tailwind from the app root via `createRequire` | bleedingdev | Fixes monorepo/workspace resolution; upstreamable in isolation | upstream-PR | P2 |
-| CLI-06 | `builder` RSC layer matching extended to fork render dist entries + `shared/rsc/rscDisabledRuntime.ts`, `plugins/rscConfig.ts`, `shared/devServer.ts` | bleedingdev | Disabled RSC must fail closed even when the optional runtime is resolvable; upstream `rscClientBrowserFallback.ts` deleted in favor of entrypoint-specific throwing modules | keep-[F] | — |
+| CLI-06 | Higher solution composes the complete disabled-RSC plugin; native builder restores its audited fallback | bleedingdev | Preserve five public entrypoint contracts, alias conflicts and late compiler enforcement through existing builderPlugins/addPlugins; actual compiler tests prove the higher composition | extension-point (extracted) | — |
 | CLI-07 | `builder/src/index.ts` export reshuffle | bleedingdev | Import hygiene | keep-[M] | — |
 | CLI-08 | `builder` tests (8 files incl. snapshots) | bleedingdev | Track CLI-03…CLI-06 | keep-[F] | — |
 | CLI-09 | `builder` `dev.lazyCompilation` disabled unless set (`parseCommonConfig.ts:220`), paired with APP-07 route-eager `lazyCompilation.test` | bleedingdev | Deliberate dev-perf lane, broadened beyond stream-SSR | keep-[F], documented — see APP-07 | — |
-| CLI-10 | `plugin-bff` `./server` export repointed **Hono → Effect** (`dist/.../runtime/effect/index`) | bleedingdev | Product decision: Effect BFF is a blessed path in this fork | keep-[F] (product) | — |
-| CLI-11 | `packages/cli/plugin-bff/src/server.ts:47-50` — `resolveRuntimeFramework` defaults `bff.runtimeFramework` to `'effect'` (`=== 'hono' ? 'hono' : 'effect'`), pinned by `packages/cli/plugin-bff/tests/server.test.ts:131` (`should treat unresolved runtime framework as effect`) | bleedingdev | Effect HttpApi + Effect BFF is the single blessed authored HTTP path; Hono remains internal compatibility and is feature-frozen; upstream has only Hono | keep-[F] | — |
-| CLI-12 | `src/server.ts` loads the fork-owned `EffectAdapter` via **dynamic** `await import('@modern-js/plugin-bff-extensions/effect-adapter')` inside `onPrepare` | bleedingdev | A static import pulls `effect/*` into the eager module graph and crashes hono-only consumers with `ERR_MODULE_NOT_FOUND`; the adapter implementation now lives entirely outside the upstream package | extension-point (extracted) + inline-patch (dynamic import seam) — see note N4 | — |
-| CLI-13 | `src/utils/{runtimeGenerator,pluginGenerator,crossProjectApiPlugin}.ts` retains audited generator compatibility seams while Effect client/source/runtime generation lives in `@modern-js/plugin-bff-extensions` (ADR-0005) | bleedingdev | Stable `plugin-bff` output paths and the compiled cross-project template remain compatible; the additive Effect generator subsystem no longer lives in upstream-owned package code | extension-point (extracted) + upstream-PR (generic fail-fast/merge behavior) | P3 |
-| CLI-14 | `plugin-bff/package.json` entirely fork-added optional `effect` / `@effect/opentelemetry` peer + mirrored devDep block | bleedingdev | Effect must resolve to one identity in the consumer graph; a `dependencies` entry lets pnpm install a second copy and the runtime barrels hand back services from the wrong instance | keep-[F] — see note N5 | — |
+| CLI-10 | Native plugin-bff `./server` restored to Hono; Effect public entries belong to `@modern-js/bff-effect` | bleedingdev | Preserve the native API identity while authored Effect APIs use the canonical fork runtime | extension-point (higher composition) | — |
+| CLI-11 | Native `src/server.ts` defaults to Hono; the higher BFF build plugin selects Effect for the fork | bleedingdev | Native consumers retain their default and fork consumers register their chosen runtime through the finite configuration registry | extension-point | — |
+| CLI-12 | Native server plugin accepts finite runtime adapter module descriptors and an optional Hono route-binder descriptor | bleedingdev | Resolve only selected application modules lazily and validate factory results; higher composition owns concrete Effect and Hono-policy targets | extension-point + inline-patch — see note N4 | — |
+| CLI-13 | Native runtime/plugin/cross-project generators retain native generation, serialization and lifecycle with typed hooks or configured module descriptors | bleedingdev | Effect clients, producer source/runtime policy and concrete cross-project transport live in fork owners; native generated entry and CLI tests cover the seam | extension-point + inline-patch | P3 |
+| CLI-14 | Effect peer/development dependency cohort belongs to canonical fork BFF packages | bleedingdev | Dependency ownership follows the retired native Effect facades and avoids installing a second Effect identity | keep-[F] — see note N5 | — |
 | CLI-15 | `src/runtime/safe-failure.ts:71` builds the error envelope from `SAFE_FAILURE_MESSAGES[status] ?? 'Request failed'`, discarding `err.message` | bleedingdev | Not a deliberate divergence — real error detail is dropped on every BFF failure, including in development | **fix** (preserve `err.message` at least in dev / behind a flag) | **P2** |
 | CLI-16 | `plugin-data-loader` (4 files): import reordering, storage import path swap, strictness | bleedingdev | Toolchain | keep-[M] | — |
 | CLI-17 | `plugin-ssg` (7 files): import reordering, destructuring/strictness in prerender/server paths | bleedingdev | Toolchain | keep-[M] | — |
 | CLI-18 | `plugin-styled-components` derives the styled interface from `typeof styledComponents.default` | bleedingdev | styled-components v6 no longer exports `StyledInterface`; coupled to the dependency migration | keep-[F] (coupled dep) | — |
-| CLI-19 | `plugin-bff/src/cli.ts` reduced to a 38-line plugin entry that delegates to fork-owned `src/cli/{generator,compress,prefix,watch}.ts`. Budget 216 → **218** lines at the 3.8.2 base | bleedingdev | Base-transition growth, not new fork code: upstream #8797 added `moduleType` and `apiFiles: apiRouter.getApiFiles()` to its inline `generator()` (4 lines). The fork already threads both from `src/cli/generator.ts:87,134` and `:253`, so the behavior is adopted — the upstream file simply grew underneath the extraction | extension-point (already extracted) | — |
-| CLI-20 | `plugin-bff/src/utils/clientGenerator.ts` is a re-export shim over fork-owned `src/utils/client-generator/`. Budget 291 → **338** lines at the 3.8.2 base | bleedingdev | Base-transition growth: upstream #8797 rewrote this file (+153 changed lines) to stop copying handler declarations into `dist/client`. The fork ports that behavior into `client-generator/{generate,type-facade,files,write-package}.ts`; a shim over a bigger upstream file measures as a bigger deletion | extension-point (already extracted) — see note N9 | — |
-| CLI-21 | `plugin-bff/src/loader.ts` delegates Effect client generation and worker-runtime rendering to `@modern-js/plugin-bff-extensions`, threads the configured `requestId`, and transpiles the worker runtime to ES2024 | bleedingdev | The upstream Rspack loader exposes no hook for the fork's Effect generators or request identity; this 14-line compatibility seam removes duplicate subsystem ownership while preserving the loader contract and stable public output paths | extension-point (extracted) + inline-patch (loader seam) | — |
-| CLI-22 | `plugin-bff/package.json` published-boundary wiring: edge-safe ESM conditions for Effect client/data-platform, no source export, direct dependencies on the extracted BFF owners, an optional `@modern-js/app-tools` declaration peer, and Node >=26.7 | bleedingdev | Package metadata has no extension hook: these declarations keep edge resolution out of CJS/source, make extracted runtime and generated declaration imports resolvable, and preserve the fork's modern Node baseline | extension-point (extracted owners) + inline-patch (17-line manifest seam) | — |
-| CLI-23 | `plugin-bff/package.json` root declaration mapping and dependency-ownership cleanup after the Effect/federation extraction | bleedingdev | The published root resolves to `cli.d.ts`; builder and esbuild are build-only; telemetry, federation, runtime-extension, and SWC-helper runtime dependencies no longer belong to this package after their consumers moved to fork-owned packages | extension-point (dependencies follow extracted owners) + inline-patch (19-line manifest cleanup) | — |
+| CLI-19 | Native plugin-bff CLI delegates its extracted generator/compress/prefix/watch operations through typed native lifecycle hooks | bleedingdev | These are audited native algorithm extractions; fork generator, bundler and policy callbacks are registered by the higher build plugin | inline-patch + extension-point | — |
+| CLI-20 | Native clientGenerator entry exports the native client-generator implementation helpers | bleedingdev | Preserve native declaration discovery, ESM facade output, file copying and package-boundary writing, with a typed callback for extension client generation | inline-patch + extension-point — see notes N9 and N10 | — |
+| CLI-21 | Native loader selects an optional configured client-codegen module through a structural callback contract and preserves explicit request identity | bleedingdev | Higher composition owns concrete codegen selection; native error transformation, request fields and generated module validation remain native | extension-point + inline-patch | — |
+| CLI-22 | Native plugin-bff publishes root/CLI/server-plugin/client/cross-project and restored Hono server entries; Effect/data-platform aliases are retired | bleedingdev | Matching runtime and declaration conditions describe actual native artifacts; the optional app-tools declaration peer and Node baseline remain explicit | inline-patch | — |
+| CLI-23 | Native plugin-bff declaration mapping and dependency ownership follow the restored public surface | bleedingdev | Builder and esbuild remain build-only; Effect, telemetry, federation and runtime-extension dependencies belong to canonical fork owners | inline-patch | — |
 
 ---
 
@@ -744,7 +744,7 @@ it covers root and infrastructure files outside `packages/`.
 | RT-20 | `render` (6 files) RSC adapter surface: `createFromFetch` export, `rscManifest` plumb-through, `react-server-dom-rspack.d.ts` | bleedingdev | Fork RSC lane; RSC stays disabled in the distribution | keep-[F] | — |
 | RT-21 | React Router / Remix compatibility surface (`plugin-runtime` router paths and related upstream-owned files) | bleedingdev | Maintenance-only: the compatibility surface is retained and takes regression fixes only, no new features or public surface. New routing work belongs to TanStack Router; RT-06/RT-16/RT-18 keep their own dispositions | keep-[F] (maintenance-only) | — |
 | RT-22 | `plugin-i18n/package.json` React and ReactDOM peer ranges match the required `@modern-js/runtime` React 19 cohort | bleedingdev | The plugin requires `@modern-js/runtime`, whose peers are `^19.2.8`; advertising React 18 was unsatisfiable in a supported install. i18next and react-i18next retain upstream floors because older versions are not exercised here | keep-[F] (dependency cohort) | — |
-| RT-23 | `plugin-runtime/src/cli/ssr/index.ts` disables Rsbuild 2.2 `splitChunks` only for Module Federation SSR server environments and emits `MODERN_MF_APP_SSR` with env-compatible string semantics | bleedingdev | Rsbuild 2.2's server default makes the CommonJS MF render entry resolve asynchronously without `requestHandler`; browser environments retain native chunk splitting. Serializing the config-derived marker as a string, paired with APP-09's ambient auto-injection exclusion, prevents conflicting DefinePlugin values while preserving the public `process.env` string contract | inline-patch | — |
+| RT-23 | Higher ultramodern-app-tools SSR integration sets Module Federation markers, flag policy, server single-chunk output and Cloudflare ESM behavior | bleedingdev | Existing builderPlugins and modifyEnvironmentConfig hooks apply policy after native SSR defaults; actual Rsbuild tests prove the required ordering | extension-point (extracted) | — |
 
 ---
 
@@ -790,7 +790,7 @@ it covers root and infrastructure files outside `packages/`.
 | APP-06 | `src/rsbuild.ts:19,58-60` adds `disableReactCompiler?: boolean` to `ResolveModernRsbuildConfigOptions` | bleedingdev | Exists only to let callers opt out of CLI-04's default; disappears if CLI-04 reverts | **revert** with CLI-02 / CLI-04 | **P1** |
 | APP-07 | `src/plugins/initialize/index.ts:36-43` defaults `dev.lazyCompilation` to `{ imports: true, entries: false }` when unset, plus `src/builder/shared/lazyCompilation.ts` route-eager `lazyCompilation.test` | bleedingdev | Deliberate dev-perf divergence, broadened beyond stream-SSR to all route component modules. Low priority so an explicit user `dev.lazyCompilation` always wins | keep-[F], documented | — |
 | APP-08 | esm register hooks, utils, tests | bleedingdev | tsgo toolchain + track the above | keep-[M] | — |
-| APP-09 | `src/utils/env.ts` excludes `MODERN_MF_APP_SSR` from ambient `MODERN_*` auto-injection; `tests/utils/env.test.ts` pins the exclusion | bleedingdev | The variable controls config selection before normalization, while plugin-runtime publishes the resolved SSR mode. Compiling the ambient value through a second DefinePlugin conflicts with the config-derived marker and can mislabel client bundles | inline-patch | — |
+| APP-09 | Native env auto-injection excludes MODERN_MF_APP_SSR; its test pins the exclusion | bleedingdev | The higher SSR integration publishes the config-derived string marker; a second ambient DefinePlugin value would conflict and mislabel clients | inline-patch | — |
 | APP-10 | `src/builder/shared/bundlerPlugins/RouterPlugin.ts`, `src/bundleDocs.ts`, and `src/plugins/analyze/{getServerRoutes,isDefaultExportFunction}.ts` carry reviewed Node 26 / TS7 / Rspack 2 / Babel 8 compatibility repairs | bleedingdev | Keep automatic public paths truthfully narrowed, use Node 26 `Dirent.parentPath`, restore the canonical main-entry constant import, and remove syntax plugins Babel 8 parses by default. No legacy Node support, casts, or diagnostic suppression are introduced | fixed-in-fork + upstream-PR | P1 |
 
 ---
@@ -825,7 +825,7 @@ result**. Referenced by ID from the tables above.
 **N1 — ROOT-02 Effect cohort (lockstep, no active patch).**
 `EFFECT_VERSION`/`EFFECT_VITEST_VERSION` in
 `packages/toolkit/ultramodern-create/src/ultramodern-workspace/versions.ts`;
-`packages/cli/plugin-bff/package.json` (dep/peer/devDep, see N5); the generated
+the canonical `bff-effect` and BFF extension package manifests (see N5); the generated
 `pnpm.overrides`/`trustPolicyExclude` emitted by
 `ultramodern-workspace/policy.ts`. Effect 4.0.0-rc.112 includes the former
 `SchemaAST.Sentinel` declaration repair, so generated workspaces carry no
@@ -846,8 +846,8 @@ Under upstream's `latest` spelling, `pnpm install` downloads real Modern.js
 `node_modules/.pnpm/node_modules/@modern-js/*`. Which one wins is not
 deterministic across machines, so anything resolving a bare `@modern-js/*`
 specifier from outside the workspace tree — the plugin-bff generator fixtures do
-exactly this — binds to upstream on CI and to the fork locally, and fork-only
-subpaths (`./effect-client`, `./effect`) fail with
+exactly this — binds to upstream on CI and to the fork locally, and canonical fork runtime
+packages or subpaths fail with
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. Take upstream's example *sources* on sync; keep
 `workspace:*` on their manifests.
 
@@ -857,28 +857,23 @@ must stay in sync with the workflow — it is also the since-boundary the change
 record uses. The tagging step is idempotent (`gh release view` → `edit`, else
 `create`) because it runs **after** the unrollbackable npm publish.
 
-**N4 — CLI-12 dynamic Effect import.**
-A static top-level import pulls `effect/Effect`, `effect/Layer`, `effect/Schema`
-and `effect/unstable/http*` into the eager module graph of
-`@modern-js/plugin-bff/server-plugin`. The dynamic target is the public
-`@modern-js/plugin-bff-extensions/effect-adapter` subpath; do not restore a
-local adapter implementation. Guard:
-`packages/cli/plugin-bff/tests/regression.test.ts`
-(`server entry does not eagerly load Effect`).
+**N4 — CLI-12 lazy registered runtime modules.**
+Native plugin-bff accepts finite registry-keyed runtime module descriptors and
+an optional Hono route-binder descriptor. It resolves only the selected module
+from the application and validates its factory and returned adapters. Concrete
+Effect and Hono policy modules are registered by the higher BFF build plugin;
+do not restore a hard-coded native Effect import or a local implementation.
+Guards: native `tests/server.test.ts` and `tests/regression.test.ts`, plus higher
+`tests/server-integration.test.ts` and `tests/hono-runtime-composition.test.ts`.
 
-**N5 — CLI-14 plugin-bff dependency block is purely additive.**
-Upstream's plugin-bff has no `effect` dependency and **no `peerDependencies`
-block at all**, so a sync merge will not conflict on it and a resolver taking
-"theirs" wholesale drops it **silently**. `@effect/opentelemetry` MUST move with
-`effect`: it declares a REQUIRED (non-optional) `effect` peer of its own, so
-leaving it in `dependencies` re-imposes that peer on every hono-only consumer
-transitively and makes the optional `effect` peer a fiction. Guards:
-`tests/regression.test.ts` asserts, for BOTH packages, that
-`dependencies[name] === undefined`,
-`peerDependencies[name] === devDependencies[name]`, and
-`peerDependenciesMeta[name].optional === true`; plus
-`packages/toolkit/ultramodern-create/tests/version-pins.test.ts`
-(`plugin-bff declares the same Effect cohort generated workspaces pin`).
+**N5 — CLI-14 Effect dependencies follow canonical fork owners.**
+The native plugin-bff package has retired its Effect/data-platform runtime
+facades. Preserve the exact Effect cohort in the canonical fork package peers
+and development dependencies, and in generated application dependencies.
+`@effect/opentelemetry` must follow `effect` because it requires the same Effect
+identity. Do not restore an additive native peer block as a compatibility shim.
+Generated applications need the configured adapter package in production
+resolution after development dependencies are removed.
 
 **N6 — RT-02 `I18nInstance`.**
 Do **not** take upstream's interface body wholesale on sync — it silently
@@ -906,12 +901,13 @@ and the byte-offset assertion in
 `tests/integration/routes-tanstack/tests/index.test.ts`.
 
 **N8 — SRV-02 optional zod peer.**
-`@modern-js/plugin-bff`'s root, `./cli`, `./server-plugin` and `./hono-server`
-entries all reach `operationContracts.ts` transitively and threw
-`ERR_MODULE_NOT_FOUND: zod` for consumers without zod. Do not "simplify" the
-assembled specifier back to a literal on sync. Guard:
-`packages/server/bff-core/tests/optionalZodPeer.test.ts` (asserts the source
-shape and that no built format carries an eager zod dependency).
+The fork operation-contract implementation lives in
+`packages/server/runtime-extensions/src/bff-policy/operationContracts.ts`.
+Its optional zod loader must remain lazy: a literal eager external import would
+require the peer before a consumer selects schema policy. Canonical fork tests
+in `tests/bff-policy/optionalZodPeer.test.ts` guard that graph. Native bff-core
+has separate `tests/optionalZodPeer.test.ts` coverage for its own public schema
+entries. Native plugin-bff no longer statically imports the fork policy graph.
 
 **N9 — CLI-20 the client type facade is always ESM.**
 Upstream #8797 threads the app-level `moduleType` from `cli.ts` into
@@ -973,7 +969,6 @@ and port any upstream change into the listed fork replacement instead.
 
 | Original upstream path | Fork replacement / reason |
 | --- | --- |
-| `packages/cli/builder/src/shared/rsc/rscClientBrowserFallback.ts` | Fork-owned `rscDisabledRuntime.ts` + entrypoint-specific throwing modules. Disabled RSC must override resolvable optional peers and fail closed (CLI-06). |
 | `packages/cli/builder/tests/__snapshots__/{default,environment}.test.ts.snap`, `packages/runtime/plugin-runtime/tests/router/__snapshots__/templates.test.ts.snap`, `packages/server/bff-core/tests/client/__snapshots__/generateClient.test.ts.snap`, `packages/server/core/tests/utils/__snapshots__/error.test.ts.snap` | Five exact-output snapshots replaced by structured/compiler/runtime behavior checks. Do not restore generated-output oracles. |
 | `packages/runtime/render/modern.config.js` | Fork-added `rslib.config.mts`. Port upstream build-config changes there. |
 | `packages/server/utils/src/compilers/typescript/typescriptLoader.ts` | tsgo compiler path under `src/compilers/typescript/` (SRV-20). |
@@ -1264,3 +1259,19 @@ pins, complete scope and stored budgets; import-boundary review remains separate
 | `packages/document/docs/zh/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Distinguish native Hono defaults from the higher extension Effect defaults and show canonical runtime registration, application dependencies and framework helper imports. | `inline-patch` |
 | `packages/document/docs/zh/guides/advanced-features/bff/function.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
 | `packages/document/docs/zh/guides/advanced-features/bff/operators.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+
+### Disabled-RSC ownership reconciliation (2026-09-10)
+
+The earlier native-retention review traced `rscDisabledRuntime.ts` to the
+audited fallback responsibility and required preservation of its five-entry
+correctness and conflict handling. The final relocation preserves those
+contracts in `ultramodern-app-tools/src/native-composition/rsc-disabled-plugin.ts`
+through existing builder plugin composition. Native
+`rscClientBrowserFallback.ts` restores the audited implementation from
+`eded841256`, with import ordering adjusted by the formatter, and
+its native registration is restored. The native fallback alone is narrower;
+the higher composition supplies the complete corrected behavior. All six real
+compiler cases move with that policy, with four additional activation cases.
+The obsolete strict rows for the removed replacement and its old test are
+retired; this records the provenance without granting a remaining native fork
+policy budget.
