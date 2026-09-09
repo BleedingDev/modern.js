@@ -14,6 +14,47 @@ const layer = HttpApiBuilder.layer(fixtureApi).pipe(Layer.provide(handlers));
 export default defineEffectBff({api: fixtureApi, layer});`;
 
 describe('strict Effect runtime binding provenance', () => {
+  test('proves parameterized factories and handler-local declarations without trusting parameters as topology', () => {
+    const source = `${imports}
+const make = (...args: readonly [unknown]) => {
+  const [dependency] = args;
+  const group = HttpApiBuilder.group(fixtureApi, 'fixture', handlers => {
+    const handle = () => undefined;
+    return handlers.handle('get', handle);
+  });
+  const handlers = Layer.mergeAll(group).pipe(Layer.provide(dependency));
+  return assembleEffectBffRuntime({api: fixtureApi, handlers});
+};
+export default make(Layer.empty);`;
+    expect(violation(source)).toBeUndefined();
+    for (const invalid of [
+      source.replace('handlers});', 'handlers: dependency});'),
+      source.replace('api: fixtureApi', 'api: dependency'),
+      source.replace(
+        'return handlers.handle',
+        'if (false) return handlers.handle',
+      ),
+      source.replace('return handlers.handle', 'return fake.handle'),
+      source.replace(
+        'return assembleEffectBffRuntime',
+        'if (false) return assembleEffectBffRuntime',
+      ),
+      source.replace(
+        'const [dependency] = args;',
+        'const [assembleEffectBffRuntime] = args;',
+      ),
+      source.replace(
+        'const handle = () => undefined;',
+        'const handle = () => undefined; const handlers = fake;',
+      ),
+      source.replace(
+        'return handlers.handle',
+        'handlers = fake; return handlers.handle',
+      ),
+    ])
+      expect(violation(invalid)).toBeDefined();
+  });
+
   test.each([
     shared,
     direct,
