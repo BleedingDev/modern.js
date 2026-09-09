@@ -175,10 +175,7 @@ function writeAppConfigFiles({
     `${resolvedApp.directory}/src/modern-app-env.d.ts`,
     createAppEnvDts(resolvedApp, remotes, scope),
   );
-  if (
-    resolvedApp.kind !== 'shell' &&
-    resolvedApp.surfaceProfile !== 'api-only'
-  ) {
+  if (resolvedApp.surfaceProfile !== 'api-only') {
     writeFile(
       targetDir,
       `${resolvedApp.directory}/src/ultramodern-build.ts`,

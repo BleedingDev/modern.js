@@ -63,12 +63,13 @@ test('generated build module applies one compiled identity to UI, API, and deliv
   }
 });
 
-test('shell build modules expose delivery identity without unused UI or API markers', () => {
+test('shell build modules expose the delivery and UI identity consumed by their pages', () => {
   const source = createUltramodernBuildModule('acme', {
     ...app,
     kind: 'shell',
   });
   assert.match(source, /export const ultramodernDeliveryUnit/u);
-  assert.doesNotMatch(source, /export const ultramodern(?:Ui|Api)Marker/u);
+  assert.match(source, /export const ultramodernUiMarker/u);
+  assert.doesNotMatch(source, /export const ultramodernApiMarker/u);
   assert.doesNotMatch(source, /typeof|surfaces: \{[\s\S]*surfaces:/u);
 });

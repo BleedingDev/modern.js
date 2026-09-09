@@ -88,6 +88,11 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
       consumerProbe,
     );
 
+    const shellUiMarker = 'apps/shell-super-app/src/ultramodern-build.ts';
+    fs.writeFileSync(
+      path.join(workspaceRoot, shellUiMarker),
+      "export { ultramodernUiMarker } from '../shared/ultramodern-build';\n",
+    );
     const removedUiMarker = path.join(
       workspaceRoot,
       'verticals/catalog/src/ultramodern-build.ts',
@@ -116,6 +121,7 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
         'apps/shell-super-app/modern.config.ts',
         'apps/shell-super-app/module-federation.config.ts',
         'apps/shell-super-app/shared/ultramodern-build.ts',
+        shellUiMarker,
         'apps/shell-super-app/src/routes/vertical-components.tsx',
         'apps/shell-super-app/src/routes/vertical-components.worker.tsx',
         'apps/shell-super-app/src/federated-components.tsx',
@@ -130,6 +136,20 @@ test('migrate formats only proven whole-file generated artifacts and stays byte-
     ].sort((left, right) => left.localeCompare(right));
 
     assert.equal(fs.existsSync(removedUiMarker), false);
+    assert.match(
+      fs.readFileSync(path.join(workspaceRoot, shellUiMarker), 'utf8'),
+      /ultramodernUiMarker/u,
+    );
+    assert.match(
+      fs.readFileSync(
+        path.join(
+          workspaceRoot,
+          'apps/shell-super-app/shared/ultramodern-build.ts',
+        ),
+        'utf8',
+      ),
+      /export const ultramodernUiMarker/u,
+    );
     assertGeneratedFilesAreFormatted(workspaceRoot, generatedPaths);
     assert.deepEqual(
       fs.readFileSync(path.join(workspaceRoot, consumerProbePath)),
