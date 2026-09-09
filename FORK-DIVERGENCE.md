@@ -870,3 +870,10 @@ current evidence — do not cite it.
    until an identity-preserving budget carry-forward has been designed and
    reviewed. Never substitute a release tag, PR merge-base, push before-SHA, or
    `HEAD`, and never re-record a fresh snapshot to erase existing debt.
+
+### Runtime React context identity (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/context/public.ts` (split from audited `runtime.ts`) | bleedingdev | Delegate public React context identity to the fork-owned runtime helper so independently bundled federation runtime paths read the current SSR provider instead of stale context. | capped-patch |
+| `packages/runtime/plugin-runtime/src/core/context/runtime.ts` | bleedingdev | Delegate the separate internal React context identity to the same fork-owned helper; React providers continue to own per-request values. | capped-patch |

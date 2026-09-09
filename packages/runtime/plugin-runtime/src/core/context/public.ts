@@ -1,3 +1,4 @@
+import { getRuntimeReactContext } from '@modern-js/runtime-extensions/react-context';
 import type { RouteObject } from '@modern-js/runtime-utils/router';
 import { createContext, useContext } from 'react';
 import type { RequestContext } from '../types';
@@ -16,7 +17,9 @@ export interface TRuntimeContext {
   [key: string]: unknown;
 }
 
-export const RuntimeContext = createContext<TRuntimeContext>({} as any);
+export const RuntimeContext = getRuntimeReactContext('public', () =>
+  createContext<TRuntimeContext>({} as any),
+);
 
 /**
  * deprecated, use RuntimeContext instead
