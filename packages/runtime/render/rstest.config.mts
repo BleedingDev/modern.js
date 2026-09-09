@@ -18,14 +18,13 @@ export default {
       include: ['tests/ssr/htmlRoot.test.tsx'],
       resolve: {
         alias: {
-          [path.join(__dirname, 'src/rsc.ts')]: path.join(
+          // Rstest resolves tsconfig paths with forward slashes on Windows.
+          [path.join(__dirname, 'src/rsc.ts').replaceAll('\\', '/')]: path.join(
             __dirname,
             'tests/fixtures/rsc-server.ts',
           ),
-          [path.join(__dirname, 'src/rsc.worker.ts')]: path.join(
-            __dirname,
-            'tests/fixtures/rsc-server.ts',
-          ),
+          [path.join(__dirname, 'src/rsc.worker.ts').replaceAll('\\', '/')]:
+            path.join(__dirname, 'tests/fixtures/rsc-server.ts'),
           'react-server-dom-rspack/client.browser': path.join(
             __dirname,
             'tests/fixtures/rsc-client.ts',
