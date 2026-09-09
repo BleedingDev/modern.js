@@ -313,6 +313,17 @@ export function strictEffectRuntimeTopologyViolation(
       }
     };
     const layerSources = [edge, 'effect'];
+    const returned = (body: t.BlockStatement | t.Expression) => {
+      if (!t.isBlockStatement(body)) return body;
+      const statements = body.body;
+      const last = statements.at(-1);
+      return statements
+        .slice(0, -1)
+        .every(statement => t.isVariableDeclaration(statement)) &&
+        t.isReturnStatement(last)
+        ? last.argument
+        : undefined;
+    };
     const pipe = (
       node: t.CallExpression,
       check: (node: t.Node) => boolean,
@@ -334,11 +345,7 @@ export function strictEffectRuntimeTopologyViolation(
         return false;
       const parameter = node.params[0];
       if (!t.isIdentifier(parameter)) return false;
-      const body = t.isBlockStatement(node.body)
-        ? node.body.body.length === 1 && t.isReturnStatement(node.body.body[0])
-          ? node.body.body[0].argument
-          : undefined
-        : node.body;
+      const body = returned(node.body);
       const chain = (value: t.Node, count = 0): boolean => {
         value = unwrap(value);
         if (t.isIdentifier(value))
@@ -515,7 +522,9 @@ export function strictEffectRuntimeTopologyViolation(
             (!extra || transport(extra))
           );
         }
-        // Only zero-argument straight-line factories prove all return paths.
+        // Dependency parameters do not establish topology: the returned root,
+        // API and handler bindings must still be proven from lexical source.
+        // Only straight-line factories prove all return paths.
         const decl = declaration(node.callee);
         const factory =
           decl && t.isFunctionDeclaration(decl)
@@ -526,23 +535,11 @@ export function strictEffectRuntimeTopologyViolation(
           (!t.isFunctionDeclaration(factory) &&
             !t.isArrowFunctionExpression(factory) &&
             !t.isFunctionExpression(factory)) ||
-          factory.params.length ||
-          node.arguments.length ||
           !factory.body
         )
           return false;
-        if (!t.isBlockStatement(factory.body)) return runtime(factory.body);
-        const statements = factory.body.body;
-        const last = statements.at(-1);
-        return (
-          statements
-            .slice(0, -1)
-            .every(statement => t.isVariableDeclaration(statement)) &&
-          !!last &&
-          t.isReturnStatement(last) &&
-          !!last.argument &&
-          runtime(last.argument)
-        );
+        const result = returned(factory.body);
+        return !!result && runtime(result);
       });
     const root = entry.file.program.body.find(statement =>
       t.isExportDefaultDeclaration(statement),
