@@ -137,6 +137,12 @@ this record does not claim that audit passed.
 | --- | --- | --- | --- |
 | `packages/cli/builder/package.json` | bleedingdev | Resolve disabled RSC browser runtimes from the fork-owned runtime package rather than the Builder Node output. | capped-patch |
 
+### Deployed server plugin interop (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/solutions/app-tools/src/plugins/deploy/utils/generator.ts` | bleedingdev | Resolve native ESM namespace wrappers around transpiled CommonJS default factories so Module Federation's Node server plugin starts. | capped-patch |
+
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
