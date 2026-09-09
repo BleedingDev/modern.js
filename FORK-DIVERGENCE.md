@@ -883,3 +883,9 @@ current evidence — do not cite it.
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
 | `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Preserve the streaming server's end-marker sibling slot during hydration so React-generated input IDs and accessibility references use the same tree positions. | capped-patch |
+
+### Eager SSR bootstrap rejection (2026-09-09)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/cli/code.ts` | bleedingdev | Observe the eager SSR handler promise before a renderer consumes it, preventing remote startup failures from terminating Node while preserving the original rejection for request error handling. | capped-patch |
