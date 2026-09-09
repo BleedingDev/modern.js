@@ -64,6 +64,7 @@ const modernPackageCohort = [
   '@modern-js/plugin-i18n',
   '@modern-js/plugin-tanstack',
   '@modern-js/runtime',
+  '@modern-js/runtime-extensions',
 ] as const;
 
 type JsonRecord = Record<string, unknown>;

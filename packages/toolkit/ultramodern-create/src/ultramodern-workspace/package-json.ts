@@ -44,6 +44,10 @@ export function appDependencies(
       '@modern-js/plugin-i18n',
       packageSource,
     ),
+    '@modern-js/runtime-extensions': modernPackageSpecifier(
+      '@modern-js/runtime-extensions',
+      packageSource,
+    ),
     '@modern-js/runtime': modernPackageSpecifier(
       '@modern-js/runtime',
       packageSource,

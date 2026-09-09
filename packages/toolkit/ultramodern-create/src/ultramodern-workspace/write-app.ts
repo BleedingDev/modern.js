@@ -175,11 +175,16 @@ function writeAppConfigFiles({
     `${resolvedApp.directory}/src/modern-app-env.d.ts`,
     createAppEnvDts(resolvedApp, remotes, scope),
   );
-  writeFile(
-    targetDir,
-    `${resolvedApp.directory}/src/ultramodern-build.ts`,
-    createUltramodernBuildReexportModule(),
-  );
+  if (
+    resolvedApp.kind !== 'shell' &&
+    resolvedApp.surfaceProfile !== 'api-only'
+  ) {
+    writeFile(
+      targetDir,
+      `${resolvedApp.directory}/src/ultramodern-build.ts`,
+      createUltramodernBuildReexportModule(resolvedApp),
+    );
+  }
   writeFile(
     targetDir,
     `${resolvedApp.directory}/shared/ultramodern-build.ts`,
