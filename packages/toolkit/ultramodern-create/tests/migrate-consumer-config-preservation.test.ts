@@ -1318,16 +1318,16 @@ test.each([
       const expected = file.includes('/src/')
         ? authored
             .replace(
-              /(['"])@modern-js\/runtime\/module-federation\/distributed-ssr\1/gu,
-              '"@modern-js/federation-runtime/distributed-ssr"',
+              '@modern-js/runtime/module-federation/distributed-ssr',
+              '@modern-js/federation-runtime/distributed-ssr',
             )
             .replace(
-              /(['"])@modern-js\/runtime\/module-federation\1/gu,
-              '"@modern-js/federation-runtime"',
+              '@modern-js/runtime/module-federation',
+              '@modern-js/federation-runtime',
             )
             .replace(
-              /(['"])@modern-js\/runtime-extensions\/boundary-debugger\1/gu,
-              '"@modern-js/boundary-debugger"',
+              '@modern-js/runtime-extensions/boundary-debugger',
+              '@modern-js/boundary-debugger',
             )
         : authored;
       assert.equal(
@@ -1348,27 +1348,40 @@ test.each([
     ]) {
       const authored = `import ${importClause} from '@modern-js/runtime/boundary-debugger';\nexport const authored = true;\n`;
       fs.writeFileSync(runtimePath, authored);
-      run();
+      updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
       assert.equal(fs.readFileSync(runtimePath, 'utf8'), authored);
     }
     const historical = `// Historical runtime keeps its own locale resource helper.\nimport { ultramodernBoundaryDebuggerPlugin as debuggerPlugin } from '@modern-js/runtime/boundary-debugger';\nexport const flattenLocaleResource = (value: string) => ({ value });\nexport const plugins = [debuggerPlugin];\n`;
     fs.writeFileSync(runtimePath, historical);
-    run();
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
     assert.equal(
       fs.readFileSync(runtimePath, 'utf8'),
       historical.replace(
-        "'@modern-js/runtime/boundary-debugger'",
-        '"@modern-js/boundary-debugger"',
+        '@modern-js/runtime/boundary-debugger',
+        '@modern-js/boundary-debugger',
       ),
     );
-    run();
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
     assert.equal(
       fs.readFileSync(runtimePath, 'utf8'),
       historical.replace(
-        "'@modern-js/runtime/boundary-debugger'",
-        '"@modern-js/boundary-debugger"',
+        '@modern-js/runtime/boundary-debugger',
+        '@modern-js/boundary-debugger',
       ),
     );
+    fs.writeFileSync(runtimePath, historical);
+    const failingIo = createMigrationIo(root, false);
+    const write = failingIo.write;
+    failingIo.write = (filePath, source) => {
+      if (filePath === runtimePath)
+        throw new Error('native provider write failed');
+      return write(filePath, source);
+    };
+    assert.throws(
+      () => updateGeneratedTypeScriptSurfaces(failingIo, config),
+      /native provider write failed/,
+    );
+    assert.equal(fs.readFileSync(runtimePath, 'utf8'), historical);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

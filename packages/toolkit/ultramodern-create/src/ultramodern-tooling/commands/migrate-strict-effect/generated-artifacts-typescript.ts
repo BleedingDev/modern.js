@@ -75,6 +75,7 @@ function migrateGeneratedProviderImports(
     ],
   };
   let updated = source;
+  let preserveAuthoredSource = false;
   try {
     const options = {
       sourceType: 'module' as const,
@@ -112,9 +113,9 @@ function migrateGeneratedProviderImports(
       );
       if (matches.length !== 1) continue;
       edits.push({
-        start: statement.source.start!,
-        end: statement.source.end!,
-        content: JSON.stringify(matches[0].source.value),
+        start: statement.source.start! + 1,
+        end: statement.source.end! - 1,
+        content: matches[0].source.value,
       });
     }
     if (edits.length === 0) return false;
@@ -123,17 +124,21 @@ function migrateGeneratedProviderImports(
     ))
       updated =
         updated.slice(0, edit.start) + edit.content + updated.slice(edit.end);
-    if (generatedUiSourceRequiresRewrite(updated, generatedSource)) {
-      io.log(
-        `${path.relative(io.workspaceRoot, filePath)} migrated native provider imports while preserving authored source.`,
-      );
-      return io.write(filePath, updated);
-    }
+    preserveAuthoredSource = generatedUiSourceRequiresRewrite(
+      updated,
+      generatedSource,
+    );
   } catch {
     io.log(
       `${path.relative(io.workspaceRoot, filePath)} preserved authored source: native provider imports could not be proven.`,
     );
     return false;
+  }
+  if (preserveAuthoredSource) {
+    io.log(
+      `${path.relative(io.workspaceRoot, filePath)} migrated native provider imports while preserving authored source.`,
+    );
+    return io.write(filePath, updated);
   }
   return io.writeGenerated(filePath, updated);
 }
