@@ -122,7 +122,6 @@ No GraphQL branch or metadata is present in the current generated protocol surfa
 
 5. **TS7/tsgo constrains parser and public-type work.** The create package builds declarations through `tsgo:dts` and ships ESM/CJS (`packages/toolkit/create/package.json:78-99`); tests forbid compiler-API imports in generator runtime, isolate TS6 compatibility API tests, and lock generated module/DTS boundaries (`packages/toolkit/create/tests/tsgo-boundary.test.ts:65-241`). Do not implement graph extraction by importing TypeScript compiler internals into the published generator.
 
-6. **Existing migrations are specialized, not a schema framework.** `migrate-strict-effect` performs a broad but specific artifact rewrite with dry-run support (`packages/toolkit/create/src/ultramodern-tooling/commands/migrate-strict-effect.ts:49-195`), while delivery sync touches only reconstructed API apps (`packages/toolkit/create/src/ultramodern-workspace/delivery-unit-sync.ts:79-215`). Neither provides strict versioned up/down migration, transactional writes, or lossless unknown-field preservation.
 
 7. **Cloudflare and Node are distinct execution surfaces.** ADR-0018 explicitly makes Cloudflare service bindings/snapshots and Node MF runtime separate adapters (`docs/super-app-rfc-adr/ADR-0018-backend-federation-contract.md:115-185`). A shared URL loader would erase that distinction and could reintroduce the defect ADR-0018 was written to prevent.
 

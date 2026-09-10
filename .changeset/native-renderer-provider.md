@@ -18,4 +18,4 @@ Reuse the native RSC renderer for the edge worker and retire the unused runtime-
 
 Move router state and server configuration declarations to fork-owned primitives while preserving their existing public interfaces.
 
-Declare the renderer directly in generated and migrated app manifests so native runtime registration resolves under strict pnpm dependency isolation.
+Declare the renderer directly in generated app manifests so native runtime registration resolves under strict pnpm dependency isolation.

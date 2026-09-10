@@ -16,7 +16,6 @@ import {
 import {
   type BackendFederationApp,
   buildArtifactPathFor,
-  buildModulePathFor,
   COMPACT_CONFIG_PATH,
   createStampedDeliveryUnit,
   findBackendFederationApp,
@@ -74,9 +73,7 @@ export const emitBackendFederationArtifacts = async (
 
   if (hasBuildIdentity) {
     const compactConfigPath = path.join(workspaceRoot, COMPACT_CONFIG_PATH);
-    const buildIdentityPath = existsSync(buildArtifactPathFor(appDirectory))
-      ? buildArtifactPathFor(appDirectory)
-      : buildModulePathFor(appDirectory);
+    const buildIdentityPath = buildArtifactPathFor(appDirectory);
     const mismatches: string[] = [];
     const compare = (
       label: string,

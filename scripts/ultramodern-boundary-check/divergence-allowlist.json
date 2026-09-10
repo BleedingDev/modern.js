@@ -6,7 +6,7 @@
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
   "totalFiles": 807,
   "totalHunks": 3022,
-  "totalChangedLines": 50724,
+  "totalChangedLines": 50085,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -676,7 +676,7 @@
     {
       "file": "packages/document/docs/en/guides/get-started/ultramodern.mdx",
       "hunks": 1,
-      "changedLines": 533
+      "changedLines": 452
     },
     {
       "file": "packages/document/docs/en/guides/get-started/upgrade.mdx",
@@ -951,7 +951,7 @@
     {
       "file": "packages/document/docs/zh/guides/get-started/ultramodern.mdx",
       "hunks": 1,
-      "changedLines": 477
+      "changedLines": 414
     },
     {
       "file": "packages/document/docs/zh/guides/get-started/upgrade.mdx",
@@ -2041,7 +2041,7 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/router/internalProvider.test.ts",
       "hunks": 1,
-      "changedLines": 82
+      "changedLines": 67
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/router/lifecycle.test.tsx",
@@ -2071,12 +2071,12 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/router/provider-realm-isolation.test.ts",
       "hunks": 1,
-      "changedLines": 199
+      "changedLines": 71
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/router/provider.test.ts",
       "hunks": 1,
-      "changedLines": 481
+      "changedLines": 129
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/router/routeComponentChannel.test.ts",

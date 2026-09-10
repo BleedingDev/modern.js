@@ -15,8 +15,7 @@ removed `Any` / `AnyWithProps` aliases, and endpoint reflection reads
 `endpoint.identifier` instead of the removed `endpoint.name` so operation
 contracts keep their real endpoint names. The generated workspace patch for
 `effect` drops its now-dead `SchemaError` type-id hunk and keeps only the
-`preResponseHandler` declaration hunk, and `migrate-strict-effect` recognizes the
-superseded beta.97 release-age and trust-policy entries.
+`preResponseHandler` declaration hunk.
 
 将 UltraModern 的 Effect 依赖组从 `4.0.0-beta.97` 升级到 `4.0.0-beta.102`。
 `effect`、`@effect/opentelemetry` 与 `@effect/vitest` 同步升级。beta.97 的
@@ -27,5 +26,4 @@ release-age 审批被移除而非重新签发：该依赖组的所有包均于 2
 `Any` / `AnyWithProps`；端点反射改读 `endpoint.identifier` 而非已移除的
 `endpoint.name`，使 operation contract 保留真实的端点名称。生成工作区的 `effect`
 补丁移除了已失效的 `SchemaError` type-id hunk，仅保留 `preResponseHandler` 声明
-hunk，`migrate-strict-effect` 也已识别被取代的 beta.97 release-age 与 trust-policy
-条目。
+hunk。

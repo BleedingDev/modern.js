@@ -17,7 +17,7 @@ const ignoredDirectories = new Set([
 ]);
 const protectedUiRoots = Object.freeze(['apps', 'packages', 'verticals']);
 const requiredTractorCheckIds = Object.freeze([
-  'exact-create-migration',
+  'exact-create-validation',
   'exact-cohort',
   'install---frozen-lockfile',
   'format',
@@ -461,6 +461,7 @@ export {
   assertNativeTanStackSearch,
   assertVisibleTractorUi,
   assertVisibleTractorUiSummary,
+  collectPackageJsonFiles,
   promotableTractorAcceptanceMode,
   requiredTractorCheckIds,
   requiredTractorTopology,

@@ -54,7 +54,7 @@ describe('Hono parity fixture table', () => {
       crossProjectPolicy: {
         enabled: true,
         allowedNamespaces: ['crm'],
-        allowClientAssertedNamespace: true,
+        verifyProducerIdentity: expect.any(Function),
       },
     });
     expect(createParityApiHandlerInfos().map(handler => handler.name)).toEqual([

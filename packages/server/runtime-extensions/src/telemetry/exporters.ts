@@ -153,7 +153,7 @@ export function createVictoriaMetricsTelemetryExporter(
   };
 }
 
-export function maybeWarnLegacyOtlpEndpoint(endpoint: string | undefined) {
+export function warnOnMetricsOtlpEndpoint(endpoint: string | undefined) {
   if (!endpoint || !endpoint.includes('/v1/metrics')) {
     return;
   }

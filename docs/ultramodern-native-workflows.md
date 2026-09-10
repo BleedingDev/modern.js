@@ -129,66 +129,19 @@ credentials and each unit's `ULTRAMODERN_PUBLIC_URL_<APP_ID>`, then run
 `pnpm cloudflare:proof --require-public-urls`. Choose the runtime you deploy to;
 a preview is not evidence of a successful public deployment.
 
-## Update a release or migrate an old contract
-
-Use the same existing entry point for both operations, from the workspace root:
-
-```sh
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@<V> ultramodern migrate-strict-effect --version <V>
-pnpm install --frozen-lockfile
-pnpm check
-pnpm build
-```
-
-The target CLI and `--version` must select the same authenticated release cohort.
-`pnpm migrate:strict-effect --version <V>` invokes the generator already installed
-in the workspace; use it only when that generator is the intended target.
-Do not add a vertical or synchronize delivery identity just to update packages.
-
-Add `--dry-run` to preview without changing live files. It implies
-`--skip-install` and cannot prove that the registry will resolve the target lock.
-The normal migration installs the target in a private stage, preserving the
-existing lock as input, then runs the target API and workspace validators before
-promoting prepared changes. Staged `node_modules` is not promoted. The
-`pnpm install --frozen-lockfile` above installs the selected lock in the live
-workspace for check/build. An explicit `--skip-install` skips staged installation
-and target checks, leaving validation incomplete.
-
-A same-contract update changes existing framework dependency version leaves,
-the selected lock, `.modernjs/release-cohort.json`, and
-`.modernjs/ultramodern.json`'s `packageSource.modernPackageVersion`. It preserves
-application source, scripts, topology, deployment settings and delivery identity.
-A package version or compact schema number alone cannot establish compatibility.
-
-A historical migration changes a recognized old schema, generated implementation
-or configuration into the current native contract. Such source/configuration
-changes must be reported as migration. Customized code must retain its behavior
-or produce an ownership conflict; deleting it to make the checker pass is not a
-migration. Unknown legacy input requires a diagnostic, not an assumed age cutoff.
-
-The narrow same-contract path and cross-release preservation are under
-qualification. Until a release proves that path for the workspace's contract,
-treat this command as migration and inspect its preview for source/configuration
-changes. Do not infer dependency-only behavior from a successful exit alone.
-
 ## Resolve a failure
 
 | Failure | Next action |
 | --- | --- |
-| Ownership or unsupported-contract conflict | Use the named path or symbol to identify the authored behavior. Keep that behavior and resolve it through the owning framework migration. |
+| Ownership or unsupported-contract conflict | Use the named path or symbol to identify the authored behavior. Keep that behavior and resolve it in the owning framework implementation. |
 | API check exit `1` | Fix the reported consumer API diagnostic. |
 | API check exit `2` | Fix the analyzer, executable or package-resolution failure, then rerun the check. |
-| Cohort, registry or lock failure | Verify the exact target release and registry access. Retry the same migration after fixing the reported cause. |
+| Cohort, registry or lock failure | Verify the exact target release and registry access. Retry installation after fixing the reported cause. |
 | Check or build failure after installation | Use the failing stage's diagnostic; do not suppress the check or add an application compatibility shim. |
 
-Migration failure rollback and deployment rollback are separate. The migrator
-rolls back its tracked writes on failure; this does not revert a later install,
-build or application edit. After a failed run, inspect the error and workspace
-changes before retrying. Abrupt process termination during file promotion is not
-a promised crash-atomic rollback. Retain any recovery data and concurrent edits.
 For deployment rollback, select a complete previous delivery unit through the
 deployment system so its UI, API and static assets retain one identity.
 
 `pnpm exec ultramodern-create ultramodern sync-delivery-unit` explicitly
-backfills identity in an existing compact workspace. It can write topology and
+synchronizes delivery identity in the current compact workspace. It can write topology and
 `shared/ultramodern-build.{json,ts}`; it is not a routine dependency-update step.

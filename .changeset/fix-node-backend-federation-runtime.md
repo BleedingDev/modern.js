@@ -34,7 +34,7 @@ and `site.webmanifest` from a traversal-safe `dist/public` fallback even when
 they were generated after `route.json`. Cloudflare verification remains
 read-only and can no longer bless mutations made after deployment staging.
 
-Keep generated and migrated Cloudflare build scripts on the same fail-closed
+Keep generated Cloudflare build scripts on the same fail-closed
 output-verification contract, and make generated command wrappers report
 process-launch failures before exiting nonzero.
 

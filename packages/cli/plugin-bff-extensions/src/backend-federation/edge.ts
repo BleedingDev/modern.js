@@ -9,10 +9,8 @@ import {
   type BackendFederationEdgeLoadEntryPluginOptions,
   type BackendFederationEdgeRemote,
   type BackendFederationEdgeRuntimeOptions,
-  createBackendFederationRuntimeForLoad,
+  createBackendFederationRuntime,
 } from './edge-runtime';
-import type { BackendFederationExpectedIdentity } from './identity';
-import { LEGACY_LOAD_WARNING } from './legacy-warning';
 import type {
   BackendFederatedEffectApiModule,
   BackendFederationLoadOptions,
@@ -79,16 +77,6 @@ export type BackendFederationIdentityLoadOptions =
 
 export function loadBackendFederatedEffectApi(
   options: EdgeBackendFederationIdentityLoadOptions,
-): Promise<BackendFederatedEffectApiModule>;
-/** @deprecated Pass `expected` delivery-unit identity. */
-export function loadBackendFederatedEffectApi(
-  options: EdgeBackendFederationLoadOptions,
-): Promise<BackendFederatedEffectApiModule>;
-export function loadBackendFederatedEffectApi(
-  options: EdgeBackendFederationLoadOptions & {
-    expected?: BackendFederationExpectedIdentity;
-    allowMissingIdentityMetadata?: boolean;
-  },
 ): Promise<BackendFederatedEffectApiModule> {
   if (
     (options as BackendFederationLoadOptions).runtime !== undefined ||
@@ -108,8 +96,12 @@ export function loadBackendFederatedEffectApi(
     );
   }
 
-  if (options.expected === undefined) {
-    console.warn(LEGACY_LOAD_WARNING);
+  if (!options.expected?.unitId || !options.expected.buildMarker) {
+    return Promise.reject(
+      new Error(
+        '[BFF][Effect] Backend federation requires expected.unitId and expected.buildMarker.',
+      ),
+    );
   }
 
   const expose =
@@ -120,7 +112,7 @@ export function loadBackendFederatedEffectApi(
 
   let runtime;
   try {
-    runtime = createBackendFederationRuntimeForLoad(options);
+    runtime = createBackendFederationRuntime(options);
   } catch (error) {
     return Promise.reject(error);
   }

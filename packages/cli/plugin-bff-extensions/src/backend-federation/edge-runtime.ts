@@ -50,8 +50,7 @@ export type BackendFederationEdgeRuntimeOptions =
   };
 
 type EdgeRuntimeLoadOptions = BackendFederationEdgeRuntimeBaseOptions & {
-  allowMissingIdentityMetadata?: boolean;
-  expected?: BackendFederationExpectedIdentity;
+  expected: BackendFederationExpectedIdentity;
 };
 
 function parseRemoteRequest(request: string) {
@@ -113,9 +112,8 @@ async function resolveEdgeEntry(
 
 class EdgeBackendFederationRuntime {
   readonly #entries = new Map<string, Promise<BackendFederationEntryExports>>();
-  readonly #expected: BackendFederationExpectedIdentity | undefined;
+  readonly #expected: BackendFederationExpectedIdentity;
   readonly #hostName: string;
-  readonly #allowMissingIdentityMetadata: boolean;
   readonly #modules = new Map<string, Promise<unknown>>();
   readonly #plugins: readonly BackendFederationEdgeLoadEntryPlugin[];
   readonly #remotes: BackendFederationEdgeRemote[];
@@ -126,8 +124,6 @@ class EdgeBackendFederationRuntime {
         '[BFF][Effect] Edge backend federation does not execute entry evaluators. Register a static or service-binding entry provider.',
       );
     }
-    this.#allowMissingIdentityMetadata =
-      options.allowMissingIdentityMetadata === true;
     this.#expected = options.expected;
     this.#hostName = options.hostName;
     this.#plugins = options.plugins ?? [];
@@ -182,7 +178,6 @@ class EdgeBackendFederationRuntime {
       }
       const loaded = await factory();
       return validateLoadedBackendFederatedEffectApi(loaded, {
-        allowMissingIdentityMetadata: this.#allowMissingIdentityMetadata,
         expected: this.#expected,
         remoteName,
         remoteRequest: request,
@@ -248,11 +243,5 @@ export function createBackendFederationRuntime(
       '[BFF][Effect] Edge backend federation runtime requires expected.unitId and expected.buildMarker.',
     );
   }
-  return new EdgeBackendFederationRuntime(options);
-}
-
-export function createBackendFederationRuntimeForLoad(
-  options: EdgeRuntimeLoadOptions,
-): BackendFederationEdgeRuntime {
   return new EdgeBackendFederationRuntime(options);
 }

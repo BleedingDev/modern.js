@@ -26,13 +26,7 @@ type HttpApiGroupLike = {
 };
 
 type HttpApiEndpointLike = {
-  /**
-   * effect 4.0.0-beta.98 renamed the endpoint `name` property to `identifier`,
-   * matching `HttpApiGroup`. `name` is kept as a fallback so reflection over an
-   * older Effect build does not silently degrade to the class name.
-   */
   identifier?: unknown;
-  name?: unknown;
   method?: unknown;
   path?: unknown;
 };
@@ -40,9 +34,6 @@ type HttpApiEndpointLike = {
 function resolveEffectEndpointName(endpoint: HttpApiEndpointLike): string {
   if (typeof endpoint.identifier === 'string' && endpoint.identifier) {
     return endpoint.identifier;
-  }
-  if (typeof endpoint.name === 'string' && endpoint.name) {
-    return endpoint.name;
   }
   return '';
 }
@@ -156,7 +147,7 @@ export async function extractHttpApiFromModule(
     isValidatorAwareHandlerFactory,
     isHttpApi,
   });
-  return facts?.legacyShape ||
+  return facts?.unsupportedShape ||
     facts?.api === undefined ||
     !facts.hasRuntimeLayer ||
     (facts.createHandler !== undefined && !facts.createHandlerValidatorAware)

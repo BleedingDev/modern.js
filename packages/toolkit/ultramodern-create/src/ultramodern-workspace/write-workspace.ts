@@ -276,7 +276,11 @@ function generateUltramodernWorkspaceInPlace(
   const workspacePackageLinkingPolicy =
     resolveWorkspacePackageLinkingPolicy(packageSource);
 
-  const excludedRootTemplates = new Set([RELEASE_COHORT_PROJECTION_PATH]);
+  const excludedRootTemplates = new Set([
+    RELEASE_COHORT_PROJECTION_PATH,
+    'scripts/bootstrap-agent-skills.mjs',
+    'scripts/setup-agent-reference-repos.mjs',
+  ]);
   if (options.generateAgentFiles === false) {
     excludedRootTemplates.add('AGENTS.md.handlebars');
     excludedRootTemplates.add('CLAUDE.md.handlebars');

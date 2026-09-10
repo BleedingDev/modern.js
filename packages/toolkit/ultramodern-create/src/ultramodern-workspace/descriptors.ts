@@ -157,14 +157,14 @@ export function createVerticalDescriptor(
             stem: domain,
             prefix: `/${domain}-api`,
             consumedBy: [shellApp.id, id],
-            // Omit `protocol` for the legacy REST default so byte-identical
+            // Omit `protocol` for the default REST default so byte-identical
             // output is preserved; only `rpc` is recorded.
             ...(apiProtocol !== 'rest' ? { protocol: apiProtocol } : {}),
           },
         }
       : {}),
     // Omit `surfaceProfile` for `full-stack` so default descriptors are
-    // byte-identical to the legacy shape.
+    // byte-identical to the default shape.
     ...(preset !== 'full-stack' ? { surfaceProfile: preset } : {}),
     ...(horizontalRemote
       ? { deliveryUnitKind: 'horizontal-remote' as const }

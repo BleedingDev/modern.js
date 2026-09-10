@@ -9,8 +9,8 @@ stays small:
   exporters, SLO alerts, telemetry-aware metrics wrapping and the
   `injectTelemetryPlugin()` server plugin (runtime status + runtime fallback
   signal endpoints).
-- **Contract-gate canary autopilot** — `TelemetryCanaryOrchestrator`,
-  `ContractGateAutopilot` and the file/HTTP contract-gate snapshot stores.
+- **Contract-gate health observation** — `TelemetryHealthMonitor`,
+  `ContractGateSnapshotObserver` and the file/HTTP contract-gate snapshot stores.
 - **Module federation runtime helpers** — remote CSS collection for SSR
   (`collectDirectRemoteModuleFederationCss`, `injectModuleFederationCssPlugin()`)
   and MF asset cache-header policies (`resolveMfAssetCacheHeaders`,
@@ -26,7 +26,7 @@ identically:
 
 - `injectTelemetryPlugin()` — no-op unless `server.telemetry` is configured.
   The runtime-fallback-signal endpoint is opt-in
-  (`canary.autopilot.runtimeFallbackSignal.enabled: true`) and requires an
+  (`health.snapshotObservation.runtimeFallbackSignal.enabled: true`) and requires an
   auth token (`auth.expectedValue` / `auth.expectedValueEnv`); the
   `/_modern/runtime/status` endpoint returns a bare health probe unless the
   caller authenticates with that token.
@@ -50,7 +50,7 @@ single typed pass by `parseServerRuntimeExtensionsEnv()` in `src/env.ts`:
 | --- | --- | --- |
 | `MODERN_ENV` | _unset_ | Deployment environment name (also drives `.env.{MODERN_ENV}` loading in the server bootstrap). First candidate for the telemetry `environment` label. |
 | `NODE_ENV` | _unset_ | Standard Node.js environment name. Second candidate for the telemetry `environment` label; the final fallback is `development`. |
-| `MODERN_CONTRACT_GATES_FILE` | `.modern/contract-gates.json` (resolved against the app directory) | Path of the contract-gate snapshot file used by the canary autopilot and the runtime fallback signal endpoint when `server.telemetry.canary.autopilot.gateSnapshotPath` is not configured. |
+| `MODERN_CONTRACT_GATES_FILE` | `.modern/contract-gates.json` (resolved against the app directory) | Path of the contract-gate snapshot file used by the health observer and the runtime fallback signal endpoint when `server.telemetry.health.snapshotObservation.gateSnapshotPath` is not configured. |
 
 Exporter endpoints and the module federation remote manifest timeout are
 configured through `server.telemetry.exporters.*.endpoint` and plugin options
@@ -62,6 +62,6 @@ read only at config time by `@modern-js/app-tools` (`baseline.ts`), not at
 server runtime.
 
 One dynamic indirection cannot be statically parsed:
-`server.telemetry.canary.autopilot.runtimeFallbackSignal.auth.expectedValueEnv`
+`server.telemetry.health.snapshotObservation.runtimeFallbackSignal.auth.expectedValueEnv`
 names an arbitrary environment variable that holds the expected runtime-signal
 auth token; it is read when the auth config is normalized.

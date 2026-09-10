@@ -46,7 +46,7 @@ At least two independent reviewers are required for completion.
 | Decision ID | Proposal | Decision | Rationale | Follow-up Ticket |
 | --- | --- | --- | --- | --- |
 | D-001 | Effect-first default for cross-project APIs | Approved | Aligns with quality goals while keeping compatibility lane explicit | `modernjs-44t.2` |
-| D-002 | TanStack-first default for routing/data orchestration | Approved | Keeps modern default while preserving backward compatibility paths | `modernjs-44t.3`, `modernjs-44t.6` |
+| D-002 | TanStack-first default for routing/data orchestration | Approved | Establishes the current routing default | `modernjs-44t.3`, `modernjs-44t.6` |
 | D-003 | Compatibility-only lanes for Hono and React Router/Remix | Approved | Preserves upstream compatibility without diluting default path | `modernjs-44t.2.3.2`, `modernjs-44t.6.2` |
 | D-004 | Server-derived tenant context requirement | Approved | Mandatory for enterprise safety and tenancy isolation | `modernjs-44t.4.1` |
 | D-005 | MF runtime compatibility hard-fail + trust checks | Approved | Required for independent deploy safety under MF super-app topology | `modernjs-44t.3.1`, `modernjs-44t.3.2` |

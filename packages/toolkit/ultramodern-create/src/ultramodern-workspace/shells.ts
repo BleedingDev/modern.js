@@ -20,7 +20,7 @@ import {
  * Multi-shell model (G28). A workspace models N Shells, each its own Delivery
  * Unit with a distinct id / path / port / Module Federation host name. Default
  * generation still emits exactly one shell — the primary shell — with today's
- * id and path, so legacy output stays byte-identical; additional shells are
+ * id and path, so default output stays byte-identical; additional shells are
  * added explicitly via the `add-shell` operation.
  *
  * A Shell (CONTEXT.md) is a thin composition host: it owns top-level routing,
@@ -136,7 +136,7 @@ export function createAdditionalShellConfigEntry(
 /**
  * Resolve the configured shells collection from a compact UltraModern config
  * (G28). Always includes the primary shell; additional shells are read from the
- * additive `shells` array so a legacy single-shell config resolves to exactly
+ * additive `shells` array so a default single-shell config resolves to exactly
  * `[primaryShell]`.
  */
 export function resolveConfiguredAdditionalShells(

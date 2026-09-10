@@ -4,8 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parse } from '@babel/parser';
 import { buildSync } from 'esbuild';
-import { updateGeneratedBuildIdentityModules } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-build-identity';
-import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
+
 import { runValidate } from '../src/ultramodern-tooling/commands/validate';
 import { normalizeWorkspaceInputs } from '../src/ultramodern-tooling/config';
 import {
@@ -271,70 +270,6 @@ test('native i18next nested resources resolve every generated locale key', async
     const source = createAppRuntimeConfig(app, 'native-proof');
     expect(source).not.toContain('flattenLocaleResource');
     expect(source).toContain(']: csResource');
-  }
-});
-
-test('legacy identity projection preserves artifact-only identity and extensions without reformatting data', () => {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'native-migrate-identity-'),
-  );
-  try {
-    const relative = 'custom/app/shared/ultramodern-build.json';
-    const app = {
-      ...shellApp,
-      directory: 'custom/app',
-      deliveryUnit: identity,
-    };
-    const artifact = JSON.parse(
-      createUltramodernBuildArtifactJson('native-proof', app),
-    );
-    artifact.extra = { deployment: 'authored' };
-    artifact.surfaces.api.extraSurface = ['preserved'];
-    const source = JSON.stringify(artifact, null, '\t') + '\n';
-    fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
-    fs.writeFileSync(path.join(root, relative), source);
-    const normalized = normalizeWorkspaceInputs(root, {
-      config: {
-        schemaVersion: 1,
-        workspace: { packageScope: 'native-proof' },
-        topology: {
-          apps: [
-            {
-              id: shellApp.id,
-              kind: 'shell',
-              path: 'custom/app',
-              moduleFederation: { verticalRefs: [] },
-            },
-          ],
-        },
-      },
-    });
-    updateGeneratedBuildIdentityModules(
-      createMigrationIo(root, false),
-      normalized.config,
-    );
-    expect(fs.readFileSync(path.join(root, relative), 'utf8')).toBe(source);
-    const projected = parse(
-      fs.readFileSync(
-        path.join(root, 'custom/app/shared/ultramodern-build.ts'),
-        'utf8',
-      ),
-      { sourceType: 'module', plugins: ['typescript'] },
-    );
-    expect(
-      projected.program.body.find(
-        statement => statement.type === 'TSImportEqualsDeclaration',
-      ),
-    ).toMatchObject({
-      type: 'TSImportEqualsDeclaration',
-      id: { name: 'buildArtifact' },
-      moduleReference: {
-        type: 'TSExternalModuleReference',
-        expression: { value: './ultramodern-build.json' },
-      },
-    });
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
   }
 });
 

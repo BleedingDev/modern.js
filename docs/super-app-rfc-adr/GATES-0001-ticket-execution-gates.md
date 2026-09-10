@@ -13,7 +13,7 @@ Goals:
 
 1. Keep implementation quality consistent.
 2. Prevent silent regressions and under-validated merges.
-3. Enforce Effect-first and TanStack-first defaults while preserving upstream and migration compatibility.
+3. Enforce Effect-first and TanStack-first defaults through upstream extension points.
 
 ## 2. Gate Model
 
@@ -48,7 +48,7 @@ Required artifacts:
 
 1. Implementation evidence (code paths, config surface, behavior change summary).
 2. Runtime behavior proof for positive and negative paths.
-3. Backward-compatibility impact statement for existing Modern.js v3 behaviors.
+3. Current-contract impact statement for affected framework behavior.
 
 Pass criteria:
 
@@ -124,7 +124,7 @@ Use this structure in ticket notes/comments:
 - What changed:
 - Behavior validation commands:
 - Validation outputs:
-- Backward compatibility notes:
+- Contract impact notes:
 
 ## Gate C: Testing Proof
 - Added/updated tests:

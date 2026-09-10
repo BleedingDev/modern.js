@@ -9,8 +9,7 @@ import { isRecord } from './utils';
 export function validateLoadedBackendFederatedEffectApi(
   loaded: unknown,
   options: {
-    allowMissingIdentityMetadata?: boolean;
-    expected?: BackendFederationExpectedIdentity;
+    expected: BackendFederationExpectedIdentity;
     remoteName: string;
     remoteRequest: string;
   },
@@ -52,14 +51,10 @@ export function validateLoadedBackendFederatedEffectApi(
     );
   }
 
-  if (options.expected !== undefined) {
+  {
     const issues = validateExpectedBackendFederationIdentity(
       loaded,
       options.expected,
-      {
-        allowMissingIdentityMetadata:
-          options.allowMissingIdentityMetadata === true,
-      },
     );
     if (issues.length > 0) {
       throw new Error(

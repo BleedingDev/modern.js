@@ -12,7 +12,7 @@ import {
   createSharedContractsIndex,
   createSharedPackage,
 } from '../src/ultramodern-workspace/package-json';
-import { migratedWorkspaceScriptArtifacts } from '../src/ultramodern-workspace/workspace-scripts';
+import { createWorkspaceScriptArtifacts } from '../src/ultramodern-workspace/workspace-scripts';
 import { createWorkspace } from './helpers/workspace-kit';
 
 const service = {
@@ -100,7 +100,7 @@ describe('scope-aware native API scaffolding', () => {
     ]);
   });
   test('migration emits the owning AST helper rather than a consumer customization', () => {
-    const artifacts = migratedWorkspaceScriptArtifacts({
+    const artifacts = createWorkspaceScriptArtifacts({
       hasBackendSurface: true,
       shellOnly: false,
     });

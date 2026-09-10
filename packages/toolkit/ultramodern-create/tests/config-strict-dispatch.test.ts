@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
+
 import {
   normalizeCompactConfig,
   UnsupportedUltramodernConfigError,
@@ -107,33 +107,6 @@ test('normalization rejects each unsupported config shape at the schema boundary
         rejection.label,
       );
     }
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('migrate-strict-effect rejects an unsupported config before writing', () => {
-  const { tempRoot, workspaceDir } = createWorkspace('strict-dispatch', {
-    tempPrefix: 'um-strict-dispatch-migrate-',
-  });
-
-  try {
-    const config = readJson(workspaceDir, ultramodernConfigPath);
-    config.schemaVersion = 2;
-    writeJson(workspaceDir, ultramodernConfigPath, config);
-    const before = snapshotWorkspace(workspaceDir);
-
-    assert.throws(
-      () =>
-        runMigrateStrictEffect(['--skip-install'], {
-          workspaceRoot: workspaceDir,
-          invocationCwd: workspaceDir,
-        }),
-      (error: unknown) =>
-        error instanceof UnsupportedUltramodernConfigError &&
-        /schemaVersion 2/u.test(error.message),
-    );
-    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

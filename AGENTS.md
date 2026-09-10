@@ -30,7 +30,7 @@
 - Unit tests: `pnpm test:ut` from repo root, or `pnpm --filter <pkg> test` for a package.
 - Framework integration tests: `pnpm test:framework`
 - Builder e2e tests: `pnpm test:builder`
-- Skill regressions: `node tests/skill/run.mjs` and `node tests/skill/feature-enable.mjs`
+- Skill regressions: `node tests/skill/feature-enable.mjs`
 - Style: Biome via `biome.json`; run lint before submit.
 - Published changes need a changeset: `pnpm change`
 
@@ -44,6 +44,8 @@
 
 ## Skills Routing
 
+- Always use the `$show-me` skill when creating or rewriting a pull request description. Lead with the concrete behavior and include the smallest useful diagram, code-shape sketch, or diff next to a brief explanation; describe the final scope and relevant validation.
+- UltraModern.js has no external adoption compatibility requirement yet. Remove obsolete APIs, aliases, compatibility layers, and framework upgrade/migration machinery directly. Document the current supported contract rather than migration paths. This does not remove application database schema migrations or platform interoperability required by current features.
 - User-facing Modern.js application skills live under root `skills/<name>/`.
 - Maintainer-facing repository skills live under `scripts/skills/<name>/`.
 - `.claude/skills`, `.agents/skills`, and `.cursor/skills` are generated mirrors from `pnpm sync:skills` and should not be hand-edited.

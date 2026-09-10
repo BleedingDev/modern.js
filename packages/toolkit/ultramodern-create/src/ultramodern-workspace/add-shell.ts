@@ -1,8 +1,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMigrationIo } from '../ultramodern-tooling/commands/migrate-strict-effect/io';
-import { preserveConsumerWorkspaceArtifacts } from '../ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
 import { normalizeWorkspaceInputs } from '../ultramodern-tooling/config';
 import {
   DEVELOPMENT_OVERLAY_PATH,
@@ -55,6 +53,7 @@ import type {
   WorkspaceApp,
 } from './types';
 import { isRecord } from './types';
+import { preserveConsumerWorkspaceArtifacts } from './workspace-artifact-ownership';
 import {
   createPackagedWorkspaceValidationScript,
   createWorkspaceScriptArtifacts,
@@ -285,7 +284,7 @@ function executeAddUltramodernShell(
           .toSorted((left, right) => left - right)
       : undefined;
   const { io: ownedIo } = preserveConsumerWorkspaceArtifacts(
-    createMigrationIo(options.workspaceRoot, false),
+    options.workspaceRoot,
     [
       ...createWorkspaceScriptArtifacts({
         shellOnly: existingVerticals.length === 0,
@@ -298,7 +297,6 @@ function executeAddUltramodernShell(
       }),
       {
         relativePath: 'scripts/validate-ultramodern-workspace.mts',
-        legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
         generatedDataBinding: 'workspaceValidationContract',
         content: createPackagedWorkspaceValidationScript(
           scope,

@@ -47,7 +47,7 @@ UltraModern 的创建、更新、原生 Effect/TanStack、shell 和运行时命�
 node scripts/scan.mjs <projectDir>
 ```
 
-产出 `context.json`：判定是否 v3（v2 项目先用 `modernjs-migrate-to-v3` 升级）、列出各功能当前是否已启用、是否支持自动化。
+产出 `context.json`：判定是否 v3（仅支持 v3 项目）、列出各功能当前是否已启用、是否支持自动化。
 
 ### 步骤 2：启用功能
 

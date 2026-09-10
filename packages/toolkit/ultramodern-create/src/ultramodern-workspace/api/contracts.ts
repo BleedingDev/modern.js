@@ -138,9 +138,9 @@ export function apiTopologyMetadata(app: WorkspaceApp): JsonValue | undefined {
 
   return {
     runtime: 'effect',
-    // A missing protocol is the strict-legacy REST default. If a reader found
+    // A missing protocol is the default REST default. If a reader found
     // an explicit `rest` value in extended-v1 metadata, preserve that value on
-    // re-emission instead of silently collapsing it to the legacy shape.
+    // re-emission instead of silently collapsing it to the default shape.
     ...(app.api.protocol === undefined ? {} : { protocol: app.api.protocol }),
     bff: {
       prefix: app.api.prefix,

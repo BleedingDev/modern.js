@@ -33,10 +33,6 @@ async function createEvidenceFixture({
   createSourceName = '@modern-js/ultramodern-create',
   createTargetName = '@bleedingdev/modern-js-ultramodern-create',
   includePublishedOperationalEvidence = false,
-  includeTractorFormattingEvidence = true,
-  receiptApiOverride,
-  releaseArtifactsApiOverride,
-  releaseManifestApiOverride,
   releaseRepoRoot = repoRoot,
   sourceIdentity = source,
 } = {}) {
@@ -76,11 +72,9 @@ async function createEvidenceFixture({
     ),
     import('../lib/prepare-bleedingdev-packages/constants.mjs'),
   ]);
-  const releaseArtifactsApi =
-    releaseArtifactsApiOverride ?? currentReleaseArtifactsApi;
-  const releaseManifestApi =
-    releaseManifestApiOverride ?? currentReleaseManifestApi;
-  const receiptApi = receiptApiOverride ?? currentReceiptApi;
+  const releaseArtifactsApi = currentReleaseArtifactsApi;
+  const releaseManifestApi = currentReleaseManifestApi;
+  const receiptApi = currentReceiptApi;
   const aliases = {
     [createSourceName]: createTargetName,
     '@modern-js/i18n-utils': '@bleedingdev/modern-js-i18n-utils',
@@ -196,7 +190,6 @@ async function createEvidenceFixture({
     });
     await createOperationalAcceptanceReceiptFixture({
       evidencePath,
-      legacyOperationalSummary: receiptApiOverride !== undefined,
       receipt,
       receiptApi,
     });
@@ -246,7 +239,6 @@ async function createEvidenceFixture({
       'no-js-ssr-css-root-marker',
       'no-js-stylesheet-href-dedupe',
       'no-js-ssr-failed-responses',
-      ...(receiptApiOverride ? ['no-js-screenshot'] : []),
       noJavaScriptType,
       ...(appId === 'shell-super-app'
         ? ['no-js-shell-composition-boundary']
@@ -292,7 +284,7 @@ async function createEvidenceFixture({
             createPackage: `${createTargetName}@${release.version}`,
             version: release.version,
           },
-          id: 'exact-create-migration',
+          id: 'exact-create-validation',
           status: 'passed',
         },
         {
@@ -310,7 +302,7 @@ async function createEvidenceFixture({
         },
         ...[
           'install---frozen-lockfile',
-          ...(includeTractorFormattingEvidence ? ['format'] : []),
+          'format',
           'check',
           'promotable-application-source',
           'build',
@@ -639,135 +631,6 @@ test('backfill reconstructs schema-v6 outcomes with the archived current-source 
     );
   } finally {
     fs.rmSync(fixture.root, { force: true, recursive: true });
-  }
-});
-
-test('backfill reconstructs schema-v4 outcomes with the archived historical create contract', async () => {
-  const historicalRef = 'ultramodern-v3.8.2-ultramodern.3';
-  const historicalCommit = execFileSync(
-    'git',
-    ['rev-parse', `${historicalRef}^{commit}`],
-    { encoding: 'utf8' },
-  ).trim();
-  const historicalRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'publish-outcome-v4-source-'),
-  );
-  const sourceArchivePath = path.join(historicalRoot, 'scripts.tar');
-  fs.writeFileSync(
-    sourceArchivePath,
-    execFileSync(
-      'git',
-      ['archive', '--format=tar', historicalCommit, 'scripts'],
-      { encoding: null, maxBuffer: 128 * 1024 * 1024 },
-    ),
-  );
-  execFileSync('tar', ['-xf', sourceArchivePath, '-C', historicalRoot], {
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
-  const historicalReceiptApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs',
-        ),
-      ),
-    )
-  );
-  const historicalReleaseArtifactsApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-publish/lib/prepare-bleedingdev-packages/release-artifacts.mjs',
-        ),
-      ),
-    )
-  );
-  const historicalReleaseManifestApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-publish/lib/source-create-proof/release-manifest.mjs',
-        ),
-      ),
-    )
-  );
-  const historicalOutcomeApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-publish/publish-outcome.mjs',
-        ),
-      ),
-    )
-  );
-  const fixture = await createEvidenceFixture({
-    createSourceName: '@modern-js/create',
-    createTargetName: '@bleedingdev/modern-js-create',
-    includePublishedOperationalEvidence: true,
-    // This archived contract predates the explicit formatter lifecycle step.
-    includeTractorFormattingEvidence: false,
-    receiptApiOverride: historicalReceiptApi,
-    releaseArtifactsApiOverride: historicalReleaseArtifactsApi,
-    releaseManifestApiOverride: historicalReleaseManifestApi,
-    releaseRepoRoot: historicalRoot,
-    sourceIdentity: { ...source, commit: historicalCommit },
-  });
-  const artifactDir = path.join(fixture.root, 'downloaded-outcome');
-  const artifactName = historicalOutcomeApi.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
-  const outcome = historicalOutcomeApi.createPublishOutcome(
-    createOptions(fixture, artifactName, false),
-  );
-  populateDownloadedOutcome(fixture, artifactDir);
-  const { verifyPublishOutcomeAtSourceCommit } = await import(
-    '../backfill-change-record.mjs'
-  );
-  try {
-    assert.equal(outcome.schemaVersion, 4);
-    assert.deepEqual(
-      verifyPublishOutcomeAtSourceCommit(
-        outcome,
-        artifactDir,
-        { name: artifactName },
-        {
-          commit: historicalCommit,
-          runAttempt: outcomeRunAttempt,
-          runId,
-          version: release.version,
-        },
-      ),
-      outcome,
-    );
-    fs.unlinkSync(
-      path.join(
-        artifactDir,
-        'published-acceptance-receipt.operational-independence.json',
-      ),
-    );
-    assert.throws(
-      () =>
-        verifyPublishOutcomeAtSourceCommit(
-          outcome,
-          artifactDir,
-          { name: artifactName },
-          {
-            commit: historicalCommit,
-            runAttempt: outcomeRunAttempt,
-            runId,
-            version: release.version,
-          },
-        ),
-      /does not match its schema operational evidence profile/u,
-    );
-  } finally {
-    fs.rmSync(fixture.root, { force: true, recursive: true });
-    fs.rmSync(historicalRoot, { force: true, recursive: true });
   }
 });
 

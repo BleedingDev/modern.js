@@ -12,7 +12,7 @@
 
 This package is the downstream adoption index for teams building true Micro Verticals on top of the completed Ultramodern framework base.
 
-The framework base already supplies one public preset, router seams, Module Federation SSR contracts, service-contract propagation, and release gates. This adoption package tells teams how to scaffold, extract, certify, operate, and migrate without inventing a bespoke process.
+The framework base already supplies one public preset, router seams, Module Federation SSR contracts, service-contract propagation, and release gates. This adoption package tells teams how to scaffold, extract, certify, and operate without inventing a bespoke process.
 
 ## 2. Milestone Order
 
@@ -36,8 +36,6 @@ This order is intentional:
 | How do we lay out the repo? | `WORKSPACE-0001-micro-vertical-workspace-scaffolding.md` |
 | How do we scaffold shell, remote, and service packages? | `packages/toolkit/ultramodern-create/README.md`, `packages/toolkit/ultramodern-create/template-workspace/`, and `packages/toolkit/ultramodern-create/src/ultramodern-workspace/` |
 | When should we extract a remote or service? | `GOVERNANCE-0001-micro-vertical-extraction-governance.md` |
-| How do we migrate an existing app? | `MIGRATION-PLAYBOOK-0001-existing-teams-to-mv.md` |
-| How do we migrate generated source checks? | `MIGRATION-PLAYBOOK-0002-ultramodern-shared-checks.md` |
 | How do we certify production readiness? | `OPERATIONS-0001-micro-vertical-certification-and-operations.md` |
 | Which contracts are machine-readable? | `docs/super-app-rfc-adr/contracts/` |
 | Which gates prove the package still works? | `CI-GATES-0001-check-and-artifact-map.md` |

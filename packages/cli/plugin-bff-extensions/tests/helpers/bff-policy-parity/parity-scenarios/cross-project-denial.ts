@@ -22,6 +22,7 @@ export const createCrossProjectDenialScenarios =
       'namespace_not_allowed',
       {
         'x-modernjs-bff-envelope': envelopeHeader('billing.producer-z'),
+        'x-test-verified-namespace': 'billing',
       },
     ),
   ];

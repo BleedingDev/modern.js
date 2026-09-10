@@ -35,7 +35,7 @@ export function verticalTopologyEntry(
     id: vertical.id,
     kind: vertical.kind,
     // Additive v1 extensions are emitted only when present on the descriptor.
-    // This keeps strict-legacy output byte-identical while allowing an
+    // This keeps default output byte-identical while allowing an
     // extended-v1 value to survive a read/mutate/re-emit cycle.
     ...(vertical.surfaceProfile
       ? { surfaceProfile: vertical.surfaceProfile }
