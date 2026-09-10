@@ -17,8 +17,8 @@ const createFixtureApp = async () => {
   const fixtureScope = path.join(appDir, 'node_modules', '@modern-js');
   await fs.promises.mkdir(fixtureScope, { recursive: true });
   await fs.promises.symlink(
-    path.resolve(__dirname, '../../plugin-bff'),
-    path.join(fixtureScope, 'plugin-bff'),
+    path.resolve(__dirname, '../../../server/bff-effect'),
+    path.join(fixtureScope, 'bff-effect'),
     process.platform === 'win32' ? 'junction' : 'dir',
   );
   const apiDir = path.join(appDir, 'api');
@@ -39,7 +39,7 @@ const createFixtureApp = async () => {
       HttpApiGroup,
       Layer,
       Schema,
-    } = require('@modern-js/plugin-bff/effect-client');
+    } = require('@modern-js/bff-effect/effect-client');
 
 const api = HttpApi.make('CodegenTestApi').add(
   HttpApiGroup.make('greetings').add(

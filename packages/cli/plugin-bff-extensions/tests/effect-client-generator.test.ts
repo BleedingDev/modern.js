@@ -161,7 +161,7 @@ describe('Effect client generation', () => {
       }
 
       expect(artifacts.code).toContain(
-        `from "@modern-js/plugin-bff/effect-client-runtime"`,
+        `from "@modern-js/bff-effect/effect-client-runtime"`,
       );
       expect(artifacts.code).toContain(`from "@modern-js/plugin-bff/client"`);
       expect(artifacts.declaration).toContain(

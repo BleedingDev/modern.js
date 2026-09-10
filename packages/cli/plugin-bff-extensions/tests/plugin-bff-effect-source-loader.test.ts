@@ -17,8 +17,8 @@ import apiLoader, {
   type EffectBffLoaderOptions as APILoaderOptions,
 } from '../src/effect-source-loader/rspack-loader';
 
-const pluginBffRoot = path.resolve(__dirname, '../../plugin-bff');
-const require = createRequire(path.join(pluginBffRoot, 'package.json'));
+const effectRuntimeRoot = path.resolve(__dirname, '../../../server/bff-effect');
+const require = createRequire(path.resolve(__dirname, '../package.json'));
 
 const writeFile = async (filename: string, source: string) => {
   await fs.promises.mkdir(path.dirname(filename), { recursive: true });
@@ -111,7 +111,6 @@ const buildEffectWorkerRuntimeModule = async ({
   requestId?: string;
   source: string;
 }) => {
-  await linkFixturePackage(appDir, '@modern-js/plugin-bff');
   await linkFixturePackage(appDir, '@modern-js/bff-effect');
   const wrapperSource = await runApiLoader({
     onDependency: onLoaderDependency,
@@ -136,16 +135,8 @@ const buildEffectWorkerRuntimeModule = async ({
   const result = await build({
     alias: {
       '@modern-js/bff-effect/effect-edge': path.resolve(
-        pluginBffRoot,
-        '../../server/bff-effect/src/effect/edge.ts',
-      ),
-      '@modern-js/plugin-bff/effect-edge': path.resolve(
-        pluginBffRoot,
-        'src/runtime/effect/edge.ts',
-      ),
-      '@modern-js/plugin-bff/effect-edge/dispatcher': path.resolve(
-        pluginBffRoot,
-        'src/runtime/effect/edge-dispatcher.ts',
+        effectRuntimeRoot,
+        'src/effect/edge.ts',
       ),
       '@modern-js/server-runtime-extensions/backend-federation-security':
         path.resolve(
@@ -186,19 +177,19 @@ describe('Effect source graph loading', () => {
     );
 
     try {
-      const pluginManifest = JSON.parse(
+      const runtimeManifest = JSON.parse(
         await fs.promises.readFile(
-          path.join(pluginBffRoot, 'package.json'),
+          path.join(effectRuntimeRoot, 'package.json'),
           'utf8',
         ),
       ) as {
         exports: Record<string, unknown>;
       };
-      const pluginDirectory = path.join(
+      const runtimeDirectory = path.join(
         appDir,
         'node_modules',
         '@modern-js',
-        'plugin-bff',
+        'bff-effect',
       );
       const effectDirectory = path.join(appDir, 'node_modules', 'effect');
       const runtimeTargets = (value: unknown): string[] => {
@@ -217,31 +208,31 @@ describe('Effect source graph loading', () => {
       ) => {
         for (const target of new Set(runtimeTargets(exportEntry))) {
           await writeFile(
-            path.join(pluginDirectory, target),
+            path.join(runtimeDirectory, target),
             target.endsWith('.mjs') ? esmSource : commonJsSource,
           );
         }
       };
 
       await writeFile(
-        path.join(pluginDirectory, 'package.json'),
+        path.join(runtimeDirectory, 'package.json'),
         JSON.stringify({
-          name: '@modern-js/plugin-bff',
+          name: '@modern-js/bff-effect',
           exports: {
-            './effect-client': pluginManifest.exports['./effect-client'],
-            './effect-edge': pluginManifest.exports['./effect-edge'],
+            './effect-client': runtimeManifest.exports['./effect-client'],
+            './effect-edge': runtimeManifest.exports['./effect-edge'],
           },
         }),
       );
       await writeRuntimeTargets(
-        pluginManifest.exports['./effect-client'],
+        runtimeManifest.exports['./effect-client'],
         `import { missing } from 'effect/Schema';
 export const makeSchema = () => ({ missing });`,
         `const { missing } = require('effect/Schema');
 exports.makeSchema = () => ({ missing });`,
       );
       await writeRuntimeTargets(
-        pluginManifest.exports['./effect-edge'],
+        runtimeManifest.exports['./effect-edge'],
         `import { missing } from 'effect/Schema';
 export const decode = schema =>
   schema.missing === missing ? 'missing' : Number(schema.missing);`,
@@ -267,8 +258,8 @@ exports.decode = schema =>
       const entryPath = path.join(appDir, 'api.cjs');
       await writeFile(
         entryPath,
-        `const client = require('@modern-js/plugin-bff/effect-client');
-const edge = require('@modern-js/plugin-bff/effect-edge');
+        `const client = require('@modern-js/bff-effect/effect-client');
+const edge = require('@modern-js/bff-effect/effect-edge');
 module.exports = edge.decode(client.makeSchema());`,
       );
 
@@ -354,14 +345,14 @@ exports.default = {
     try {
       const apiDir = path.join(appDir, 'api');
       const entryFile = path.join(apiDir, 'index.js');
-      const source = `const { HttpApi, HttpApiEndpoint, HttpApiGroup, Layer, Schema } = require('@modern-js/plugin-bff/effect-client');
+      const source = `const { HttpApi, HttpApiEndpoint, HttpApiGroup, Layer, Schema } = require('@modern-js/bff-effect/effect-client');
 const api = HttpApi.make('LoaderRequestIdApi').add(
   HttpApiGroup.make('catalog').add(
     HttpApiEndpoint.get('readiness', '/readiness', { success: Schema.Boolean }),
   ),
 );
 module.exports = { api, layer: Layer.empty };`;
-      await linkFixturePackage(appDir, '@modern-js/plugin-bff');
+      await linkFixturePackage(appDir, '@modern-js/bff-effect');
       await writeFile(
         path.join(appDir, 'package.json'),
         JSON.stringify({ name: 'package-fallback', version: '1.0.0' }),
@@ -530,7 +521,7 @@ import {
   Layer,
   Schema,
   useEffectContext,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/bff-effect/effect-edge';
 
 const api = HttpApi.make('WorkerDefineApi').add(
   HttpApiGroup.make('status').add(
@@ -621,7 +612,7 @@ import {
   HttpApiGroup,
   Layer,
   Schema,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/bff-effect/effect-edge';
 
 export const api = HttpApi.make('WorkerContractApi').add(
   HttpApiGroup.make('status').add(
@@ -748,7 +739,7 @@ import {
   Layer,
   Schema,
   useEffectContext,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/bff-effect/effect-edge';
 
 export const api = HttpApi.make('WorkerRawApi').add(
   HttpApiGroup.make('status').add(
@@ -836,7 +827,7 @@ import {
   Layer,
   Schema,
   useEffectContext,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/bff-effect/effect-edge';
 
 const disposeMarker = Symbol.for(${JSON.stringify(disposeMarker.description)});
 const api = HttpApi.make('WorkerDisposalApi').add(

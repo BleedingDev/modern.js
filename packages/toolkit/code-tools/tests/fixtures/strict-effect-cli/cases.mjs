@@ -28,10 +28,15 @@ export const positives = {
     ),
   },
   'node-split': {
-    source: direct.replace(
-      "import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';",
-      "import { defineEffectBff } from '@modern-js/bff-effect/effect';\nimport { HttpApiBuilder } from 'effect/unstable/httpapi';\nimport * as Layer from 'effect/Layer';",
-    ),
+    source: direct
+      .replace(
+        "import { assembleEffectBffRuntime } from '@fixture/shared-contracts/server/effect-bff-runtime';",
+        '',
+      )
+      .replace(
+        "import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';",
+        "import { defineEffectBff } from '@modern-js/bff-effect/effect';\nimport { HttpApiBuilder } from 'effect/unstable/httpapi';\nimport * as Layer from 'effect/Layer';",
+      ),
   },
   shared: { source: cleanShared },
   factory: {

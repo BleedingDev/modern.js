@@ -1,3 +1,7 @@
+import path from 'node:path';
+import type { AppTools } from '@modern-js/app-tools';
+import { createPluginManager } from '@modern-js/plugin';
+import { createContext, initPluginAPI } from '@modern-js/plugin/cli';
 import { bffPlugin as nativeBffPlugin } from '../../plugin-bff/src/cli';
 import { bffPlugin } from '../src';
 
@@ -16,25 +20,50 @@ rstest.mock('@modern-js/plugin-bff-extensions/client-generator', () => {
 });
 
 test('Hono composition registers native hooks without resolving or importing Effect', async () => {
-  const hooks = nativeBffPlugin().registryHooks!;
-  let bundler: (chain: unknown, utils: { isServer: boolean }) => Promise<void>;
-  const api = {
-    config: rstest.fn(),
-    getHooks: () => hooks,
-    getConfig: () => ({ bff: { runtimeFramework: 'hono' } }),
-    getAppContext: () => ({ bffRuntimeFramework: 'hono' }),
-    updateAppContext: rstest.fn(),
-    onBeforeBffCompile: hooks.onBeforeBffCompile.tap,
-    onAfterBffCompile: hooks.onAfterBffCompile.tap,
-    modifyBffClientArtifacts: hooks.modifyBffClientArtifacts.tap,
-    modifyBffGeneratedEntries: hooks.modifyBffGeneratedEntries.tap,
-    modifyBundlerChain: (callback: typeof bundler) => {
-      bundler = callback;
-    },
+  const manager = createPluginManager();
+  manager.addPlugins([bffPlugin()]);
+  const plugins = manager.getPlugins();
+  const config = {
+    bff: { runtimeFramework: 'hono' },
+    source: {},
+    output: {},
+    server: {},
   };
-  await bffPlugin().setup!(api as never);
-  await bundler!({}, { isServer: false });
-  expect(api.config.mock.calls[0][0]()).toEqual({
+  const context = await createContext<AppTools>({
+    appContext: {
+      appDirectory: __dirname,
+      apiDirectory: path.join(__dirname, 'api'),
+      lambdaDirectory: path.join(__dirname, 'api/lambda'),
+      plugins,
+    } as never,
+    config: config as never,
+    normalizedConfig: config as never,
+  });
+  const api = initPluginAPI<AppTools>({ context, pluginManager: manager });
+  for (const plugin of plugins) await plugin.setup?.(api);
+  const descriptors = await api
+    .getHooks()
+    ._internalServerPlugins.call({ plugins: [] });
+  expect(descriptors.plugins).toEqual([
+    {
+      name: '@modern-js/plugin-bff/server-plugin',
+      options: {
+        runtimeAdapters: {
+          effect: '@modern-js/plugin-bff-extensions/effect-adapter',
+        },
+        honoRouteBinder: '@modern-js/plugin-bff-extensions/hono/node',
+      },
+    },
+  ]);
+  await api.getHooks().modifyBundlerChain.call(
+    {} as never,
+    {
+      isServer: false,
+      CHAIN_ID: { RULE: { JS: 'js' } },
+    } as never,
+  );
+  const configurations = await api.getHooks().config.call();
+  expect(configurations).toContainEqual({
     bff: {
       requestCreator: '@modern-js/runtime-extensions/request-policy',
       runtimeCreateRequest: '@modern-js/runtime-extensions/request-policy',
@@ -43,9 +72,7 @@ test('Hono composition registers native hooks without resolving or importing Eff
       ),
     },
   });
-  expect(api.updateAppContext).toHaveBeenCalledWith({
-    bffRuntimeFramework: 'hono',
-  });
+  expect(api.getAppContext().bffRuntimeFramework).toBe('hono');
 });
 
 describe('optional Effect peer', () => {
