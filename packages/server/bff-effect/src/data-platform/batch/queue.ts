@@ -307,15 +307,14 @@ export function createBatchTransportQueue({
     abortBatchIfUnused?.();
   };
 
-  const runSingle = (request: QueuedBatchRequest) => {
-    return runWithSignal(request.lifetime.signal, async () => {
+  const runSingle = (request: QueuedBatchRequest) =>
+    runWithSignal(request.lifetime.signal, async () => {
       const response = await baseFetch(
         request.requestInput,
         request.requestInit,
       );
       return parseResponseLikeCreateRequest(response);
     });
-  };
 
   const settleRequests = async (
     items: QueuedBatchRequest[],

@@ -9,8 +9,8 @@ export default defineConfig({
       ...config.source,
       define: {
         ...config.source?.define,
-        'process.env.MODERN_EFFECT_NODE_RUNTIME': JSON.stringify(
-          config.output?.target === 'node' ? 'true' : 'false',
+        __MODERN_EFFECT_NODE_RUNTIME__: JSON.stringify(
+          config.output?.target === 'node',
         ),
       },
     },

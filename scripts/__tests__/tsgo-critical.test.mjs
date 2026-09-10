@@ -31,8 +31,8 @@ test('critical Effect TS-Go compiler resolves through the public framework API',
   assert.equal(compiler.includes('node_modules/.bin/effect-tsgo'), false);
 });
 
+const effectFrameworkConfig = 'packages/server/bff-effect/tsconfig.json';
 const frameworkConfigs = [
-  'packages/cli/plugin-bff/tsconfig.json',
   'packages/runtime/plugin-tanstack/tsconfig.tsgo.json',
   'packages/runtime/plugin-runtime/tsconfig.tsgo.json',
 ];
@@ -53,11 +53,16 @@ test('all nine critical configs remain covered; consumers keep every strict diag
     .split('\n')
     .map(line => line.trim())
     .filter(line => line && !line.startsWith('#'));
-  assert.deepEqual(configs, [...frameworkConfigs, ...consumerConfigs]);
+  assert.deepEqual(configs, [
+    effectFrameworkConfig,
+    ...frameworkConfigs,
+    ...consumerConfigs,
+  ]);
   const strict = Object.fromEntries(
     effectDiagnostics.map(name => [name, 'error']),
   );
   for (const config of [
+    effectFrameworkConfig,
     ...consumerConfigs,
     'packages/new-framework/tsconfig.json',
   ]) {
@@ -88,7 +93,7 @@ function compileFixture(config, source) {
     // Resolve real installed Effect and Node declarations through their declared
     // framework consumer. No mock compiler or global dependency is involved.
     const require = createRequire(
-      join(repoRoot, 'packages/cli/plugin-bff/package.json'),
+      join(repoRoot, 'packages/server/bff-effect/package.json'),
     );
     const effectRoot = dirname(require.resolve('effect/package.json'));
     const nodeTypesRoot = dirname(require.resolve('@types/node/package.json'));
@@ -141,19 +146,25 @@ test('native Promise APIs and build constants pass only the framework profile', 
 `;
   const framework = compileFixture(frameworkConfigs[0], source);
   assert.equal(framework.status, 0, framework.output);
-  const consumer = compileFixture(consumerConfigs[0], source);
-  assert.equal(consumer.status, 1, consumer.output);
-  assert.match(consumer.output, /effect\(asyncFunction\)/);
-  assert.match(consumer.output, /effect\(processEnv\)/);
+  for (const config of [effectFrameworkConfig, consumerConfigs[0]]) {
+    const strict = compileFixture(config, source);
+    assert.equal(strict.status, 1, strict.output);
+    assert.match(strict.output, /effect\(asyncFunction\)/);
+    assert.match(strict.output, /effect\(processEnv\)/);
+  }
 });
 
-test('Effect correctness and TypeScript errors remain fatal in both profiles', () => {
+test('Effect correctness and TypeScript errors remain fatal in framework and strict profiles', () => {
   const source = `import { Effect } from 'effect';
 Effect.succeed(1);
 export const environment = Effect.sync(() => process.env.VALUE);
 export const invalid: string = 1;
 `;
-  for (const config of [frameworkConfigs[0], consumerConfigs[0]]) {
+  for (const config of [
+    frameworkConfigs[0],
+    effectFrameworkConfig,
+    consumerConfigs[0],
+  ]) {
     const result = compileFixture(config, source);
     assert.equal(result.status, 1, result.output);
     assert.match(result.output, /effect\(floatingEffect\)/);

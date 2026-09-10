@@ -1,14 +1,34 @@
+import * as Logger from 'effect/Logger';
 import type { DataBatchResponsePayload } from '../src/data-platform';
 import { decodeBatchBody } from '../src/data-platform/batch/protocol';
+import {
+  BatchItemTimeoutError,
+  promiseWithTimeout,
+} from '../src/effect/handler/batch';
 import { createDataPlatformBatchRequestHandler } from '../src/effect/handler/batch-handler';
 
 describe('Effect batch operation boundary', () => {
+  test('preserves the timeout instance passed to cancellation and rejection', async () => {
+    let cancellationError: BatchItemTimeoutError | undefined;
+    const pending = new Promise<never>(() => undefined);
+    const failure = await promiseWithTimeout(pending, 1, error => {
+      cancellationError = error;
+    }).catch(error => error);
+
+    expect(failure).toBe(cancellationError);
+    expect(failure).toBeInstanceOf(BatchItemTimeoutError);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.name).toBe('Error');
+    expect(failure.message).toBe('Batch item timeout after 1ms');
+  });
+
   test('isolates mixed item failures without leaking diagnostics or changing order', async () => {
-    const loggedErrors: unknown[][] = [];
+    const loggedErrors: unknown[] = [];
     const loggerSpy = rs
-      .spyOn(console, 'error')
-      .mockImplementation((...args: unknown[]) => {
-        loggedErrors.push(args);
+      .spyOn(Logger.defaultLogger, 'log')
+      .mockImplementation(({ message, logLevel }) => {
+        expect(logLevel).toBe('Error');
+        loggedErrors.push(message);
       });
     const abortedIds: string[] = [];
     const thrownSecret = 'postgres://admin:secret@example.test/private';
@@ -110,7 +130,7 @@ describe('Effect batch operation boundary', () => {
       ]);
       expect(abortedIds).toEqual(['timeout']);
 
-      expect(loggedErrors.map(args => args[0])).toEqual([
+      expect(loggedErrors.flat()).toEqual([
         {
           event: 'bff.batch.item.failure',
           batchId: 'boundary-batch',

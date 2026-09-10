@@ -1,4 +1,5 @@
 // @effect-diagnostics anyUnknownInErrorContext:off asyncFunction:off globalDate:off globalTimers:off newPromise:off strictBooleanExpressions:off
+import * as Effect from 'effect/Effect';
 import {
   type DataBatchResponsePayload,
   DEFAULT_DATA_BATCH_HEADER,
@@ -417,14 +418,16 @@ export function createDataPlatformBatchRequestHandler<TContext>(options: {
           );
         } catch (error) {
           if (error instanceof BatchItemTimeoutError) {
-            console.error({
-              event: 'bff.batch.item.timeout',
-              batchId: payload.batchId,
-              itemId,
-              method: itemMethod,
-              path: itemPathname,
-              errorName: error.name,
-            });
+            Effect.runSync(
+              Effect.logError({
+                event: 'bff.batch.item.timeout',
+                batchId: payload.batchId,
+                itemId,
+                method: itemMethod,
+                path: itemPathname,
+                errorName: error.name,
+              }),
+            );
             return toBatchItemError(
               itemId,
               504,
@@ -435,14 +438,16 @@ export function createDataPlatformBatchRequestHandler<TContext>(options: {
             return toBatchResponseItem(itemId, error, itemMethod === 'HEAD');
           }
 
-          console.error({
-            event: 'bff.batch.item.failure',
-            batchId: payload.batchId,
-            itemId,
-            method: itemMethod,
-            path: itemPathname,
-            errorName: error instanceof Error ? error.name : 'UnknownError',
-          });
+          Effect.runSync(
+            Effect.logError({
+              event: 'bff.batch.item.failure',
+              batchId: payload.batchId,
+              itemId,
+              method: itemMethod,
+              path: itemPathname,
+              errorName: error instanceof Error ? error.name : 'UnknownError',
+            }),
+          );
           return toBatchItemError(itemId, 500, 'Internal Server Error');
         } finally {
           request.signal.removeEventListener('abort', abortFromBatchRequest);

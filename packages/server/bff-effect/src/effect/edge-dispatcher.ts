@@ -4,6 +4,7 @@ import {
   type NormalizedCrossProjectPolicy,
   resolveCrossProjectRequestObservation,
 } from '@modern-js/server-runtime-extensions/bff-policy';
+import * as Effect from 'effect/Effect';
 import { toHeaderRecord } from '../headers';
 import {
   type DispatchEffectBffRequestOptions,
@@ -285,9 +286,11 @@ export async function createEffectBffEdgeDispatcher(
       disposePromise ??= (async () => {
         acceptingRequests = false;
         if (activeDispatches > 0) {
-          await new Promise<void>(resolve => {
-            resolveDrain = resolve;
-          });
+          await Effect.runPromise(
+            Effect.callback<void>(resume => {
+              resolveDrain = () => resume(Effect.void);
+            }),
+          );
         }
         await loaded.dispose?.();
       })();

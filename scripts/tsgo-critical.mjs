@@ -18,7 +18,6 @@ const tsgoBin = resolveEffectTsgoCompiler({ from: import.meta.url });
 // those contracts is not a correctness check. Consumer configs, and any newly
 // added config, retain the complete strict Effect profile by default.
 const nativeFrameworkConfigs = new Set([
-  'packages/cli/plugin-bff/tsconfig.json',
   'packages/runtime/plugin-tanstack/tsconfig.tsgo.json',
   'packages/runtime/plugin-runtime/tsconfig.tsgo.json',
 ]);

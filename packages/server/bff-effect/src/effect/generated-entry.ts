@@ -14,8 +14,9 @@ export function createEffectBffEdgeDispatcherFactory(
   return (options?: Omit<EffectBffEdgeHandlerOptions, 'module'>) => {
     const policy = options?.crossProjectPolicy;
     const crossProjectPolicy =
-      !policy ||
-      !policy.expectedOperationContracts ||
+      policy === undefined ||
+      policy === null ||
+      policy.expectedOperationContracts === null ||
       typeof policy.expectedOperationContracts !== 'object' ||
       Array.isArray(policy.expectedOperationContracts)
         ? policy
