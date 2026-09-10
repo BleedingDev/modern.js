@@ -881,7 +881,8 @@ jobs:
   # the npm-publish environment, no token secret.
   publish-sidecars:
     name: Publish the stable sidecars before the cohort
-    runs-on: namespace-profile-testing
+    # npm provenance rejects self-hosted runners, including Namespace.
+    runs-on: ubuntu-24.04
     environment: npm-publish
     permissions:
       actions: read
@@ -959,7 +960,8 @@ jobs:
 
   publish:
     name: Publish accepted @bleedingdev tarballs
-    runs-on: namespace-profile-testing
+    # npm provenance rejects self-hosted runners, including Namespace.
+    runs-on: ubuntu-24.04
     environment: npm-publish
     permissions:
       actions: read

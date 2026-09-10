@@ -1527,6 +1527,11 @@ test('the tooling lane qualifies the whole import closure the OIDC jobs load', (
   // id-token: write. So walk the closure and check coverage against it.
   const entrypoints = new Set();
   for (const jobName of oidcJobs) {
+    assert.match(
+      parsed.jobs[jobName]['runs-on'],
+      /^ubuntu-(?:22\.04|24\.04|latest)$/u,
+      `${jobName} must use a GitHub-hosted runner for npm provenance`,
+    );
     const { runs, heredocs } = jobShellSources(parsed.jobs[jobName]);
     const jobTargets = new Set();
     for (const run of runs) {
