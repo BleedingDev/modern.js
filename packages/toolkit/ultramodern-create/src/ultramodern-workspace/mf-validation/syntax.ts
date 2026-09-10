@@ -1,223 +1,204 @@
-import type { BalancedBlock, LocatedObjectLiteral } from './types';
+import {
+  type Expression,
+  type File,
+  parse,
+  parseExpression,
+} from '@babel/parser';
+import type { LocatedObjectLiteral } from './types';
 
-function isEscaped(source: string, index: number): boolean {
-  let slashCount = 0;
-  for (
-    let cursor = index - 1;
-    cursor >= 0 && source[cursor] === '\\';
-    cursor -= 1
+type ConfigNode = Expression | File['program']['body'][number];
+
+function unwrapExpression(node: Expression): Expression {
+  while (
+    node.type === 'TSAsExpression' ||
+    node.type === 'TSSatisfiesExpression' ||
+    node.type === 'TSNonNullExpression' ||
+    node.type === 'TSTypeAssertion' ||
+    node.type === 'ParenthesizedExpression'
   ) {
-    slashCount += 1;
+    node = node.expression;
   }
-  return slashCount % 2 === 1;
+  return node;
 }
 
-function skipQuoted(source: string, start: number, quote: "'" | '"'): number {
-  for (let index = start + 1; index < source.length; index += 1) {
-    if (source[index] === quote && !isEscaped(source, index)) {
-      return index + 1;
-    }
+export function parseStaticExpression(
+  source: string | undefined,
+): Expression | undefined {
+  if (source === undefined) {
+    return undefined;
   }
-
-  return source.length;
+  try {
+    return unwrapExpression(
+      parseExpression(source, { plugins: ['typescript'] }),
+    );
+  } catch {
+    return undefined;
+  }
 }
 
-function skipLineComment(source: string, start: number): number {
-  const newline = source.indexOf('\n', start + 2);
-  return newline === -1 ? source.length : newline + 1;
+export function parseConfigModule(source: string) {
+  return parse(source, { sourceType: 'module', plugins: ['typescript'] });
 }
 
-function skipBlockComment(source: string, start: number): number {
-  const close = source.indexOf('*/', start + 2);
-  return close === -1 ? source.length : close + 2;
-}
-
-function skipTemplateExpression(source: string, start: number): number {
-  let depth = 1;
-
-  for (let index = start + 1; index < source.length; index += 1) {
-    const char = source[index];
-    const next = source[index + 1];
-
-    if (char === "'") {
-      index = skipQuoted(source, index, "'") - 1;
-      continue;
-    }
-    if (char === '"') {
-      index = skipQuoted(source, index, '"') - 1;
-      continue;
-    }
-    if (char === '`') {
-      index = skipTemplate(source, index) - 1;
-      continue;
-    }
-    if (char === '/' && next === '/') {
-      index = skipLineComment(source, index) - 1;
-      continue;
-    }
-    if (char === '/' && next === '*') {
-      index = skipBlockComment(source, index) - 1;
-      continue;
-    }
-    if (char === '{') {
-      depth += 1;
-      continue;
-    }
-    if (char === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        return index + 1;
-      }
-    }
-  }
-
-  return source.length;
-}
-
-function skipTemplate(source: string, start: number): number {
-  for (let index = start + 1; index < source.length; index += 1) {
-    const char = source[index];
-    const next = source[index + 1];
-
-    if (char === '`' && !isEscaped(source, index)) {
-      return index + 1;
-    }
-    if (char === '$' && next === '{' && !isEscaped(source, index)) {
-      index = skipTemplateExpression(source, index + 1) - 1;
-    }
-  }
-
-  return source.length;
-}
-
-export function skipSyntax(source: string, index: number): number {
-  const char = source[index];
-  const next = source[index + 1];
-
-  if (char === "'") {
-    return skipQuoted(source, index, "'");
-  }
-  if (char === '"') {
-    return skipQuoted(source, index, '"');
-  }
-  if (char === '`') {
-    return skipTemplate(source, index);
-  }
-  if (char === '/' && next === '/') {
-    return skipLineComment(source, index);
-  }
-  if (char === '/' && next === '*') {
-    return skipBlockComment(source, index);
-  }
-
-  return index;
-}
-
-function findBalanced(
+function locateExportedConfig(
   source: string,
-  start: number,
-  open: '{' | '[' | '(',
-  close: '}' | ']' | ')',
-): number | undefined {
-  let depth = 1;
+  factory: boolean,
+): LocatedObjectLiteral | undefined {
+  const module = parseConfigModule(source);
+  const constants = new Map<string, Expression>();
+  const bindingStarts = new Map<string, number | null | undefined>();
+  const resolvedBindings = new Set<string>();
+  const allowedReferences = new Set<number>();
+  const factories = new Set<string>();
+  const namespaces = new Set<string>();
+  const defaults: ConfigNode[] = [];
 
-  for (let index = start + 1; index < source.length; index += 1) {
-    const skipped = skipSyntax(source, index);
-    if (skipped !== index) {
-      index = skipped - 1;
-      continue;
+  for (const statement of module.program.body) {
+    if (
+      statement.type === 'ImportDeclaration' &&
+      statement.importKind !== 'type' &&
+      statement.source.value === '@module-federation/modern-js-v3'
+    ) {
+      for (const specifier of statement.specifiers) {
+        if (specifier.type === 'ImportNamespaceSpecifier') {
+          namespaces.add(specifier.local.name);
+        } else if (
+          specifier.type === 'ImportSpecifier' &&
+          specifier.importKind !== 'type' &&
+          (specifier.imported.type === 'Identifier'
+            ? specifier.imported.name
+            : specifier.imported.value) === 'createModuleFederationConfig'
+        ) {
+          factories.add(specifier.local.name);
+        }
+      }
     }
-
-    if (source[index] === open) {
-      depth += 1;
-      continue;
+    const declaration =
+      statement.type === 'ExportNamedDeclaration'
+        ? statement.declaration
+        : statement;
+    if (
+      declaration?.type === 'VariableDeclaration' &&
+      declaration.kind === 'const'
+    ) {
+      for (const binding of declaration.declarations) {
+        if (binding.id.type === 'Identifier' && binding.init) {
+          constants.set(binding.id.name, binding.init);
+          bindingStarts.set(binding.id.name, binding.id.start);
+        }
+      }
     }
-
-    if (source[index] === close) {
-      depth -= 1;
-      if (depth === 0) {
-        return index;
+    if (statement.type === 'ExportDefaultDeclaration') {
+      defaults.push(statement.declaration);
+    } else if (
+      statement.type === 'ExportNamedDeclaration' &&
+      !statement.source &&
+      statement.exportKind !== 'type'
+    ) {
+      for (const specifier of statement.specifiers) {
+        if (
+          specifier.type === 'ExportSpecifier' &&
+          specifier.exportKind !== 'type' &&
+          (specifier.exported.type === 'Identifier'
+            ? specifier.exported.name
+            : specifier.exported.value) === 'default'
+        ) {
+          defaults.push(specifier.local);
+        }
       }
     }
   }
 
-  return undefined;
-}
-
-function skipWhitespaceAndComments(source: string, start: number): number {
-  let index = start;
-
-  while (index < source.length) {
-    const char = source[index];
-    const next = source[index + 1];
-
-    if (/\s/u.test(char ?? '')) {
-      index += 1;
-      continue;
+  const resolve = (
+    node: ConfigNode | undefined,
+    seen = new Set<string>(),
+  ): ConfigNode | undefined => {
+    if (!node) return undefined;
+    if (node.type === 'Identifier') {
+      if (seen.has(node.name)) return undefined;
+      seen.add(node.name);
+      resolvedBindings.add(node.name);
+      if (node.start != null) allowedReferences.add(node.start);
+      const bindingStart = bindingStarts.get(node.name);
+      if (bindingStart != null) allowedReferences.add(bindingStart);
+      return resolve(constants.get(node.name), seen);
     }
-    if (char === '/' && next === '/') {
-      index = skipLineComment(source, index);
-      continue;
+    if (
+      node.type === 'TSAsExpression' ||
+      node.type === 'TSSatisfiesExpression' ||
+      node.type === 'TSNonNullExpression' ||
+      node.type === 'TSTypeAssertion' ||
+      node.type === 'ParenthesizedExpression'
+    ) {
+      return resolve(node.expression, seen);
     }
-    if (char === '/' && next === '*') {
-      index = skipBlockComment(source, index);
-      continue;
-    }
+    return node;
+  };
 
-    return index;
+  if (defaults.length !== 1) return undefined;
+  let node = resolve(defaults[0]);
+  if (factory) {
+    if (node?.type !== 'CallExpression' || node.arguments.length !== 1)
+      return undefined;
+    const callee = node.callee;
+    const supported =
+      (callee.type === 'Identifier' && factories.has(callee.name)) ||
+      (callee.type === 'MemberExpression' &&
+        !callee.computed &&
+        callee.object.type === 'Identifier' &&
+        namespaces.has(callee.object.name) &&
+        callee.property.type === 'Identifier' &&
+        callee.property.name === 'createModuleFederationConfig');
+    if (!supported) return undefined;
+    const argument = node.arguments[0];
+    if (
+      !argument ||
+      argument.type === 'SpreadElement' ||
+      argument.type === 'ArgumentPlaceholder'
+    )
+      return undefined;
+    node = resolve(argument);
   }
-
-  return index;
-}
-
-function hasIdentifierBoundary(source: string, start: number, end: number) {
-  return (
-    !/[$\w]/u.test(source[start - 1] ?? '') && !/[$\w]/u.test(source[end] ?? '')
-  );
+  if (
+    node?.type !== 'ObjectExpression' ||
+    node.start == null ||
+    node.end == null
+  )
+    return undefined;
+  // A const object can still be mutated or passed to arbitrary code. Only
+  // references followed along the exported config chain are statically safe.
+  const hasOtherReference = (value: unknown): boolean => {
+    if (!value || typeof value !== 'object') return false;
+    if (Array.isArray(value)) return value.some(hasOtherReference);
+    const entry = value as Record<string, unknown>;
+    if (
+      entry.type === 'Identifier' &&
+      typeof entry.name === 'string' &&
+      resolvedBindings.has(entry.name) &&
+      (typeof entry.start !== 'number' || !allowedReferences.has(entry.start))
+    )
+      return true;
+    return Object.entries(entry).some(
+      ([key, child]) =>
+        key !== 'loc' &&
+        key !== 'comments' &&
+        key !== 'leadingComments' &&
+        key !== 'trailingComments' &&
+        hasOtherReference(child),
+    );
+  };
+  if (hasOtherReference(module.program)) return undefined;
+  return {
+    start: node.start,
+    end: node.end,
+    source: source.slice(node.start, node.end),
+  };
 }
 
 export function locateCreateModuleFederationConfigObject(
   source: string,
 ): LocatedObjectLiteral | undefined {
-  const callee = 'createModuleFederationConfig';
-  let offset = 0;
-
-  while (offset < source.length) {
-    const index = source.indexOf(callee, offset);
-    if (index === -1) {
-      break;
-    }
-
-    offset = index + callee.length;
-    if (!hasIdentifierBoundary(source, index, offset)) {
-      continue;
-    }
-
-    const parenIndex = skipWhitespaceAndComments(source, offset);
-    if (source[parenIndex] !== '(') {
-      continue;
-    }
-
-    const argumentIndex = skipWhitespaceAndComments(source, parenIndex + 1);
-    if (source[argumentIndex] !== '{') {
-      throw new Error(
-        'Module Federation config must pass a static object literal to createModuleFederationConfig.',
-      );
-    }
-
-    const closeIndex = findBalanced(source, argumentIndex, '{', '}');
-    if (closeIndex === undefined) {
-      throw new Error('Module Federation config object literal is not closed.');
-    }
-
-    return {
-      end: closeIndex + 1,
-      source: source.slice(argumentIndex, closeIndex + 1),
-      start: argumentIndex,
-    };
-  }
-
-  return undefined;
+  return locateExportedConfig(source, true);
 }
 
 export function findCreateModuleFederationConfigObject(
@@ -227,54 +208,5 @@ export function findCreateModuleFederationConfigObject(
 }
 
 export function findExportDefaultObject(source: string): string | undefined {
-  const exportDefault = 'export default';
-  const index = source.indexOf(exportDefault);
-  if (index === -1) {
-    return undefined;
-  }
-
-  const objectStart = skipWhitespaceAndComments(
-    source,
-    index + exportDefault.length,
-  );
-  if (source[objectStart] !== '{') {
-    return undefined;
-  }
-
-  const objectEnd = findBalanced(source, objectStart, '{', '}');
-  if (objectEnd === undefined) {
-    throw new Error('Module Federation export default object is not closed.');
-  }
-
-  return source.slice(objectStart, objectEnd + 1);
-}
-
-export function getOuterBlock(
-  source: string,
-  open: '{' | '[',
-  close: '}' | ']',
-): BalancedBlock | undefined {
-  const trimmed = source.trim();
-  if (trimmed[0] !== open) {
-    return undefined;
-  }
-
-  const end = findBalanced(trimmed, 0, open, close);
-  if (end === undefined) {
-    return undefined;
-  }
-
-  const suffix = trimmed.slice(end + 1).trim();
-  if (
-    suffix !== '' &&
-    !suffix.startsWith('as ') &&
-    !suffix.startsWith('satisfies ')
-  ) {
-    return undefined;
-  }
-
-  return {
-    inner: trimmed.slice(1, end),
-    suffix,
-  };
+  return locateExportedConfig(source, false)?.source;
 }

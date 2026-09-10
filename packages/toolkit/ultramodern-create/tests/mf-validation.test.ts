@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { format } from 'oxfmt';
 import {
   discoverModuleFederationConfigs,
   validateModuleFederationTypes,
@@ -365,6 +366,13 @@ for (const format of ['source', 'cjs', 'esm', 'esm-node']) {
       () => inspect('export default { dts: false, exposes: dynamic() };'),
       /Cannot statically extract/u,
     );
+    assertThrowsWithMessage(
+      () =>
+        inspect(
+          '// createModuleFederationConfig({ exposes: {} });\nexport /* actual */\n default { /* properties */ dts: false, exposes: ["./Page", /* trailing */] };',
+        ),
+      /DTS cannot be disabled/u,
+    );
   });
 }
 
@@ -427,4 +435,150 @@ export default createModuleFederationConfig({
     fs.existsSync(path.join(workspaceRoot, 'config-was-executed.txt')),
     false,
   );
+});
+
+test('MF inspection follows the default export instead of comments, strings or unused factory calls', () => {
+  const realConfig = mfConfig().replace(
+    /dts: \{[\s\S]*?\n {2}\},/u,
+    'dts: false,',
+  );
+  const decoys = [
+    '// createModuleFederationConfig({ dts: false, exposes: {} });\n',
+    '/* export default { exposes: {} }; createModuleFederationConfig({}); */\n',
+    'const example = "createModuleFederationConfig({ exposes: {} })";\n',
+    'const unused = createModuleFederationConfig({ exposes: {} });\n',
+  ];
+  for (const decoy of decoys) {
+    assertThrowsWithMessage(
+      () =>
+        inspectModuleFederationConfigSource(
+          decoy + realConfig,
+          'apps/remote',
+          'module-federation.config.ts',
+        ),
+      /DTS cannot be disabled/u,
+    );
+    assertThrowsWithMessage(
+      () =>
+        inspectModuleFederationConfigSource(
+          '// ultramodern-mf: host-only\n' + decoy + mfConfig(),
+          'apps/remote',
+          'module-federation.config.ts',
+        ),
+      /declaration conflicts with actual exposes/u,
+    );
+  }
+  assert.equal(
+    inspectModuleFederationConfigSource(
+      'const example = "ultramodern-mf: host-only"; export default { exposes: {} };',
+      'apps/host',
+      'module-federation.config.ts',
+    ).hostOnlyNoExposes,
+    false,
+  );
+});
+
+test('MF inspection tolerates property comments, export line breaks and native formatter choices', async () => {
+  const source = mfConfig({
+    exposes: "[/* first */ './Widget', /* last */] as const",
+  })
+    .replace('export default', 'export /* declaration */\n default')
+    .replace('dts: {', '/* DTS ownership */ dts: /* settings */ {')
+    .replace(
+      'compilerInstance: tsgoCompilerInstance',
+      'compilerInstance: (tsgoCompilerInstance as string)',
+    )
+    .replace(
+      "tsConfigPath: './tsconfig.mf-types.json'",
+      "tsConfigPath: ('./tsconfig.mf-types.json' satisfies string)",
+    );
+  const expected = inspectModuleFederationConfigSource(
+    mfConfig(),
+    'apps/remote',
+    'module-federation.config.ts',
+  );
+  assert.deepEqual(
+    inspectModuleFederationConfigSource(
+      source,
+      'apps/remote',
+      'module-federation.config.ts',
+    ),
+    expected,
+  );
+  for (const printWidth of [80, 120, 160]) {
+    for (const singleQuote of [false, true]) {
+      for (const trailingComma of ['all', 'none'] as const) {
+        const formatted = await format('module-federation.config.ts', source, {
+          printWidth,
+          singleQuote,
+          trailingComma,
+        });
+        assert.deepEqual(
+          inspectModuleFederationConfigSource(
+            formatted.code,
+            'apps/remote',
+            'module-federation.config.ts',
+          ),
+          expected,
+        );
+      }
+    }
+  }
+});
+
+test('MF inspection resolves typed constants and imported factory aliases', () => {
+  const imports = [
+    "import { createModuleFederationConfig as defineConfig } from '@module-federation/modern-js-v3';",
+    "import * as mf from '@module-federation/modern-js-v3';",
+  ];
+  for (const [index, declaration] of imports.entries()) {
+    const source = `${declaration}
+const options = ({ exposes: { './Widget': './widget.tsx' } } satisfies Record<string, unknown>);
+const config = ${index === 0 ? 'defineConfig' : 'mf.createModuleFederationConfig'}(options);
+const exported = config;
+export { exported as default };
+`;
+    assert.deepEqual(
+      inspectModuleFederationConfigSource(
+        source,
+        'apps/remote',
+        'module-federation.config.ts',
+      ).exposes,
+      ['./Widget'],
+    );
+  }
+});
+
+test('MF inspection fails closed on dynamic, ambiguous and mutated config expressions', () => {
+  const unsupported = [
+    'export default { ...base };',
+    'export default { [key]: {} };',
+    'export default { get exposes() { return {}; } };',
+    'export default { exposes };',
+    'export default { exposes: {}, exposes: {} };',
+    'export default { exposes: ["./Widget", ...rest] };',
+    'export default { exposes: ["./Widget", ,] };',
+    `export default { exposes: \`./\${name}\` };`,
+    'export default { exposes: dynamic() };',
+    'let config = {}; export default config;',
+    'const a = b; const b = a; export default a;',
+    'const config = {}; config.exposes = dynamic(); export default config;',
+    'const config = {}; mutate(config); export default config;',
+    'const config = {}; export default config; export default {};',
+    "import { createModuleFederationConfig } from './untrusted'; export default createModuleFederationConfig({});",
+    'function createModuleFederationConfig(value) { return value; } export default createModuleFederationConfig({});',
+    'export default { exposes: {} ',
+  ];
+  for (const source of unsupported) {
+    assert.throws(
+      () =>
+        inspectModuleFederationConfigSource(
+          source,
+          'apps/remote',
+          'module-federation.config.ts',
+        ),
+      undefined,
+      source,
+    );
+  }
 });

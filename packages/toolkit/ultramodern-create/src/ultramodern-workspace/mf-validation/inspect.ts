@@ -6,6 +6,7 @@ import {
 import {
   findCreateModuleFederationConfigObject,
   findExportDefaultObject,
+  parseConfigModule,
 } from './syntax';
 import type { ModuleFederationConfigInspection } from './types';
 
@@ -81,7 +82,9 @@ function extractDtsSettings(
 }
 
 function hasHostOnlyNoExposesDeclaration(source: string): boolean {
-  return /@?ultramodern-mf\s*:?\s*(?:host-only|no-exposes)\b/iu.test(source);
+  return (parseConfigModule(source).comments ?? []).some(comment =>
+    /@?ultramodern-mf\s*:?\s*(?:host-only|no-exposes)\b/iu.test(comment.value),
+  );
 }
 
 export function inspectModuleFederationConfigSource(
