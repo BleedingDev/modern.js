@@ -128,12 +128,6 @@ export type EffectDataPlatformBatchOptions = {
    */
   maxBatchBytes?: number;
   /**
-   * Client-side micro-batch flush window in milliseconds.
-   * Server runtime ignores this value and passes it through for codegen.
-   * Defaults to `8`.
-   */
-  flushIntervalMs?: number;
-  /**
    * Maximum per-batch internal request concurrency.
    * Defaults to `4`.
    */

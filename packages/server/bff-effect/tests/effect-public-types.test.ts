@@ -47,6 +47,7 @@ import type {
   EffectApiClientFromApi,
   EffectBffDefinition,
   EffectBffRuntime,
+  EffectDataPlatformBatchOptions,
   EffectRuntimeLayer,
 } from '@modern-js/bff-effect/effect';
 
@@ -173,6 +174,8 @@ const runtime: EffectBffDefinition<typeof api, EffectRuntimeLayer> &
 
 // @ts-expect-error a server definition does not pretend to contain a client
 runtime.client;
+// @ts-expect-error server configuration no longer carries client codegen options
+const removedBatchOption: EffectDataPlatformBatchOptions = { flushIntervalMs: 8 };
 void runtime;
 `,
       );

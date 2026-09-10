@@ -185,7 +185,6 @@ export default defineConfig({
     endpoint: '/_data/batch',
     maxBatchSize: 16,
     maxBatchBytes: 64 * 1024,
-    flushIntervalMs: 8,
     maxConcurrency: 4,
     requestTimeoutMs: 10000,
     allowedMethods: ['GET'],
@@ -219,9 +218,9 @@ export default defineConfig({
 });
 ```
 
-`batch.flushIntervalMs` controls the client-side micro-batch window in the generated Effect client. `maxConcurrency` and `requestTimeoutMs` are applied by the server batch gateway when dispatching items.
+`maxConcurrency` and `requestTimeoutMs` control the server batch gateway. Native `HttpApiClient` calls send individual requests; they do not automatically batch requests.
 
-The generated `api.client.*` API only exists for loader-materialized `@api/index` imports. Directly importing the server entry (`api/index`) exposes the Effect BFF definition; its `client` property is a placeholder that fails on operation access.
+Import a shared `HttpApi` contract and pass it to `HttpApiClient.make` or `makeEffectHttpApiClient`. The client is fully type-inferred; `defineEffectBff` exposes server handlers and does not contain a client.
 
 ## Effect cohort
 

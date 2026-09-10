@@ -4,9 +4,9 @@
   "upstreamRef": "2f4d9c4559e26209a0d77f02c6757f29fe3699a2",
   "pathspec": ["packages"],
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
-  "totalFiles": 812,
-  "totalHunks": 3030,
-  "totalChangedLines": 51849,
+  "totalFiles": 807,
+  "totalHunks": 3022,
+  "totalChangedLines": 50716,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -216,7 +216,7 @@
     {
       "file": "packages/cli/plugin-bff/src/utils/client-generator/package-json.ts",
       "hunks": 1,
-      "changedLines": 172
+      "changedLines": 181
     },
     {
       "file": "packages/cli/plugin-bff/src/utils/client-generator/type-facade.ts",
@@ -226,7 +226,7 @@
     {
       "file": "packages/cli/plugin-bff/src/utils/client-generator/write-package.ts",
       "hunks": 1,
-      "changedLines": 156
+      "changedLines": 170
     },
     {
       "file": "packages/cli/plugin-bff/src/utils/clientGenerator.ts",
@@ -251,7 +251,7 @@
     {
       "file": "packages/cli/plugin-bff/src/utils/runtimeGenerator.ts",
       "hunks": 5,
-      "changedLines": 111
+      "changedLines": 115
     },
     {
       "file": "packages/cli/plugin-bff/tests/bffBuildHooks.test.ts",
@@ -291,7 +291,7 @@
     {
       "file": "packages/cli/plugin-bff/tests/regression.test.ts",
       "hunks": 1,
-      "changedLines": 225
+      "changedLines": 118
     },
     {
       "file": "packages/cli/plugin-bff/tests/server.test.ts",
@@ -1106,7 +1106,7 @@
     {
       "file": "packages/runtime/plugin-i18n/rstest.config.mts",
       "hunks": 1,
-      "changedLines": 49
+      "changedLines": 47
     },
     {
       "file": "packages/runtime/plugin-i18n/src/cli/index.ts",
@@ -1346,7 +1346,7 @@
     {
       "file": "packages/runtime/plugin-i18n/tests/i18nUtils.test.ts",
       "hunks": 1,
-      "changedLines": 94
+      "changedLines": 60
     },
     {
       "file": "packages/runtime/plugin-i18n/tests/link.test.tsx",
@@ -1369,14 +1369,9 @@
       "changedLines": 176
     },
     {
-      "file": "packages/runtime/plugin-i18n/tests/peerCohort.test.ts",
-      "hunks": 1,
-      "changedLines": 25
-    },
-    {
       "file": "packages/runtime/plugin-i18n/tests/reactI18nextRuntimeBoundary.test.ts",
       "hunks": 1,
-      "changedLines": 198
+      "changedLines": 117
     },
     {
       "file": "packages/runtime/plugin-i18n/tests/redirectPolicy.test.ts",
@@ -1956,12 +1951,12 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/cli/ssr/loadable-bundler-plugin.test.ts",
       "hunks": 1,
-      "changedLines": 249
+      "changedLines": 232
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/core/browser/hydrate.test.tsx",
       "hunks": 1,
-      "changedLines": 80
+      "changedLines": 57
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/core/browser/stream-hydration.test.tsx",
@@ -1986,17 +1981,12 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/core/server/requestResponse.test.ts",
       "hunks": 1,
-      "changedLines": 328
+      "changedLines": 302
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/core/server/routerCleanup.test.ts",
       "hunks": 1,
       "changedLines": 157
-    },
-    {
-      "file": "packages/runtime/plugin-runtime/tests/core/server/ssrHelpers.matrix.test.ts",
-      "hunks": 1,
-      "changedLines": 184
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/document/cli.test.tsx",
@@ -2016,7 +2006,7 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/exports/loadable.test.ts",
       "hunks": 1,
-      "changedLines": 30
+      "changedLines": 18
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/fixtures/rsc-client.ts",
@@ -2029,11 +2019,6 @@
       "changedLines": 10
     },
     {
-      "file": "packages/runtime/plugin-runtime/tests/registrySurface.test.ts",
-      "hunks": 1,
-      "changedLines": 25
-    },
-    {
       "file": "packages/runtime/plugin-runtime/tests/router/__snapshots__/templates.test.ts.snap",
       "hunks": 1,
       "changedLines": 149
@@ -2041,7 +2026,7 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/router/cliExtension.test.ts",
       "hunks": 1,
-      "changedLines": 490
+      "changedLines": 351
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/router/fixtures/nested-routes/user/$.data.ts",
@@ -2086,7 +2071,7 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/router/provider-realm-isolation.test.ts",
       "hunks": 1,
-      "changedLines": 228
+      "changedLines": 199
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/router/provider.test.ts",
@@ -2101,7 +2086,7 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/router/routerHelper.test.ts",
       "hunks": 1,
-      "changedLines": 141
+      "changedLines": 105
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/router/rsc-build-boundary.test.ts",
@@ -2140,8 +2125,8 @@
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/ssr/helmet.test.ts",
-      "hunks": 2,
-      "changedLines": 16
+      "hunks": 1,
+      "changedLines": 1
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/ssr/moduleFederation.test.ts",
@@ -2176,12 +2161,12 @@
     {
       "file": "packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToString/entry.test.ts",
       "hunks": 1,
-      "changedLines": 129
+      "changedLines": 127
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/ssr/serverRender/requestHandler.test.tsx",
       "hunks": 1,
-      "changedLines": 292
+      "changedLines": 231
     },
     {
       "file": "packages/runtime/plugin-runtime/tests/ssr/serverRender/workerLifecycle.test.tsx",
@@ -2306,7 +2291,7 @@
     {
       "file": "packages/runtime/render/tests/build-artifact/ssr-externals.test.ts",
       "hunks": 1,
-      "changedLines": 167
+      "changedLines": 156
     },
     {
       "file": "packages/runtime/render/tests/fixtures/rsc-client.ts",
@@ -2671,7 +2656,7 @@
     {
       "file": "packages/server/core/tests/adapters/utils.test.ts",
       "hunks": 1,
-      "changedLines": 150
+      "changedLines": 112
     },
     {
       "file": "packages/server/core/tests/context.test.ts",
@@ -2710,8 +2695,8 @@
     },
     {
       "file": "packages/server/core/tests/utils/error.test.ts",
-      "hunks": 5,
-      "changedLines": 57
+      "hunks": 4,
+      "changedLines": 42
     },
     {
       "file": "packages/server/core/tsconfig.json",
@@ -2767,16 +2752,6 @@
       "file": "packages/server/create-request/src/utiles.ts",
       "hunks": 2,
       "changedLines": 7
-    },
-    {
-      "file": "packages/server/create-request/tests/acceptHeader.test.ts",
-      "hunks": 1,
-      "changedLines": 34
-    },
-    {
-      "file": "packages/server/create-request/tests/browser-get-body.test.ts",
-      "hunks": 1,
-      "changedLines": 30
     },
     {
       "file": "packages/server/create-request/tests/browser.test.ts",
@@ -2981,7 +2956,7 @@
     {
       "file": "packages/server/server/tests/reloadManager.test.ts",
       "hunks": 7,
-      "changedLines": 187
+      "changedLines": 169
     },
     {
       "file": "packages/server/server/tests/watcher.test.ts",
@@ -3091,7 +3066,7 @@
     {
       "file": "packages/server/utils/tests/rewriteOutput.test.ts",
       "hunks": 1,
-      "changedLines": 148
+      "changedLines": 143
     },
     {
       "file": "packages/server/utils/tests/ts.test.ts",
@@ -3101,12 +3076,12 @@
     {
       "file": "packages/server/utils/tests/tsgo.test.ts",
       "hunks": 1,
-      "changedLines": 358
+      "changedLines": 248
     },
     {
       "file": "packages/server/utils/tests/tsgoCleanup.test.ts",
       "hunks": 1,
-      "changedLines": 131
+      "changedLines": 128
     },
     {
       "file": "packages/server/utils/tsconfig.json",
@@ -3421,7 +3396,7 @@
     {
       "file": "packages/solutions/app-tools/tests/builder/index.test.ts",
       "hunks": 2,
-      "changedLines": 80
+      "changedLines": 66
     },
     {
       "file": "packages/solutions/app-tools/tests/builder/lazyCompilation.test.ts",
@@ -3440,8 +3415,8 @@
     },
     {
       "file": "packages/solutions/app-tools/tests/config/default.test.ts",
-      "hunks": 2,
-      "changedLines": 19
+      "hunks": 1,
+      "changedLines": 6
     },
     {
       "file": "packages/solutions/app-tools/tests/deploy/generator.test.ts",
@@ -3461,7 +3436,7 @@
     {
       "file": "packages/solutions/app-tools/tests/initAppContext.test.ts",
       "hunks": 1,
-      "changedLines": 86
+      "changedLines": 61
     },
     {
       "file": "packages/solutions/app-tools/tests/onPrepareCleanup.test.ts",
@@ -3476,7 +3451,7 @@
     {
       "file": "packages/solutions/app-tools/tests/rslib-template-output.test.ts",
       "hunks": 1,
-      "changedLines": 93
+      "changedLines": 71
     },
     {
       "file": "packages/solutions/app-tools/tests/serverBuild.test.ts",
@@ -3801,7 +3776,7 @@
     {
       "file": "packages/toolkit/runtime-utils/tests/node/serialize.test.ts",
       "hunks": 1,
-      "changedLines": 30
+      "changedLines": 26
     },
     {
       "file": "packages/toolkit/runtime-utils/tests/url.test.ts",

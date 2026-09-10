@@ -42,6 +42,10 @@ every PR.
 | `packages/cli/plugin-bff/src/utils/runtimeGenerator.ts` | bleedingdev | Honor an omitted request runtime and remove the previous generated runtime directory so a native inferred-client build leaves no custom client configuration module. | `extension-point` + `inline-patch` |
 | `packages/cli/plugin-bff/src/utils/client-generator/package-json.ts` | bleedingdev | Remove stale framework-managed runtime exports and type mappings when the generated runtime is omitted, while preserving unrelated authored exports. | `inline-patch` |
 | `packages/cli/plugin-bff/tests/clientGenerator.test.ts` | bleedingdev | Assert that an empty client build does not advertise a missing wildcard API export. | `inline-patch` |
+| `packages/document/docs/en/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/en/configure/app/bff/effect.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/zh/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/zh/configure/app/bff/effect.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
 
 ### 2026-09-10 native declarations and tutorial qualification
 
