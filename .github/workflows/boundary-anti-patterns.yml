@@ -51,6 +51,14 @@ jobs:
         with:
           node-version: '26.7.0'
 
+      - name: Install boundary parser dependency
+        env:
+          BOUNDARY_PARSER_DIR: ${{ runner.temp }}/ultramodern-boundary-parser
+        run: |
+          npm install --prefix "$BOUNDARY_PARSER_DIR" --no-save --ignore-scripts \
+            --no-package-lock --no-audit --no-fund '@babel/core@8.0.1'
+          printf 'NODE_PATH=%s/node_modules\n' "$BOUNDARY_PARSER_DIR" >> "$GITHUB_ENV"
+
       - name: Run boundary anti-pattern guards
         run: node scripts/boundary-guards/check-boundary-violations.js --profile scripts/boundary-guards/profile.json
 
