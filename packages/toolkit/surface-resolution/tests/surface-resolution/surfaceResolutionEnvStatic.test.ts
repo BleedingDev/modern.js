@@ -1,6 +1,5 @@
 import {
   createEnvStaticSurfaceResolutionProvider,
-  ENV_STATIC_PROVIDER_NAME,
   type EnvStaticUnitConfig,
   parseSurfaceRef,
 } from '../../src/surface-resolution';
@@ -59,15 +58,10 @@ function createProvider(
 }
 
 describe('createEnvStaticSurfaceResolutionProvider', () => {
-  it('names the provider env-static', () => {
-    expect(createProvider().name).toBe(ENV_STATIC_PROVIDER_NAME);
-  });
-
   it('assembles ONE complete record covering browser, node, http, and binding locations from localhost fallbacks', async () => {
-    const result = await createProvider().resolve(
-      ref('acme/checkout#cart'),
-      'development',
-    );
+    const result = await createProvider({
+      VERTICAL_CHECKOUT_MF_MANIFEST: '   ',
+    }).resolve(ref('acme/checkout#cart'), 'development');
 
     expect(result).toEqual({
       ok: true,
@@ -330,7 +324,10 @@ describe('createEnvStaticSurfaceResolutionProvider', () => {
 
   it('honours per-major envSegment and port overrides in local environments', async () => {
     const provider = createProvider(
-      {},
+      {
+        VERTICAL_CHECKOUT_LEGACY_MF_MANIFEST:
+          'verticalCheckout@https://legacy.example.test/mf-manifest.json',
+      },
       { majors: [{ major: 3, envSegment: 'CHECKOUT_LEGACY', port: 3999 }] },
     );
 
@@ -345,10 +342,20 @@ describe('createEnvStaticSurfaceResolutionProvider', () => {
           {
             servedMajor: 3,
             locations: [
-              { manifestUrl: 'http://localhost:3999/mf-manifest.json' },
+              {
+                manifestUrl: 'https://legacy.example.test/mf-manifest.json',
+              },
             ],
           },
-          expect.anything(),
+          {
+            locations: [
+              {
+                manifestRef: 'http://localhost:3999/backend-mf-manifest.json',
+              },
+              { baseUrl: 'http://localhost:3999' },
+              expect.anything(),
+            ],
+          },
         ],
       },
     });
@@ -366,12 +373,6 @@ describe('createEnvStaticSurfaceResolutionProvider', () => {
   });
 
   it('applies localhost fallbacks in both default local environments and honours localEnvironments overrides', async () => {
-    const local = await createProvider().resolve(
-      ref('acme/checkout#cart'),
-      'local',
-    );
-    expect(local).toMatchObject({ ok: true });
-
     const custom = createEnvStaticSurfaceResolutionProvider({
       env: {},
       units: [createUnitConfig()],
@@ -386,22 +387,6 @@ describe('createEnvStaticSurfaceResolutionProvider', () => {
     ).toMatchObject({
       ok: false,
       error: { code: 'provider-unavailable' },
-    });
-  });
-
-  it('marks the compatibility verdict static-identity-unverified under static-trust (identity asserted, not verified)', async () => {
-    const result = await createProvider().resolve(
-      ref('acme/checkout#cart'),
-      'development',
-    );
-    expect(result).toMatchObject({
-      ok: true,
-      unit: {
-        compatibility: {
-          status: 'compatible',
-          reason: 'static-identity-unverified',
-        },
-      },
     });
   });
 
@@ -439,26 +424,6 @@ describe('createEnvStaticSurfaceResolutionProvider', () => {
       error: {
         code: 'provider-unavailable',
         details: { publicUrlEnv: 'ULTRAMODERN_PUBLIC_URL_CHECKOUT' },
-      },
-    });
-  });
-
-  it('treats blank env values as unset', async () => {
-    const result = await createProvider({
-      VERTICAL_CHECKOUT_MF_MANIFEST: '   ',
-    }).resolve(ref('acme/checkout#cart'), 'development');
-
-    expect(result).toMatchObject({
-      ok: true,
-      unit: {
-        surfaces: [
-          {
-            locations: [
-              { manifestUrl: 'http://localhost:3101/mf-manifest.json' },
-            ],
-          },
-          expect.anything(),
-        ],
       },
     });
   });

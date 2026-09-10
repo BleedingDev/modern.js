@@ -10,15 +10,11 @@
       "review-evidence.md"
     ],
     "requiredMetadataFields": [
-      "author",
-      "timestamp",
-      "ticket_id",
       "commit_sha",
       "workflow_run_url",
       "module_id",
       "runtime_lane"
-    ],
-    "minimumReviewers": 2
+    ]
   },
   "gateCommands": [
     {

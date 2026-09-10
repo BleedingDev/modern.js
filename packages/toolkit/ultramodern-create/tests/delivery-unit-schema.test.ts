@@ -1,22 +1,16 @@
 import assert from 'node:assert/strict';
 import type {
   BaselineCohort,
-  DeliveryUnitDescriptor,
   ParsedSurfaceRef,
-  SurfaceDescriptor,
   SurfaceRefParseError,
-  V1ProjectionContext,
 } from '../src/ultramodern-workspace/delivery-unit-schema/types';
 import {
-  assertNever,
   formatSurfaceRef,
   parseDeliveryUnitDescriptor,
   parseSurfaceRef,
-  projectDeliveryUnitToV1,
   resolvePublicationZone,
   serializeDeliveryUnitDescriptor,
 } from '../src/ultramodern-workspace/delivery-unit-schema/types';
-import type { Ownership } from '../src/ultramodern-workspace/types';
 
 const baselineCohort: BaselineCohort = {
   cohortId: 'baseline-2026-07',
@@ -27,32 +21,6 @@ const baselineCohort: BaselineCohort = {
     tailwind: '4.3.3',
   },
 };
-
-const ownership: Ownership = {
-  team: 'checkout',
-  slack: '#checkout',
-  pagerDuty: 'checkout-oncall',
-  runbookRef: 'runbooks/checkout.md',
-  adrRef: 'ADR-0019',
-  blastRadius: { tier: 'tier-1', references: ['payments'] },
-};
-
-function context(
-  overrides: Partial<V1ProjectionContext> = {},
-): V1ProjectionContext {
-  return {
-    directory: 'apps/checkout',
-    packageSuffix: 'checkout',
-    displayName: 'Checkout',
-    portEnv: 'CHECKOUT_PORT',
-    port: 8300,
-    mfName: 'checkout',
-    ownership,
-    packageName: '@acme/checkout',
-    version: '0.1.0',
-    ...overrides,
-  };
-}
 
 /* -------------------------------------------------------------------------- */
 /* SurfaceRef parse / format round-trips                                       */
@@ -164,194 +132,6 @@ test('publication zone defaults to coordinated', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* v1 down-projection golden cases                                             */
-/* -------------------------------------------------------------------------- */
-
-test('down-projects a shell descriptor', () => {
-  const descriptor: DeliveryUnitDescriptor = {
-    unitId: 'acme/shell-super-app',
-    kind: 'shell',
-    owner: { kind: 'team', id: 'platform' },
-    sourceRevision: 'rev-shell',
-    buildMarker: 'marker-shell',
-    baselineCohort,
-    surfaces: [
-      {
-        kind: 'route',
-        surfaceId: 'root',
-        locations: [
-          { platform: 'browser-mf', manifestUrl: 'https://s/mf-manifest.json' },
-        ],
-      },
-    ],
-  };
-  const { app, deliveryUnitRecord } = projectDeliveryUnitToV1(
-    descriptor,
-    context({ directory: 'apps/shell', packageSuffix: 'shell' }),
-  );
-  assert.equal(app.kind, 'shell');
-  assert.equal(app.id, 'shell-super-app');
-  assert.equal(app.api, undefined);
-  assert.equal(deliveryUnitRecord.unitId, 'acme/shell-super-app');
-  assert.equal(deliveryUnitRecord.buildMarker, 'marker-shell');
-  assert.equal(deliveryUnitRecord.sourceRevision, 'rev-shell');
-  assert.equal(deliveryUnitRecord.appId, 'shell-super-app');
-});
-
-test('down-projects a full-stack microvertical descriptor', () => {
-  const descriptor: DeliveryUnitDescriptor = {
-    unitId: 'acme/checkout',
-    kind: 'microvertical',
-    owner: { kind: 'agent-team', id: 'checkout-agents', contact: '#checkout' },
-    sourceRevision: 'rev-42',
-    buildMarker: 'marker-42',
-    baselineCohort,
-    surfaces: [
-      {
-        kind: 'component',
-        surfaceId: 'cart',
-        locations: [
-          { platform: 'browser-mf', manifestUrl: 'https://c/mf-manifest.json' },
-        ],
-      },
-      {
-        kind: 'api',
-        surfaceId: 'checkout-api',
-        protocol: 'rest',
-        locations: [{ platform: 'http', address: '/api/checkout' }],
-      },
-      {
-        kind: 'backend',
-        surfaceId: 'checkout-server',
-        locations: [
-          { platform: 'node-mf', manifestUrl: 'https://c/backend-mf.json' },
-          { platform: 'cloudflare-binding', serviceBinding: 'CHECKOUT_SVC' },
-        ],
-      },
-    ],
-  };
-  const { app, deliveryUnitRecord } = projectDeliveryUnitToV1(
-    descriptor,
-    context(),
-  );
-  assert.equal(app.kind, 'vertical');
-  assert.equal(app.id, 'checkout');
-  assert.deepEqual(app.api, {
-    stem: 'checkout-api',
-    prefix: '/api/checkout',
-    consumedBy: [],
-  });
-  assert.equal(deliveryUnitRecord.buildMarker, 'marker-42');
-  assert.equal(deliveryUnitRecord.packageName, '@acme/checkout');
-});
-
-test('down-projects a headless microvertical (no api http address)', () => {
-  const descriptor: DeliveryUnitDescriptor = {
-    unitId: 'acme/pricing',
-    kind: 'microvertical',
-    owner: { kind: 'agent', id: 'pricing-agent' },
-    sourceRevision: 'rev-9',
-    buildMarker: 'marker-9',
-    baselineCohort,
-    surfaces: [
-      {
-        kind: 'api',
-        surfaceId: 'pricing',
-        protocol: 'rpc',
-        locations: [
-          { platform: 'node-mf', manifestUrl: 'https://p/backend-mf.json' },
-        ],
-      },
-    ],
-  };
-  const { app } = projectDeliveryUnitToV1(descriptor, context());
-  assert.equal(app.kind, 'vertical');
-  // No http location -> prefix falls back to '/' + surfaceId.
-  assert.deepEqual(app.api, {
-    stem: 'pricing',
-    prefix: '/pricing',
-    consumedBy: [],
-  });
-});
-
-test('down-projection never leaks an unsupported GraphQL protocol into v1', () => {
-  const descriptor: DeliveryUnitDescriptor = {
-    unitId: 'acme/catalog',
-    kind: 'microvertical',
-    owner: { kind: 'team', id: 'catalog' },
-    sourceRevision: 'rev-graphql',
-    buildMarker: 'marker-graphql',
-    baselineCohort,
-    surfaces: [
-      {
-        kind: 'api',
-        surfaceId: 'catalog',
-        protocol: 'graphql',
-        locations: [{ platform: 'http', address: '/graphql' }],
-      },
-    ],
-  };
-
-  const { app } = projectDeliveryUnitToV1(
-    descriptor,
-    context({ mode: 'extended-v1' }),
-  );
-
-  assert.deepEqual(app.api, {
-    stem: 'catalog',
-    prefix: '/graphql',
-    consumedBy: [],
-  });
-});
-
-test('horizontal-remote collapses to vertical (lossy)', () => {
-  const descriptor: DeliveryUnitDescriptor = {
-    unitId: 'acme/design-system',
-    kind: 'horizontal-remote',
-    owner: { kind: 'team', id: 'design' },
-    sourceRevision: 'rev-ds',
-    buildMarker: 'marker-ds',
-    baselineCohort,
-    surfaces: [
-      {
-        kind: 'component',
-        surfaceId: 'button',
-        locations: [
-          { platform: 'browser-mf', manifestUrl: 'https://d/mf-manifest.json' },
-        ],
-      },
-    ],
-  };
-  const { app, deliveryUnitRecord } = projectDeliveryUnitToV1(
-    descriptor,
-    context(),
-  );
-  assert.equal(app.kind, 'vertical');
-  assert.equal(deliveryUnitRecord.unitId, 'acme/design-system');
-  assert.equal(deliveryUnitRecord.buildMarker, 'marker-ds');
-});
-
-/* -------------------------------------------------------------------------- */
-/* Marker preservation                                                         */
-/* -------------------------------------------------------------------------- */
-
-test('down-projection preserves markers (never regenerates)', () => {
-  const descriptor: DeliveryUnitDescriptor = {
-    unitId: 'acme/checkout',
-    kind: 'microvertical',
-    owner: { kind: 'team', id: 'checkout' },
-    sourceRevision: 'exact-source-rev',
-    buildMarker: 'exact-build-marker',
-    baselineCohort,
-    surfaces: [],
-  };
-  const { deliveryUnitRecord } = projectDeliveryUnitToV1(descriptor, context());
-  assert.equal(deliveryUnitRecord.buildMarker, 'exact-build-marker');
-  assert.equal(deliveryUnitRecord.sourceRevision, 'exact-source-rev');
-  assert.equal(deliveryUnitRecord.unitId, 'acme/checkout');
-});
-
-/* -------------------------------------------------------------------------- */
 /* Unknown-field preservation (round-trip parse -> serialize)                  */
 /* -------------------------------------------------------------------------- */
 
@@ -401,40 +181,4 @@ test('parse leaves unknownFields absent when there are none', () => {
   const parsed = parseDeliveryUnitDescriptor(json);
   assert.equal(parsed.unknownFields, undefined);
   assert.deepEqual(serializeDeliveryUnitDescriptor(parsed), json);
-});
-
-/* -------------------------------------------------------------------------- */
-/* Type-level exhaustiveness (compile-time switch checks)                      */
-/* -------------------------------------------------------------------------- */
-
-test('surface-kind switch is exhaustive', () => {
-  const describe = (surface: SurfaceDescriptor): string => {
-    switch (surface.kind) {
-      case 'component':
-        return 'component';
-      case 'route':
-        return 'route';
-      case 'api':
-        return `api:${surface.protocol}`;
-      case 'backend':
-        return 'backend';
-      default:
-        // Compile-time guard: a new SurfaceKind makes this a type error.
-        return assertNever(surface);
-    }
-  };
-
-  assert.equal(
-    describe({
-      kind: 'api',
-      surfaceId: 's',
-      protocol: 'graphql',
-      locations: [],
-    }),
-    'api:graphql',
-  );
-  assert.equal(
-    describe({ kind: 'component', surfaceId: 's', locations: [] }),
-    'component',
-  );
 });

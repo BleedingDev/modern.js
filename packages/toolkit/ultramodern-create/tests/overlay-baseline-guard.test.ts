@@ -17,11 +17,11 @@ function writeOverlayGenerator(tempRoot: string, name: string, body: string) {
   fs.mkdirSync(generatorDir, { recursive: true });
   fs.writeFileSync(
     path.join(generatorDir, 'package.json'),
-    JSON.stringify(
-      { name: `test-${name}`, version: '0.0.0', main: './index.cjs' },
-      null,
-      2,
-    ),
+    JSON.stringify({
+      name: `test-${name}`,
+      version: '0.0.0',
+      main: './index.cjs',
+    }),
   );
   fs.writeFileSync(path.join(generatorDir, 'index.cjs'), body);
   return generatorDir;
@@ -38,210 +38,101 @@ function generateWithOverlay(targetDir: string, generatorDir: string) {
   });
 }
 
-function assertWorkspaceYamlRelaxation(name: string, mutation: string) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
-  try {
-    const generatorDir = writeOverlayGenerator(
-      tempRoot,
-      `${name}-overlay`,
-      `
-const fs = require('node:fs');
-const path = require('node:path');
-module.exports = async context => {
-  const workspaceYamlPath = path.join(
-    context.config.outputWorkspaceRoot,
-    'pnpm-workspace.yaml',
-  );
-  let workspaceYaml = fs.readFileSync(workspaceYamlPath, 'utf-8');
-  ${mutation}
-  fs.writeFileSync(workspaceYamlPath, workspaceYaml);
-};
-`,
-    );
-    const targetDir = path.join(tempRoot, name);
-    assert.throws(
-      () => generateWithOverlay(targetDir, generatorDir),
-      (error: unknown) => {
-        assert.ok(
-          error instanceof OverlayBaselineRelaxationError,
-          String(error),
-        );
-        assert.ok(
-          error.violations.some(
-            violation =>
-              violation.kind === 'baseline-version-relaxation' &&
-              violation.path.startsWith('pnpm-workspace.yaml#'),
-          ),
-          error.message,
-        );
-        return true;
-      },
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-}
-
-function assertRelaxationOverlay(name: string, mutation: string) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
-  try {
-    const generatorDir = writeOverlayGenerator(
-      tempRoot,
-      `${name}-overlay`,
-      `
-const fs = require('node:fs');
-const path = require('node:path');
-module.exports = async context => {
-  const shellPkgPath = path.join(
-    context.config.outputWorkspaceRoot,
-    'apps/shell-super-app/package.json',
-  );
-  const shellPkg = JSON.parse(fs.readFileSync(shellPkgPath, 'utf-8'));
-  ${mutation}
-  fs.writeFileSync(shellPkgPath, JSON.stringify(shellPkg, null, 2));
-};
-`,
-    );
-    const targetDir = path.join(tempRoot, name);
-    assert.throws(
-      () => generateWithOverlay(targetDir, generatorDir),
-      (error: unknown) => {
-        assert.ok(
-          error instanceof OverlayBaselineRelaxationError,
-          String(error),
-        );
-        assert.ok(
-          error.violations.some(
-            violation =>
-              violation.kind === 'baseline-version-relaxation' &&
-              violation.detail.includes('react'),
-          ),
-          error.message,
-        );
-        return true;
-      },
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-}
-
-test('overlay that downgrades a Platform Baseline pin fails with a typed error before acceptance', () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
-  try {
-    const generatorDir = writeOverlayGenerator(
-      tempRoot,
-      'relax-baseline-overlay',
-      `
-const fs = require('node:fs');
-const path = require('node:path');
-module.exports = async context => {
-  const shellPkgPath = path.join(
-    context.config.outputWorkspaceRoot,
-    'apps/shell-super-app/package.json',
-  );
-  const shellPkg = JSON.parse(fs.readFileSync(shellPkgPath, 'utf-8'));
-  shellPkg.dependencies = shellPkg.dependencies || {};
-  shellPkg.dependencies.react = '18.0.0';
-  fs.writeFileSync(shellPkgPath, JSON.stringify(shellPkg, null, 2));
-};
-`,
-    );
-    const targetDir = path.join(tempRoot, 'relax-baseline');
-    assert.throws(
-      () => generateWithOverlay(targetDir, generatorDir),
-      (error: unknown) => {
-        assert.ok(
-          error instanceof OverlayBaselineRelaxationError,
-          `expected OverlayBaselineRelaxationError, got ${String(error)}`,
-        );
-        assert.equal(error.code, 'ULTRAMODERN_OVERLAY_BASELINE_RELAXATION');
-        assert.ok(
-          error.violations.some(
-            violation =>
-              violation.kind === 'baseline-version-relaxation' &&
-              violation.detail.includes('react'),
-          ),
-          error.message,
-        );
-        return true;
-      },
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('overlay that removes a baseline-pinned dependency fails closed', () => {
-  assertRelaxationOverlay(
-    'remove-baseline',
-    'delete shellPkg.dependencies.react;',
-  );
-});
-
-test('overlay npm aliases that resolve to a baseline package are checked', () => {
-  assertRelaxationOverlay(
-    'npm-alias-baseline',
-    "shellPkg.dependencies['react-alias'] = 'npm:react@18.0.0';",
-  );
-});
-
-test('overlay overrides are checked through nested keys', () => {
-  assertRelaxationOverlay(
-    'overrides-baseline',
-    "shellPkg.overrides = { tooling: { react: '18.0.0' } };",
-  );
-});
-
-test('overlay resolutions are checked', () => {
-  assertRelaxationOverlay(
-    'resolutions-baseline',
-    "shellPkg.resolutions = { react: '18.0.0' };",
-  );
-});
-
-test('overlay pnpm.overrides are checked', () => {
-  assertRelaxationOverlay(
-    'pnpm-overrides-baseline',
-    "shellPkg.pnpm = { overrides: { react: '18.0.0' } };",
-  );
-});
-
-test('workspace YAML override widening is detected', () => {
-  assertWorkspaceYamlRelaxation(
-    'workspace-override-widening',
+function assertRelaxationOverlay(
+  tempRoot: string,
+  name: string,
+  mutation: string,
+) {
+  const generatorDir = writeOverlayGenerator(
+    tempRoot,
+    `${name}-overlay`,
     `
-workspaceYaml = workspaceYaml
-  .split('\\n')
-  .map(line =>
-    line.includes("'@tanstack/react-router':")
-      ? "  '@tanstack/react-router': '^1.0.0'"
-      : line,
-  )
-  .join('\\n');
+const fs = require('node:fs');
+const path = require('node:path');
+module.exports = async context => {
+  const shellPkgPath = path.join(
+    context.config.outputWorkspaceRoot,
+    'apps/shell-super-app/package.json',
+  );
+  const shellPkg = JSON.parse(fs.readFileSync(shellPkgPath, 'utf-8'));
+  ${mutation}
+  fs.writeFileSync(shellPkgPath, JSON.stringify(shellPkg, null, 2));
+};
 `,
   );
+  assert.throws(
+    () => generateWithOverlay(path.join(tempRoot, name), generatorDir),
+    (error: unknown) => {
+      assert.ok(error instanceof OverlayBaselineRelaxationError, String(error));
+      assert.ok(
+        error.violations.some(
+          violation =>
+            violation.kind === 'baseline-version-relaxation' &&
+            violation.detail.includes('react'),
+        ),
+        error.message,
+      );
+      return true;
+    },
+  );
+}
+
+test('overlay baseline guard keeps one rejection matrix and a neutral extension', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
+  try {
+    for (const [name, mutation] of [
+      ['downgrade', "shellPkg.dependencies.react = '18.0.0';"],
+      ['remove', 'delete shellPkg.dependencies.react;'],
+      [
+        'npm-alias',
+        "shellPkg.dependencies['react-alias'] = 'npm:react@18.0.0';",
+      ],
+      ['overrides', "shellPkg.overrides = { tooling: { react: '18.0.0' } };"],
+      ['resolutions', "shellPkg.resolutions = { react: '18.0.0' };"],
+      ['pnpm-overrides', "shellPkg.pnpm = { overrides: { react: '18.0.0' } };"],
+      ['catalog', "shellPkg.catalog = { react: '18.0.0' };"],
+    ] as const) {
+      assertRelaxationOverlay(tempRoot, name, mutation);
+    }
+
+    const neutralGenerator = writeOverlayGenerator(
+      tempRoot,
+      'neutral-overlay',
+      `
+const fs = require('node:fs');
+const path = require('node:path');
+module.exports = async context => {
+  const outDir = path.join(context.config.outputWorkspaceRoot, 'overlay-output');
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(path.join(outDir, 'ok.json'), JSON.stringify({ ok: true }));
+};
+`,
+    );
+    const targetDir = path.join(tempRoot, 'neutral');
+    generateWithOverlay(targetDir, neutralGenerator);
+    assert.equal(
+      fs.existsSync(path.join(targetDir, 'overlay-output/ok.json')),
+      true,
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
-test('workspace YAML catalog pin replacement is detected', () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
+test('workspace catalog baseline changes fail with a typed violation', () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-overlay-catalog-'),
+  );
   const workspaceRoot = path.join(tempRoot, 'workspace');
   const workspaceYamlPath = path.join(workspaceRoot, 'pnpm-workspace.yaml');
   try {
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(
       workspaceYamlPath,
-      `catalog:
-  react: '${BASELINE_DEPENDENCY_PINS.react}'
-`,
+      `catalog:\n  react: '${BASELINE_DEPENDENCY_PINS.react}'\n`,
     );
     const snapshot = captureOverlayBaselineSnapshot(workspaceRoot, []);
-    fs.writeFileSync(
-      workspaceYamlPath,
-      `catalog:
-  react: '18.0.0'
-`,
-    );
+    fs.writeFileSync(workspaceYamlPath, "catalog:\n  react: '18.0.0'\n");
 
     assert.throws(
       () =>
@@ -260,124 +151,6 @@ test('workspace YAML catalog pin replacement is detected', () => {
         );
         return true;
       },
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('workspace YAML catalog pin removal is detected', () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
-  const workspaceRoot = path.join(tempRoot, 'workspace');
-  const workspaceYamlPath = path.join(workspaceRoot, 'pnpm-workspace.yaml');
-  try {
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(
-      workspaceYamlPath,
-      `catalog:
-  react: '${BASELINE_DEPENDENCY_PINS.react}'
-`,
-    );
-    const snapshot = captureOverlayBaselineSnapshot(workspaceRoot, []);
-    fs.writeFileSync(workspaceYamlPath, 'catalog:\n');
-
-    assert.throws(
-      () =>
-        assertOverlayPreservedBaseline({
-          workspaceRoot,
-          generator: 'catalog-removal-overlay',
-          snapshot,
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof OverlayBaselineRelaxationError);
-        assert.ok(
-          error.violations.some(
-            violation =>
-              violation.path === 'pnpm-workspace.yaml#catalog.react' &&
-              violation.detail.includes('removed baseline policy'),
-          ),
-          error.message,
-        );
-        return true;
-      },
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('overlay catalog entries are checked', () => {
-  assertRelaxationOverlay(
-    'catalog-baseline',
-    "shellPkg.catalog = { react: '18.0.0' };",
-  );
-});
-
-test('overlay that reintroduces a forbidden thin-shell artifact fails with a typed error', () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
-  try {
-    const generatorDir = writeOverlayGenerator(
-      tempRoot,
-      'forbidden-artifact-overlay',
-      `
-const fs = require('node:fs');
-const path = require('node:path');
-module.exports = async context => {
-  const apiDir = path.join(
-    context.config.outputWorkspaceRoot,
-    'apps/shell-super-app/api',
-  );
-  fs.mkdirSync(apiDir, { recursive: true });
-  fs.writeFileSync(path.join(apiDir, 'handler.ts'), 'export const handler = () => {};\\n');
-};
-`,
-    );
-    const targetDir = path.join(tempRoot, 'forbidden-artifact');
-    assert.throws(
-      () => generateWithOverlay(targetDir, generatorDir),
-      (error: unknown) => {
-        assert.ok(
-          error instanceof OverlayBaselineRelaxationError,
-          String(error),
-        );
-        assert.ok(
-          error.violations.some(
-            violation => violation.kind === 'forbidden-shell-artifact',
-          ),
-          error.message,
-        );
-        return true;
-      },
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('overlay that only adds neutral output preserves the Platform Baseline', () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-guard-'));
-  try {
-    const generatorDir = writeOverlayGenerator(
-      tempRoot,
-      'neutral-overlay',
-      `
-const fs = require('node:fs');
-const path = require('node:path');
-module.exports = async context => {
-  const outDir = path.join(
-    context.config.outputWorkspaceRoot,
-    'overlay-output',
-  );
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(path.join(outDir, 'ok.json'), JSON.stringify({ ok: true }));
-};
-`,
-    );
-    const targetDir = path.join(tempRoot, 'neutral');
-    generateWithOverlay(targetDir, generatorDir);
-    assert.equal(
-      fs.existsSync(path.join(targetDir, 'overlay-output/ok.json')),
-      true,
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

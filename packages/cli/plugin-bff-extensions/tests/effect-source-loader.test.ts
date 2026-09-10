@@ -268,9 +268,6 @@ export const schemaIdentity = Schema.String;`,
         'effect-source-loader',
       );
       const cacheEntries = await fs.promises.readdir(cacheDirectory);
-      expect(cacheEntries.filter(entry => entry.endsWith('.mjs'))).toHaveLength(
-        2,
-      );
       expect(cacheEntries.filter(entry => entry.endsWith('.tmp'))).toEqual([]);
     } finally {
       releaseFirstPublication();

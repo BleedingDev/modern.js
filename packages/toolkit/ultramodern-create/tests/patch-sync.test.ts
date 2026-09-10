@@ -10,9 +10,7 @@ import { SHARED_ULTRAMODERN_WORKSPACE_PATCH_FILES } from '../src/ultramodern-wor
 import {
   DRIZZLE_ORM_VERSION,
   MODULE_FEDERATION_VERSION,
-  MSGPACKR_VERSION,
   TYPES_NODE_VERSION,
-  ZOD_VERSION,
 } from '../src/ultramodern-workspace/versions';
 
 const packageRoot = path.resolve(__dirname, '..');
@@ -939,62 +937,6 @@ test('shared UltraModern workspace patch list matches files present in both patc
       fs.readFileSync(path.join(templatePatchDir, patchFile)),
     );
   }
-});
-
-test('msgpackr patch only removes the dynamic record-reader optimizer', () => {
-  const patchFile = `msgpackr@${MSGPACKR_VERSION}.patch`;
-  const patchSource = fs.readFileSync(
-    path.join(repoPatchDir, patchFile),
-    'utf8',
-  );
-
-  assert.equal(
-    fs.readFileSync(path.join(templatePatchDir, patchFile), 'utf8'),
-    patchSource,
-  );
-  assert.deepEqual(patchSource.match(/^@@ .*$/gmu), [
-    '@@ -491,25 +491,8 @@ export function read() {',
-  ]);
-  assert.equal(
-    patchSource
-      .split('\n')
-      .filter(line => line.startsWith('+') && !line.startsWith('+++')).length,
-    0,
-    'the patch must not replace msgpackr behavior',
-  );
-  assert.match(
-    patchSource,
-    /^-\s*optimizedReadObject = structure\.read = \(new Function\(/mu,
-  );
-  assert.match(
-    patchSource,
-    /^ \t\tlet object = \{\};\r?\n \t\tfor \(let i = 0, l = structure\.length; i < l; i\+\+\) \{\r?\n \t\t\tlet key = structure\[i\];$/mu,
-    'the ordinary record decoder must remain as unchanged patch context',
-  );
-});
-
-test('zod patch disables its runtime evaluator probe in both module formats', () => {
-  const patchFile = `zod@${ZOD_VERSION}.patch`;
-  const patchSource = fs.readFileSync(
-    path.join(repoPatchDir, patchFile),
-    'utf8',
-  );
-
-  assert.equal(
-    fs.readFileSync(path.join(templatePatchDir, patchFile), 'utf8'),
-    patchSource,
-  );
-  assert.deepEqual(patchSource.match(/^@@ .*$/gmu), [
-    '@@ -213,22 +213,7 @@ function isObject(data) {',
-    '@@ -146,22 +146,7 @@ export function isObject(data) {',
-  ]);
-  assert.match(patchSource, /^-\s*const F = Function;$/mu);
-  assert.match(patchSource, /^-\s*new F\(""\);$/mu);
-  assert.equal(
-    patchSource.match(/^\+\s*return false;$/gmu)?.length,
-    2,
-    'both published module formats must deterministically disable evaluation',
-  );
 });
 
 for (const packageName of [

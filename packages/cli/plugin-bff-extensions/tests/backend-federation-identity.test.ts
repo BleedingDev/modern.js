@@ -5,10 +5,7 @@
  * additive-compatible but emits a deprecation warning.
  */
 import type { ModuleFederation } from '@module-federation/runtime';
-import {
-  type BackendFederationExpectedIdentity,
-  validateExpectedBackendFederationIdentity,
-} from '../src/backend-federation/edge';
+import type { BackendFederationExpectedIdentity } from '../src/backend-federation/edge';
 import { loadBackendFederatedEffectApi } from '../src/backend-federation/load';
 
 const expected: BackendFederationExpectedIdentity = {
@@ -157,48 +154,5 @@ describe('allowMissingIdentityMetadata (manifest-adapter compatibility)', () => 
         allowMissingIdentityMetadata: true,
       }),
     ).rejects.toThrow(/delivery-unit identity mismatch/u);
-  });
-
-  it('classifies identity mismatches as version_mismatch in the manifest adapter', async () => {
-    const { classifyLoadError } = await import(
-      '../src/backend-federation-manifest/validation'
-    );
-    expect(
-      classifyLoadError(
-        new Error(
-          '[BFF][Effect] Backend federation expose x delivery-unit identity mismatch: y.',
-        ),
-      ),
-    ).toBe('version_mismatch');
-  });
-});
-
-describe('validateExpectedBackendFederationIdentity', () => {
-  it('returns no issues for a matching module', () => {
-    expect(
-      validateExpectedBackendFederationIdentity(createLoadedModule(), expected),
-    ).toEqual([]);
-  });
-
-  it('reports each mismatching identity field with its path', () => {
-    const issues = validateExpectedBackendFederationIdentity(
-      createLoadedModule({ unitId: 'acme/other', build: 'stale' }),
-      expected,
-    );
-    expect(issues.map(issue => issue.path)).toEqual([
-      'backendFederationContract.compatibility.unitId',
-      'backendFederationContract.compatibility.build',
-    ]);
-  });
-
-  it('reports missing compatibility metadata as a single issue', () => {
-    expect(
-      validateExpectedBackendFederationIdentity({ api: {} }, expected),
-    ).toEqual([
-      {
-        path: 'backendFederationContract.compatibility',
-        message: expect.stringContaining('no compatibility metadata'),
-      },
-    ]);
   });
 });

@@ -1,6 +1,5 @@
 // Consumer: backfill-change-record.mjs historical release recovery.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,47 +16,12 @@ import {
   validateOutcomeArchiveEntries,
   verifyAuthenticatedRegistryProvenance,
   verifyBackfillEvidence,
-  verifyPublishOutcomeAtSourceCommit,
 } from '../backfill-change-record.mjs';
 
 const version = '3.5.0-ultramodern.102';
 const commit = 'ea21b8ba12e3e68ce529622b8b93b63fd4345018';
 const runId = '31386576796';
 const runAttempt = 2;
-
-function createCurrentSourceCommit() {
-  const directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'backfill-source-validator-'),
-  );
-  const indexPath = path.join(directory, 'index');
-  const environment = {
-    ...process.env,
-    GIT_AUTHOR_EMAIL: 'tests@ultramodern.invalid',
-    GIT_AUTHOR_NAME: 'UltraModern tests',
-    GIT_COMMITTER_EMAIL: 'tests@ultramodern.invalid',
-    GIT_COMMITTER_NAME: 'UltraModern tests',
-    GIT_INDEX_FILE: indexPath,
-  };
-
-  try {
-    const head = execFileSync('git', ['rev-parse', 'HEAD'], {
-      encoding: 'utf8',
-    }).trim();
-    execFileSync('git', ['read-tree', head], { env: environment });
-    execFileSync('git', ['add', '-A', '--', 'scripts'], { env: environment });
-    const tree = execFileSync('git', ['write-tree'], {
-      encoding: 'utf8',
-      env: environment,
-    }).trim();
-    return execFileSync(
-      'git',
-      ['commit-tree', tree, '-p', head, '-m', 'backfill source validator test'],
-      { encoding: 'utf8', env: environment },
-    ).trim();
-  } finally {
-    fs.rmSync(directory, { force: true, recursive: true });
-  }
-}
 
 function options(overrides = {}) {
   return {
@@ -451,90 +415,30 @@ test('registry provenance must stay within the authenticated retry window', asyn
   );
 });
 
-test('published evidence verification delegates bytes, receipts, and exact-run provenance to production validators', async t => {
+test('published evidence rejects before registry acceptance when release proof fails', async t => {
   const artifactDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'backfill-evidence-'),
   );
   t.after(() => fs.rmSync(artifactDir, { force: true, recursive: true }));
-  const manifest = {
-    packages: [
-      {
-        targetName: '@bleedingdev/modern-js-create',
-        version,
+  fs.writeFileSync(path.join(artifactDir, 'publish-outcome.json'), '{}\n');
+  let registryCalled = false;
+  await assert.rejects(
+    verifyBackfillEvidence(artifactDir, outcomeArtifact(), options(), {
+      verifyReleaseArtifacts: () => ({ manifest: {} }),
+      verifyPublishOutcome: () => {
+        throw new Error('release proof rejected');
       },
-    ],
-    release: { tag: 'latest', version },
-    source: { commit, repository: trustedRepository },
-  };
-  const outcome = {
-    dryRun: false,
-    publication: { runAttempt: 1 },
-    producer: { runAttempt: 1 },
-    release: { tag: 'latest', version },
-    source: { commit, repository: trustedRepository },
-  };
-  fs.writeFileSync(
-    path.join(artifactDir, 'publish-outcome.json'),
-    `${JSON.stringify(outcome)}\n`,
+      createRegistryProvenanceExpectation: () => {
+        registryCalled = true;
+        return {};
+      },
+      validateRegistryCohort: async () => {
+        registryCalled = true;
+      },
+    }),
+    /release proof rejected/u,
   );
-  const calls = [];
-  const validators = {
-    createRegistryProvenanceExpectation(value, env) {
-      calls.push(['provenance', value, env]);
-      return {
-        invocation: { runAttempt: Number(env.GITHUB_RUN_ATTEMPT), runId },
-      };
-    },
-    async validateRegistryCohort(value, publishOptions, registry) {
-      calls.push(['cohort', value, publishOptions]);
-      await registry.verifyRegistryPackage(value.packages[0]);
-      await registry.verifyRegistryDistTag(
-        value.packages[0].targetName,
-        publishOptions.tag,
-        value.release.version,
-      );
-    },
-    async verifyRegistryDistTag(packageName, tag, packageVersion) {
-      calls.push(['dist-tag', packageName, tag, packageVersion]);
-    },
-    async verifyRegistryPackage(item, expectation, invocationWindow) {
-      calls.push(['package', item, expectation, invocationWindow]);
-    },
-    verifyPublishOutcome(value, directory, artifact, expected) {
-      calls.push(['outcome', value, directory, artifact, expected]);
-      return value;
-    },
-    verifyReleaseArtifacts(directory, expected) {
-      calls.push(['artifacts', directory, expected]);
-      return { manifest };
-    },
-  };
-
-  await verifyBackfillEvidence(
-    artifactDir,
-    outcomeArtifact(),
-    options(),
-    validators,
-  );
-
-  assert.deepEqual(
-    calls.map(([name]) => name),
-    ['artifacts', 'outcome', 'provenance', 'cohort', 'package', 'dist-tag'],
-  );
-  assert.deepEqual(calls[2][2], {
-    GITHUB_REF: 'refs/heads/main-ultramodern',
-    GITHUB_REPOSITORY: trustedRepository,
-    GITHUB_RUN_ATTEMPT: '1',
-    GITHUB_RUN_ID: runId,
-  });
-  assert.deepEqual(calls[4][2], {
-    invocation: { runAttempt: 1, runId },
-  });
-  assert.deepEqual(calls[4][3], {
-    producerRunAttempt: 1,
-    publicationRunAttempt: 1,
-    runId,
-  });
+  assert.equal(registryCalled, false);
 });
 
 test('published evidence fails before registry acceptance on version or outcome mismatch', async t => {
@@ -651,19 +555,11 @@ test('backfill creates a release only after all authenticated publication proofs
   const { events, operations } = createOperations();
   const result = await executeBackfill(options(), operations);
   assert.equal(result.released, true);
-  assert.deepEqual(events, [
-    'workflow',
-    'reachability',
-    'artifact',
-    'temporary-directory',
-    'download',
-    'evidence',
-    'tag',
-    'fetch-tags',
-    'change-record',
-    'release',
-    'cleanup',
-  ]);
+  assert.ok(
+    events.indexOf('evidence') < events.indexOf('release'),
+    'release mutation must follow evidence validation',
+  );
+  assert.equal(events.at(-1), 'cleanup');
 });
 
 test('backfill never mutates GitHub after failed or mismatched proof', async () => {
@@ -724,70 +620,25 @@ test('backfill never mutates GitHub after failed or mismatched proof', async () 
   }
 });
 
-test('backfill archives the current source validator and rejects malformed outcomes before side effects', async () => {
-  const currentSourceCommit = createCurrentSourceCommit();
+test('backfill cleans up after malformed outcome validation', async () => {
+  const { events, operations, temporaryDirectory } = createOperations();
+  const artifactDir = path.join(temporaryDirectory, 'publish-outcome');
+  fs.mkdirSync(artifactDir);
+  fs.writeFileSync(path.join(artifactDir, 'publish-outcome.json'), '{}\n');
+  operations.downloadOutcomeArtifact = async () => {
+    events.push('download');
+    return artifactDir;
+  };
+  operations.verifyEvidence = async () => {
+    events.push('evidence');
+    throw new Error('Publish outcome has unknown or missing fields');
+  };
 
-  for (const malformedOutcome of [{}, { unexpected: true }]) {
-    const { events, operations, temporaryDirectory } = createOperations();
-    const artifactDir = path.join(temporaryDirectory, 'publish-outcome');
-    fs.mkdirSync(artifactDir);
-    for (const entry of requiredArchiveEntries) {
-      if (!entry.startsWith('tarballs/')) {
-        fs.writeFileSync(path.join(artifactDir, entry), '');
-      }
-    }
-    fs.writeFileSync(
-      path.join(artifactDir, 'publish-outcome.json'),
-      `${JSON.stringify(malformedOutcome)}\n`,
-    );
-    const currentOptions = options({ commit: currentSourceCommit });
-    const currentWorkflowRun = workflowRun({ head_sha: currentSourceCommit });
-    const currentArtifact = outcomeArtifact({
-      workflow_run: {
-        ...outcomeArtifact().workflow_run,
-        head_sha: currentSourceCommit,
-      },
-    });
-    operations.loadWorkflowRun = async () => {
-      events.push('workflow');
-      return currentWorkflowRun;
-    };
-    operations.assertCommitReachable = async () => {
-      events.push('reachability');
-      return currentSourceCommit;
-    };
-    operations.loadOutcomeArtifact = async () => {
-      events.push('artifact');
-      return currentArtifact;
-    };
-    operations.downloadOutcomeArtifact = async () => {
-      events.push('download');
-      return artifactDir;
-    };
-    operations.verifyEvidence = async (directory, artifact, expected) => {
-      events.push('evidence');
-      return verifyPublishOutcomeAtSourceCommit(
-        malformedOutcome,
-        directory,
-        artifact,
-        expected,
-      );
-    };
-
-    await assert.rejects(
-      executeBackfill(currentOptions, operations),
-      /Publish outcome has unknown or missing fields/u,
-    );
-    assert.deepEqual(events, [
-      'workflow',
-      'reachability',
-      'artifact',
-      'temporary-directory',
-      'download',
-      'evidence',
-      'cleanup',
-    ]);
-  }
+  await assert.rejects(
+    executeBackfill(options(), operations),
+    /Publish outcome has unknown or missing fields/u,
+  );
+  assert.equal(events.at(-1), 'cleanup');
 });
 
 test('dry-run performs every proof but does not create a release', async () => {

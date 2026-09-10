@@ -26,25 +26,6 @@ const writeJson = (dir, name, value) => {
   return filePath;
 };
 
-test('boundary-guards CLI passes on a minimal valid profile', () => {
-  const dir = makeTempDir();
-  try {
-    const profilePath = writeJson(dir, 'profile.json', {
-      schemaVersion: 1,
-      importGuards: [],
-    });
-    const result = runCli('scripts/boundary-guards/check-boundary-violations.js', [
-      '--profile',
-      profilePath,
-      '--allow-empty-manifests',
-    ]);
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /\[boundary-guards\] anti-pattern checks passed/);
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test('boundary-guards CLI fails on an unsupported profile schemaVersion', () => {
   const dir = makeTempDir();
   try {
@@ -104,13 +85,29 @@ test('release-gates CLI cannot qualify missing evidence and skipped commands', (
   try {
     const evidenceDir = path.join(dir, 'empty-evidence');
     const snapshotPath = path.join(dir, 'gates.json');
+    const profilePath = writeJson(dir, 'profile.json', {
+      schemaVersion: 1,
+      name: 'missing-evidence-gate',
+      evidence: {
+        defaultDir: evidenceDir,
+        requiredFiles: ['evidence.md'],
+        requiredMetadataFields: [],
+        minimumReviewers: 1,
+      },
+      gateCommands: [
+        {
+          command: process.execPath,
+          args: ['-e', 'process.exit(0)'],
+        },
+      ],
+    });
     fs.mkdirSync(evidenceDir);
 
     const result = runCli(
       'scripts/release-gates/validate-release-candidate-gates.js',
       [
         '--profile',
-        'scripts/release-gates/module-certification-profile.json',
+        profilePath,
         '--evidence-dir',
         evidenceDir,
         '--allow-missing-evidence',
@@ -124,14 +121,14 @@ test('release-gates CLI cannot qualify missing evidence and skipped commands', (
     assert.doesNotMatch(result.stdout, /RC contract gates passed/);
 
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
-    const gate = snapshot.gates['module-onboarding-certification-gates'];
+    const gate = snapshot.gates['missing-evidence-gate'];
     assert.equal(gate.passed, false);
     assert.equal(gate.summary.validatedEvidenceFiles, 0);
-    assert.equal(gate.summary.skippedEvidenceFiles, 4);
+    assert.equal(gate.summary.skippedEvidenceFiles, 1);
     assert.equal(gate.summary.executedCommands, 0);
-    assert.equal(gate.summary.skippedCommands, 2);
-    assert.match(gate.reason, /4 required evidence files were skipped/);
-    assert.match(gate.reason, /2 gate commands were skipped/);
+    assert.equal(gate.summary.skippedCommands, 1);
+    assert.match(gate.reason, /1 required evidence file was skipped/);
+    assert.match(gate.reason, /1 gate command was skipped/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

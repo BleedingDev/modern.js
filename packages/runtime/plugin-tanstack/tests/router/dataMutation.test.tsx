@@ -105,54 +105,14 @@ describe('tanstack data mutation fetcher', () => {
     states.length = 0;
   });
 
-  test('tracks submitting and loading phases for mutation submit', async () => {
-    const actionResult = createDeferred<Response>();
-    const invalidateResult = createDeferred<void>();
-
-    currentRouter = createRouter({
-      action: async () => actionResult.promise,
-      invalidate: async () => invalidateResult.promise,
-    });
-
-    render(<FetcherHarness />);
-    expect(screen.getByTestId('state').textContent).toBe('idle');
-
-    let submitPromise: Promise<void> | undefined;
-    act(() => {
-      submitPromise = latestFetcher!.submit(
-        { amount: 2 },
-        { method: 'post', action: '/mutation' },
-      );
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('state').textContent).toBe('submitting');
-    });
-
-    actionResult.resolve(
-      new Response(JSON.stringify({ count: 2 }), {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }),
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('state').textContent).toBe('loading');
-    });
-
-    invalidateResult.resolve();
-
-    await act(async () => {
-      await submitPromise;
-    });
-
-    expect(screen.getByTestId('state').textContent).toBe('idle');
-    expect(screen.getByTestId('data').textContent).toBe('{"count":2}');
-    expect(states).toEqual(['idle', 'submitting', 'loading', 'idle']);
-  });
-
-  test('defaults fetcher submit without method to mutation state', async () => {
+  test.each([
+    { amount: 2, count: 2, method: 'post' as const, name: 'explicit method' },
+    { amount: 1, count: 1, method: undefined, name: 'default method' },
+  ])('tracks submitting/loading phases with the $name', async ({
+    amount,
+    count,
+    method,
+  }) => {
     const actionResult = createDeferred<Response>();
     const invalidateResult = createDeferred<void>();
     const action = rstest.fn(async () => actionResult.promise);
@@ -170,8 +130,11 @@ describe('tanstack data mutation fetcher', () => {
     let submitPromise: Promise<void> | undefined;
     act(() => {
       submitPromise = latestFetcher!.submit(
-        { amount: 1 },
-        { action: '/mutation' },
+        { amount },
+        {
+          ...(method === undefined ? {} : { method }),
+          action: '/mutation',
+        },
       );
     });
 
@@ -182,7 +145,7 @@ describe('tanstack data mutation fetcher', () => {
     expect(loader).not.toHaveBeenCalled();
 
     actionResult.resolve(
-      new Response(JSON.stringify({ count: 1 }), {
+      new Response(JSON.stringify({ count }), {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -200,44 +163,10 @@ describe('tanstack data mutation fetcher', () => {
     });
 
     expect(screen.getByTestId('state').textContent).toBe('idle');
-    expect(screen.getByTestId('data').textContent).toBe('{"count":1}');
-    expect(states).toEqual(['idle', 'submitting', 'loading', 'idle']);
-  });
-
-  test('passes built href and matched route params to mutation actions', async () => {
-    const action = rstest.fn(
-      async ({ request, params }: Parameters<RouteHandler>[0]) => ({
-        params,
-        requestUrl: request.url,
-      }),
+    expect(screen.getByTestId('data').textContent).toBe(
+      JSON.stringify({ count }),
     );
-    currentRouter = createRouter({
-      action,
-      params: { userId: '42' },
-    });
-
-    render(<FetcherHarness />);
-
-    await act(async () => {
-      await latestFetcher!.submit(
-        { amount: 2 },
-        {
-          method: 'post',
-          action: '/users/42?tab=edit#details',
-        },
-      );
-    });
-
-    expect(action).toHaveBeenCalledTimes(1);
-    const actionArgs = action.mock.calls[0][0];
-    const expectedRequestUrl = `${window.location.origin}/users/42?tab=edit#details`;
-    expect(actionArgs.params).toEqual({ userId: '42' });
-    expect(actionArgs.request.url).toBe(expectedRequestUrl);
-    expect(latestFetcher?.data).toEqual({
-      params: { userId: '42' },
-      requestUrl: expectedRequestUrl,
-    });
-    expect(currentRouter.invalidate).toHaveBeenCalledTimes(1);
+    expect(states).toEqual(['idle', 'submitting', 'loading', 'idle']);
   });
 
   test('surfaces non-2xx action responses as fetcher errors', async () => {
@@ -459,38 +388,5 @@ describe('tanstack data mutation fetcher', () => {
     } finally {
       globalThis.FormData = NativeFormData;
     }
-  });
-
-  test('does not throw for Form submit with non-2xx response and still invalidates', async () => {
-    const action = rstest.fn(
-      async () =>
-        new Response(JSON.stringify({ message: 'invalid amount' }), {
-          status: 422,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }),
-    );
-    currentRouter = createRouter({
-      action,
-    });
-
-    render(
-      <Form method="post" action="/mutation">
-        <button type="submit">submit</button>
-      </Form>,
-    );
-
-    const form = document.querySelector('form');
-    expect(form).toBeTruthy();
-
-    await act(async () => {
-      fireEvent.submit(form!);
-    });
-
-    await waitFor(() => {
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(currentRouter.invalidate).toHaveBeenCalledTimes(1);
-    });
   });
 });

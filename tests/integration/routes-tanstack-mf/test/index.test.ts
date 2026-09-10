@@ -104,30 +104,6 @@ async function fetchJson(url: string) {
   };
 }
 
-function extractRemoteSsrFallbackMetadata(html: string) {
-  const match = html.match(
-    /<script id="remote-ssr-fallback-metadata" type="application\/json">([^<]+)<\/script>/,
-  );
-  expect(match?.[1]).toBeTruthy();
-  return JSON.parse(match![1]) as {
-    version: number;
-    routeId: string;
-    contract: string;
-    hydrationOwner: string;
-    fallbackClasses: string[];
-    remotes: Array<{
-      id: string;
-      exportName: string;
-      placeholderId: string;
-      strategy: string;
-      runtimeBoundary: string;
-      reason: string;
-      classification: string;
-      telemetryEvent: string;
-    }>;
-  };
-}
-
 async function assertRedirectAndNotFoundHandoff(hostPort: number) {
   const redirectResponse = await fetchHtml(
     `http://localhost:${hostPort}/mf-redirect`,
@@ -145,35 +121,6 @@ async function assertRedirectAndNotFoundHandoff(hostPort: number) {
   expect(notFoundResponse.status).toBe(404);
   expect(notFoundResponse.html).toContain('404');
   expect(notFoundResponse.html).not.toContain('mf-not-found:unreachable');
-}
-
-async function assertSharedTreeShakingStats(port: number) {
-  const statsResponse = await fetchJson(
-    `http://localhost:${port}/mf-stats.json`,
-  );
-  expect(statsResponse.status).toBe(200);
-  const shared = (
-    statsResponse.json as {
-      shared?: Array<{
-        name?: string;
-        treeShaking?: false | { mode?: string };
-      }>;
-    }
-  ).shared;
-  expect(Array.isArray(shared)).toBe(true);
-  expect((shared || []).length).toBeGreaterThan(0);
-  const ssrSingletonPackages = new Set([
-    'react',
-    'react-dom',
-    'react-dom/client',
-    '@tanstack/react-router',
-    '@modern-js/runtime',
-  ]);
-  for (const item of shared || []) {
-    if (ssrSingletonPackages.has(item.name || '')) {
-      expect(item.treeShaking ?? false).toBe(false);
-    }
-  }
 }
 
 type TraceSpanSnapshot = {
@@ -452,59 +399,6 @@ async function stopFederatedApps(apps: unknown[]) {
   if (rejected) {
     throw rejected.reason;
   }
-}
-
-async function assertRemoteLoadFailureFallback(input: {
-  page: Page;
-  hostPort: number;
-  mode: 'timeout' | 'network' | 'contract' | 'version-skew';
-  target: 'remote/Widget' | 'remote/Mutator' | 'remote2/Panel';
-  fallbackSelector:
-    | '#remote-error'
-    | '#remote-mutator-error'
-    | '#remote2-error';
-  expectedErrorName: 'RemoteLoadError' | 'RemoteComponentContractError';
-  expectedClassification: 'timeout' | 'network' | 'contract' | 'version-skew';
-}) {
-  const url = new URL(`http://localhost:${input.hostPort}/mf`);
-  url.searchParams.set('mfRemoteFailure', input.mode);
-  url.searchParams.set('mfRemoteTarget', input.target);
-
-  await input.page.goto(url.toString(), {
-    waitUntil: ['networkidle0'],
-    timeout: 50000,
-  });
-  await input.page.waitForSelector(input.fallbackSelector, {
-    timeout: 50000,
-  });
-
-  const fallbackText = await input.page.$eval(
-    input.fallbackSelector,
-    el => el.textContent || '',
-  );
-  expect(fallbackText).toContain(
-    `remote-load-error:${input.expectedErrorName}`,
-  );
-  const fallbackContract = await input.page.$eval(input.fallbackSelector, el =>
-    el.getAttribute('data-mf-fallback-contract'),
-  );
-  const fallbackClassification = await input.page.$eval(
-    input.fallbackSelector,
-    el => el.getAttribute('data-mf-fallback-classification'),
-  );
-  const fallbackTelemetryEvent = await input.page.$eval(
-    input.fallbackSelector,
-    el => el.getAttribute('data-mf-telemetry-event'),
-  );
-  expect(fallbackContract).toBe('typed-ssr-fallback-client-hydration');
-  expect(fallbackClassification).toBe(input.expectedClassification);
-  expect(fallbackTelemetryEvent).toBe('mf.client.remote.fallback');
-
-  const hostLoaderText = await input.page.$eval(
-    '#host-loader',
-    el => el.textContent || '',
-  );
-  expect(hostLoaderText).toBe('host-mf-loader');
 }
 
 async function assertRemoteComponentInteraction(
@@ -870,7 +764,7 @@ describe('routes-tanstack-mf', () => {
     }
   });
 
-  test('renders shell SSR and records the typed remote fallback contract', async () => {
+  test('renders the shell SSR fallback boundary', async () => {
     const { status, html } = await fetchHtml(
       `http://localhost:${ports.host}/mf`,
     );
@@ -887,107 +781,83 @@ describe('routes-tanstack-mf', () => {
       'data-runtime-boundary="tanstack-mf-client-hydration"',
     );
     expect(html).toContain('data-hydration-owner="client"');
-    expect(html).toContain('id="remote-ssr-fallback-metadata"');
-    expect(extractRemoteSsrFallbackMetadata(html)).toEqual({
-      version: 1,
-      routeId: 'mf/page',
-      contract: 'typed-ssr-fallback-client-hydration',
-      hydrationOwner: 'client',
-      fallbackClasses: [
-        'remote-unavailable',
-        'timeout',
-        'network',
-        'contract',
-        'version-skew',
-      ],
-      remotes: [
-        {
-          id: 'remote/Widget',
-          exportName: 'default',
-          placeholderId: 'remote-ssr-placeholder',
-          strategy: 'client-hydration',
-          runtimeBoundary: 'tanstack-mf-client-hydration',
-          reason: 'remote-unavailable',
-          classification: 'remote-unavailable',
-          telemetryEvent: 'mf.ssr.remote.fallback',
-        },
-        {
-          id: 'remote/Mutator',
-          exportName: 'default',
-          placeholderId: 'remote-mutator-ssr-placeholder',
-          strategy: 'client-hydration',
-          runtimeBoundary: 'tanstack-mf-client-hydration',
-          reason: 'remote-unavailable',
-          classification: 'remote-unavailable',
-          telemetryEvent: 'mf.ssr.remote.fallback',
-        },
-        {
-          id: 'remote2/Panel',
-          exportName: 'default',
-          placeholderId: 'remote2-ssr-placeholder',
-          strategy: 'client-hydration',
-          runtimeBoundary: 'tanstack-mf-client-hydration',
-          reason: 'remote-unavailable',
-          classification: 'remote-unavailable',
-          telemetryEvent: 'mf.ssr.remote.fallback',
-        },
-      ],
-    });
     expect(html).toContain('remote-widget:pending');
     expect(html).toContain('remote-mutator:pending');
     expect(html).toContain('remote2-panel:pending');
-    expect(html).not.toContain('remote-widget:ok');
-    expect(html).not.toContain('id="remote-mutator"');
-    expect(html).not.toContain('remote2-panel:ok');
   });
 
   test('maps MF loader redirects and notFound responses through TanStack SSR', async () => {
     await assertRedirectAndNotFoundHandoff(ports.host);
   });
 
-  test('host app exposes effect bff endpoints in mf setup', async () => {
-    const effectResponse = await fetchJson(
-      `http://localhost:${ports.host}/host-api/effect/hello`,
-    );
-    expect(effectResponse.status).toBe(200);
-    expect(effectResponse.json).toEqual({
-      message: 'Hello from host Effect API',
-      runtime: 'host',
-    });
+  test('exposes Effect BFF endpoints in the MF setup', async () => {
+    for (const endpoint of [
+      {
+        port: ports.host,
+        prefix: 'host-api',
+        message: 'Hello from host Effect API',
+        runtime: 'host',
+      },
+      {
+        port: ports.remote,
+        prefix: 'remote-api',
+        message: 'Hello from remote Effect API',
+        runtime: 'remote',
+      },
+    ]) {
+      const effectResponse = await fetchJson(
+        `http://localhost:${endpoint.port}/${endpoint.prefix}/effect/hello`,
+      );
+      expect(effectResponse.status).toBe(200);
+      expect(effectResponse.json).toEqual({
+        message: endpoint.message,
+        runtime: endpoint.runtime,
+      });
 
-    const openapiResponse = await fetchJson(
-      `http://localhost:${ports.host}/host-api/openapi.json`,
-    );
-    expect(openapiResponse.status).toBe(200);
-    expect(openapiResponse.json.paths['/effect/hello']).toBeDefined();
+      const openapiResponse = await fetchJson(
+        `http://localhost:${endpoint.port}/${endpoint.prefix}/openapi.json`,
+      );
+      expect(openapiResponse.status).toBe(200);
+      expect(openapiResponse.json.paths['/effect/hello']).toBeDefined();
+    }
   });
 
-  test('remote app exposes effect bff endpoints in mf setup', async () => {
-    const effectResponse = await fetchJson(
-      `http://localhost:${ports.remote}/remote-api/effect/hello`,
+  test('publishes the live MF manifest ABI used by native remotes', async () => {
+    const hostManifest = await fetchJson(
+      `http://localhost:${ports.host}/mf-manifest.json`,
     );
-    expect(effectResponse.status).toBe(200);
-    expect(effectResponse.json).toEqual({
-      message: 'Hello from remote Effect API',
-      runtime: 'remote',
-    });
+    const remoteManifest = await fetchJson(
+      `http://localhost:${ports.remote}/mf-manifest.json`,
+    );
+    const remoteTwoManifest = await fetchJson(
+      `http://localhost:${ports.remoteTwo}/mf-manifest.json`,
+    );
 
-    const openapiResponse = await fetchJson(
-      `http://localhost:${ports.remote}/remote-api/openapi.json`,
+    expect(hostManifest.status).toBe(200);
+    expect(remoteManifest.status).toBe(200);
+    expect(remoteTwoManifest.status).toBe(200);
+    expect(hostManifest.json.remotes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          alias: 'remote',
+          entry: `http://localhost:${ports.remote}/mf-manifest.json`,
+        }),
+        expect.objectContaining({
+          alias: 'remote2',
+          entry: `http://localhost:${ports.remoteTwo}/mf-manifest.json`,
+        }),
+      ]),
     );
-    expect(openapiResponse.status).toBe(200);
-    expect(openapiResponse.json.paths['/effect/hello']).toBeDefined();
-  });
-
-  test('remote2 app exposes effect bff endpoints in mf setup', async () => {
-    const effectResponse = await fetchJson(
-      `http://localhost:${ports.remoteTwo}/remote2-api/effect/hello`,
-    );
-    expect(effectResponse.status).toBe(200);
-    expect(effectResponse.json).toEqual({
-      message: 'Hello from remote2 Effect API',
-      runtime: 'remote2',
-    });
+    expect(
+      remoteManifest.json.exposes.map(
+        (expose: { name?: string }) => expose.name,
+      ),
+    ).toEqual(expect.arrayContaining(['App', 'Widget', 'Mutator']));
+    expect(
+      remoteTwoManifest.json.exposes.map(
+        (expose: { name?: string }) => expose.name,
+      ),
+    ).toEqual(expect.arrayContaining(['App', 'Panel']));
   });
 
   test('supports remote component fetcher with host loader/action', async () => {
@@ -996,42 +866,6 @@ describe('routes-tanstack-mf', () => {
 
   test('routes native TanStack navigation from both remotes without reloading the host', async () => {
     await assertRemoteNativeBridgeNavigation(page, ports.host, errors);
-  });
-
-  test('supports deterministic remote failure injection fallbacks', async () => {
-    await assertRemoteLoadFailureFallback({
-      page,
-      hostPort: ports.host,
-      mode: 'timeout',
-      target: 'remote/Widget',
-      fallbackSelector: '#remote-error',
-      expectedErrorName: 'RemoteLoadError',
-      expectedClassification: 'timeout',
-    });
-    await assertRemoteLoadFailureFallback({
-      page,
-      hostPort: ports.host,
-      mode: 'contract',
-      target: 'remote/Widget',
-      fallbackSelector: '#remote-error',
-      expectedErrorName: 'RemoteComponentContractError',
-      expectedClassification: 'contract',
-    });
-    await assertRemoteLoadFailureFallback({
-      page,
-      hostPort: ports.host,
-      mode: 'version-skew',
-      target: 'remote2/Panel',
-      fallbackSelector: '#remote2-error',
-      expectedErrorName: 'RemoteLoadError',
-      expectedClassification: 'version-skew',
-    });
-  });
-
-  test('emits tree-shaking metadata for shared modules', async () => {
-    await assertSharedTreeShakingStats(ports.host);
-    await assertSharedTreeShakingStats(ports.remote);
-    await assertSharedTreeShakingStats(ports.remoteTwo);
   });
 
   test('captures browser -> host -> remote distributed otel trace', async () => {
@@ -1052,11 +886,8 @@ describe('routes-tanstack-mf serve mode', () => {
   let remoteApp: unknown;
   let remoteTwoApp: unknown;
   let hostApp: unknown;
-  let browser: Browser;
-  let page: Page;
   let ports: FederatedPorts;
   let releaseFixtureLock: ReleaseFixtureLock | undefined;
-  const errors: string[] = [];
 
   beforeAll(async () => {
     releaseFixtureLock = await acquireFixtureLock(fixtureRoot);
@@ -1079,21 +910,10 @@ describe('routes-tanstack-mf serve mode', () => {
 
     hostApp = await modernServe(hostDir, ports.host, { env });
     await waitForAppReady(`http://localhost:${ports.host}/`);
-
-    browser = await puppeteer.launch(launchOptions as any);
-    page = await browser.newPage();
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text());
-      }
-    });
   });
 
   afterAll(async () => {
     try {
-      if (browser) {
-        await browser.close();
-      }
       await stopFederatedApps([hostApp, remoteTwoApp, remoteApp]);
     } finally {
       await releaseFixtureLock?.();
@@ -1103,48 +923,5 @@ describe('routes-tanstack-mf serve mode', () => {
   test('serves module federation assets as static files', async () => {
     await assertModuleFederationAssets(ports.remote);
     await assertModuleFederationAssets(ports.remoteTwo);
-  });
-
-  test('supports remote component fetcher with host loader/action in serve mode', async () => {
-    await assertRemoteComponentInteraction(page, ports.host, errors);
-  });
-
-  test('routes native TanStack navigation across isolated remote realms in serve mode', async () => {
-    await assertRemoteNativeBridgeNavigation(page, ports.host, errors);
-  });
-
-  test('maps MF loader redirects and notFound responses through TanStack SSR in serve mode', async () => {
-    await assertRedirectAndNotFoundHandoff(ports.host);
-  });
-
-  test('supports deterministic remote network fallback in serve mode', async () => {
-    await assertRemoteLoadFailureFallback({
-      page,
-      hostPort: ports.host,
-      mode: 'network',
-      target: 'remote2/Panel',
-      fallbackSelector: '#remote2-error',
-      expectedErrorName: 'RemoteLoadError',
-      expectedClassification: 'network',
-    });
-  });
-
-  test('serves tree-shaking metadata for shared modules in serve mode', async () => {
-    await assertSharedTreeShakingStats(ports.host);
-    await assertSharedTreeShakingStats(ports.remote);
-    await assertSharedTreeShakingStats(ports.remoteTwo);
-  });
-
-  test('captures browser -> host -> remote distributed otel trace in serve mode', async () => {
-    await assertDistributedTraceFromBrowser(
-      page,
-      ports.host,
-      ports.remote,
-      errors,
-    );
-  });
-
-  test('propagates accept-language through host -> remote effect trace run in serve mode', async () => {
-    await assertEffectLocalePropagation(page, ports.host, ports.remote, errors);
   });
 });

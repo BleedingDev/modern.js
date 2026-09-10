@@ -217,8 +217,163 @@ const actionMatches = (step, action) =>
   typeof step.uses === 'string' &&
   step.uses.toLowerCase().startsWith(`${action.toLowerCase()}@`);
 
+const stripShellComments = command => {
+  let quote;
+  let escaped = false;
+  let result = '';
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+
+    if (escaped) {
+      result += character;
+      escaped = false;
+      continue;
+    }
+
+    if (character === '\\' && quote !== "'") {
+      result += character;
+      escaped = true;
+      continue;
+    }
+
+    if (quote !== undefined) {
+      result += character;
+      if (character === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+
+    if (character === "'" || character === '"') {
+      quote = character;
+      result += character;
+      continue;
+    }
+
+    if (
+      character === '#' &&
+      (index === 0 || /[\s;|&()]/u.test(command[index - 1]))
+    ) {
+      while (index < command.length && command[index] !== '\n') {
+        index += 1;
+      }
+      result += '\n';
+      continue;
+    }
+
+    result += character;
+  }
+
+  return result;
+};
+
 const runIncludes = (step, value) =>
-  typeof step.run === 'string' && step.run.includes(value);
+  typeof step.run === 'string' && stripShellComments(step.run).includes(value);
+
+const shellCommandWords = command => {
+  const commands = [[]];
+  let current = '';
+  let escaped = false;
+  let quote;
+  let wordStarted = false;
+
+  const pushWord = () => {
+    if (!wordStarted) {
+      return;
+    }
+    commands.at(-1).push(current);
+    current = '';
+    wordStarted = false;
+  };
+
+  const pushCommand = () => {
+    pushWord();
+    if (commands.at(-1).length > 0) {
+      commands.push([]);
+    }
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+
+    if (escaped) {
+      if (character !== '\n') {
+        current += character;
+      }
+      escaped = false;
+      wordStarted = true;
+      continue;
+    }
+
+    if (character === '\\' && quote !== "'") {
+      escaped = true;
+      wordStarted = true;
+      continue;
+    }
+
+    if (quote !== undefined) {
+      if (character === quote) {
+        quote = undefined;
+      } else {
+        current += character;
+      }
+      wordStarted = true;
+      continue;
+    }
+
+    if (character === "'" || character === '"') {
+      quote = character;
+      wordStarted = true;
+      continue;
+    }
+
+    if (/\s/u.test(character)) {
+      if (character === '\n') {
+        pushCommand();
+      } else {
+        pushWord();
+      }
+      continue;
+    }
+
+    if (character === ';' || character === '&' || character === '|') {
+      pushCommand();
+      if (command[index + 1] === character) {
+        index += 1;
+      }
+      continue;
+    }
+
+    current += character;
+    wordStarted = true;
+  }
+
+  pushWord();
+  return commands.filter(words => words.length > 0);
+};
+
+const nodeExecutablePattern = /(?:^|\/)node(?:\.exe)?$/u;
+const receiptVerifierScript =
+  'scripts/ultramodern-publish/run-release-acceptance.mjs';
+
+const hasShellOption = (words, option) =>
+  words.some(word => word === option || word.startsWith(`${option}=`));
+
+const receiptVerificationCommands = command =>
+  shellCommandWords(stripShellComments(command)).flatMap(words => {
+    if (!nodeExecutablePattern.test(words[0])) {
+      return [];
+    }
+    const scriptIndex = words.indexOf(receiptVerifierScript, 1);
+    if (scriptIndex === -1) {
+      return [];
+    }
+    const argumentsAfterScript = words.slice(scriptIndex + 1);
+    return hasShellOption(argumentsAfterScript, '--verify-receipt')
+      ? [argumentsAfterScript]
+      : [];
+  });
 
 const hasDryRunPublishBranches = workflow => {
   const input = workflow.on?.workflow_dispatch?.inputs?.dry_run;
@@ -236,18 +391,18 @@ const hasDryRunPublishBranches = workflow => {
 };
 
 function collectReceiptRunIdentityErrors(workflow, relativePath) {
-  return workflowSteps(workflow).flatMap(({ jobId, step }) =>
-    runIncludes(
-      step,
-      'scripts/ultramodern-publish/run-release-acceptance.mjs',
-    ) &&
-    runIncludes(step, '--verify-receipt') &&
-    !runIncludes(step, '--run-identity')
+  return workflowSteps(workflow).flatMap(({ jobId, step }) => {
+    const receiptCommands =
+      typeof step.run === 'string' ? receiptVerificationCommands(step.run) : [];
+    return receiptCommands.some(
+      argumentsAfterScript =>
+        !hasShellOption(argumentsAfterScript, '--run-identity'),
+    )
       ? [
           `${relativePath} job ${jobId} receipt verification must pass an authenticated --run-identity`,
         ]
-      : [],
-  );
+      : [];
+  });
 }
 
 function collectPublishOutcomeErrors(workflow, relativePath) {

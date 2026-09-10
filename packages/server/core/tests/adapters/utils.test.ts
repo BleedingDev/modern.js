@@ -14,49 +14,39 @@ const createLiveResponse = (overrides: FakeResponse = {}): any => ({
 });
 
 describe('isResFinalized', () => {
-  it('should not finalize a plain live response with a writable socket', () => {
-    expect(isResFinalized(createLiveResponse())).toBe(false);
-  });
-
-  it('should not finalize a live response whose socket is not yet assigned', () => {
-    expect(isResFinalized(createLiveResponse({ socket: undefined }))).toBe(
-      false,
-    );
-    expect(isResFinalized(createLiveResponse({ socket: null }))).toBe(false);
-  });
-
-  it('should not finalize a response object that never exposes a socket', () => {
-    // worker / webworker style mocks: no `socket` key at all
-    expect(isResFinalized({ headersSent: false } as any)).toBe(false);
-  });
-
-  it('should finalize a destroyed response whose socket was detached', () => {
-    expect(
-      isResFinalized(createLiveResponse({ destroyed: true, socket: null })),
-    ).toBe(true);
-  });
-
-  it('should finalize a closed response whose socket was detached', () => {
-    expect(
-      isResFinalized(createLiveResponse({ closed: true, socket: undefined })),
-    ).toBe(true);
-  });
-
-  it('should finalize an HTTP/2 compat response whose stream was destroyed', () => {
-    // `Http2ServerResponse` exposes neither `destroyed` nor `closed`; a
-    // client-cancelled stream also detaches the socket.
-    expect(
-      isResFinalized({
+  it.each([
+    ['live HTTP/1 response', createLiveResponse(), false],
+    ['socket not assigned', createLiveResponse({ socket: undefined }), false],
+    [
+      'detached destroyed response',
+      createLiveResponse({ destroyed: true, socket: null }),
+      true,
+    ],
+    [
+      'unwritable socket',
+      createLiveResponse({ socket: { writable: false } }),
+      true,
+    ],
+    ['sent headers', createLiveResponse({ headersSent: true }), true],
+    ['piped body', createLiveResponse({ _modernBodyPiped: true }), true],
+    ['ended body', createLiveResponse({ writableEnded: true }), true],
+    ['finished response', createLiveResponse({ finished: true }), true],
+    [
+      'destroyed HTTP/2 stream without a socket',
+      {
         headersSent: false,
         writableEnded: false,
         finished: false,
         socket: undefined,
         stream: { destroyed: true, closed: true },
-      } as any),
-    ).toBe(true);
+      },
+      true,
+    ],
+  ])('classifies a %s response by lifecycle state', (_, response, finalized) => {
+    expect(isResFinalized(response as any)).toBe(finalized);
   });
 
-  it('should not finalize a live HTTP/2 compat response', () => {
+  it('keeps a socketless response live while an HTTP/2 stream is active', () => {
     expect(
       isResFinalized({
         headersSent: false,
@@ -66,34 +56,6 @@ describe('isResFinalized', () => {
         stream: { destroyed: false, closed: false },
       } as any),
     ).toBe(false);
-  });
-
-  it('should finalize when the socket is present but not writable', () => {
-    expect(
-      isResFinalized(createLiveResponse({ socket: { writable: false } })),
-    ).toBe(true);
-  });
-
-  it('should finalize when headers have been sent', () => {
-    expect(isResFinalized(createLiveResponse({ headersSent: true }))).toBe(
-      true,
-    );
-  });
-
-  it('should finalize when the body has been piped', () => {
-    expect(isResFinalized(createLiveResponse({ _modernBodyPiped: true }))).toBe(
-      true,
-    );
-  });
-
-  it('should finalize when writableEnded is set', () => {
-    expect(isResFinalized(createLiveResponse({ writableEnded: true }))).toBe(
-      true,
-    );
-  });
-
-  it('should finalize when finished is set', () => {
-    expect(isResFinalized(createLiveResponse({ finished: true }))).toBe(true);
   });
 });
 

@@ -176,31 +176,6 @@ test('public API runs explicit CodeSmith overlays and leaves base generation unc
   }
 });
 
-test('CLI runs explicit CodeSmith overlay for a MicroVertical', () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-'));
-
-  try {
-    const overlayGenerator = createOverlayGenerator(tempRoot);
-    const workspaceDir = path.join(tempRoot, 'cli-overlay-workspace');
-    createWorkspace(path.basename(workspaceDir), { workspaceDir });
-
-    const result = runCli(workspaceDir, [
-      '--vertical=checkout',
-      '--codesmith-overlay',
-      overlayGenerator,
-    ]);
-
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(
-      readJson(workspaceDir, 'overlay-output/vertical-checkout.json')
-        .generatedAppId,
-      'checkout',
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
 test('CLI reports CodeSmith overlay failures without the success message', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-overlay-'));
 

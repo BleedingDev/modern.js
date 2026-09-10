@@ -133,9 +133,7 @@ describe('immutable target-specific MicroVertical release envelope', () => {
     )!.runtime = 'workerd-effect';
     await expect(
       createMicroVerticalReleaseEnvelope(wrongRuntime),
-    ).rejects.toThrow(
-      'node API/backend artifact "api/handler.mjs" must use runtime "nodejs"',
-    );
+    ).rejects.toThrow(/node API\/backend artifact.*runtime.*nodejs/iu);
   });
 
   it('rejects non-release identities and incomplete or ambiguous artifact sets', async () => {
@@ -144,35 +142,31 @@ describe('immutable target-specific MicroVertical release envelope', () => {
     workspaceIdentity.identity.sourceRevision = 'workspace';
     await expect(
       createMicroVerticalReleaseEnvelope(workspaceIdentity),
-    ).rejects.toThrow(
-      'sourceRevision must be an exact lowercase 40- or 64-character Git object ID',
-    );
+    ).rejects.toThrow(/sourceRevision.*exact lowercase.*Git object ID/iu);
 
     const ambiguousRevision = createInput(artifactRoot);
     ambiguousRevision.identity.sourceRevision = 'revision-one';
     await expect(
       createMicroVerticalReleaseEnvelope(ambiguousRevision),
-    ).rejects.toThrow(
-      'sourceRevision must be an exact lowercase 40- or 64-character Git object ID',
-    );
+    ).rejects.toThrow(/sourceRevision.*exact lowercase.*Git object ID/iu);
 
     const missingSsr = createInput(artifactRoot);
     missingSsr.surfaces.ssr = [];
     await expect(
       createMicroVerticalReleaseEnvelope(missingSsr),
-    ).rejects.toThrow('surfaces.ssr must contain at least one artifact path');
+    ).rejects.toThrow(/surfaces\.ssr.*at least one artifact path/iu);
 
     const duplicate = createInput(artifactRoot);
     duplicate.artifacts[0].logicalPath = 'ui/main.js';
     await expect(createMicroVerticalReleaseEnvelope(duplicate)).rejects.toThrow(
-      'Duplicate artifact logicalPath "ui/main.js"',
+      /Duplicate artifact logicalPath.*ui\/main\.js/iu,
     );
 
     const unboundSurface = createInput(artifactRoot);
     unboundSurface.surfaces.apiBackend = ['api/not-bound.mjs'];
     await expect(
       createMicroVerticalReleaseEnvelope(unboundSurface),
-    ).rejects.toThrow('references unbound artifact "api/not-bound.mjs"');
+    ).rejects.toThrow(/references unbound artifact.*api\/not-bound\.mjs/iu);
   });
 
   it('rejects target mismatch, unknown fields, symlink escapes, and byte drift', async () => {
@@ -186,7 +180,7 @@ describe('immutable target-specific MicroVertical release envelope', () => {
         artifactRoot,
         expectedTarget: 'cloudflare',
       }),
-    ).rejects.toThrow('envelope.target must be "cloudflare"');
+    ).rejects.toThrow(/envelope\.target.*cloudflare/iu);
 
     await fs.writeFile(
       path.join(artifactRoot, 'api/handler.mjs'),
@@ -194,13 +188,13 @@ describe('immutable target-specific MicroVertical release envelope', () => {
     );
     await expect(
       verifyMicroVerticalReleaseEnvelope(envelope, { artifactRoot }),
-    ).rejects.toThrow('digest does not match final artifact bytes');
+    ).rejects.toThrow(/digest does not match final artifact bytes/iu);
 
     const unknown = JSON.parse(JSON.stringify(envelope));
     unknown.artifacts[0].mutableUrl = 'latest';
     await expect(
       verifyMicroVerticalReleaseEnvelope(unknown, { artifactRoot }),
-    ).rejects.toThrow('contains unknown field "mutableUrl"');
+    ).rejects.toThrow(/contains unknown field.*mutableUrl/iu);
 
     const outsideDirectory = await fs.mkdtemp(
       path.join(os.tmpdir(), 'modern-release-envelope-outside-'),
@@ -216,6 +210,6 @@ describe('immutable target-specific MicroVertical release envelope', () => {
     symlinkEscape.surfaces.apiBackend = ['api/escaped.mjs'];
     await expect(
       createMicroVerticalReleaseEnvelope(symlinkEscape),
-    ).rejects.toThrow('resolves outside artifactRoot');
+    ).rejects.toThrow(/resolves outside artifactRoot/iu);
   });
 });

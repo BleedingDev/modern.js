@@ -1,4 +1,4 @@
-// Golden tests for the external-surface validator (G13b/G14/G15/G18).
+// Metadata classifier tests for the external-surface validator (G13b/G14/G15/G18).
 // Mirrors the release-gates node:test convention. The validator modules are
 // pure ESM (.mjs); this CommonJS test loads them via dynamic import so it is
 // picked up by the existing `scripts/release-gates/__tests__/*.test.js` glob.
@@ -31,7 +31,7 @@ test.before(async () => {
 
 function runComparatorSuite(label, compareKey, fx) {
   for (const [scenario, data] of Object.entries(fx)) {
-    test(`${label}: ${scenario}`, () => {
+    test(`${label} metadata: ${scenario}`, () => {
       const result = mods[compareKey](data.old, data.new, { zone: data.zone });
       assert.equal(
         result.classification,
@@ -59,7 +59,7 @@ runComparatorSuite('G14-MF', 'mf', mfFx);
 runComparatorSuite('G14-REST', 'rest', restFx);
 runComparatorSuite('G14-RPC', 'rpc', rpcFx);
 
-test('G14-MF: removal of external expose without new major fails', () => {
+test('G14-MF metadata: removal of external expose without new major fails', () => {
   const result = mods.mf(
     { kind: 'mf', surfaceId: 's', exposes: [{ path: './a', signature: 'x' }] },
     { kind: 'mf', surfaceId: 's', exposes: [] },
@@ -69,7 +69,7 @@ test('G14-MF: removal of external expose without new major fails', () => {
   assert.equal(result.verdict, 'fail');
 });
 
-test('G14-RPC: side-by-side requires old version still served', () => {
+test('G14-RPC metadata: side-by-side requires old version to remain declared', () => {
   const result = mods.rpc(
     {
       kind: 'rpc',
@@ -91,7 +91,7 @@ test('G14-RPC: side-by-side requires old version still served', () => {
   assert.equal(result.verdict, 'fail');
 });
 
-// ---- G15/G18 baseline compatibility --------------------------------------
+// ---- G15/G18 declared baseline compatibility -------------------------------
 
 for (const [scenario, data] of Object.entries(baselineFx)) {
   test(`G15/G18 baseline: ${scenario}`, () => {
@@ -110,13 +110,6 @@ for (const [scenario, data] of Object.entries(baselineFx)) {
     }
   });
 }
-
-test('G15/G18: majorOf handles exact, caret, and prerelease pins', () => {
-  assert.equal(mods.baseline.majorOf('19.0.0'), 19);
-  assert.equal(mods.baseline.majorOf('^18.2.0'), 18);
-  assert.equal(mods.baseline.majorOf('4.0.0-beta.94'), 4);
-  assert.equal(mods.baseline.majorOf(undefined), null);
-});
 
 // ---- G13b zone policy ------------------------------------------------------
 

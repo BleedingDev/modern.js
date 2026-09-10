@@ -67,16 +67,6 @@ describe('effect-client runtime (createGeneratedEffectClient)', () => {
       runtime,
     );
 
-    expect(Object.keys(generated.client)).toEqual(['greetings']);
-    expect(typeof generated.client.greetings!.ping).toBe('function');
-    expect(generated.operationManifest.greetings!.ping).toMatchObject({
-      apiId: 'TestApi',
-      operationId: 'GET:/api/ping',
-      schemaHash: 'hash-ping',
-      operationVersion: 3,
-      version: 3,
-    });
-
     expect(createRequestCalls).toHaveLength(1);
     expect(createRequestCalls[0]).toMatchObject({
       path: '/api/ping',

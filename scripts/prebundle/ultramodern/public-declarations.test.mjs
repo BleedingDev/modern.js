@@ -159,6 +159,12 @@ try {
   assert.notEqual(baseline.status, 0);
   for (const diagnostic of ['TS2420', 'TS2307', 'TS2882', 'TS2428', 'TS1540'])
     assert.ok(baseline.output.includes(diagnostic), diagnostic);
+  const runtimeBefore = readdirSync(utils, { recursive: true })
+    .filter(name => /\.[cm]?js$/.test(name))
+    .sort();
+  const runtimeBytes = new Map(
+    runtimeBefore.map(name => [name, readFileSync(join(utils, name))]),
+  );
   link(
     'rxjs',
     realpathSync(join(root, 'packages/toolkit/utils/node_modules/rxjs')),
@@ -184,13 +190,14 @@ try {
       before,
     );
   }
-  const runtimeFiles = readdirSync(utils, { recursive: true }).filter(name =>
-    /\.[cm]?js$/.test(name),
-  );
+  const runtimeFiles = readdirSync(utils, { recursive: true })
+    .filter(name => /\.[cm]?js$/.test(name))
+    .sort();
+  assert.deepEqual(runtimeFiles, runtimeBefore, 'Runtime file set changed');
   for (const name of runtimeFiles)
     assert.deepEqual(
       readFileSync(join(utils, name)),
-      readFileSync(join(root, 'packages/toolkit/utils/compiled', name)),
+      runtimeBytes.get(name),
       `Runtime changed: ${name}`,
     );
   const require = createRequire(join(temp, 'runtime.cjs'));

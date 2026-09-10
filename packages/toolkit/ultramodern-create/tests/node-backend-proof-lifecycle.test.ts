@@ -176,19 +176,21 @@ test('Node backend proof owns the runtime lifecycle for built MicroVerticals', a
         workspaceRoot,
       },
     );
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/`);
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { port: String(port) });
+    } finally {
+      await proofModule.stopNodeRuntime!(runtime);
+    }
 
-    const response = await fetch(`http://127.0.0.1:${port}/`);
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { port: String(port) });
-
-    await proofModule.stopNodeRuntime!(runtime);
     await assert.rejects(fetch(`http://127.0.0.1:${port}/`));
   } finally {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   }
 });
 
-test('Node backend proof executes the exact container bytes it verified', async () => {
+test('Node backend proof passes exact verified container bytes to the loader', async () => {
   const proofModule = (await import(
     pathToFileURL(
       path.resolve(
@@ -268,7 +270,7 @@ test('Node backend proof executes the exact container bytes it verified', async 
     'backend container',
     fetchImpl,
   );
-  const loaded = await proofModule.loadBackendFromVerifiedArtifacts!({
+  const delivered = await proofModule.loadBackendFromVerifiedArtifacts!({
     app,
     buildIdentity: {
       buildVersion: 'catalog-build',
@@ -286,7 +288,7 @@ test('Node backend proof executes the exact container bytes it verified', async 
     },
   });
 
-  assert.equal(loaded, verifiedContainerBytes.toString('utf8'));
+  assert.equal(delivered, verifiedContainerBytes.toString('utf8'));
   assert.equal(networkFetchCount, 2);
-  assert.notEqual(loaded, changedSecondFetchBytes.toString('utf8'));
+  assert.notEqual(delivered, changedSecondFetchBytes.toString('utf8'));
 });

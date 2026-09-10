@@ -63,12 +63,12 @@ test.describe('html element set', () => {
 
   test('custom inject', async ({ page }) => {
     await page.goto(getHrefByEntryName('main', builder.port));
+    const scripts = page.locator('script');
+    expect(await scripts.count()).toBeGreaterThan(0);
     expect(
-      await page
-        .locator('script')
-        .evaluateAll(scripts =>
-          scripts.every(script => script.parentElement?.tagName === 'BODY'),
-        ),
+      await scripts.evaluateAll(elements =>
+        elements.every(script => script.parentElement?.tagName === 'BODY'),
+      ),
     ).toBe(true);
   });
 
@@ -170,12 +170,12 @@ test('tools.htmlPlugin', async ({ page }) => {
 
   await page.goto(getHrefByEntryName('main', builder.port));
 
+  const scripts = page.locator('script');
+  expect(await scripts.count()).toBeGreaterThan(0);
   expect(
-    await page
-      .locator('script')
-      .evaluateAll(scripts =>
-        scripts.every(script => script.type === 'module'),
-      ),
+    await scripts.evaluateAll(elements =>
+      elements.every(script => script.type === 'module'),
+    ),
   ).toBe(true);
 
   builder.close();

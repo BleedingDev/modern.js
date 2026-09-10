@@ -6,21 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { generateUltramodernWorkspace } from '../src/ultramodern-workspace';
 
-const shellPath = 'apps/shell-super-app';
-const moduleFederationConfigPath = `${shellPath}/module-federation.config.ts`;
-const modernConfigPath = `${shellPath}/modern.config.ts`;
-const bridgeBlock =
-  /\n\s*bridge: \{\s*enableBridgeRouter: (?:false|true),\s*\},/u;
-
-function generateWorkspace(workspaceDir: string) {
-  generateUltramodernWorkspace({
-    targetDir: workspaceDir,
-    packageName: path.basename(workspaceDir),
-    modernVersion: '3.2.1',
-    enableTailwind: true,
-    packageSource: { strategy: 'workspace' },
-  });
-}
+const moduleFederationConfigPath =
+  'apps/shell-super-app/module-federation.config.ts';
 
 function runValidation(workspaceDir: string) {
   const typescriptPackage = createRequire(import.meta.url).resolve(
@@ -40,7 +27,7 @@ function runValidation(workspaceDir: string) {
   );
 }
 
-function commandOutput(result: ReturnType<typeof runValidation>) {
+function output(result: ReturnType<typeof runValidation>) {
   return `${result.stdout}\n${result.stderr}`;
 }
 
@@ -57,100 +44,54 @@ function rewrite(
 }
 
 function declareReactRouter(workspaceDir: string) {
-  const absolutePath = path.join(workspaceDir, `${shellPath}/package.json`);
-  const packageJson = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
-  packageJson.dependencies['react-router'] = '7.18.2';
-  fs.writeFileSync(
-    absolutePath,
-    `${JSON.stringify(packageJson, null, 2)}\n`,
-    'utf-8',
+  const packagePath = path.join(
+    workspaceDir,
+    'apps/shell-super-app/package.json',
   );
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
+  packageJson.dependencies['react-router'] = '7.18.2';
+  fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
 }
 
-test('generated validator ties bridge.enableBridgeRouter to the declared react-router dependency', () => {
+function generateWorkspace(workspaceDir: string) {
+  generateUltramodernWorkspace({
+    targetDir: workspaceDir,
+    packageName: path.basename(workspaceDir),
+    modernVersion: '3.2.1',
+    enableTailwind: true,
+    packageSource: { strategy: 'workspace' },
+  });
+}
+
+test('bridge router gate consumes the declaration and dependency boundary', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-bridge-router-'));
   const baselineDir = path.join(tempRoot, 'baseline');
-  const scenarios: Array<{
-    name: string;
-    mutate: (workspaceDir: string) => void;
-    expected: RegExp;
-  }> = [
-    {
-      name: 'missing-bridge-declaration',
-      mutate: workspaceDir => {
-        rewrite(workspaceDir, moduleFederationConfigPath, source =>
-          source.replace(bridgeBlock, ''),
-        );
-      },
-      expected: /must declare bridge\.enableBridgeRouter/u,
-    },
-    {
-      name: 'bridge-declaration-outside-bridge-block',
-      mutate: workspaceDir => {
-        rewrite(workspaceDir, moduleFederationConfigPath, source =>
-          source.replace(bridgeBlock, '\n  enableBridgeRouter: false,'),
-        );
-      },
-      expected: /must declare bridge\.enableBridgeRouter/u,
-    },
-    {
-      name: 'unauthorized-bridge-router',
-      mutate: workspaceDir => {
-        rewrite(workspaceDir, moduleFederationConfigPath, source =>
-          source.replace(
-            'enableBridgeRouter: false',
-            'enableBridgeRouter: true',
-          ),
-        );
-      },
-      expected: /declares neither react-router nor react-router-dom/u,
-    },
-    {
-      name: 'stray-bridge-router-flag',
-      mutate: workspaceDir => {
-        rewrite(
-          workspaceDir,
-          modernConfigPath,
-          source =>
-            `${source}\nexport const bridgeDeviation = { enableBridgeRouter: false };\n`,
-        );
-      },
-      expected: /carries forbidden option enableBridgeRouter/u,
-    },
-  ];
 
   try {
     generateWorkspace(baselineDir);
     const baseline = runValidation(baselineDir);
-    assert.equal(baseline.status, 0, commandOutput(baseline));
+    assert.equal(baseline.status, 0, output(baseline));
 
-    for (const scenario of scenarios) {
-      const workspaceDir = path.join(tempRoot, scenario.name);
-      fs.cpSync(baselineDir, workspaceDir, { recursive: true });
-      scenario.mutate(workspaceDir);
+    const unauthorizedDir = path.join(tempRoot, 'unauthorized');
+    fs.cpSync(baselineDir, unauthorizedDir, { recursive: true });
+    rewrite(unauthorizedDir, moduleFederationConfigPath, source =>
+      source.replace('enableBridgeRouter: false', 'enableBridgeRouter: true'),
+    );
+    const unauthorized = runValidation(unauthorizedDir);
+    assert.notEqual(unauthorized.status, 0, output(unauthorized));
+    assert.match(
+      output(unauthorized),
+      /declares neither react-router nor react-router-dom/u,
+    );
 
-      const result = runValidation(workspaceDir);
-      const output = commandOutput(result);
-      assert.notEqual(result.status, 0, `${scenario.name}\n${output}`);
-      assert.match(output, scenario.expected, scenario.name);
-      assert.match(
-        output,
-        /module federation bridge capability/u,
-        scenario.name,
-      );
-    }
-
-    // The same `true` the previous scenario rejected becomes legal the moment
-    // the owning app declares React Router itself — that declaration is the
-    // whole opt-in contract.
-    const authorizedDir = path.join(tempRoot, 'authorized-bridge-router');
+    const authorizedDir = path.join(tempRoot, 'authorized');
     fs.cpSync(baselineDir, authorizedDir, { recursive: true });
     rewrite(authorizedDir, moduleFederationConfigPath, source =>
       source.replace('enableBridgeRouter: false', 'enableBridgeRouter: true'),
     );
     declareReactRouter(authorizedDir);
     const authorized = runValidation(authorizedDir);
-    assert.equal(authorized.status, 0, commandOutput(authorized));
+    assert.equal(authorized.status, 0, output(authorized));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

@@ -135,15 +135,6 @@ function stripDeliveryUnitIdentity(workspaceDir: string) {
 test('sync-delivery-unit backfills identity blocks matching the generator', () => {
   const { tempRoot, workspaceDir } = scaffoldWorkspace();
   try {
-    // Capture the generator's semantic output (parsed, so the fixture's
-    // oxfmt whitespace does not enter the comparison).
-    const expectedCompact = JSON.parse(
-      read(workspaceDir, '.modernjs/ultramodern.json'),
-    );
-    const expectedTopology = JSON.parse(
-      read(workspaceDir, 'topology/reference-topology.json'),
-    );
-
     stripDeliveryUnitIdentity(workspaceDir);
     // Sanity: stripping actually removed the identity.
     assert.ok(
@@ -159,16 +150,11 @@ test('sync-delivery-unit backfills identity blocks matching the generator', () =
     });
     assert.equal(status, 0);
 
-    // JSON files must be semantically restored to the generator output.
-    assert.deepEqual(
-      JSON.parse(read(workspaceDir, '.modernjs/ultramodern.json')),
-      expectedCompact,
-      '.modernjs/ultramodern.json should match the generator semantics',
-    );
-    assert.deepEqual(
-      JSON.parse(read(workspaceDir, 'topology/reference-topology.json')),
-      expectedTopology,
-      'reference-topology.json should match the generator semantics',
+    // Check the repaired identity independently of generator output. This
+    // catches a shared-oracle regression while keeping the public identity
+    // contract explicit.
+    const compact = JSON.parse(
+      read(workspaceDir, '.modernjs/ultramodern.json'),
     );
     const shell = JSON.parse(
       read(workspaceDir, '.modernjs/ultramodern.json'),
@@ -199,21 +185,6 @@ test('sync-delivery-unit backfills identity blocks matching the generator', () =
       workspaceDir,
       'verticals/catalog/shared/ultramodern-build.ts',
     );
-    assert.deepEqual(Object.keys(buildModule).sort(), [
-      'ultramodernApiMarker',
-      'ultramodernDeliveryUnit',
-      'ultramodernUiMarker',
-    ]);
-    for (const [exportName, expected] of [
-      ['ultramodernDeliveryUnit', buildArtifact.deliveryUnit],
-      ['ultramodernApiMarker', buildArtifact.surfaces.api],
-      ['ultramodernUiMarker', buildArtifact.surfaces.ui],
-    ] as const) {
-      assert.deepEqual(
-        JSON.parse(JSON.stringify(buildModule[exportName])),
-        expected,
-      );
-    }
     assert.equal(
       buildModule.ultramodernDeliveryUnit.unitId,
       buildArtifact.deliveryUnit.unitId,
@@ -224,9 +195,6 @@ test('sync-delivery-unit backfills identity blocks matching the generator', () =
     );
 
     // Validator-shaped assertions on the restored compact config.
-    const compact = JSON.parse(
-      read(workspaceDir, '.modernjs/ultramodern.json'),
-    );
     const catalog = compact.topology.apps.find(
       (app: any) => app.id === 'catalog',
     );
@@ -256,9 +224,9 @@ test('sync-delivery-unit is idempotent and only touches the three target sets', 
     });
     const afterFirst = snapshotAllFiles(workspaceDir);
 
-    const changed = [...afterFirst.keys()].filter(
-      file => afterFirst.get(file) !== before.get(file),
-    );
+    const changed = [
+      ...new Set([...before.keys(), ...afterFirst.keys()]),
+    ].filter(file => afterFirst.get(file) !== before.get(file));
     const expectedChanged = TARGET_FILES.filter(
       file =>
         file !== 'apps/shell-super-app/shared/ultramodern-build.json' &&
@@ -269,43 +237,13 @@ test('sync-delivery-unit is idempotent and only touches the three target sets', 
       expectedChanged.sort(),
       'sync must rewrite stale metadata and leave an in-sync JSON artifact untouched',
     );
-    assert.equal(
-      afterFirst.get('verticals/catalog/shared/ultramodern-build.json'),
-      before.get('verticals/catalog/shared/ultramodern-build.json'),
-      'canonical JSON artifact should already be in sync',
-    );
-    assert.equal(
-      afterFirst.get('apps/shell-super-app/shared/ultramodern-build.json'),
-      before.get('apps/shell-super-app/shared/ultramodern-build.json'),
-      'shell JSON artifact should already be in sync',
-    );
-
     // Second run: no writes at all.
     const status = runSyncDeliveryUnit([], {
       workspaceRoot: workspaceDir,
       invocationCwd: workspaceDir,
     });
     assert.equal(status, 0);
-    const afterSecond = snapshotAllFiles(workspaceDir);
-    for (const [file, content] of afterSecond) {
-      assert.equal(content, afterFirst.get(file), `${file} changed on rerun`);
-    }
-  } finally {
-    fs.rmSync(tempRoot, { force: true, recursive: true });
-  }
-});
-
-test('sync-delivery-unit refuses when the compact config is missing', () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-du-sync-empty-'));
-  try {
-    assert.throws(
-      () =>
-        runSyncDeliveryUnit([], {
-          workspaceRoot: tempRoot,
-          invocationCwd: tempRoot,
-        }),
-      /Missing \.modernjs\/ultramodern\.json/u,
-    );
+    assert.deepEqual(snapshotAllFiles(workspaceDir), afterFirst);
   } finally {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   }

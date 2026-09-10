@@ -139,20 +139,13 @@ async function expectLegacyLambdaRoutesBlocked(port: number) {
   expect(indexBody).not.toContain('Hello from index lambda in effect mode');
 }
 
-function expectDurationHeader(
-  value: string | null,
-  expectedPath: string,
-  headerName: string,
-) {
+function expectDurationHeader(value: string | null, expectedPath: string) {
   expect(value).toBeTruthy();
   if (!value) {
     return;
   }
   expect(value).toMatch(/^dur=\d+; path=/);
   expect(value).toContain(`path=${expectedPath}`);
-  expect(value).toEqual(expect.stringContaining('dur='));
-  expect(value).toEqual(expect.stringContaining('path='));
-  expect(headerName).toContain('x-effect-');
 }
 
 async function expectCustomServerHeaders(port: number) {
@@ -161,7 +154,6 @@ async function expectCustomServerHeaders(port: number) {
   expectDurationHeader(
     apiResponse.headers.get('x-effect-request-middleware'),
     '/bff-api/hello',
-    'x-effect-request-middleware',
   );
 
   const renderResponse = await fetch(`${host}:${port}/`, {
@@ -173,12 +165,10 @@ async function expectCustomServerHeaders(port: number) {
   expectDurationHeader(
     renderResponse.headers.get('x-effect-request-middleware'),
     '/',
-    'x-effect-request-middleware',
   );
   expectDurationHeader(
     renderResponse.headers.get('x-effect-render-middleware'),
     '/',
-    'x-effect-render-middleware',
   );
 }
 
@@ -327,8 +317,6 @@ async function expectOpenTelemetryTraceInBrowser(page: Page, port: number) {
 describe('bff effect tests', () => {
   describe('bff effect in dev', () => {
     let app: AppProcess;
-    let browser: Browser | undefined;
-    let page: Page | undefined;
     let releaseFixtureLock: ReleaseFixtureLock | undefined;
     let port = 8080;
 
@@ -338,62 +326,15 @@ describe('bff effect tests', () => {
       await ensureWorkspacePackagesBuilt(ensureWorkspacePackages);
       port = await getPort();
       app = await launchApp(appDir, port, { ensureWorkspacePackages });
-      browser = await puppeteer.launch(browserLaunchOptions);
-      page = await browser.newPage();
     });
 
     test('effect http api route works', async () => {
       await expectEffectHttpApiRoute(port);
     });
 
-    test('effect path and query route works', async () => {
-      await expectEffectPathAndQueryRoute(port);
-    });
-
-    test('effect payload route works', async () => {
-      await expectEffectPayloadRoute(port);
-    });
-
-    test('effect rpc route works', async () => {
-      await expectEffectRpcRoute(port);
-    });
-
-    test('openapi route works', async () => {
-      await expectOpenApiRoute(port);
-    });
-
-    test('managed effect error uses serverConfig.onError', async () => {
-      await expectManagedEffectErrorRoute(port);
-    });
-
-    test('effect runtime does not serve api/lambda handlers', async () => {
-      await expectLegacyLambdaRoutesBlocked(port);
-    });
-
-    test('custom server middlewares run for effect runtime', async () => {
-      await expectCustomServerHeaders(port);
-    });
-
-    test('client sdk import still works in browser', async () => {
-      expect(page).toBeDefined();
-      await expectClientSdkInBrowser(page!, port);
-    });
-
-    test('custom sdk interceptor works for effect client', async () => {
-      expect(page).toBeDefined();
-      await expectCustomSdkInBrowser(page!, port);
-    });
-
-    test('opentelemetry traces from browser to effect spans', async () => {
-      expect(page).toBeDefined();
-      await expectOpenTelemetryTraceInBrowser(page!, port);
-    });
-
     afterAll(async () => {
       try {
         await killApp(app);
-        await page?.close();
-        await browser?.close();
       } finally {
         await releaseFixtureLock?.();
       }

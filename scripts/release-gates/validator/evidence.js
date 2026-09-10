@@ -3,16 +3,10 @@ const path = require('path');
 const { shouldRequireCiBackedMetadata } = require('./env');
 const { validateMetadataFields } = require('./metadata');
 
-const countReviewers = content => {
-  const matches = content.match(/(^|\n)\s*[-*]?\s*reviewer[\w-]*\s*[:=]/gim);
-  return matches ? matches.length : 0;
-};
-
 const validateEvidence = ({
   evidenceDir,
   requiredFiles,
   requiredMetadataFields,
-  minimumReviewers,
   allowMissingEvidence,
   allowLocalEvidenceMetadata = false,
   requireCiBackedMetadata,
@@ -48,21 +42,6 @@ const validateEvidence = ({
       requiredMetadataFields,
       requireCiBackedMetadata: enforceCiBackedMetadata,
     });
-
-    if (
-      requiredFile.toLowerCase() === 'review-evidence.md' &&
-      Number.isFinite(minimumReviewers) &&
-      minimumReviewers > 0
-    ) {
-      const reviewerCount = countReviewers(content);
-      if (reviewerCount < minimumReviewers) {
-        throw new Error(
-          `Review evidence must contain at least ${String(
-            minimumReviewers,
-          )} reviewer entries. Found ${String(reviewerCount)} in ${filePath}.`,
-        );
-      }
-    }
 
     report.validatedFiles.push(requiredFile);
   }

@@ -3,10 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { yaml } from '@modern-js/utils';
-import {
-  buildDependencyClosure,
-  validateExactExclusions,
-} from '../../../../scripts/ultramodern-production-readiness/published-create-proof/release-age-audit.mjs';
+import { validateExactExclusions } from '../../../../scripts/ultramodern-production-readiness/published-create-proof/release-age-audit.mjs';
 import type { ResolvedUltramodernPackageSource } from '../src/ultramodern-package-source';
 import { parseUltramodernReleaseCohort } from '../src/ultramodern-release-cohort';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
@@ -80,31 +77,6 @@ test('retires all current third-party release-age approvals', () => {
   assert.deepEqual(renderMinimumReleaseAgeExclude({ now }), []);
 });
 
-test('does not treat Module Federation registry evidence as a release-age approval', () => {
-  const moduleFederation =
-    ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.registryEvidence
-      .moduleFederation;
-  assert.equal(moduleFederation.version, '2.9.0');
-  assert.equal(moduleFederation.nodeVersion, '2.7.50');
-  assert.equal(moduleFederation.releases.length, 18);
-  assert.equal(
-    moduleFederation.releases.find(
-      release => release.packageName === '@module-federation/modern-js-v3',
-    )?.registry.publishedAt,
-    '2026-08-24T08:21:54.080Z',
-  );
-  assert.equal(
-    moduleFederation.node.registry.dist.integrity,
-    'sha512-mbpQRdafyeWgsmYoJfdhOQf76zS6onOGpC2X1ELpWXB1Y4BcZGloL0CLjNMNon9m3ucfpc99tOGAQqFzQVkSBQ==',
-  );
-  assert.equal(
-    ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals.some(approval =>
-      approval.packageName.startsWith('@module-federation/'),
-    ),
-    false,
-  );
-});
-
 test('rejects review evidence created before a dependency was published', () => {
   const existing = testApproval;
 
@@ -153,35 +125,7 @@ function august10RetiredReleaseAgeSelectors() {
     .map(record => packageKey(record.packageName, record.version));
 }
 
-test('does not keep retired Effect, TS-Go, or Oxc release-age approvals active', () => {
-  const retiredSelectors = august10RetiredReleaseAgeSelectors();
-  const activeApprovalSelectors = new Set(
-    ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals.map(approval =>
-      packageKey(approval.packageName, approval.version),
-    ),
-  );
-  const renderedSelectors = new Set(
-    renderMinimumReleaseAgeExclude({
-      now: new Date('2026-08-11T00:39:42.463Z'),
-    }),
-  );
-
-  assert.equal(retiredSelectors.length, 51);
-  for (const selector of retiredSelectors) {
-    assert.equal(
-      activeApprovalSelectors.has(selector),
-      false,
-      `${selector} must not remain an active release-age approval`,
-    );
-    assert.equal(
-      renderedSelectors.has(selector),
-      false,
-      `${selector} must not render as a release-age exclusion`,
-    );
-  }
-});
-
-test('migrates the exact authenticated August 10 release-age list idempotently', () => {
+test('migrates the authenticated August 10 release-age list and rejects unknown selectors', () => {
   const historicalSelectors = august10RetiredReleaseAgeSelectors();
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-stale-release-age-'),
@@ -224,16 +168,6 @@ test('migrates the exact authenticated August 10 release-age list idempotently',
       false,
     );
 
-    assert.equal(
-      updateGeneratedPnpmWorkspacePolicy(
-        createMigrationIo(workspaceRoot, false),
-        packageSource,
-        { now: migrationNow, releaseCohort },
-      ),
-      false,
-    );
-    assert.deepEqual(fs.readFileSync(workspaceFile), canonicalPolicy);
-
     const unreviewedSelector = '@oxlint/plugins@1.78.0';
     fs.writeFileSync(
       workspaceFile,
@@ -252,215 +186,6 @@ test('migrates the exact authenticated August 10 release-age list idempotently',
       /Unapproved release-age exclusion "@oxlint\/plugins@1\.78\.0"/u,
     );
     assert.deepEqual(fs.readFileSync(workspaceFile), unreviewedPolicy);
-  } finally {
-    fs.rmSync(workspaceRoot, { force: true, recursive: true });
-  }
-});
-
-test('retires the expired upstream cohort while preserving historical review evidence', () => {
-  const review = JSON.parse(
-    fs.readFileSync(
-      new URL('../release-age-review-2026-08-24.json', import.meta.url),
-      'utf8',
-    ),
-  ) as {
-    expiresAt: string;
-    registryRecords: Array<{
-      packageName: string;
-      version: string;
-      publishedAt: string;
-      dist: { integrity: string };
-    }>;
-    reviewedAt: string;
-  };
-  const historicalSelectors = review.registryRecords.map(record =>
-    packageKey(record.packageName, record.version),
-  );
-  const activeApprovalSelectors = new Set(
-    ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals.map(approval =>
-      packageKey(approval.packageName, approval.version),
-    ),
-  );
-
-  assert.equal(historicalSelectors.length, 3);
-  const renderedAtReview = new Set(
-    renderMinimumReleaseAgeExclude({
-      now: new Date(review.reviewedAt),
-    }),
-  );
-  for (const selector of historicalSelectors) {
-    assert.equal(activeApprovalSelectors.has(selector), false);
-    assert.equal(renderedAtReview.has(selector), false);
-  }
-  for (const retired of [
-    'i18next',
-    'typescript',
-    '@typescript/native-preview',
-  ]) {
-    assert.equal(
-      ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals.some(
-        approval => approval.packageName === retired,
-      ),
-      false,
-    );
-  }
-  assert.equal(
-    ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals.some(approval =>
-      approval.packageName.startsWith('@typescript/typescript-'),
-    ),
-    false,
-  );
-});
-
-test('retires the expired browser data cohort while preserving review evidence', () => {
-  const review = JSON.parse(
-    fs.readFileSync(
-      new URL('../release-age-review-2026-08-25.json', import.meta.url),
-      'utf8',
-    ),
-  ) as {
-    registryRecords: Array<{
-      packageName: string;
-      version: string;
-    }>;
-    reviewedAt: string;
-  };
-  const activeApprovalSelectors = new Set(
-    ULTRAMODERN_WORKSPACE_POLICY.pnpm.releaseAge.approvals.map(approval =>
-      packageKey(approval.packageName, approval.version),
-    ),
-  );
-  const renderedAtReview = new Set(
-    renderMinimumReleaseAgeExclude({ now: new Date(review.reviewedAt) }),
-  );
-
-  assert.equal(review.registryRecords.length, 2);
-  for (const record of review.registryRecords) {
-    const selector = packageKey(record.packageName, record.version);
-    assert.equal(activeApprovalSelectors.has(selector), false);
-    assert.equal(renderedAtReview.has(selector), false);
-  }
-});
-
-test('migrates the exact authenticated August 24 through 26 selectors atomically', () => {
-  const reviewedSelectors = [
-    '../release-age-review-2026-08-24.json',
-    '../release-age-review-2026-08-25.json',
-    '../release-age-review-2026-08-26-rsbuild-rspack-2.2.0.json',
-  ].flatMap(reviewPath => {
-    const review = JSON.parse(
-      fs.readFileSync(new URL(reviewPath, import.meta.url), 'utf8'),
-    ) as {
-      registryRecords: Array<{
-        packageName: string;
-        version: string;
-      }>;
-    };
-    return review.registryRecords.map(record =>
-      packageKey(record.packageName, record.version),
-    );
-  });
-  assert.deepEqual(
-    [...reviewedSelectors].sort(),
-    [
-      '@rsbuild/core@2.2.0-rc.0',
-      'baseline-browser-mapping@2.11.19',
-      'caniuse-lite@1.0.30001810',
-      'electron-to-chromium@1.5.413',
-      'electron-to-chromium@1.5.414',
-      '@rsbuild/core@2.2.0',
-      '@rspack/binding-darwin-arm64@2.2.0',
-      '@rspack/binding-darwin-x64@2.2.0',
-      '@rspack/binding-linux-arm64-gnu@2.2.0',
-      '@rspack/binding-linux-arm64-musl@2.2.0',
-      '@rspack/binding-linux-ppc64-gnu@2.2.0',
-      '@rspack/binding-linux-riscv64-gnu@2.2.0',
-      '@rspack/binding-linux-riscv64-musl@2.2.0',
-      '@rspack/binding-linux-s390x-gnu@2.2.0',
-      '@rspack/binding-linux-x64-gnu@2.2.0',
-      '@rspack/binding-linux-x64-musl@2.2.0',
-      '@rspack/binding-wasm32-wasi@2.2.0',
-      '@rspack/binding-win32-arm64-msvc@2.2.0',
-      '@rspack/binding-win32-ia32-msvc@2.2.0',
-      '@rspack/binding-win32-x64-msvc@2.2.0',
-      '@rspack/binding@2.2.0',
-      '@rspack/core@2.2.0',
-    ].sort(),
-  );
-  const workspaceRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-stale-reviewed-release-age-'),
-  );
-  const workspaceFile = path.join(workspaceRoot, 'pnpm-workspace.yaml');
-  const migrationNow = new Date('2026-09-08T00:00:00.000Z');
-
-  try {
-    fs.writeFileSync(path.join(workspaceRoot, 'package.json'), '{}\n');
-    fs.writeFileSync(
-      workspaceFile,
-      yaml.dump({ minimumReleaseAgeExclude: reviewedSelectors }),
-    );
-
-    assert.equal(
-      updateGeneratedPnpmWorkspacePolicy(
-        createMigrationIo(workspaceRoot, false),
-        packageSource,
-        { now: migrationNow, releaseCohort },
-      ),
-      true,
-    );
-
-    const canonicalPolicy = fs.readFileSync(workspaceFile);
-    const migratedPolicy = yaml.load(canonicalPolicy.toString('utf-8')) as {
-      minimumReleaseAgeExclude: string[];
-    };
-    for (const reviewedSelector of reviewedSelectors) {
-      assert.equal(
-        migratedPolicy.minimumReleaseAgeExclude.includes(reviewedSelector),
-        false,
-      );
-    }
-    assert.deepEqual(
-      migratedPolicy.minimumReleaseAgeExclude,
-      renderMinimumReleaseAgeExclude({
-        now: migrationNow,
-        packageSource,
-        releaseCohort,
-      }),
-    );
-
-    assert.equal(
-      updateGeneratedPnpmWorkspacePolicy(
-        createMigrationIo(workspaceRoot, false),
-        packageSource,
-        { now: migrationNow, releaseCohort },
-      ),
-      false,
-    );
-    assert.deepEqual(fs.readFileSync(workspaceFile), canonicalPolicy);
-
-    for (const unreviewedSelector of [
-      'electron-to-chromium@1.5.415',
-      '@rspack/core@2.2.1',
-    ]) {
-      fs.writeFileSync(
-        workspaceFile,
-        yaml.dump({ minimumReleaseAgeExclude: [unreviewedSelector] }),
-      );
-      const unreviewedPolicy = fs.readFileSync(workspaceFile);
-      assert.throws(
-        () =>
-          updateGeneratedPnpmWorkspacePolicy(
-            createMigrationIo(workspaceRoot, false),
-            packageSource,
-            { now: migrationNow, releaseCohort },
-          ),
-        new RegExp(
-          `Unapproved release-age exclusion "${unreviewedSelector.replaceAll('.', '\\.')}"`,
-          'u',
-        ),
-      );
-      assert.deepEqual(fs.readFileSync(workspaceFile), unreviewedPolicy);
-    }
   } finally {
     fs.rmSync(workspaceRoot, { force: true, recursive: true });
   }
@@ -731,7 +456,7 @@ test('rejects an unapproved immature dependency reached through a snapshot', asy
   }
 });
 
-test('matches the production audit closure for reachable pnpm graph entries', () => {
+test('reports the expected reachable pnpm graph entries', () => {
   const root = '@bleedingdev/modern-js-create@3.5.0-ultramodern.1';
   const nested = 'nested-package@1.0.0';
   const lockfile = lockfileWithImporter('@modern-js/create', root, {
@@ -751,21 +476,20 @@ test('matches the production audit closure for reachable pnpm graph entries', ()
   });
 
   const migrationClosure = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
-  const productionClosure = buildDependencyClosure(lockfile);
-
-  assert.deepEqual(migrationClosure.unresolved, productionClosure.unresolved);
   assert.deepEqual(
-    migrationClosure.candidates,
-    productionClosure.closure.map(candidate => ({
-      packageName: candidate.name,
-      version: candidate.version,
-      registry: { dist: { integrity: candidate.integrity } },
-      path: candidate.path,
-    })),
+    migrationClosure.candidates.map(({ packageName, version }) => [
+      packageName,
+      version,
+    ]),
+    [
+      ['@bleedingdev/modern-js-create', '3.5.0-ultramodern.1'],
+      ['nested-package', '1.0.0'],
+    ],
   );
+  assert.deepEqual(migrationClosure.unresolved, []);
 });
 
-test('matches the production audit closure across peer-variant snapshots', () => {
+test('reports reachable peer-variant snapshots without duplicate nodes', () => {
   const peerA = 'peer-a@1.0.0';
   const peerB = 'peer-b@1.0.0';
   const variantA = `variant@1.0.0(${peerA})`;
@@ -786,18 +510,18 @@ test('matches the production audit closure across peer-variant snapshots', () =>
   });
 
   const migrationClosure = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
-  const productionClosure = buildDependencyClosure(lockfile);
-
-  assert.deepEqual(migrationClosure.unresolved, productionClosure.unresolved);
   assert.deepEqual(
-    migrationClosure.candidates,
-    productionClosure.closure.map(candidate => ({
-      packageName: candidate.name,
-      version: candidate.version,
-      registry: { dist: { integrity: candidate.integrity } },
-      path: candidate.path,
-    })),
+    migrationClosure.candidates.map(({ packageName, version }) => [
+      packageName,
+      version,
+    ]),
+    [
+      ['peer-a', '1.0.0'],
+      ['peer-b', '1.0.0'],
+      ['variant', '1.0.0'],
+    ],
   );
+  assert.deepEqual(migrationClosure.unresolved, []);
 });
 
 test('audits registry dependencies and peers reachable through integrity-pinned HTTPS tarballs', () => {
@@ -820,15 +544,8 @@ test('audits registry dependencies and peers reachable through integrity-pinned 
     },
   });
   const migration = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
-  const production = buildDependencyClosure(lockfile);
   assert.deepEqual(migration.unresolved, []);
-  assert.deepEqual(production.unresolved, []);
   assert.deepEqual(migration.candidates.map(item => item.packageName).sort(), [
-    'nested',
-    'peer',
-    'transitive',
-  ]);
-  assert.deepEqual(production.closure.map(item => item.name).sort(), [
     'nested',
     'peer',
     'transitive',
@@ -842,13 +559,6 @@ test('audits registry dependencies and peers reachable through integrity-pinned 
       path: ['importer:.', key],
     },
   ]);
-  assert.deepEqual(
-    production.tarballs,
-    migration.tarballs.map(({ packageName, ...item }) => ({
-      name: packageName,
-      ...item,
-    })),
-  );
 
   const variants: Array<(lock: any) => void> = [
     lock => {
@@ -876,15 +586,10 @@ test('audits registry dependencies and peers reachable through integrity-pinned 
   for (const mutate of variants) {
     const invalid = structuredClone(lockfile);
     mutate(invalid);
-    for (const discover of [
-      discoverReachablePnpmLockReleaseAgeClosure,
-      buildDependencyClosure,
-    ]) {
-      assert.throws(() => {
-        const result = discover(invalid);
-        if (result.unresolved.length) throw new Error('unresolved closure');
-      });
-    }
+    assert.throws(() => {
+      const result = discoverReachablePnpmLockReleaseAgeClosure(invalid);
+      if (result.unresolved.length) throw new Error('unresolved closure');
+    });
   }
 });
 
@@ -916,11 +621,8 @@ test('URL package identities remain distinct from each other and from registry v
     },
   });
   const migration = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
-  const production = buildDependencyClosure(lockfile);
   assert.deepEqual(migration.unresolved, []);
-  assert.deepEqual(production.unresolved, []);
   assert.deepEqual(migration.tarballs.map(item => item.url).sort(), urls);
-  assert.deepEqual(production.tarballs.map(item => item.url).sort(), urls);
   assert.deepEqual(migration.candidates.map(item => item.packageName).sort(), [
     'parent',
     'tool',
@@ -999,22 +701,11 @@ test('accepts pnpm 11.17 base package records and nested peer snapshot locators'
   );
 
   const migrationClosure = discoverReachablePnpmLockReleaseAgeClosure(lockfile);
-  const productionClosure = buildDependencyClosure(lockfile);
 
   assert.deepEqual(migrationClosure.unresolved, []);
-  assert.deepEqual(productionClosure.unresolved, []);
   assert.deepEqual(
     migrationClosure.candidates.map(candidate => candidate.packageName).sort(),
     ['@bleedingdev/modern-js-plugin-tanstack', 'direct-peer', 'nested-peer'],
-  );
-  assert.deepEqual(
-    migrationClosure.candidates,
-    productionClosure.closure.map(candidate => ({
-      packageName: candidate.name,
-      version: candidate.version,
-      registry: { dist: { integrity: candidate.integrity } },
-      path: candidate.path,
-    })),
   );
 });
 

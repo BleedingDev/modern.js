@@ -156,7 +156,7 @@ describe('BFF compiler global variables', () => {
     }
   });
 
-  it('embeds exact release identity without touching near matches, strings, or comments', async () => {
+  it('embeds exact release identity without replacing literal tokens', async () => {
     const appDirectory = await fs.realpath(
       await fs.mkdtemp(path.join(os.tmpdir(), 'plugin-bff-global-vars-')),
     );
@@ -212,16 +212,6 @@ describe('BFF compiler global variables', () => {
         '};',
       ].join('\n'),
     );
-    const unrelatedBrowserOutput = path.join(
-      distDirectory,
-      'static/browser.js',
-    );
-    await fs.outputFile(
-      unrelatedBrowserOutput,
-      'globalThis.browserMarker = ULTRAMODERN_BUILD_MARKER;\n',
-    );
-    const unrelatedBrowserStat = await fs.stat(unrelatedBrowserOutput);
-
     const api = {
       getAppContext: () => ({
         appDirectory,
@@ -262,12 +252,6 @@ describe('BFF compiler global variables', () => {
         distDirectory,
         'shared/ultramodern-build.js',
       );
-      expect(await fs.stat(unrelatedBrowserOutput)).toMatchObject({
-        ino: unrelatedBrowserStat.ino,
-        mtimeMs: unrelatedBrowserStat.mtimeMs,
-        size: unrelatedBrowserStat.size,
-      });
-
       const runtime = require(compiledPath) as {
         ultramodernApiMarker: {
           buildMarker: string;

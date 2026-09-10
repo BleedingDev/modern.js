@@ -2,7 +2,6 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  collectDirectRemoteModuleFederationCss,
   collectDirectRemoteModuleFederationCssWithMeta,
   collectModuleFederationManifestCss,
   createModuleFederationCssCollector,
@@ -146,7 +145,7 @@ describe('module federation css collection', () => {
     ]);
   });
 
-  it('loads direct remote manifests from the host manifest without throwing on failures', async () => {
+  it('loads available remote CSS and marks partial remote failures', async () => {
     const pwd = await createTempDir();
     await writeFile(
       path.join(pwd, 'mf-manifest.json'),
@@ -194,63 +193,20 @@ describe('module federation css collection', () => {
       });
     });
 
-    const css = await collectDirectRemoteModuleFederationCss(pwd, {
+    const result = await collectDirectRemoteModuleFederationCssWithMeta(pwd, {
       fetcher,
       monitors: {
         warn,
       } as any,
     });
 
-    expect(css).toEqual([
+    expect(result.assets).toEqual([
       'https://cdn.example.com/a/static/css/shared.css',
       'https://cdn.example.com/a/static/css/expose.css',
     ]);
+    expect(result.errored).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledTimes(1);
-  });
-
-  it('flags partial collections as errored when a remote manifest fails', async () => {
-    const pwd = await createTempDir();
-    await writeFile(
-      path.join(pwd, 'mf-manifest.json'),
-      JSON.stringify({
-        remotes: [
-          {
-            entry: 'https://remote-a.example.com/mf-manifest.json',
-          },
-          {
-            entry: 'https://remote-b.example.com/mf-manifest.json',
-          },
-        ],
-      }),
-    );
-
-    const fetcher = rs.fn(async (url: string) => {
-      if (url.includes('remote-b')) {
-        return new Response('boom', { status: 500 });
-      }
-      return Response.json({
-        exposes: [
-          {
-            assets: {
-              css: {
-                sync: ['static/css/a.css'],
-              },
-            },
-          },
-        ],
-      });
-    });
-
-    const result = await collectDirectRemoteModuleFederationCssWithMeta(pwd, {
-      fetcher,
-      monitors: { warn: rs.fn() } as any,
-    });
-
-    expect(result.errored).toBe(true);
-    expect(result.assets).toEqual([
-      'https://remote-a.example.com/static/css/a.css',
-    ]);
   });
 });
 

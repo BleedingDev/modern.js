@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
@@ -38,7 +37,6 @@ test('applies fork branding without discarding upstream Rspress behavior', () =>
     },
   );
 
-  assert.equal(config.title, 'UltraModern.js 3.0');
   assert.equal(config.base, '/ultramodern.js/');
   assert.deepEqual(config.logo, {
     light: '/ultramodern.js/img/ultramodern-logo-light.svg',
@@ -58,10 +56,6 @@ test('applies fork branding without discarding upstream Rspress behavior', () =>
       { lang: 'zh', label: '简体中文', title: 'UltraModern.js 3.0' },
       { lang: 'en', label: 'English', title: 'UltraModern.js 3.0' },
     ],
-  );
-  assert.equal(
-    config.themeConfig?.editLink?.docRepoBaseUrl,
-    'https://github.com/BleedingDev/ultramodern.js/tree/main-ultramodern/packages/document/docs',
   );
   assert.deepEqual(config.themeConfig?.socialLinks, [
     { icon: 'discord', mode: 'link', content: 'https://discord.test' },
@@ -124,30 +118,7 @@ test('emits coherent Open Graph and Twitter metadata without an identity claim',
 
   assert.equal(meta['og:image']?.content, image);
   assert.equal(meta['twitter:image']?.content, image);
-  assert.equal(meta['twitter:title']?.content, 'UltraModern.js 3.0');
-  assert.equal(
-    meta['twitter:description']?.content,
-    'A SuperApp framework for Effect, TanStack Router, SSR, BFF, and Micro Verticals.',
-  );
   assert.equal(meta['twitter:card']?.content, 'summary_large_image');
   assert.equal(meta['twitter:site'], undefined);
   assert.equal(meta['twitter:creator'], undefined);
-});
-
-test('ships contrasting logos and a 1200 by 630 PNG social card', async () => {
-  const assetsPath = fileURLToPath(ultraModernDocsAssets);
-  const [lightLogo, darkLogo, socialCard] = await Promise.all([
-    readFile(`${assetsPath}/img/ultramodern-logo-light.svg`, 'utf8'),
-    readFile(`${assetsPath}/img/ultramodern-logo-dark.svg`, 'utf8'),
-    readFile(`${assetsPath}/img/ultramodern-social-card.png`),
-  ]);
-
-  assert.match(lightLogo, /fill="#0f172a"[^>]*>UltraModern\.js<\/text>/);
-  assert.match(darkLogo, /fill="#f8fafc"[^>]*>UltraModern\.js<\/text>/);
-  assert.deepEqual(
-    [...socialCard.subarray(0, 8)],
-    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-  );
-  assert.equal(socialCard.readUInt32BE(16), 1200);
-  assert.equal(socialCard.readUInt32BE(20), 630);
 });

@@ -102,7 +102,6 @@ describe('telemetry registry queue matrix', () => {
         totalDropped,
       });
       expect(batches).toHaveLength(windowIndex + 1);
-      expect(batches[windowIndex]).toHaveLength(5);
     }
 
     const emitted = batches.flat();

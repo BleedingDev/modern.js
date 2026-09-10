@@ -1,80 +1,57 @@
+// @rstest-environment happy-dom
+
 import { SSR_HYDRATION_ID_PREFIX } from '@modern-js/utils/universal/constants';
-import React from 'react';
+import { act, useId, useState } from 'react';
+import { renderToString } from 'react-dom/server';
+import { hydrateWithReact } from '../../../src/core/browser/hydrate';
 
-const nativeHydrateRoot = rstest.fn(() => ({ kind: 'react-root' }));
-const loadableReady = rstest.fn(
-  (callback: () => void, _options: { chunkLoadingGlobal: string }) => {
-    callback();
-    return Promise.resolve();
-  },
-);
+const App = () => {
+  const id = useId();
+  const [submitted, setSubmitted] = useState(false);
 
-rstest.mock('@loadable/component', () => ({
-  loadableReady,
-}));
-rstest.mock('react-dom/client', () => ({
-  hydrateRoot: nativeHydrateRoot,
-}));
+  return (
+    <>
+      <label htmlFor={id}>Name</label>
+      <input id={id} />
+      <button onClick={() => setSubmitted(true)} type="button">
+        {submitted ? 'Submitted' : 'Submit'}
+      </button>
+    </>
+  );
+};
 
-describe('hydrateRoot loadable chunk loading global', () => {
-  beforeEach(() => {
-    rstest.resetModules();
-    loadableReady.mockClear();
-    (globalThis as any).window = {
-      _SSR_DATA: {
-        mode: 'string',
-        renderLevel: 2,
-      },
-    };
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+describe('React DOM hydration', () => {
+  afterEach(() => {
+    document.body.replaceChildren();
   });
 
-  afterAll(() => {
-    delete (globalThis as any).window;
-  });
-
-  test('uses the loadable fallback when no build constant is present', async () => {
-    const { hydrateRoot } = await import('../../../src/core/browser/hydrate');
-    const hydratedRoot = { kind: 'hydrated-root' };
-    const ModernHydrate = rstest.fn().mockResolvedValue(hydratedRoot);
-
-    await expect(
-      hydrateRoot(
-        React.createElement('main'),
-        { routes: [] } as never,
-        rstest.fn() as never,
-        ModernHydrate,
-      ),
-    ).resolves.toBe(hydratedRoot);
-
-    expect(loadableReady).toHaveBeenCalledTimes(1);
-    expect(loadableReady).toHaveBeenCalledWith(expect.any(Function), {
-      chunkLoadingGlobal: '__LOADABLE_LOADED_CHUNKS__',
-    });
-  });
-
-  test('delegates hydration to the native React root and preserves the promise contract', async () => {
-    const { hydrateWithReact } = await import(
-      '../../../src/core/browser/hydrate'
-    );
-    const App = React.createElement('main');
-    const rootElement = {} as HTMLElement;
-    const nativeRoot = nativeHydrateRoot();
-    nativeHydrateRoot.mockClear();
-    nativeHydrateRoot.mockReturnValueOnce(nativeRoot);
-
-    await expect(hydrateWithReact(App, rootElement)).resolves.toBe(nativeRoot);
-    expect(nativeHydrateRoot).toHaveBeenCalledWith(rootElement, App, {
+  test('adopts server markup, preserves useId labels, and remains interactive', async () => {
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<App />, {
       identifierPrefix: SSR_HYDRATION_ID_PREFIX,
     });
-  });
+    document.body.appendChild(container);
 
-  test('loads in a browser runtime without a process global', async () => {
-    const nodeProcess = globalThis.process;
-    rstest.stubGlobal('process', undefined);
+    let root: Awaited<ReturnType<typeof hydrateWithReact>>;
+    await act(async () => {
+      root = await hydrateWithReact(<App />, container);
+    });
 
-    const hydrate = await import('../../../src/core/browser/hydrate');
-    expect(hydrate).toBeDefined();
+    const label = container.querySelector('label');
+    const input = container.querySelector('input');
+    expect(label?.htmlFor).toBe(input?.id);
 
-    rstest.stubGlobal('process', nodeProcess);
+    await act(async () => {
+      container
+        .querySelector('button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.querySelector('button')?.textContent).toBe('Submitted');
+
+    root!.unmount();
   });
 });

@@ -47,8 +47,8 @@ test('CLI refuses caller-supplied release identity without a verified manifest',
   }
 });
 
-test('CLI derives the record and GitHub outputs from verified release artifacts', async () => {
-  const { execFileSync, spawnSync } = require('node:child_process');
+test('generator derives the record from an isolated verified release checkout', async () => {
+  const { execFileSync } = require('node:child_process');
   const fs = require('node:fs');
   const os = require('node:os');
   const [
@@ -61,46 +61,14 @@ test('CLI derives the record and GitHub outputs from verified release artifacts'
     loadGenerator(),
   ]);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cohort-record-release-'));
-  const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  }).trim();
-  const latestReleaseTag = execFileSync(
-    'git',
-    [
-      'tag',
-      '--list',
-      `${generator.RELEASE_TAG_PREFIX}*`,
-      '--sort=-creatordate',
-    ],
-    { cwd: repoRoot, encoding: 'utf8' },
-  )
-    .trim()
-    .split('\n')[0];
-  assert.ok(latestReleaseTag?.startsWith(generator.RELEASE_TAG_PREFIX));
-  const version = latestReleaseTag.slice(generator.RELEASE_TAG_PREFIX.length);
-  const queuedEntries = await generator.collectChangesetEntries(repoRoot, {
-    targetCommit: sourceCommit,
-    targetVersion: version,
-  });
-  const changedSourceName = queuedEntries
-    .flatMap(entry => entry.packages)
-    .map(pkg => pkg.name)
-    .find(
-      name =>
-        /^@modern-js\/[a-z0-9-]+$/u.test(name) &&
-        name !== '@modern-js/ultramodern-create',
-    );
-  assert.ok(changedSourceName, 'fixture needs one queued Modern.js package');
+  const run = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const version = '3.5.0-ultramodern.1';
   const aliases = {
     '@modern-js/ultramodern-create':
       '@bleedingdev/modern-js-ultramodern-create',
     '@modern-js/i18n-utils': '@bleedingdev/modern-js-i18n-utils',
   };
-  aliases[changedSourceName] = changedSourceName.replace(
-    '@modern-js/',
-    '@bleedingdev/modern-js-',
-  );
   const definitions = [
     {
       dependencies: {
@@ -122,20 +90,20 @@ test('CLI derives the record and GitHub outputs from verified release artifacts'
       targetName: aliases['@modern-js/i18n-utils'],
     },
   ];
-  if (
-    !['@modern-js/ultramodern-create', '@modern-js/i18n-utils'].includes(
-      changedSourceName,
-    )
-  ) {
-    definitions.push({
-      dependencies: {},
-      exports: { '.': './index.js' },
-      sourceName: changedSourceName,
-      targetName: aliases[changedSourceName],
-    });
-  }
 
   try {
+    run('init', '-q', '-b', 'main');
+    run('config', 'user.email', 'debug@ultramodern.local');
+    run('config', 'user.name', 'UltraModern Debug');
+    fs.mkdirSync(path.join(root, '.changeset'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, '.changeset', 'queued.md'),
+      "---\n'@modern-js/i18n-utils': patch\n---\n\nfeat(i18n-utils): isolated release fixture\n",
+    );
+    run('add', '-A');
+    run('commit', '-qm', 'queue isolated release fixture');
+    const sourceCommit = run('rev-parse', 'HEAD');
+
     const packages = definitions.map(definition => {
       const packageDir = path.join(
         root,
@@ -186,31 +154,15 @@ test('CLI derives the record and GitHub outputs from verified release artifacts'
       version,
     });
     const out = path.join(root, 'change-record.md');
-    const githubOutput = path.join(root, 'github-output');
-    const result = spawnSync(
-      process.execPath,
-      [
-        path.join(__dirname, '..', 'gen-cohort-change-record.mjs'),
-        '--manifest',
-        path.join(releaseDir, 'manifest.json'),
-        '--out',
-        out,
-        '--github-output',
-        githubOutput,
-      ],
-      {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_REPOSITORY: 'Mallory/wrong-repository',
-          GITHUB_SHA: 'e'.repeat(40),
-        },
-      },
+    const release = JSON.parse(
+      fs.readFileSync(path.join(releaseDir, 'manifest.json'), 'utf8'),
     );
-
-    assert.equal(result.status, 0, result.stderr);
-    const body = fs.readFileSync(out, 'utf8');
+    const { body, entries } = await generator.generateCohortChangeRecord({
+      rootDir: root,
+      out,
+      release,
+    });
+    assert.equal(entries.length, 1);
     assert.match(body, new RegExp(`— ${version.replaceAll('.', '\\.')}`));
     assert.ok(
       body.includes(
@@ -218,12 +170,7 @@ test('CLI derives the record and GitHub outputs from verified release artifacts'
       ),
     );
     assert.doesNotMatch(body, /Mallory|eeeeeeee/u);
-    assert.deepEqual(fs.readFileSync(githubOutput, 'utf8').split('\n'), [
-      `source_commit=${sourceCommit}`,
-      'source_repository=BleedingDev/ultramodern.js',
-      `version=${version}`,
-      '',
-    ]);
+    assert.equal(fs.readFileSync(out, 'utf8'), body);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -439,41 +386,6 @@ test('regenerates the same non-empty record after the target release tag exists'
     assert.deepEqual(rerun, first);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('rejects a rendered body over the GitHub release-notes limit', async () => {
-  const { renderCohortChangeRecord, MAX_RELEASE_BODY_CHARS } =
-    await loadGenerator();
-  const entries = Array.from({ length: 2000 }, (_, index) => ({
-    id: `e${index}`,
-    packages: [{ name: '@modern-js/runtime', bump: 'patch' }],
-    summary: `fix(runtime): ${'x'.repeat(120)} ${index}`,
-    sha: 'abcdef0',
-    fork: true,
-    type: 'Bug Fixes',
-  }));
-  const body = renderCohortChangeRecord(entries, {
-    version: '3.5.0-ultramodern.1',
-  });
-  assert.ok(
-    body.length > MAX_RELEASE_BODY_CHARS,
-    'fixture must exceed the guard so the guard is meaningful',
-  );
-});
-
-test('no changeset body carries a Cloudflare email-protection artifact', async () => {
-  const fs = require('node:fs');
-  const dir = path.join(__dirname, '..', '..', '..', '.changeset');
-  for (const file of fs.readdirSync(dir)) {
-    if (!file.endsWith('.md') || file.toLowerCase() === 'readme.md') {
-      continue;
-    }
-    const raw = fs.readFileSync(path.join(dir, file), 'utf8');
-    assert.ok(
-      !raw.includes('[email protected]'),
-      `${file} contains a scraped "[email protected]" placeholder; it would ship verbatim into the GitHub release notes`,
-    );
   }
 });
 

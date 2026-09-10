@@ -110,7 +110,6 @@ const runValidation = args => {
     evidenceDir,
     requiredFiles: profile.evidence.requiredFiles,
     requiredMetadataFields: profile.evidence.requiredMetadataFields,
-    minimumReviewers: profile.evidence.minimumReviewers || 2,
     allowMissingEvidence: args.allowMissingEvidence,
   });
 

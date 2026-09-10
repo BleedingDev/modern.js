@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
-import { UnsupportedUltramodernConfigError } from '../src/ultramodern-tooling/config';
+import {
+  normalizeCompactConfig,
+  UnsupportedUltramodernConfigError,
+} from '../src/ultramodern-tooling/config';
 import { runSyncDeliveryUnit } from '../src/ultramodern-workspace/delivery-unit-sync';
 import { createWorkspace, snapshotWorkspace } from './helpers/workspace-kit';
 
@@ -70,61 +73,88 @@ const configRejectionCases = [
   },
 ];
 
-const strictDispatchEntryPoints = [
-  {
-    command: 'migrate-strict-effect',
-    invoke: (workspaceDir: string) =>
-      runMigrateStrictEffect(['--skip-install'], {
-        workspaceRoot: workspaceDir,
-        invocationCwd: workspaceDir,
-      }),
-  },
-  {
-    command: 'sync-delivery-unit',
-    invoke: (workspaceDir: string) =>
-      runSyncDeliveryUnit([], {
-        workspaceRoot: workspaceDir,
-        invocationCwd: workspaceDir,
-      }),
-  },
-];
-
-const matrix = strictDispatchEntryPoints.flatMap(entryPoint =>
-  configRejectionCases.map(rejection => ({ entryPoint, rejection })),
-);
-
-test.each(
-  matrix,
-)('$entryPoint.command rejects $rejection.label before writes', ({
-  entryPoint,
-  rejection,
-}) => {
+test('normalization rejects each unsupported config shape at the schema boundary', () => {
   const { tempRoot, workspaceDir } = createWorkspace('strict-dispatch', {
     tempPrefix: 'um-strict-dispatch-',
   });
 
   try {
+    const baseline = readJson(workspaceDir, ultramodernConfigPath);
+    for (const rejection of configRejectionCases) {
+      const config = structuredClone(baseline);
+      rejection.mutate(config);
+      assert.throws(
+        () =>
+          normalizeCompactConfig(
+            workspaceDir,
+            path.join(workspaceDir, ultramodernConfigPath),
+            config,
+          ),
+        error => {
+          const typedError = error as UnsupportedUltramodernConfigError;
+          assert.equal(typedError.name, 'UnsupportedUltramodernConfigError');
+          // Subset match: the issue may carry additional diagnostic fields
+          // (e.g. reason) beyond the identity asserted here.
+          for (const [key, value] of Object.entries(rejection.issue)) {
+            assert.deepEqual(
+              (typedError.issue as Record<string, unknown>)[key],
+              value,
+            );
+          }
+          assert.match(typedError.message, rejection.error);
+          return true;
+        },
+        rejection.label,
+      );
+    }
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('migrate-strict-effect rejects an unsupported config before writing', () => {
+  const { tempRoot, workspaceDir } = createWorkspace('strict-dispatch', {
+    tempPrefix: 'um-strict-dispatch-migrate-',
+  });
+
+  try {
     const config = readJson(workspaceDir, ultramodernConfigPath);
-    rejection.mutate(config);
+    config.schemaVersion = 2;
     writeJson(workspaceDir, ultramodernConfigPath, config);
     const before = snapshotWorkspace(workspaceDir);
 
     assert.throws(
-      () => entryPoint.invoke(workspaceDir),
-      error => {
-        const typedError = error as UnsupportedUltramodernConfigError;
-        assert.equal(typedError.name, 'UnsupportedUltramodernConfigError');
-        // Subset match: the issue may carry additional diagnostic fields
-        // (e.g. reason) beyond the identity asserted here.
-        for (const [key, value] of Object.entries(rejection.issue)) {
-          assert.deepEqual(
-            (typedError.issue as Record<string, unknown>)[key],
-            value,
-          );
-        }
-        assert.match(typedError.message, rejection.error);
-        return true;
-      },
+      () =>
+        runMigrateStrictEffect(['--skip-install'], {
+          workspaceRoot: workspaceDir,
+          invocationCwd: workspaceDir,
+        }),
+      (error: unknown) =>
+        error instanceof UnsupportedUltramodernConfigError &&
+        /schemaVersion 2/u.test(error.message),
+    );
+    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('sync-delivery-unit rejects a missing compact config before writing', () => {
+  const { tempRoot, workspaceDir } = createWorkspace('strict-dispatch', {
+    tempPrefix: 'um-strict-dispatch-sync-',
+  });
+
+  try {
+    fs.rmSync(path.join(workspaceDir, ultramodernConfigPath));
+    const before = snapshotWorkspace(workspaceDir);
+
+    assert.throws(
+      () =>
+        runSyncDeliveryUnit([], {
+          workspaceRoot: workspaceDir,
+          invocationCwd: workspaceDir,
+        }),
+      /Missing \.modernjs\/ultramodern\.json/u,
     );
     assert.deepEqual(snapshotWorkspace(workspaceDir), before);
   } finally {

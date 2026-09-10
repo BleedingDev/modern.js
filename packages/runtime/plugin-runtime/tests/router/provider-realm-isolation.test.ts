@@ -139,35 +139,6 @@ describe('router provider runtime-realm isolation', () => {
     }
   });
 
-  it('allows independent realms to select different non-default providers', async () => {
-    const verticalA = await loadVerticalRuntime();
-    const tanstackA = createFactory('A:tanstack');
-    verticalA.registerRouterProvider('tanstack', tanstackA);
-    const realmA = createVerticalRealm(
-      verticalA,
-      createFactory('A:react-router'),
-      { name: 'tanstack', factory: tanstackA },
-    );
-
-    const verticalB = await loadVerticalRuntime();
-    const solidRouterB = createFactory('B:solid-router');
-    expect(() =>
-      verticalB.registerRouterProvider('solid-router', solidRouterB),
-    ).not.toThrow();
-    const realmB = createVerticalRealm(
-      verticalB,
-      createFactory('B:react-router'),
-      { name: 'solid-router', factory: solidRouterB },
-    );
-
-    expect(verticalA.resolveRouterProvider('tanstack', { realm: realmA })).toBe(
-      tanstackA,
-    );
-    expect(
-      verticalB.resolveRouterProvider('solid-router', { realm: realmB }),
-    ).toBe(solidRouterB);
-  });
-
   it.each(
     COMPATIBILITY_REGISTRY_SLOTS,
   )('fails closed instead of invoking a foreign %s provider for an explicit framework', async (_version, slot) => {

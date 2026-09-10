@@ -1,3 +1,9 @@
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { addUltramodernVertical } from '../src/ultramodern-workspace';
 import { createApiClient } from '../src/ultramodern-workspace/api/client';
 import { createApiServiceEntry } from '../src/ultramodern-workspace/api/service';
 import { createSharedApi } from '../src/ultramodern-workspace/api/shared';
@@ -7,6 +13,7 @@ import {
   createSharedPackage,
 } from '../src/ultramodern-workspace/package-json';
 import { migratedWorkspaceScriptArtifacts } from '../src/ultramodern-workspace/workspace-scripts';
+import { createWorkspace } from './helpers/workspace-kit';
 
 const service = {
   id: 'inventory-stock',
@@ -110,4 +117,95 @@ describe('scope-aware native API scaffolding', () => {
     );
     expect(checker).toBeUndefined();
   });
+});
+
+const MODERN_VERSION = '3.2.1';
+
+function linkGeneratedWorkspacePackages(
+  workspaceDir: string,
+  scope: string,
+): void {
+  const rootNodeModules = path.resolve(
+    __dirname,
+    '../../../../node_modules/.pnpm/node_modules',
+  );
+  const nodeModules = path.join(workspaceDir, 'node_modules');
+  fs.mkdirSync(nodeModules, { recursive: true });
+
+  for (const entry of fs.readdirSync(rootNodeModules)) {
+    const source = path.join(rootNodeModules, entry);
+    const destination = path.join(nodeModules, entry);
+    if (!fs.existsSync(destination)) {
+      fs.symlinkSync(source, destination, 'junction');
+    }
+  }
+
+  const generatedScope = path.join(nodeModules, `@${scope}`);
+  fs.mkdirSync(generatedScope, { recursive: true });
+  fs.symlinkSync(
+    path.join(workspaceDir, 'packages/shared-contracts'),
+    path.join(generatedScope, 'shared-contracts'),
+    'junction',
+  );
+}
+
+test('a generated REST API serves a request through its shared contract', () => {
+  const packageName = 'w23-api-request';
+  const { tempRoot, workspaceDir } = createWorkspace(packageName, {
+    tempPrefix: 'um-api-request-',
+  });
+
+  try {
+    addUltramodernVertical({
+      workspaceRoot: workspaceDir,
+      name: 'catalog',
+      modernVersion: MODERN_VERSION,
+    });
+    linkGeneratedWorkspacePackages(workspaceDir, packageName);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        pathToFileURL(
+          path.resolve(__dirname, '../node_modules/tsx/dist/loader.mjs'),
+        ).href,
+        '--input-type=module',
+        '--eval',
+        `const loaded = await import('./api/index.ts');
+const runtime = loaded.default?.default ?? loaded.default;
+const webHandler = runtime.createHandler();
+try {
+  const response = await webHandler.handler(new Request('https://catalog.example/catalog?limit=1'));
+  process.stdout.write('\\n__RESULT__' + JSON.stringify({ status: response.status, body: await response.json() }));
+} finally {
+  await webHandler.dispose();
+}`,
+      ],
+      {
+        cwd: path.join(workspaceDir, 'verticals/catalog'),
+        encoding: 'utf-8',
+      },
+    );
+
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    const response = JSON.parse(result.stdout.split('__RESULT__').at(-1) ?? '');
+    assert.equal(response.status, 200);
+    assert.deepEqual(
+      response.body.items.map(
+        ({ id, title }: { id: string; title: string }) => ({
+          id,
+          title,
+        }),
+      ),
+      [{ id: 'starter-catalog', title: 'Wire a real catalog source here' }],
+    );
+    assert.equal(response.body.items[0].marker.appId, 'catalog');
+    assert.equal(
+      response.body.items[0].marker.unitId,
+      'w23-api-request/catalog',
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });

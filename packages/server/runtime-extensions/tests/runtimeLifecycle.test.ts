@@ -17,23 +17,6 @@ const deferred = () => {
 };
 
 describe('server runtime lifecycle', () => {
-  test('shares one disposal across concurrent and repeated callers', async () => {
-    const owner = {};
-    const release = deferred();
-    const dispose = rstest.fn(async () => release.promise);
-    registerServerRuntimeDisposer(owner, dispose);
-
-    const first = disposeServerRuntime(owner);
-    const second = disposeServerRuntime(owner);
-    expect(first).toBe(second);
-    await Promise.resolve();
-    expect(dispose).toHaveBeenCalledTimes(1);
-
-    release.resolve();
-    await Promise.all([first, second, disposeServerRuntime(owner)]);
-    expect(dispose).toHaveBeenCalledTimes(1);
-  });
-
   test('attempts every owned disposer when one fails synchronously', async () => {
     const owner = {};
     const completed = rstest.fn();

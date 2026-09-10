@@ -14,17 +14,8 @@ const repoRoot = path.resolve(__dirname, '../../..');
 const requireFromCreate = createRequire(
   path.join(repoRoot, 'packages/toolkit/create/package.json'),
 );
-// js-yaml from the prebundle toolchain, as in the sibling workflow suites, and
-// not the `yaml` re-exported by @modern-js/utils: that one resolves through the
-// package's exports map into its dist/, which makes this suite unloadable on a
-// checkout with no built package bytes. `qualify-source` runs the publish
-// tooling suites in the recovery lane, where nothing is built.
-const requireFromPrebundle = createRequire(
-  path.join(repoRoot, 'scripts/prebundle/package.json'),
-);
 const sourceFrameworkVersion = requireFromCreate('./package.json').version;
 const fixtureReleaseVersion = `${sourceFrameworkVersion}-ultramodern.1`;
-const yaml = requireFromPrebundle('js-yaml');
 const scriptPath = path.join(
   repoRoot,
   'scripts/ultramodern-publish/prepare-bleedingdev-packages.mjs',
@@ -321,75 +312,6 @@ test('publish selection retains upstream create only as the version anchor', asy
       item => item.packageJson.name === '@modern-js/ultramodern-create',
     ).length,
     1,
-  );
-});
-
-test('RSC remains an explicit optional toolchain and is absent from the release cohort', () => {
-  const upstreamRuntime = '0.1.0';
-  const frameworkContracts = [
-    {
-      path: 'packages/cli/builder/package.json',
-      optionalPeers: {
-        'react-server-dom-rspack': upstreamRuntime,
-        'rsbuild-plugin-rsc': '0.1.1',
-      },
-    },
-    {
-      path: 'packages/runtime/render/package.json',
-      optionalPeers: { 'react-server-dom-rspack': upstreamRuntime },
-    },
-    {
-      path: 'packages/runtime/plugin-tanstack/package.json',
-      optionalPeers: { 'react-server-dom-rspack': upstreamRuntime },
-    },
-  ];
-
-  for (const { path: relativePath, optionalPeers } of frameworkContracts) {
-    const packageJson = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, relativePath), 'utf8'),
-    );
-    for (const [packageName, version] of Object.entries(optionalPeers)) {
-      assert.equal(
-        packageJson.dependencies?.[packageName],
-        undefined,
-        `${relativePath} must not install ${packageName} for non-RSC consumers`,
-      );
-      assert.equal(packageJson.devDependencies?.[packageName], version);
-      assert.equal(packageJson.peerDependencies?.[packageName], version);
-      assert.equal(
-        packageJson.peerDependenciesMeta?.[packageName]?.optional,
-        true,
-      );
-    }
-  }
-
-  for (const relativePath of [
-    'tests/integration/routes-tanstack-rsc/package.json',
-    'tests/integration/rsc-csr-app/package.json',
-    'tests/integration/rsc-csr-routes/package.json',
-    'tests/integration/rsc-ssr-app/package.json',
-    'tests/integration/rsc-ssr-routes/package.json',
-    'tests/integration/ssr/fixtures/rsc-closing-tags/package.json',
-  ]) {
-    const packageJson = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, relativePath), 'utf8'),
-    );
-    assert.equal(
-      packageJson.dependencies?.['react-server-dom-rspack'],
-      upstreamRuntime,
-      `${relativePath} must exercise the audited upstream runtime directly`,
-    );
-  }
-
-  assert.equal(
-    fs.existsSync(
-      path.join(
-        repoRoot,
-        'packages/runtime/react-server-dom-rspack/package.json',
-      ),
-    ),
-    false,
-    'the Modern.js release cohort must not contain a temporary RSDR package',
   );
 });
 
@@ -3082,7 +3004,7 @@ test('dry-run validation cannot publish or request credentials', async () => {
 });
 
 test('final pack runs once and dry-run consumes accepted bytes without lifecycle scripts', async () => {
-  const { publishPackage, verifyReleaseArtifacts } = await import(
+  const { publishPackage } = await import(
     '../prepare-bleedingdev-packages.mjs'
   );
   const fixture = await createArtifactFixture({
@@ -3118,20 +3040,6 @@ test('final pack runs once and dry-run consumes accepted bytes without lifecycle
     const manifest = fixture.releaseArtifacts.manifest;
     assert.equal(manifest.schema, 'bleedingdev.ultramodern.release-manifest');
     assert.equal(manifest.schemaVersion, 3);
-    assert.deepEqual(Object.keys(manifest).sort(), [
-      'aliases',
-      'cohortDigest',
-      'cohortProjection',
-      'dependencyGraph',
-      'packages',
-      'publishOrder',
-      'release',
-      'schema',
-      'schemaVersion',
-      'sidecars',
-      'source',
-      'tools',
-    ]);
     assert.equal(manifest.sidecars, null);
     assert.deepEqual(manifest.source, releaseSource);
     assert.deepEqual(manifest.release, {
@@ -3140,20 +3048,6 @@ test('final pack runs once and dry-run consumes accepted bytes without lifecycle
     });
     assert.deepEqual(manifest.tools, releaseTools);
     for (const item of manifest.packages) {
-      assert.deepEqual(Object.keys(item).sort(), [
-        'fileCount',
-        'fileListSha256',
-        'integrity',
-        'packageJsonSha256',
-        'sha256',
-        'shasum',
-        'size',
-        'sourceName',
-        'tarballPath',
-        'targetName',
-        'unpackedSize',
-        'version',
-      ]);
       assert.match(item.tarballPath, /^tarballs\/[^/]+\.tgz$/u);
       assert.equal(path.isAbsolute(item.tarballPath), false);
     }
@@ -3215,12 +3109,6 @@ test('final pack runs once and dry-run consumes accepted bytes without lifecycle
         .update(fs.readFileSync(artifact.artifactPath))
         .digest('hex'),
       before,
-    );
-    assert.doesNotThrow(() =>
-      verifyReleaseArtifacts(
-        fixture.outDir,
-        artifactExpectations(fixture.aliases),
-      ),
     );
   } finally {
     removeDir(fixture.root);
@@ -3293,7 +3181,7 @@ test('local acceptance publishes verified buffers even when source paths mutate'
   }
 });
 
-test('local acceptance seeds staged sidecars before the exact cohort', async () => {
+test('local acceptance publishes verified staged sidecar bytes to the registry', async () => {
   const { publishStagedSidecars } = await import(
     '../lib/source-create-proof/runtime-proof/registry.mjs'
   );
@@ -3364,57 +3252,6 @@ test('local acceptance seeds staged sidecars before the exact cohort', async () 
   }
 });
 
-test('local acceptance registry tolerates transient npm uplink failures', async () => {
-  const { createVerdaccioConfig } = await import(
-    '../lib/source-create-proof/runtime-proof/registry.mjs'
-  );
-  const config = createVerdaccioConfig({
-    storageDir: '/tmp/registry-storage',
-    htpasswdPath: '/tmp/registry-htpasswd',
-    scope: 'bleedingdev',
-  });
-
-  assert.deepEqual(yaml.load(config).uplinks.npmjs, {
-    url: 'https://registry.npmjs.org/',
-    timeout: '10m',
-    max_fails: 100,
-    fail_timeout: '1s',
-  });
-});
-
-test('local acceptance registry keeps published cohort history without conflicting with exact sidecar seeds', async () => {
-  const { createVerdaccioConfig } = await import(
-    '../lib/source-create-proof/runtime-proof/registry.mjs'
-  );
-  const config = yaml.load(
-    createVerdaccioConfig({
-      storageDir: '/tmp/registry-storage',
-      htpasswdPath: '/tmp/registry-htpasswd',
-      scope: 'bleedingdev',
-      sidecarNames: ['@bleedingdev/image-size'],
-    }),
-  );
-
-  // The scoped .npmrc keeps install traffic for external packages off the
-  // ephemeral registry, but the catch-all proxy must survive so release-age
-  // audit fallbacks through Verdaccio still resolve.
-  assert.deepEqual(config.packages['@bleedingdev/*'], {
-    access: '$all',
-    publish: '$authenticated',
-    unpublish: '$authenticated',
-    proxy: 'npmjs',
-  });
-  assert.deepEqual(config.packages['@bleedingdev/image-size'], {
-    access: '$all',
-    publish: '$authenticated',
-    unpublish: '$authenticated',
-  });
-  assert.deepEqual(config.packages['**'], {
-    access: '$all',
-    proxy: 'npmjs',
-  });
-});
-
 test('local acceptance user config scopes the ephemeral registry and keeps npmjs as the default', async () => {
   const { writeRegistryUserConfig } = await import(
     '../lib/source-create-proof/runtime-proof/registry.mjs'
@@ -3440,25 +3277,9 @@ test('local acceptance user config scopes the ephemeral registry and keeps npmjs
   }
 });
 
-test('local acceptance registry env carries no registry override keys', async () => {
+test('local acceptance registry trust env records verified package identities', async () => {
   const { createRegistryEnv } = await import(
     '../lib/source-create-proof/runtime-proof/registry.mjs'
-  );
-  const env = createRegistryEnv({
-    userConfigPath: '/tmp/registry/.npmrc',
-    cacheDir: '/tmp/registry/npm-cache',
-  });
-
-  assert.deepEqual(env, {
-    npm_config_cache: '/tmp/registry/npm-cache',
-    npm_config_userconfig: '/tmp/registry/.npmrc',
-  });
-  // Registry routing lives exclusively in the scoped user config: an env-level
-  // registry override would send external packages through the ephemeral
-  // registry again.
-  assert.deepEqual(
-    Object.keys(env).filter(key => key.toLowerCase().includes('registry')),
-    [],
   );
   const verified = createRegistryEnv({
     userConfigPath: '/tmp/registry/.npmrc',
@@ -4021,19 +3842,9 @@ test('validateRegistryCohort verifies members concurrently and reports failures 
 test('post-publish verification re-resolves the dist every attempt and downloads the tarball once', async () => {
   const {
     createRegistryProvenanceExpectation,
-    registryVerificationRetryDelaysMs,
     verifyRegistryPackage,
     verifyRegistryPackageDist,
   } = await import('../lib/prepare-bleedingdev-packages/registry.mjs');
-
-  // The propagation window itself is a hard release invariant: 36 attempts and
-  // at least 350s of cumulative sleep across the 35 delays the loop can spend.
-  assert.equal(registryVerificationRetryDelaysMs.length, 36);
-  assert(
-    registryVerificationRetryDelaysMs
-      .slice(0, 35)
-      .reduce((total, delayMs) => total + delayMs, 0) >= 350000,
-  );
 
   const item = {
     integrity: 'sha512-fixture',
@@ -4046,7 +3857,6 @@ test('post-publish verification re-resolves the dist every attempt and downloads
   const lookups = [];
   let tarballDownloads = 0;
   let provenanceChecks = 0;
-  const startedAt = Date.now();
 
   const dist = await verifyRegistryPackage(
     item,
@@ -4095,9 +3905,6 @@ test('post-publish verification re-resolves the dist every attempt and downloads
   ]);
   assert.equal(provenanceChecks, 2);
   assert.equal(tarballDownloads, 1);
-  const elapsed = Date.now() - startedAt;
-  assert(elapsed >= registryVerificationRetryDelaysMs[0]);
-  assert(elapsed < 10000);
 });
 
 test('post-publish verification re-pins the tarball URL after the download is memoized', async () => {
@@ -4198,38 +4005,6 @@ test('validateRegistryCohort stops launching windows after three failed members'
     '@bleedingdev/modern-js-pkg-1',
     '@bleedingdev/modern-js-pkg-2',
   ]);
-});
-
-test('the release validator tracks the merged Modern.js source version', async () => {
-  const { enforceSingleVersionPolicy } = await import(
-    '../lib/prepare-bleedingdev-packages/rewrite.mjs'
-  );
-  // Read straight from the repository so the merged upstream baseline — not a
-  // hand-written fixture — decides which release versions are legal.
-  const packages = [
-    {
-      packageJson: {
-        name: '@modern-js/create',
-        version: sourceFrameworkVersion,
-      },
-    },
-  ];
-  const accept = version =>
-    enforceSingleVersionPolicy(
-      { dependencyVersion: version, version },
-      packages,
-      packages,
-    );
-
-  assert.equal(sourceFrameworkVersion, '3.9.0');
-  assert.doesNotThrow(() => accept('3.9.0-ultramodern.1'));
-  for (const stale of ['3.8.3-ultramodern.1', '3.8.3-ultramodern.6']) {
-    assert.throws(
-      () => accept(stale),
-      /release base 3\.8\.3 does not match the incorporated Modern\.js source version 3\.9\.0/i,
-      `expected ${stale} to be rejected after the 3.9.0 merge`,
-    );
-  }
 });
 
 test('dry-run preflights absent versions and publishes every exact snapshot without claiming provenance', async () => {

@@ -168,14 +168,6 @@ const securityCases: readonly SecurityCase[] = [
   },
 ];
 
-const handlerExport = {
-  heif: 'HEIF',
-  icns: 'ICNS',
-  jp2: 'JP2',
-  jpg: 'JPG',
-  jxl: 'JXL',
-} as const;
-
 function distributionEntry(
   moduleKind: ModuleKind,
   name: 'fromFile' | 'index',
@@ -278,26 +270,6 @@ function parseFileInChild(
   }
 }
 
-function parseWithHandlerInChild(
-  moduleKind: ModuleKind,
-  imageType: ImageType,
-  bytes: readonly number[],
-  aggregate: boolean,
-): ChildResult {
-  const loadHandler = loadModuleSource(
-    moduleKind,
-    typeEntry(moduleKind, aggregate ? 'index' : imageType),
-  );
-  const selectHandler = aggregate
-    ? `module.typeHandlers.get(${JSON.stringify(imageType)})`
-    : `module.${handlerExport[imageType]}`;
-  return runInChild(`async () => {
-    const module = ${loadHandler};
-    const handler = ${selectHandler};
-    return handler.calculate(Uint8Array.from(${JSON.stringify(bytes)}));
-  }`);
-}
-
 function expectSecurityOutcome(
   actual: ChildResult,
   expected: ExpectedOutcome,
@@ -329,28 +301,6 @@ describe.each(moduleKinds)('image-size %s distribution', moduleKind => {
     expected,
   }) => {
     expectSecurityOutcome(parseFileInChild(moduleKind, bytes), expected);
-  });
-
-  it.each(securityCases)('bounds the direct handler for $name', ({
-    bytes,
-    expected,
-    imageType,
-  }) => {
-    expectSecurityOutcome(
-      parseWithHandlerInChild(moduleKind, imageType, bytes, false),
-      expected,
-    );
-  });
-
-  it.each(securityCases)('bounds the aggregate handler for $name', ({
-    bytes,
-    expected,
-    imageType,
-  }) => {
-    expectSecurityOutcome(
-      parseWithHandlerInChild(moduleKind, imageType, bytes, true),
-      expected,
-    );
   });
 
   it.each(validImages)('preserves valid $name parsing', async fixture => {

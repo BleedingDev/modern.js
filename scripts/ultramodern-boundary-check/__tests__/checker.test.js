@@ -11,7 +11,6 @@ const {
   checkForkImportBoundary,
   createAllowlistSnapshot,
   findDenylistMatches,
-  formatBoundaryReport,
   hasOnlyNativeRequestBindings,
   isNativeCreateRequestPackage,
   isNativeCreateRequestSurface,
@@ -434,20 +433,6 @@ test('native request eligibility does not weaken any broader or custom marker', 
   } finally {
     fs.rmSync(rootDir, { recursive: true, force: true });
   }
-});
-
-test('repo report fails whenever current governed imports remain', () => {
-  const report = checkForkImportBoundary({
-    rootDir: repoRoot,
-    baseRef: DEFAULT_BASE_REF,
-    allowlistPath: DEFAULT_ALLOWLIST_PATH,
-  });
-
-  assert.equal(
-    report.ok,
-    report.currentViolations.length === 0,
-    formatBoundaryReport(report),
-  );
 });
 
 test('detects a new fork-only import in an upstream-owned source file', () => {

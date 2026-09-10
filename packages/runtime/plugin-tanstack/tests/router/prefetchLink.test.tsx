@@ -5,7 +5,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import React from 'react';
 import { Link, NavLink } from '../../src/runtime/prefetchLink';
 
@@ -74,7 +74,7 @@ async function renderLink(options: Parameters<typeof buildRouter>[0]) {
     return found as HTMLAnchorElement;
   });
 
-  return { anchor, ...utils };
+  return { anchor, router, ...utils };
 }
 
 describe('tanstack prefetch link adapter - aria-current override', () => {
@@ -100,28 +100,20 @@ describe('tanstack prefetch link adapter - aria-current override', () => {
     expect(anchor.hasAttribute('aria-current')).toBe(false);
   });
 
-  it('leaves an inactive link untouched when caller passes nothing', async () => {
-    const { anchor } = await renderLink({ initialPath: '/' });
-    expect(anchor.hasAttribute('aria-current')).toBe(false);
-    expect(anchor.getAttribute('data-status')).not.toBe('active');
-  });
-
-  it('resolves render-prop children with the active state like TanStack Link', async () => {
-    const { anchor } = await renderLink({
-      initialPath: '/settings',
-      children: ({ isActive }: { isActive: boolean }) =>
-        isActive ? 'Active settings' : 'Settings',
-    });
-    expect(anchor.textContent).toBe('Active settings');
-  });
-
-  it('resolves render-prop children as inactive on a non-matching route', async () => {
-    const { anchor } = await renderLink({
+  it('updates render-prop children across an inactive-to-active transition', async () => {
+    const { anchor, router } = await renderLink({
       initialPath: '/',
       children: ({ isActive }: { isActive: boolean }) =>
         isActive ? 'Active settings' : 'Settings',
     });
+
     expect(anchor.textContent).toBe('Settings');
+
+    await act(async () => {
+      await router.navigate({ to: '/settings' });
+    });
+
+    await waitFor(() => expect(anchor.textContent).toBe('Active settings'));
   });
 
   it('passes the native anchor ref through the router hook', async () => {

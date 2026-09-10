@@ -4,11 +4,11 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { readJsonFile, repoRoot, writeJsonFile } = require('../fs-kit');
+const { readJsonFile, writeJsonFile } = require('../fs-kit');
 
 const makeTempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fs-kit-'));
 
-test('writeJsonFile creates parent directories and writes pretty JSON', () => {
+test('writeJsonFile writes atomic and direct JSON artifacts', () => {
   const dir = makeTempDir();
   try {
     const filePath = path.join(dir, 'nested', 'value.json');
@@ -18,25 +18,22 @@ test('writeJsonFile creates parent directories and writes pretty JSON', () => {
       `${JSON.stringify({ answer: 42 }, null, 2)}\n`,
     );
     assert.equal(fs.existsSync(`${filePath}.tmp`), false);
+
+    const directPath = path.join(dir, 'artifact.json');
+    writeJsonFile(directPath, ['ok'], { atomic: false });
+    assert.equal(fs.readFileSync(directPath, 'utf8'), '[\n  "ok"\n]\n');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('readJsonFile parses JSON using native JSON.parse behavior', () => {
+test('readJsonFile parses JSON and adds path context to parse errors', () => {
   const dir = makeTempDir();
   try {
-    const filePath = path.join(dir, 'value.json');
-    fs.writeFileSync(filePath, '{"answer":42}\n');
-    assert.deepEqual(readJsonFile(filePath), { answer: 42 });
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-});
+    const validPath = path.join(dir, 'value.json');
+    fs.writeFileSync(validPath, '{"answer":42}\n');
+    assert.deepEqual(readJsonFile(validPath), { answer: 42 });
 
-test('readJsonFile reports the file path on parse errors', () => {
-  const dir = makeTempDir();
-  try {
     const filePath = path.join(dir, 'broken.json');
     fs.writeFileSync(filePath, '{"answer":');
     assert.throws(
@@ -45,21 +42,6 @@ test('readJsonFile reports the file path on parse errors', () => {
         error.message.includes('Failed to parse JSON') &&
         error.message.includes(filePath),
     );
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('repoRoot points at the repository root', () => {
-  assert.equal(repoRoot, path.resolve(__dirname, '../../..'));
-});
-
-test('writeJsonFile supports direct writes for streaming-style artifacts', () => {
-  const dir = makeTempDir();
-  try {
-    const filePath = path.join(dir, 'artifact.json');
-    writeJsonFile(filePath, ['ok'], { atomic: false });
-    assert.equal(fs.readFileSync(filePath, 'utf8'), '[\n  "ok"\n]\n');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

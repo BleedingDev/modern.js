@@ -33,6 +33,10 @@ describe('router helper route error recognition', () => {
 describe('router helper route module handling', () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
+  function Page() {
+    return null;
+  }
+  const rspackExports = Symbol('rspack exports');
 
   afterEach(() => {
     Object.defineProperty(globalThis, 'document', {
@@ -80,53 +84,13 @@ describe('router helper route module handling', () => {
     expect(shouldRevalidate).toHaveBeenCalledTimes(1);
   });
 
-  test('returns a default route component module from a nested namespace', () => {
-    function Page() {
-      return null;
-    }
-
-    expect(resolveRouteComponent({ default: { default: Page } })).toBe(Page);
-    expect(
-      handleRouteModule({ default: { default: Page } }, 'about/page'),
-    ).toEqual({
-      default: Page,
-    });
-  });
-
-  test('returns a default route component module from a Component export', () => {
-    function Page() {
-      return null;
-    }
-
-    expect(resolveRouteComponent({ Component: Page })).toBe(Page);
-    expect(handleRouteModule({ Component: Page }, 'about/page')).toEqual({
-      default: Page,
-    });
-  });
-
-  test('returns a default route component module from Rspack async module exports', () => {
-    function Page() {
-      return null;
-    }
-    const rspackExports = Symbol('rspack exports');
-
-    expect(
-      resolveRouteComponent({
-        [rspackExports]: {
-          default: Page,
-        },
-      }),
-    ).toBe(Page);
-    expect(
-      handleRouteModule(
-        {
-          [rspackExports]: {
-            default: Page,
-          },
-        },
-        'about/page',
-      ),
-    ).toEqual({
+  test.each([
+    ['nested namespace', { default: { default: Page } }],
+    ['Component export', { Component: Page }],
+    ['Rspack async exports', { [rspackExports]: { default: Page } }],
+  ])('normalizes a route component from a %s', (_name, routeModule) => {
+    expect(resolveRouteComponent(routeModule)).toBe(Page);
+    expect(handleRouteModule(routeModule, 'about/page')).toEqual({
       default: Page,
     });
   });

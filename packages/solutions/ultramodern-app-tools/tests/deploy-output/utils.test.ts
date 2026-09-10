@@ -1,59 +1,68 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { resolveESMDependency } from '../../../app-tools/src/plugins/deploy/utils';
+import { pathToFileURL } from 'node:url';
+import { buildSync } from 'esbuild';
+
+const sourcePath = path.resolve(
+  __dirname,
+  '../../../app-tools/src/plugins/deploy/utils/index.ts',
+);
 
 describe('deploy utils', () => {
-  it('should resolve independently of process.cwd()', async () => {
-    // At deploy time cwd is the user's app dir, where import-meta-resolve is
-    // not installed (it is a dependency of app-tools, not of user apps, and
-    // pnpm's strict layout does not hoist it). The resolver must therefore
-    // never resolve its own dependencies relative to cwd.
-    const originalCwd = process.cwd();
-    const emptyDir = mkdtempSync(path.join(tmpdir(), 'app-tools-deploy-'));
+  it('resolves from the package when a consumer cwd has no app-tools dependencies', () => {
+    const consumerDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'app-tools-deploy-consumer-'),
+    );
+    const bundlePath = path.join(consumerDirectory, 'resolver.mjs');
+    const utilsStubPath = path.join(consumerDirectory, 'modern-utils.mjs');
+
+    fs.writeFileSync(
+      utilsStubPath,
+      `export const dynamicImport = specifier => import(specifier);
+export const fs = { existsSync: () => false, readFile: async () => '' };
+export const getMeta = name => name;
+export const ROUTE_SPEC_FILE = 'route.json';
+export const SERVER_DIR = 'server';
+`,
+    );
+
     try {
-      process.chdir(emptyDir);
+      buildSync({
+        alias: { '@modern-js/utils': utilsStubPath },
+        bundle: true,
+        define: {
+          __dirname: JSON.stringify(path.dirname(sourcePath)),
+          __filename: JSON.stringify(sourcePath),
+        },
+        entryPoints: [sourcePath],
+        external: ['node:*'],
+        format: 'esm',
+        outfile: bundlePath,
+        platform: 'node',
+      });
 
-      const resolved = await resolveESMDependency('@modern-js/prod-server');
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { resolveESMDependency } from ${JSON.stringify(pathToFileURL(bundlePath).href)};
+const resolved = await resolveESMDependency('mlly');
+if (!resolved?.endsWith('/dist/index.mjs')) throw new Error(String(resolved));
+const missing = await resolveESMDependency('@modern-js/definitely-not-a-package');
+if (missing !== undefined) throw new Error(String(missing));
+console.log('resolved', resolved);`,
+        ],
+        { cwd: consumerDirectory, encoding: 'utf8' },
+      );
 
-      expect(resolved).toMatch(/dist\/esm-node\/index\.mjs$/);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/resolved .*dist\/index\.mjs/);
+      expect(result.stderr).not.toContain('ERR_MODULE_NOT_FOUND');
     } finally {
-      process.chdir(originalCwd);
-      rmSync(emptyDir, { recursive: true, force: true });
+      fs.rmSync(consumerDirectory, { recursive: true, force: true });
     }
-  });
-
-  it('should resolve workspace esm dependencies without external resolver drift', async () => {
-    const resolved = await resolveESMDependency('@modern-js/prod-server');
-
-    expect(resolved).toContain('packages/server/prod-server/');
-    expect(resolved).toMatch(/dist\/esm-node\/index\.mjs$/);
-  });
-
-  it('should resolve root-sugar exports without a "." key to the ESM entry', async () => {
-    // mlly declares `exports: { types, import, require }` directly (no "."
-    // key); the previous hand-rolled parser fell back to the CJS entry here.
-    const resolved = await resolveESMDependency('mlly');
-
-    expect(resolved).toMatch(/dist\/index\.mjs$/);
-  });
-
-  it('should resolve root-sugar string exports', async () => {
-    // pkg-types declares `exports: { ".": "./dist/index.mjs" }`.
-    const resolved = await resolveESMDependency('pkg-types');
-
-    expect(resolved).toMatch(/dist\/index\.mjs$/);
-  });
-
-  it('should resolve conditional exports with import keys', async () => {
-    const resolved = await resolveESMDependency('es-module-lexer');
-
-    expect(resolved).toMatch(/dist\/lexer\.js$/);
-  });
-
-  it('should return undefined for unresolvable specifiers', async () => {
-    await expect(
-      resolveESMDependency('@modern-js/definitely-not-a-package'),
-    ).resolves.toBeUndefined();
   });
 });

@@ -1,11 +1,4 @@
 import { UNSAFE_ErrorResponseImpl as ErrorResponseImpl } from '@modern-js/runtime-utils/router';
-import type React from 'react';
-import { isValidElement } from 'react';
-import { createRscProxy } from '../../src/runtime/rsc/createRscProxy';
-import {
-  reviveTanstackRscFlightValues,
-  serializeTanstackRscFlightValues,
-} from '../../src/runtime/rsc/flightSerialization';
 import {
   __setTanstackRscPayloadDecoderForTests,
   createTanstackRscServerPayload,
@@ -13,12 +6,6 @@ import {
   loadTanstackRscRouteData,
 } from '../../src/runtime/rsc/payloadRouter';
 import { ReplayableStream } from '../../src/runtime/rsc/ReplayableStream';
-import {
-  RENDERABLE_RSC,
-  RSC_PROXY_PATH,
-  SERVER_COMPONENT_STREAM,
-  type ServerComponentStream,
-} from '../../src/runtime/rsc/symbols';
 
 async function readAll(stream: ReadableStream<Uint8Array>) {
   const reader = stream.getReader();
@@ -67,75 +54,6 @@ describe('tanstack rsc runtime helpers', () => {
     await expect(readAll(replayable.createReplayStream())).resolves.toEqual([
       1, 2, 3,
     ]);
-  });
-
-  test('revives shared structures that the Flight serializer preserves', async () => {
-    const shared = { label: 'shared' };
-    const serialized = serializeTanstackRscFlightValues({
-      left: shared,
-      right: shared,
-    }) as { left: unknown; right: unknown };
-
-    const revived = (await reviveTanstackRscFlightValues(serialized)) as {
-      left: unknown;
-      right: unknown;
-    };
-
-    expect(serialized.left).toBe(serialized.right);
-    expect(revived.left).toBe(revived.right);
-  });
-
-  test('serializes TanStack RSC flight values nested in map and set containers', () => {
-    const stream: ServerComponentStream = {
-      createReplayStream: () => new ReadableStream<Uint8Array>(),
-    };
-    const proxy = createRscProxy(() => null, {
-      renderable: true,
-      stream,
-    }) as React.ReactElement & Record<PropertyKey, unknown>;
-
-    const serialized = serializeTanstackRscFlightValues({
-      map: new Map([['slot', proxy]]),
-      set: new Set([proxy]),
-    }) as {
-      map: Map<string, Record<string, unknown>>;
-      set: Set<Record<string, unknown>>;
-    };
-
-    const mapValue = serialized.map.get('slot');
-    const [setValue] = serialized.set;
-
-    expect(mapValue).not.toBe(proxy);
-    expect(setValue).not.toBe(proxy);
-    expect(mapValue).toMatchObject({
-      __modernTanstackRsc: true,
-      kind: 'renderable',
-    });
-    expect(setValue).toMatchObject({
-      __modernTanstackRsc: true,
-      kind: 'renderable',
-    });
-  });
-
-  test('renderable RSC proxies preserve React element behavior and metadata', () => {
-    const stream: ServerComponentStream = {
-      createReplayStream: () => new ReadableStream<Uint8Array>(),
-    };
-    const proxy = createRscProxy(() => ({ sidebar: 'ok' }), {
-      renderable: true,
-      stream,
-    }) as React.ReactElement & Record<PropertyKey, unknown>;
-
-    expect(isValidElement(proxy)).toBe(true);
-    expect(proxy[SERVER_COMPONENT_STREAM]).toBe(stream);
-    expect(proxy[RENDERABLE_RSC]).toBe(true);
-    expect(proxy.then).toBeUndefined();
-    expect('__SEROVAL_STREAM__' in proxy).toBe(false);
-    expect('__SEROVAL_SEQUENCE__' in proxy).toBe(false);
-    expect(Symbol.iterator in proxy).toBe(false);
-
-    const sidebar = proxy.sidebar as Record<PropertyKey, unknown>;
-    expect(sidebar[RSC_PROXY_PATH]).toEqual(['sidebar']);
   });
 
   test('creates TanStack RSC server payload and omits client-loader data during RSC navigation', () => {
@@ -301,29 +219,39 @@ describe('tanstack rsc runtime helpers', () => {
     expect(JSON.stringify(payload.errors)).not.toContain('token secret');
   });
 
-  test('converts TanStack RSC redirects to Modern RSC navigation headers', () => {
-    const response = handleTanstackRscRedirect(
-      new Headers({ Location: '/base/login' }),
-      '/base',
-      302,
-    );
+  test('normalizes redirect basenames while preserving status and headers', () => {
+    const scenarios = [
+      { location: '/base', name: 'exact basename', redirect: '/' },
+      {
+        location: '/base/login?from=%2Fbase',
+        name: 'leading basename',
+        redirect: '/login?from=%2Fbase',
+      },
+      {
+        location: '/shop/base/login',
+        name: 'mid-path basename',
+        redirect: '/shop/base/login',
+      },
+    ] as const;
 
-    expect(response.status).toBe(302);
-    expect(response.headers.get('Location')).toBeNull();
-    expect(response.headers.get('X-Modernjs-Redirect')).toBe('/login');
-    expect(response.headers.get('X-Modernjs-BaseUrl')).toBe('/base');
-  });
+    for (const scenario of scenarios) {
+      const response = handleTanstackRscRedirect(
+        new Headers({
+          Location: scenario.location,
+          'X-Trace': scenario.name,
+        }),
+        '/base',
+        307,
+      );
 
-  test('preserves TanStack RSC redirect paths that do not start with the basename', () => {
-    const response = handleTanstackRscRedirect(
-      new Headers({ Location: '/shop/base/login' }),
-      '/base',
-      302,
-    );
-
-    expect(response.headers.get('X-Modernjs-Redirect')).toBe(
-      '/shop/base/login',
-    );
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBeNull();
+      expect(response.headers.get('X-Modernjs-BaseUrl')).toBe('/base');
+      expect(response.headers.get('X-Modernjs-Redirect')).toBe(
+        scenario.redirect,
+      );
+      expect(response.headers.get('X-Trace')).toBe(scenario.name);
+    }
   });
 
   test('preserves RSC redirect response status and headers in TanStack redirects', async () => {
@@ -362,47 +290,50 @@ describe('tanstack rsc runtime helpers', () => {
     expect(thrown.options?.to).toBe('/login');
   });
 
-  test('loads one RSC payload for multiple server route loaders', async () => {
-    const payload = {
-      type: 'render',
-      actionData: null,
-      errors: null,
-      loaderData: {
-        __root__: { shell: true },
-        '/products': { product: 1 },
+  test('separates RSC payload cache entries by URL and request method', async () => {
+    const payloads = [
+      {
+        type: 'render',
+        actionData: null,
+        errors: null,
+        loaderData: { '/method': { method: 'GET' } },
+        location: { href: '/method' },
+        routes: [{ id: '/method', hasLoader: true }],
       },
-      location: { href: '/products' },
-      routes: [
-        { id: '__root__', hasLoader: true },
-        { id: '/products', hasLoader: true },
-      ],
-    };
-    const fetchMock = rstest.fn(() => Promise.resolve(new Response('payload')));
-    const decodeMock = rstest.fn(async () => payload);
+      {
+        type: 'render',
+        actionData: null,
+        errors: null,
+        loaderData: { '/method': { method: 'POST' } },
+        location: { href: '/method' },
+        routes: [{ id: '/method', hasLoader: true }],
+      },
+    ];
+    let payloadIndex = 0;
+    const fetchMock = rstest.fn(() =>
+      Promise.resolve(new Response(JSON.stringify(payloads[payloadIndex++]))),
+    );
     rstest.stubGlobal('fetch', fetchMock);
-    __setTanstackRscPayloadDecoderForTests(decodeMock);
+    __setTanstackRscPayloadDecoderForTests(async stream =>
+      JSON.parse(await new Response(stream).text()),
+    );
 
-    const request = new Request('http://localhost/products');
-    const [rootData, productData] = await Promise.all([
+    const [getData, postData] = await Promise.all([
       loadTanstackRscRouteData({
-        loadClientData: async () => ({ fallback: 'root' }),
-        request,
-        routeId: '__root__',
+        loadClientData: async () => ({ fallback: 'get' }),
+        request: new Request('http://localhost/method', { method: 'GET' }),
+        routeId: '/method',
       }),
       loadTanstackRscRouteData({
-        loadClientData: async () => ({ fallback: 'product' }),
-        request,
-        routeId: '/products',
+        loadClientData: async () => ({ fallback: 'post' }),
+        request: new Request('http://localhost/method', { method: 'POST' }),
+        routeId: '/method',
       }),
     ]);
 
-    expect(rootData).toEqual({ shell: true });
-    expect(productData).toEqual({ product: 1 });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[1]?.headers.get('x-rsc-tree')).toBe(
-      'true',
-    );
-    expect(decodeMock).toHaveBeenCalledTimes(1);
+    expect(getData).toEqual({ method: 'GET' });
+    expect(postData).toEqual({ method: 'POST' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   test('separates RSC payload cache entries by forwarded request headers', async () => {
@@ -462,6 +393,57 @@ describe('tanstack rsc runtime helpers', () => {
     expect(aliceData).toEqual({ user: 'alice' });
     expect(bobData).toEqual({ user: 'bob' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('rethrows matched route errors from the decoded payload', async () => {
+    const routeError = new Error('route loader failed');
+    const payload = {
+      type: 'render',
+      actionData: null,
+      errors: { '/broken': routeError },
+      loaderData: {},
+      location: { href: '/broken' },
+      routes: [{ id: '/broken', hasLoader: true }],
+    };
+    rstest.stubGlobal(
+      'fetch',
+      rstest.fn(() => Promise.resolve(new Response('payload'))),
+    );
+    __setTanstackRscPayloadDecoderForTests(async () => payload);
+
+    await expect(
+      loadTanstackRscRouteData({
+        loadClientData: async () => ({ fallback: true }),
+        request: new Request('http://localhost/broken'),
+        routeId: '/broken',
+      }),
+    ).rejects.toBe(routeError);
+  });
+
+  test('returns undefined for a route id missing from the decoded payload', async () => {
+    const loadClientData = rstest.fn(async () => ({ fallback: true }));
+    const payload = {
+      type: 'render',
+      actionData: null,
+      errors: null,
+      loaderData: { '/known': { known: true } },
+      location: { href: '/known' },
+      routes: [{ id: '/known', hasLoader: true }],
+    };
+    rstest.stubGlobal(
+      'fetch',
+      rstest.fn(() => Promise.resolve(new Response('payload'))),
+    );
+    __setTanstackRscPayloadDecoderForTests(async () => payload);
+
+    await expect(
+      loadTanstackRscRouteData({
+        loadClientData,
+        request: new Request('http://localhost/missing'),
+        routeId: '/missing',
+      }),
+    ).resolves.toBeUndefined();
+    expect(loadClientData).not.toHaveBeenCalled();
   });
 
   test('uses client loader data without requesting an RSC payload for client-loader routes', async () => {

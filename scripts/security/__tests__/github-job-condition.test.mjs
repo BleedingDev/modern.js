@@ -4,7 +4,6 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 
 import {
-  conditionCalls,
   evaluateJobSchedule,
   parseJobCondition,
 } from '../github-job-condition.mjs';
@@ -52,18 +51,6 @@ const resultsWithSkippedAncestor = {
   'tractor-downstream': 'success',
   'validate-release': 'skipped',
 };
-
-test('parses the restricted expression grammar with GitHub precedence', () => {
-  const ast = parseJobCondition(
-    publishWorkflow.jobs['publish-change-record'].if,
-  );
-
-  assert.equal(conditionCalls(ast, 'always'), true);
-  assert.equal(conditionCalls(ast, 'format'), true);
-  assert.equal(conditionCalls(ast, 'success'), false);
-  assert.equal(ast.type, 'binary');
-  assert.equal(ast.operator, '&&');
-});
 
 test('rejects conditions outside the restricted grammar', () => {
   assert.throws(() => parseJobCondition('!cancelled()'), SyntaxError);

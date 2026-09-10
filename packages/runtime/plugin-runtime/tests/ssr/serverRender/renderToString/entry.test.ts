@@ -89,19 +89,17 @@ describe('SSR data script generation', () => {
     });
   });
 
-  it('should inject inline scripts with nonce correctly', () => {
-    const html = createScripts({ nonce: 'test-nonce' });
-    expect(parseScripts(html)[0]?.attributes).toEqual({ nonce: 'test-nonce' });
+  it.each([
+    { name: 'without a nonce', options: {}, attributes: {} },
+    {
+      name: 'with a nonce',
+      options: { nonce: 'test-nonce' },
+      attributes: { nonce: 'test-nonce' },
+    },
+  ])('should inject an executable inline script $name', entry => {
+    const html = createScripts(entry.options);
+    expect(parseScripts(html)[0]?.attributes).toEqual(entry.attributes);
     expect(executeScripts(html)._SSR_DATA).toMatchObject({
-      data: { initialData: { name: 'modern.js' }, i18nData: {} },
-      mode: 'string',
-      renderLevel: RenderLevel.SERVER_RENDER,
-    });
-  });
-
-  it('should inject inline script correctly', () => {
-    const payload = executeScripts(createScripts())._SSR_DATA;
-    expect(payload).toMatchObject({
       data: { initialData: { name: 'modern.js' }, i18nData: {} },
       context: {
         request: {

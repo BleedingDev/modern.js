@@ -56,6 +56,47 @@ const advance = async (milliseconds: number) => {
   await Promise.resolve();
 };
 
+type SignalInitFactory = (
+  controller: AbortController,
+  onRead: () => void,
+) => RequestInit;
+
+const signalCompatibilityCases: Array<
+  readonly [string, SignalInitFactory, 'GET' | 'POST']
+> = [
+  [
+    'accessor',
+    (controller, onRead) => {
+      const init = {} as RequestInit;
+      Object.defineProperty(init, 'signal', {
+        enumerable: true,
+        get() {
+          onRead();
+          return controller.signal;
+        },
+      });
+      return init;
+    },
+    'GET',
+  ],
+  [
+    'inherited',
+    controller => Object.create({ signal: controller.signal }) as RequestInit,
+    'GET',
+  ],
+  [
+    'non-enumerable',
+    controller => {
+      const init = { method: 'POST' } as RequestInit;
+      Object.defineProperty(init, 'signal', {
+        value: controller.signal,
+      });
+      return init;
+    },
+    'POST',
+  ],
+];
+
 describe('Effect batch cancellation and deadlines', () => {
   beforeEach(() => {
     rs.useFakeTimers();
@@ -162,92 +203,58 @@ describe('Effect batch cancellation and deadlines', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  test('snapshots an accessor signal once and isolates its cancellation', async () => {
-    const fetchMock = rs.fn(async () =>
-      Response.json({ path: '/accessor-signal' }),
-    );
-    const request = createQueue(fetchMock);
+  test.each(
+    signalCompatibilityCases,
+  )('preserves the %s RequestInit signal boundary', async (_name, makeInit, method) => {
     const controller = new AbortController();
-    const reason = new DOMException('accessor caller stopped', 'AbortError');
+    const reason = new DOMException('caller stopped', 'AbortError');
+    const path = `/${_name}-signal`;
     let signalReads = 0;
-    const mutableInit = {} as RequestInit;
-    Object.defineProperty(mutableInit, 'signal', {
-      enumerable: true,
-      get() {
-        signalReads += 1;
-        return signalReads === 1 ? controller.signal : undefined;
+    const fetchMock = rs.fn(
+      async (_input: string | URL | Request, init?: RequestInit) => {
+        if (method === 'POST') {
+          expect(init?.method).toBe('POST');
+          expect(init?.signal).toBe(controller.signal);
+          const signal = init?.signal;
+          if (signal?.aborted) {
+            throw signal.reason;
+          }
+          return new Promise<Response>((_resolve, reject) => {
+            signal?.addEventListener('abort', () => reject(signal.reason), {
+              once: true,
+            });
+          });
+        }
+
+        const url = String(_input);
+        return url.endsWith(DEFAULT_DATA_BATCH_ENDPOINT)
+          ? batchResponse(parseBatchPayload(init))
+          : Response.json({ path: new URL(url).pathname });
       },
+    );
+    const request = createQueue(fetchMock);
+    const init = makeInit(controller, () => {
+      signalReads += 1;
     });
+    const signaled = request(`http://localhost${path}`, init);
 
-    const signaled = request('http://localhost/accessor-signal', mutableInit);
-    const unsignaled = request('http://localhost/accessor-signal');
-    expect(signaled).not.toBe(unsignaled);
+    if (method === 'POST') {
+      await Promise.resolve();
+      controller.abort(reason);
+      await expect(signaled).rejects.toBe(reason);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      return;
+    }
+
+    const unsignaled = request(`http://localhost${path}`);
     await Promise.resolve();
     await Promise.resolve();
 
     controller.abort(reason);
     await expect(signaled).rejects.toBe(reason);
     await advance(100);
-    await expect(unsignaled).resolves.toEqual({ path: '/accessor-signal' });
-    expect(signalReads).toBe(1);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  test('honors an inherited signal without deduplicating its caller', async () => {
-    const fetchMock = rs.fn(async () =>
-      Response.json({ path: '/inherited-signal' }),
-    );
-    const request = createQueue(fetchMock);
-    const controller = new AbortController();
-    const reason = new DOMException('inherited caller stopped', 'AbortError');
-    const inheritedInit = Object.create({
-      signal: controller.signal,
-    }) as RequestInit;
-
-    const signaled = request(
-      'http://localhost/inherited-signal',
-      inheritedInit,
-    );
-    const unsignaled = request('http://localhost/inherited-signal');
-    expect(signaled).not.toBe(unsignaled);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    controller.abort(reason);
-    await expect(signaled).rejects.toBe(reason);
-    await advance(100);
-    await expect(unsignaled).resolves.toEqual({ path: '/inherited-signal' });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  test('preserves a non-enumerable signal on the direct request path', async () => {
-    const controller = new AbortController();
-    const reason = new DOMException('direct caller stopped', 'AbortError');
-    const fetchMock = rs.fn(async (_input, init?: RequestInit) => {
-      expect(init?.method).toBe('POST');
-      expect(init?.signal).toBe(controller.signal);
-      const signal = init?.signal;
-      if (signal?.aborted) {
-        throw signal.reason;
-      }
-      return new Promise<Response>((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(signal.reason), {
-          once: true,
-        });
-      });
-    });
-    const request = createQueue(fetchMock);
-    const directInit = { method: 'POST' } as RequestInit;
-    Object.defineProperty(directInit, 'signal', {
-      value: controller.signal,
-    });
-
-    const pending = request('http://localhost/direct-signal', directInit);
-    await Promise.resolve();
-    await Promise.resolve();
-    controller.abort(reason);
-
-    await expect(pending).rejects.toBe(reason);
+    await expect(unsignaled).resolves.toEqual({ path });
+    expect(signalReads).toBe(_name === 'accessor' ? 1 : 0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

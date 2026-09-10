@@ -210,52 +210,32 @@ test('generated shell, checkout, and generic verticals are lint-clean', () => {
       name: 'catalog',
       modernVersion: '3.2.1',
     });
+    // One named and one generic vertical exercise the distinct generated
+    // branches; the complete template does not need five more lint passes.
+    addUltramodernVertical({
+      workspaceRoot: workspaceDir,
+      name: 'records',
+      modernVersion: '3.2.1',
+    });
     assertGeneratedWorkspaceLintClean(
       workspaceDir,
-      'workspace with checkout and catalog',
+      'workspace with checkout, catalog, and records',
     );
     assertGeneratedWorkspaceContractClean(
       workspaceDir,
-      'workspace with checkout and catalog',
-    );
-
-    for (const name of ['records', 'actions', 'workspace']) {
-      addUltramodernVertical({
-        workspaceRoot: workspaceDir,
-        name,
-        modernVersion: '3.2.1',
-      });
-    }
-    assertGeneratedWorkspaceLintClean(
-      workspaceDir,
-      'workspace with former demo-name verticals',
-    );
-    assertGeneratedWorkspaceContractClean(
-      workspaceDir,
-      'workspace with former demo-name verticals',
+      'workspace with checkout, catalog, and records',
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
 
-test('ten generated APIs pass real Oxlint after Oxfmt with the current preset and native boundaries', () => {
+test('generated APIs pass real Oxlint after Oxfmt with the current preset and native boundaries', () => {
   const { tempRoot, workspaceDir } = createWorkspace('erp-api-lint');
   try {
     provisionGeneratedLintDependencies(workspaceDir);
     provisionApiDependencies(workspaceDir, 'erp-api-lint');
-    const names = [
-      'inventory',
-      'orders',
-      'customers',
-      'suppliers',
-      'invoices',
-      'payments',
-      'shipping',
-      'reports',
-      'catalog',
-      'checkout',
-    ];
+    const names = ['inventory', 'orders'];
     for (const name of names) {
       addUltramodernVertical({
         workspaceRoot: workspaceDir,
@@ -275,7 +255,7 @@ test('ten generated APIs pass real Oxlint after Oxfmt with the current preset an
     }
     assertGeneratedWorkspaceLintClean(
       workspaceDir,
-      'ten formatted scoped APIs',
+      'two formatted scoped APIs',
     );
     const checked = spawnSync(
       process.execPath,
@@ -334,38 +314,6 @@ test('Tractor-shaped migration preserves the root barrel bytes and module graph 
     assertGeneratedWorkspaceLintClean(
       workspaceDir,
       'additive migration with lightweight consumer root',
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('generated lint policy accepts the workspace component styles', () => {
-  const { tempRoot, workspaceDir } = createWorkspace(
-    'generated-component-style',
-    {
-      tempPrefix: 'um-generated-component-style-',
-    },
-  );
-
-  try {
-    provisionGeneratedLintDependencies(workspaceDir);
-    const componentDir = path.join(workspaceDir, 'packages', 'style-probe');
-    fs.mkdirSync(componentDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(componentDir, 'components.tsx'),
-      `export function FunctionDeclaration() {
-  return <div />;
-}
-
-export const ArrowFunction = () => <div />;
-`,
-      'utf-8',
-    );
-
-    assertGeneratedWorkspaceLintClean(
-      workspaceDir,
-      'workspace component style probe',
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

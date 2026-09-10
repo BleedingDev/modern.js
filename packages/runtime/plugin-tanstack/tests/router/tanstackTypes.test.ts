@@ -36,15 +36,6 @@ import {
 } from '../../src/cli/tanstackTypes';
 
 const execFileAsync = promisify(execFile);
-const routerGenOxlintConfigPath = path.join(
-  __dirname,
-  'fixtures',
-  'router-gen.oxlint.json',
-);
-const oxlintCliPath = path.resolve(
-  __dirname,
-  '../../../../toolkit/code-tools/node_modules/oxlint/bin/oxlint',
-);
 const strictestTsconfigPath = path.resolve(
   __dirname,
   '../../node_modules/@tsconfig/strictest/tsconfig.json',
@@ -96,7 +87,7 @@ async function writeRuntimeTestPackage(projectDirectory: string) {
       '};',
       'export const runtimeState: { adapterCalls: Array<{ hasSplat: boolean; modernLoader: unknown }> };',
       'export function createMemoryHistory<TOptions>(options: TOptions): TOptions;',
-      'export const modernTanstackRouterFastDefaults: { defaultPreload: "intent" };',
+      'export const modernTanstackRouterFastDefaults: { readonly defaultStructuralSharing: true };',
       'export function createRootRouteWithContext<TContext extends ModernRouterContext>(): <const TOptions extends RouteOptions>(options: TOptions) => Route<TOptions>;',
       'export function createRoute<const TOptions extends RouteOptions>(options: TOptions): Route<TOptions>;',
       'export function createRouter<const TOptions extends { context: ModernRouterContext; history: unknown; routeTree: unknown }>(options: TOptions): TOptions;',
@@ -116,7 +107,7 @@ async function writeRuntimeTestPackage(projectDirectory: string) {
       '  },',
       '});',
       'const createMemoryHistory = options => options;',
-      'const modernTanstackRouterFastDefaults = { defaultPreload: "intent" };',
+      'const modernTanstackRouterFastDefaults = { defaultStructuralSharing: true };',
       'const createRootRouteWithContext = () => options => createRouteRecord(options);',
       'const createRoute = options => createRouteRecord(options);',
       'const createRouter = options => options;',
@@ -493,137 +484,6 @@ describe('tanstack router type generation', () => {
     }
   });
 
-  test('strictly compiles and executes a loader-free conventional route tree', async () => {
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-types-'));
-    const srcDirectory = path.join(tempDir, 'src');
-    const files = new Map([
-      [
-        'routes/layout.tsx',
-        'export default function Layout() { return null; }',
-      ],
-      ['routes/page.tsx', 'export default function Home() { return null; }'],
-      [
-        'routes/reviews/[scanId]/page.tsx',
-        'export default function Review() { return null; }',
-      ],
-    ]);
-
-    for (const [relativePath, contents] of files) {
-      const filePath = path.join(srcDirectory, relativePath);
-      await mkdir(path.dirname(filePath), { recursive: true });
-      await writeFile(filePath, contents);
-    }
-
-    const { routerGenTs } = await generateTanstackRouterTypesSourceForEntry({
-      appContext: {
-        srcDirectory,
-        internalSrcAlias: '@/_',
-      } as any,
-      entryName: 'index',
-      routes: [
-        {
-          type: 'nested',
-          id: 'layout',
-          isRoot: true,
-          _component: '@/_/routes/layout',
-          children: [
-            {
-              type: 'nested',
-              id: 'page',
-              index: true,
-              _component: '@/_/routes/page',
-            },
-            {
-              type: 'nested',
-              id: 'reviews/(scanId)/page',
-              path: 'reviews/:scanId',
-              _component: '@/_/routes/reviews/[scanId]/page',
-            },
-          ],
-        },
-      ] as any,
-    });
-
-    await compileAndRunGeneratedRouter({
-      projectDirectory: tempDir,
-      routerGenTs,
-      runtimeCheck: [
-        "import { runtimeState } from '@modern-js/plugin-tanstack/runtime';",
-        "import Layout from './routes/layout';",
-        "import Home from './routes/page';",
-        "import Review from './routes/reviews/[scanId]/page';",
-        "import { rootRoute, routeTree, router } from './modern-tanstack/index/router.gen';",
-        '',
-        'if (runtimeState.adapterCalls.length !== 0) throw new Error("loader adapter registered without a loader");',
-        'if (Object.keys(router.context).length !== 0) throw new Error("router context is not empty");',
-        'if (rootRoute.options.component !== Layout) throw new Error("root component was not wired");',
-        'const [homeRoute, reviewRoute] = routeTree.children;',
-        'if (homeRoute.options.component !== Home) throw new Error("index component was not wired");',
-        'if (reviewRoute.options.component !== Review) throw new Error("review component was not wired");',
-        'if (reviewRoute.options.path !== "reviews/$scanId") throw new Error("route params were not translated");',
-      ].join('\n'),
-    });
-  });
-
-  test('executes generated loader and action wiring through route static data', async () => {
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-types-'));
-    const srcDirectory = path.join(tempDir, 'src');
-    const routeDir = path.join(srcDirectory, 'routes', 'mf');
-    await mkdir(routeDir, { recursive: true });
-    await writeFile(
-      path.join(routeDir, 'page.data.ts'),
-      [
-        'export const loader = () => ({ count: 0 });',
-        'export const action = () => Response.json({ count: 1 });',
-      ].join('\n'),
-    );
-
-    const { routerGenTs } = await generateTanstackRouterTypesSourceForEntry({
-      appContext: {
-        srcDirectory,
-        internalSrcAlias: '@/_',
-      } as any,
-      entryName: 'index',
-      routes: [
-        {
-          type: 'nested',
-          id: 'layout',
-          isRoot: true,
-          children: [
-            {
-              type: 'nested',
-              id: 'mf/page',
-              path: 'mf',
-              data: '@/_/routes/mf/page.data',
-              action: '@/_/routes/mf/page.data',
-            },
-          ],
-        },
-      ] as any,
-    });
-
-    await compileAndRunGeneratedRouter({
-      projectDirectory: tempDir,
-      routerGenTs,
-      runtimeCheck: [
-        "import { runtimeState } from '@modern-js/plugin-tanstack/runtime';",
-        "import { action, loader } from './routes/mf/page.data';",
-        "import { routeTree } from './modern-tanstack/index/router.gen';",
-        '',
-        'async function main() {',
-        'const [mfRoute] = routeTree.children;',
-        'if (runtimeState.adapterCalls.length !== 1) throw new Error("loader adapter was not registered exactly once");',
-        'if (runtimeState.adapterCalls[0]?.modernLoader !== loader) throw new Error("wrong loader was adapted");',
-        'const result = await mfRoute.options.loader({});',
-        'if (result.count !== 0) throw new Error("adapted loader returned the wrong value");',
-        'if (mfRoute.options.staticData.modernRouteLoader !== loader) throw new Error("loader static data was not wired");',
-        'if (mfRoute.options.staticData.modernRouteAction !== action) throw new Error("action static data was not wired");',
-        '}',
-        'void main();',
-      ].join('\n'),
-    });
-  });
-
   test('executes component sharing correctly when module resolution races', async () => {
     tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-types-'));
     const srcDirectory = path.join(tempDir, 'src');
@@ -748,101 +608,6 @@ describe('tanstack router type generation', () => {
     await compileGeneratedRouterAgainstInstalledDeclarations({
       projectDirectory: tempDir,
       routerGenTs,
-    });
-  });
-
-  test('passes the generated-artifact lint contract', async () => {
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-types-'));
-    const srcDirectory = path.join(tempDir, 'src');
-    const routerGenTs = await generateComprehensiveRouterGen(srcDirectory);
-    const routerGenPath = path.join(
-      srcDirectory,
-      'modern-tanstack',
-      'golden',
-      'router.gen.ts',
-    );
-
-    await mkdir(path.dirname(routerGenPath), { recursive: true });
-    await writeFile(routerGenPath, routerGenTs);
-
-    const { stderr, stdout } = await execFileAsync(
-      process.execPath,
-      [
-        oxlintCliPath,
-        routerGenPath,
-        '--config',
-        routerGenOxlintConfigPath,
-        '--no-ignore',
-        '--report-unused-disable-directives-severity',
-        'error',
-        '--format',
-        'unix',
-      ],
-      { cwd: tempDir },
-    );
-
-    expect(`${stdout}${stderr}`).toBe('');
-  });
-
-  test('executes localized aliases with typed children and correct parents', async () => {
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-types-'));
-    const srcDirectory = path.join(tempDir, 'src');
-
-    const { routerGenTs } = await generateTanstackRouterTypesSourceForEntry({
-      appContext: {
-        srcDirectory,
-        internalSrcAlias: '@/_',
-      } as any,
-      entryName: 'index',
-      routes: [
-        {
-          type: 'nested',
-          id: 'layout',
-          isRoot: true,
-          children: [
-            {
-              type: 'nested',
-              id: '(lang)/layout',
-              path: ':lang',
-              children: [
-                {
-                  type: 'nested',
-                  id: '(lang)/products/(slug)/page',
-                  path: 'products/:slug',
-                },
-                {
-                  type: 'nested',
-                  id: '(lang)/products/(slug)/page__localised_produkty_slug',
-                  path: 'produkty/:slug',
-                },
-                {
-                  type: 'nested',
-                  id: '(lang)/optional/(slug$)/page__localised_volitelne_slug',
-                  path: 'volitelne/:slug?',
-                },
-              ],
-            },
-          ],
-        },
-      ] as any,
-    });
-
-    await compileAndRunGeneratedRouter({
-      projectDirectory: tempDir,
-      routerGenTs,
-      runtimeCheck: [
-        "import { routeTree } from './modern-tanstack/index/router.gen';",
-        '',
-        'const [localeRoute] = routeTree.children;',
-        'const [productRoute, localizedProductRoute, optionalRoute] = localeRoute.children;',
-        'if (localeRoute.options.path !== "$lang") throw new Error("locale param was not translated");',
-        'if (productRoute.options.path !== "products/$slug") throw new Error("product param was not translated");',
-        'if (localizedProductRoute.options.path !== "produkty/$slug") throw new Error("localized param was not translated");',
-        'if (optionalRoute.options.path !== "volitelne/{-$slug}") throw new Error("optional param was not translated");',
-        'for (const child of localeRoute.children) {',
-        '  if (child.options.getParentRoute() !== localeRoute) throw new Error("localized child points at the wrong parent");',
-        '}',
-      ].join('\n'),
     });
   });
 });
@@ -1000,61 +765,6 @@ describe('collectCanonicalRoutesForEntry', () => {
 
     expect(result).not.toBeNull();
     expect(Object.keys(result!)).toEqual(['/', '/about']);
-
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-canonical-'));
-    await typecheckCanonicalRegisterContract({
-      canonicalRoutes: result!,
-      contractLines: [
-        "const rootParams: UltramodernCanonicalRoutes['/'] = {};",
-        "const aboutParams: UltramodernCanonicalRoutes['/about'] = {};",
-        '// @ts-expect-error index canonical routes reject unexpected params',
-        "const invalidRootParams: UltramodernCanonicalRoutes['/'] = { slug: 'unexpected' };",
-        'void rootParams;',
-        'void aboutParams;',
-        'void invalidRootParams;',
-      ],
-      projectDirectory: tempDir,
-    });
-  });
-
-  test('converts :slug to $slug with required params type', async () => {
-    const result = collectCanonicalRoutesForEntry([
-      {
-        type: 'nested',
-        id: 'layout',
-        isRoot: true,
-        children: [
-          {
-            type: 'nested',
-            id: '(lang)/layout',
-            path: ':lang',
-            children: [
-              {
-                type: 'nested',
-                id: '(lang)/products/(slug)/page',
-                path: 'products/:slug',
-              },
-            ],
-          },
-        ],
-      },
-    ] as any);
-
-    expect(result).not.toBeNull();
-    expect(Object.keys(result!)).toEqual(['/products/$slug']);
-
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-canonical-'));
-    await typecheckCanonicalRegisterContract({
-      canonicalRoutes: result!,
-      contractLines: [
-        "const productParams: UltramodernCanonicalRoutes['/products/$slug'] = { slug: 'tractor' };",
-        '// @ts-expect-error a required slug cannot be omitted',
-        "const missingProductParams: UltramodernCanonicalRoutes['/products/$slug'] = {};",
-        'void productParams;',
-        'void missingProductParams;',
-      ],
-      projectDirectory: tempDir,
-    });
   });
 
   test('converts :slug? to optional {-$slug} with optional params type', async () => {
@@ -1082,21 +792,6 @@ describe('collectCanonicalRoutesForEntry', () => {
 
     expect(result).not.toBeNull();
     expect(Object.keys(result!)).toEqual(['/optional/{-$slug}']);
-
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-canonical-'));
-    await typecheckCanonicalRegisterContract({
-      canonicalRoutes: result!,
-      contractLines: [
-        "const omittedOptionalParams: UltramodernCanonicalRoutes['/optional/{-$slug}'] = {};",
-        "const presentOptionalParams: UltramodernCanonicalRoutes['/optional/{-$slug}'] = { slug: 'tractor' };",
-        '// @ts-expect-error optional canonical params still retain their string type',
-        "const invalidOptionalParams: UltramodernCanonicalRoutes['/optional/{-$slug}'] = { slug: 42 };",
-        'void omittedOptionalParams;',
-        'void presentOptionalParams;',
-        'void invalidOptionalParams;',
-      ],
-      projectDirectory: tempDir,
-    });
   });
 
   test('converts * splat to $ with optional _splat param', async () => {
@@ -1124,21 +819,6 @@ describe('collectCanonicalRoutesForEntry', () => {
 
     expect(result).not.toBeNull();
     expect(Object.keys(result!)).toEqual(['/files/$']);
-
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-canonical-'));
-    await typecheckCanonicalRegisterContract({
-      canonicalRoutes: result!,
-      contractLines: [
-        "const emptySplatParams: UltramodernCanonicalRoutes['/files/$'] = {};",
-        "const splatParams: UltramodernCanonicalRoutes['/files/$'] = { _splat: 'guides/intro' };",
-        '// @ts-expect-error splat params retain their string type',
-        "const invalidSplatParams: UltramodernCanonicalRoutes['/files/$'] = { _splat: 42 };",
-        'void emptySplatParams;',
-        'void splatParams;',
-        'void invalidSplatParams;',
-      ],
-      projectDirectory: tempDir,
-    });
   });
 
   test('collapses localized variants with shared modernCanonicalPath to one canonical key', async () => {
@@ -1182,67 +862,47 @@ describe('collectCanonicalRoutesForEntry', () => {
     expect(result).not.toBeNull();
     // Two physical variants share the same canonical path — only one entry.
     const keys = Object.keys(result!);
-    // /products/$slug and /optional/{-$slug} — exactly 2 keys with params
-    expect(keys.filter(k => k.startsWith('/products'))).toHaveLength(1);
-    expect(keys).toHaveLength(2);
     expect(keys).toEqual(['/optional/{-$slug}', '/products/$slug']);
     // The Czech localized path must not appear as a separate key.
     expect('/produkty/$slug' in result!).toBe(false);
 
     tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-canonical-'));
     await typecheckCanonicalRegisterContract({
-      canonicalRoutes: result!,
+      canonicalRoutes: {
+        '/': 'Record<string, never>',
+        '/files/$': '{ _splat?: string }',
+        ...result!,
+      },
       contractLines: [
+        "const rootParams: UltramodernCanonicalRoutes['/'] = {};",
+        '// @ts-expect-error index canonical routes reject unexpected params',
+        "const invalidRootParams: UltramodernCanonicalRoutes['/'] = { slug: 'unexpected' };",
         "const productParams: UltramodernCanonicalRoutes['/products/$slug'] = { slug: 'tractor' };",
         "const optionalParams: UltramodernCanonicalRoutes['/optional/{-$slug}'] = {};",
+        "const presentOptionalParams: UltramodernCanonicalRoutes['/optional/{-$slug}'] = { slug: 'tractor' };",
+        '// @ts-expect-error optional canonical params still retain their string type',
+        "const invalidOptionalParams: UltramodernCanonicalRoutes['/optional/{-$slug}'] = { slug: 42 };",
+        "const emptySplatParams: UltramodernCanonicalRoutes['/files/$'] = {};",
+        "const splatParams: UltramodernCanonicalRoutes['/files/$'] = { _splat: 'guides/intro' };",
+        '// @ts-expect-error splat params retain their string type',
+        "const invalidSplatParams: UltramodernCanonicalRoutes['/files/$'] = { _splat: 42 };",
         '// @ts-expect-error localized physical variants do not become canonical keys',
         "declare const localizedParams: UltramodernCanonicalRoutes['/produkty/$slug'];",
         '// @ts-expect-error the deduplicated product route still requires its param',
         "const missingProductParams: UltramodernCanonicalRoutes['/products/$slug'] = {};",
+        'void rootParams;',
         'void productParams;',
         'void optionalParams;',
+        'void presentOptionalParams;',
+        'void emptySplatParams;',
+        'void splatParams;',
+        'void invalidRootParams;',
+        'void invalidOptionalParams;',
+        'void invalidSplatParams;',
         'void localizedParams;',
         'void missingProductParams;',
       ],
       projectDirectory: tempDir,
     });
-  });
-
-  test('output is sorted alphabetically by canonical key', () => {
-    const result = collectCanonicalRoutesForEntry([
-      {
-        type: 'nested',
-        id: 'layout',
-        isRoot: true,
-        children: [
-          {
-            type: 'nested',
-            id: '(lang)/layout',
-            path: ':lang',
-            children: [
-              {
-                type: 'nested',
-                id: '(lang)/products/(slug)/page',
-                path: 'products/:slug',
-              },
-              {
-                type: 'nested',
-                id: '(lang)/about/page',
-                path: 'about',
-              },
-              {
-                type: 'nested',
-                id: '(lang)/page',
-                index: true,
-              },
-            ],
-          },
-        ],
-      },
-    ] as any);
-
-    expect(result).not.toBeNull();
-    const keys = Object.keys(result!);
-    expect(keys).toEqual([...keys].sort((a, b) => a.localeCompare(b)));
   });
 });

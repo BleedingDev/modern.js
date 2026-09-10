@@ -179,6 +179,13 @@ const buildRsbuildWorker = async ({
   return (await listJavaScriptFiles(workerDirectory)).sort();
 };
 
+const withDispatcher = (source: string) =>
+  [
+    source,
+    'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
+    'module.exports = { __modern_create_effect_bff_dispatcher };',
+  ].join('\n');
+
 const writeJson = async (filePath: string, value: unknown) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(`${filePath}`, `${JSON.stringify(value, null, 2)}\n`);
@@ -750,231 +757,144 @@ describe('Cloudflare output verifier', () => {
     );
   });
 
-  it('allows supported Cloudflare Worker node: builtins', async () => {
+  it.each([
+    {
+      name: 'accepts a supported Worker node builtin',
+      source: "require('node:async_hooks');",
+      expectedOk: true,
+    },
+    {
+      name: 'accepts a declared bare dependency',
+      source: "require('@acme/worker-runtime');",
+      dependencies: { '@acme/worker-runtime': '1.0.0' },
+      expectedOk: true,
+    },
+    {
+      name: 'ignores comments and strings',
+      source:
+        "// require('node:child_process')\nconst text = \"import('node:child_process')\";",
+      expectedOk: true,
+    },
+    {
+      name: 'accepts locally bound require calls',
+      source: "const require = value => value; require('node:child_process');",
+      expectedOk: true,
+    },
+    {
+      name: 'rejects ambient loader aliases',
+      source: "const load = require; load('node:child_process');",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects ambient require calls with extra arguments',
+      source: "require('@evil/worker-runtime', 1);",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects ambient require calls with a bound specifier',
+      source: "const target = '@evil/worker-runtime'; require(target);",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects dynamic imports',
+      source: "const target = './worker.js'; import(target);",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects dynamic imports that resemble the chunk loader',
+      source:
+        "const runtime = { u: () => '../server/index.mjs' }; import('./' + runtime.u());",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects unsupported node builtins',
+      source: "require('node:not_a_worker_builtin');",
+      expectedOk: false,
+    },
+    {
+      name: 'accepts static module.require with declared dependency',
+      source: "module.require('@acme/worker-runtime');",
+      dependencies: { '@acme/worker-runtime': '1.0.0' },
+      expectedOk: true,
+    },
+    {
+      name: 'rejects non-static module.require',
+      source: "const target = '@acme/worker-runtime'; module.require(target);",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects destructured ambient module loaders',
+      source: "const { require: load } = module; load('node:child_process');",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects optional ambient module loaders',
+      source: "module?.require('node:child_process');",
+      expectedOk: false,
+    },
+    {
+      name: 'rejects computed ambient module loaders',
+      source:
+        "const exports = 'require'; module[exports]('node:child_process');",
+      expectedOk: false,
+    },
+    {
+      name: 'accepts quoted module.require with declared dependency',
+      source: "module['require']('@acme/worker-runtime');",
+      dependencies: { '@acme/worker-runtime': '1.0.0' },
+      expectedOk: true,
+    },
+    {
+      name: 'rejects empty module specifiers',
+      source: "require(''); module.require(''); import('');",
+      expectedOk: false,
+    },
+    {
+      name: 'allows loader availability checks',
+      source:
+        "const available = typeof require === 'function'; require('@acme/worker-runtime');",
+      dependencies: { '@acme/worker-runtime': '1.0.0' },
+      expectedOk: true,
+    },
+    {
+      name: 'allows loader names as destructuring keys',
+      source:
+        'let local; const value = { require: 1, module: 2 }; ({ require: local } = value); ({ module: local } = value);',
+      expectedOk: true,
+    },
+    {
+      name: 'rejects writes to ambient loader bindings',
+      source: 'require = loader;',
+      expectedOk: false,
+    },
+    {
+      name: 'allows locally bound module objects',
+      source:
+        'const moduleLoader = module => module.require("i"); const value = moduleLoader({ require: input => input });',
+      expectedOk: true,
+    },
+  ])('enforces worker import grammar: $name', async ({
+    source,
+    dependencies,
+    expectedOk,
+  }) => {
     const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "require('node:async_hooks');",
-        "require('node:util');",
-        "require('node:dns');",
-        "require('node:fs');",
-        "require('node:http');",
-        "require('node:http2');",
-        "require('node:net');",
-        "require('node:os');",
-        "require('node:tls');",
-        "require('node:util/types');",
-        "require('node:zlib');",
-        "require('node:assert');",
-        "require('node:assert/strict');",
-        "require('node:child_process');",
-        "require('node:dgram');",
-        "require('node:domain');",
-        "require('node:inspector');",
-        "require('node:readline');",
-        "require('node:readline/promises');",
-        "require('node:repl');",
-        "require('node:sqlite');",
-        "require('node:stream/consumers');",
-        "require('node:stream/promises');",
-        "require('node:stream/web');",
-        "require('node:timers');",
-        "require('node:timers/promises');",
-        "require('node:trace_events');",
-        "require('node:tty');",
-        "require('node:v8');",
-        "require('node:vm');",
-        "require('node:wasi');",
-        "require('node:worker_threads');",
-        "require('cloudflare:sockets');",
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-
-    await expect(
-      verifyCloudflareOutput({ outputDirectory, importWorker: false }),
-    ).resolves.toEqual({ ok: true, issues: [] });
-  });
-
-  it('rejects unsupported node: builtins even when package metadata declares them', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "require('node:not_a_worker_builtin');",
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
+      bffWorkerSource: withDispatcher(source),
     });
     await writeJson(path.join(outputDirectory, 'worker/package.json'), {
-      dependencies: {
-        'node:not_a_worker_builtin': '1.0.0',
-      },
+      dependencies,
       type: 'commonjs',
     });
-
     const result = await verifyCloudflareOutput({
       outputDirectory,
       importWorker: false,
     });
-
-    expect(result.ok).toBe(false);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        code: 'invalid-worker-bundle',
-        message:
-          'Cloudflare worker bundle import "node:not_a_worker_builtin" is not a supported Worker node: builtin.',
-      }),
-    );
-  });
-
-  it('allows bare imports only when worker package metadata provides them', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "require('@acme/worker-runtime');",
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-    await writeJson(path.join(outputDirectory, 'worker/package.json'), {
-      dependencies: {
-        '@acme/worker-runtime': '1.0.0',
-      },
-      type: 'commonjs',
-    });
-
-    await expect(
-      verifyCloudflareOutput({ outputDirectory, importWorker: false }),
-    ).resolves.toEqual({ ok: true, issues: [] });
-  });
-
-  it('ignores import-like text in worker comments and strings', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "// require('@modern-js/bff-effect/effect-edge');",
-        `const documentation = "import '@modern-js/bff-effect/effect-edge';";`,
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response(documentation), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-
-    await expect(
-      verifyCloudflareOutput({ outputDirectory, importWorker: false }),
-    ).resolves.toEqual({ ok: true, issues: [] });
-  });
-
-  it('distinguishes locally bound require calls from module imports', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "const invoke = require => require('i');",
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response(invoke(value => value)), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-
-    await expect(
-      verifyCloudflareOutput({ outputDirectory, importWorker: false }),
-    ).resolves.toEqual({ ok: true, issues: [] });
-  });
-
-  it('rejects passing the ambient CommonJS loader through a local binding', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "(require => require('@evil/worker-runtime'))(require);",
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-
-    const result = await verifyCloudflareOutput({
-      outputDirectory,
-      importWorker: false,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        code: 'invalid-worker-bundle',
-        message:
-          'Cloudflare worker bundles must use exactly one string-literal specifier in ambient CommonJS loader calls and must not pass or alias the loader.',
-      }),
-    );
-  });
-
-  it('rejects ambient require calls that are not static module edges', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "require('@evil/worker-runtime', 1);",
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-
-    const result = await verifyCloudflareOutput({
-      outputDirectory,
-      importWorker: false,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        code: 'invalid-worker-bundle',
-        message:
-          'Cloudflare worker bundles must use exactly one string-literal specifier in ambient CommonJS loader calls and must not pass or alias the loader.',
-      }),
-    );
-  });
-
-  it('rejects ambient require calls whose specifier is a bound variable', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "const effect = '@evil/worker-runtime';",
-        'require(effect);',
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-    await writeJson(path.join(outputDirectory, 'worker/package.json'), {
-      dependencies: { effect: '4.0.0' },
-      type: 'commonjs',
-    });
-
-    const result = await verifyCloudflareOutput({
-      outputDirectory,
-      importWorker: false,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        code: 'invalid-worker-bundle',
-        message:
-          'Cloudflare worker bundles must use exactly one string-literal specifier in ambient CommonJS loader calls and must not pass or alias the loader.',
-      }),
-    );
-  });
-
-  it('rejects dynamic imports whose specifier is not a string literal', async () => {
-    const { outputDirectory } = await createOutputFixture({
-      bffWorkerSource: [
-        "const effect = '@evil/worker-runtime';",
-        'void import(effect);',
-        'const __modern_create_effect_bff_dispatcher = async () => ({ dispatch: async () => new Response("ok"), dispose: async () => {} });',
-        'module.exports = { __modern_create_effect_bff_dispatcher };',
-      ].join('\n'),
-    });
-
-    const result = await verifyCloudflareOutput({
-      outputDirectory,
-      importWorker: false,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        code: 'invalid-worker-bundle',
-        message:
-          'Cloudflare worker bundles must not contain non-static dynamic module imports.',
-      }),
-    );
+    expect(result.ok).toBe(expectedOk);
+    if (!expectedOk) {
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ code: 'invalid-worker-bundle' }),
+      );
+    }
   });
 
   it('rejects the react-router browser lazy-route-loader dynamic import shape', async () => {

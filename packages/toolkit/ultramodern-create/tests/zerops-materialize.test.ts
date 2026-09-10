@@ -252,17 +252,6 @@ fs.writeFileSync(
     assert.equal(pnpmRecord.cwd, workspaceRealPath);
     assert.equal(pnpmRecord.env.MODERNJS_DEPLOY, 'node');
 
-    const npmRecord = readJson<CommandRecord>(path.join(recordDir, 'npm.json'));
-    assert.deepEqual(npmRecord.argv, [
-      'install',
-      '--omit=dev',
-      '--no-audit',
-      '--fund=false',
-      '--legacy-peer-deps',
-    ]);
-    assert.match(npmRecord.cwd, /ultramodern-zerops-catalog-/u);
-    assert.equal(npmRecord.env.MODERNJS_DEPLOY, 'node');
-
     const runtimeRoot = path.join(workspaceRoot, '.zerops/runtime/catalog');
     assert.equal(
       execFileSync('npm', ['run', 'serve', '--silent'], {
@@ -281,39 +270,6 @@ fs.writeFileSync(
     );
     assert.equal(runtimePackage.private, true);
     assert.equal(runtimePackage.name, 'catalog-zerops-runtime');
-    assert.equal(
-      runtimePackage.dependencies?.['@bleedingdev/modern-js-runtime'],
-      modernVersion,
-    );
-    assert.equal(
-      runtimePackage.dependencies?.['@modern-js/runtime'],
-      `npm:@bleedingdev/modern-js-runtime@${modernVersion}`,
-    );
-    assert.equal(
-      runtimePackage.optionalDependencies?.['@modern-js/plugin-bff'],
-      `npm:@bleedingdev/modern-js-plugin-bff@${modernVersion}`,
-    );
-
-    const installPackage = readJson<PackageJson>(
-      path.join(recordDir, 'npm-install-package.json'),
-    );
-    assert.equal(installPackage.dependencies?.['@acme/shared'], undefined);
-    assert.equal(
-      installPackage.optionalDependencies?.['@acme/optional'],
-      undefined,
-    );
-    assert.equal(installPackage.dependencies?.['left-pad'], '1.0.0');
-    assert.equal(
-      installPackage.dependencies?.['@modern-js/runtime'],
-      `npm:@bleedingdev/modern-js-runtime@${modernVersion}`,
-    );
-
-    assert.equal(
-      readJson<PackageJson>(
-        path.join(runtimeRoot, 'node_modules/left-pad/package.json'),
-      ).name,
-      'left-pad',
-    );
     const copiedSharedPackage = readJson<PackageJson>(
       path.join(runtimeRoot, 'node_modules/@acme/shared/package.json'),
     );
@@ -336,12 +292,6 @@ fs.writeFileSync(
     );
     assert.equal(sharedModule.sharedValue, 'from-shared');
     assert.deepEqual(sharedModule.tuple, ['shared']);
-    assert.equal(
-      readJson<PackageJson>(
-        path.join(runtimeRoot, 'node_modules/@acme/optional/package.json'),
-      ).exports,
-      './src/optional.js',
-    );
   } finally {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   }

@@ -43,16 +43,22 @@ describe('build', () => {
       waitUntil: ['networkidle0'],
     });
 
-    const image = await page.$eval('#root img', element => ({
-      complete: (element as HTMLImageElement).complete,
-      height: (element as HTMLImageElement).height,
-      src: element.getAttribute('src'),
-      srcset: element.getAttribute('srcset'),
-      width: (element as HTMLImageElement).width,
-    }));
+    const image = await page.$eval('#root img', async element => {
+      const image = element as HTMLImageElement;
+      await image.decode();
+      return {
+        height: image.height,
+        naturalHeight: image.naturalHeight,
+        naturalWidth: image.naturalWidth,
+        src: image.getAttribute('src'),
+        srcset: image.getAttribute('srcset'),
+        width: image.width,
+      };
+    });
     expect(image).toEqual({
-      complete: true,
       height: 334,
+      naturalHeight: 1281,
+      naturalWidth: 1920,
       src: '/static/assets/crab.png?w=1000&q=75',
       srcset:
         '/static/assets/crab.png?w=500&q=75 1x,/static/assets/crab.png?w=1000&q=75 2x',
@@ -87,15 +93,30 @@ describe('dev', () => {
       waitUntil: ['networkidle0'],
     });
 
-    const root = await page.$('#root img');
-    const targetText = await page.evaluate(el => el?.outerHTML, root);
-    expect(targetText).toMatch(
-      /srcset="\/_(modern|rsbuild)\/ipx\/f_auto,w_500,q_75\/static\/assets\/crab\.png 1x,\/_(modern|rsbuild)\/ipx\/f_auto,w_1000,q_75\/static\/assets\/crab\.png 2x"/,
+    const image = await page.$eval('#root img', async element => {
+      const image = element as HTMLImageElement;
+      await image.decode();
+      return {
+        height: image.height,
+        naturalHeight: image.naturalHeight,
+        naturalWidth: image.naturalWidth,
+        src: image.getAttribute('src'),
+        srcset: image.getAttribute('srcset'),
+        width: image.width,
+      };
+    });
+    expect(image).toMatchObject({
+      height: 334,
+      width: 500,
+    });
+    expect(image.naturalWidth).toBeGreaterThan(0);
+    expect(image.naturalHeight).toBeGreaterThan(0);
+    expect(image.srcset).toMatch(
+      /\/_(?:modern|rsbuild)\/ipx\/f_auto,w_500,q_75\/static\/assets\/crab\.png 1x,\/_(?:modern|rsbuild)\/ipx\/f_auto,w_1000,q_75\/static\/assets\/crab\.png 2x/,
     );
-    expect(targetText).toMatch(
-      /src="\/_(modern|rsbuild)\/ipx\/f_auto,w_1000,q_75\/static\/assets\/crab\.png"/,
+    expect(image.src).toMatch(
+      /\/_(?:modern|rsbuild)\/ipx\/f_auto,w_1000,q_75\/static\/assets\/crab\.png/,
     );
-    expect(targetText).toContain('width="500"');
     expect(errors.length).toEqual(0);
 
     await browser.close();

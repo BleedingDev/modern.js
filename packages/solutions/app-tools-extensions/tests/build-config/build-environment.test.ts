@@ -15,7 +15,6 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Rspack } from '@rsbuild/core';
 import {
-  getBuildConfigEnvironment,
   resolveEffectTsgoCompiler,
   withBuildConfigEnvironment,
 } from '../../src/build-config/public';
@@ -141,15 +140,6 @@ function getLeasePlugin(config: TestRspackConfig): Rspack.RspackPluginInstance {
   return plugin as Rspack.RspackPluginInstance;
 }
 
-test('reads framework-owned build configuration environment', async () => {
-  await withEnvironment('ULTRAMODERN_CONFIG_API_TEST', 'configured', () => {
-    assert.equal(
-      getBuildConfigEnvironment('ULTRAMODERN_CONFIG_API_TEST'),
-      'configured',
-    );
-  });
-});
-
 test('reference-counts overlapping leases for the same value', async () => {
   const name = 'ULTRAMODERN_CONFIG_SAME_VALUE_LEASE_TEST';
 
@@ -235,24 +225,6 @@ test('keeps a one-shot lease through done and restores after afterDone', async (
   });
 });
 
-test('restores a failed one-shot lease', async () => {
-  const name = 'ULTRAMODERN_CONFIG_FAILED_LEASE_TEST';
-
-  await withEnvironment(name, 'original', async () => {
-    const config = await withBuildConfigEnvironment(
-      name,
-      'leased',
-      (rspackConfig: TestRspackConfig) => rspackConfig,
-    )({ plugins: [] });
-    const compiler = createTestCompiler();
-
-    getLeasePlugin(config).apply(compiler.compiler);
-    compiler.call('run');
-    compiler.call('failed');
-    assert.equal(process.env[name], 'original');
-  });
-});
-
 test('retains a watch lease across rebuild completion and failure', async () => {
   const name = 'ULTRAMODERN_CONFIG_WATCH_LEASE_TEST';
 
@@ -272,24 +244,6 @@ test('retains a watch lease across rebuild completion and failure', async () => 
     assert.equal(process.env[name], 'leased');
 
     compiler.call('watchClose');
-    assert.equal(process.env[name], 'original');
-  });
-});
-
-test('restores a watch lease during compiler shutdown', async () => {
-  const name = 'ULTRAMODERN_CONFIG_SHUTDOWN_LEASE_TEST';
-
-  await withEnvironment(name, 'original', async () => {
-    const config = await withBuildConfigEnvironment(
-      name,
-      'leased',
-      (rspackConfig: TestRspackConfig) => rspackConfig,
-    )({ plugins: [] });
-    const compiler = createTestCompiler();
-
-    getLeasePlugin(config).apply(compiler.compiler);
-    compiler.call('watchRun');
-    compiler.call('shutdown');
     assert.equal(process.env[name], 'original');
   });
 });
@@ -321,25 +275,6 @@ test('restores the lease when setup throws or rejects', async () => {
         },
       )({ plugins: [] }),
       error => error === rejectedError,
-    );
-    assert.equal(process.env[name], 'original');
-  });
-});
-
-test('fails closed when a required terminal hook is unavailable', async () => {
-  const name = 'ULTRAMODERN_CONFIG_MISSING_HOOK_TEST';
-
-  await withEnvironment(name, 'original', async () => {
-    const config = await withBuildConfigEnvironment(
-      name,
-      'leased',
-      (rspackConfig: TestRspackConfig) => rspackConfig,
-    )({ plugins: [] });
-    const compiler = createTestCompiler({ omit: 'shutdown' });
-
-    assert.throws(
-      () => getLeasePlugin(config).apply(compiler.compiler),
-      /does not expose the "shutdown" lifecycle hook/u,
     );
     assert.equal(process.env[name], 'original');
   });

@@ -1,12 +1,18 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { build } from '@scripts/shared';
 import { join } from 'path';
 
 const fixtures = __dirname;
 
-const getResourceLinks = async (
-  page: Page,
+const getAttribute = (tag: string, name: string): string | null => {
+  const match = new RegExp(
+    `(?:^|\\s)${name}\\b(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+)))?`,
+    'i',
+  ).exec(tag);
+  return match ? (match[1] ?? match[2] ?? match[3] ?? '') : null;
+};
+
+const getResourceLinks = (
   files: Record<string, string>,
   rel: 'prefetch' | 'preload',
 ) => {
@@ -14,19 +20,17 @@ const getResourceLinks = async (
     name.endsWith('index.html'),
   )?.[1];
   expect(html).toBeDefined();
-  await page.setContent(html!);
-  return page.locator(`link[rel="${rel}"]`).evaluateAll(links =>
-    links.map(link => ({
-      as: link.getAttribute('as'),
-      crossOrigin: link.getAttribute('crossorigin'),
-      href: link.getAttribute('href'),
-    })),
-  );
+  return [...(html ?? '').matchAll(/<link\b[^>]*>/gi)]
+    .map(match => match[0])
+    .filter(tag => getAttribute(tag, 'rel') === rel)
+    .map(tag => ({
+      as: getAttribute(tag, 'as'),
+      crossOrigin: getAttribute(tag, 'crossorigin'),
+      href: getAttribute(tag, 'href'),
+    }));
 };
 
-test('should generate prefetch link when prefetch is defined', async ({
-  page,
-}) => {
+test('should generate prefetch link when prefetch is defined', async () => {
   const builder = await build({
     cwd: fixtures,
     entry: {
@@ -47,7 +51,7 @@ test('should generate prefetch link when prefetch is defined', async ({
   const asyncFileName = Object.keys(files).find(file =>
     file.includes('/static/js/async/'),
   )!;
-  const links = await getResourceLinks(page, files, 'prefetch');
+  const links = getResourceLinks(files, 'prefetch');
 
   expect(links).toHaveLength(3);
   expect(links).toContainEqual({
@@ -59,9 +63,7 @@ test('should generate prefetch link when prefetch is defined', async ({
   });
 });
 
-test('should generate prefetch link correctly when assetPrefix do not have a protocol', async ({
-  page,
-}) => {
+test('should generate prefetch link correctly when assetPrefix do not have a protocol', async () => {
   const builder = await build({
     cwd: fixtures,
     entry: {
@@ -82,7 +84,7 @@ test('should generate prefetch link correctly when assetPrefix do not have a pro
   const asyncFileName = Object.keys(files).find(file =>
     file.includes('/static/js/async/'),
   )!;
-  const links = await getResourceLinks(page, files, 'prefetch');
+  const links = getResourceLinks(files, 'prefetch');
 
   expect(links).toContainEqual({
     as: null,
@@ -93,7 +95,7 @@ test('should generate prefetch link correctly when assetPrefix do not have a pro
   });
 });
 
-test('should generate prefetch link with filter', async ({ page }) => {
+test('should generate prefetch link with filter', async () => {
   const builder = await build({
     cwd: fixtures,
     entry: {
@@ -113,7 +115,7 @@ test('should generate prefetch link with filter', async ({ page }) => {
   const asyncFileName = Object.keys(files).find(file =>
     file.includes('/static/image/test'),
   )!;
-  const links = await getResourceLinks(page, files, 'prefetch');
+  const links = getResourceLinks(files, 'prefetch');
 
   expect(links).toEqual([
     {
@@ -124,9 +126,7 @@ test('should generate prefetch link with filter', async ({ page }) => {
   ]);
 });
 
-test('should generate preload link when preload is defined', async ({
-  page,
-}) => {
+test('should generate preload link when preload is defined', async () => {
   const builder = await build({
     cwd: fixtures,
     entry: {
@@ -144,7 +144,7 @@ test('should generate preload link when preload is defined', async ({
   const asyncFileName = Object.keys(files).find(file =>
     file.includes('/static/js/async/'),
   )!;
-  const links = await getResourceLinks(page, files, 'preload');
+  const links = getResourceLinks(files, 'preload');
 
   expect(links).toHaveLength(3);
   expect(links).toContainEqual({
@@ -154,7 +154,7 @@ test('should generate preload link when preload is defined', async ({
   });
 });
 
-test('should generate preload link with crossOrigin', async ({ page }) => {
+test('should generate preload link with crossOrigin', async () => {
   const builder = await build({
     cwd: fixtures,
     entry: {
@@ -178,7 +178,7 @@ test('should generate preload link with crossOrigin', async ({ page }) => {
   const asyncFileName = Object.keys(files).find(file =>
     file.includes('/static/js/async/'),
   )!;
-  const links = await getResourceLinks(page, files, 'preload');
+  const links = getResourceLinks(files, 'preload');
 
   expect(links).toHaveLength(3);
   expect(links).toContainEqual({
@@ -190,9 +190,7 @@ test('should generate preload link with crossOrigin', async ({ page }) => {
   });
 });
 
-test('should generate preload link without crossOrigin when same origin', async ({
-  page,
-}) => {
+test('should generate preload link without crossOrigin when same origin', async () => {
   const builder = await build({
     cwd: fixtures,
     entry: {
@@ -213,7 +211,7 @@ test('should generate preload link without crossOrigin when same origin', async 
   const asyncFileName = Object.keys(files).find(file =>
     file.includes('/static/js/async/'),
   )!;
-  const links = await getResourceLinks(page, files, 'preload');
+  const links = getResourceLinks(files, 'preload');
 
   expect(links).toHaveLength(3);
   expect(links).toContainEqual({

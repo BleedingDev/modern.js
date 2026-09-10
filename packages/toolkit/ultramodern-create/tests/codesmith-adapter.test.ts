@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,16 +7,10 @@ import ultramodernCodeSmithAdapter from '../src/ultramodern-workspace/codesmith'
 import { createWorkspace } from './helpers/workspace-kit';
 
 const packageRoot = path.resolve(__dirname, '..');
-const builtCliPath = path.join(packageRoot, 'dist/esm-node/index.js');
 const builtCodeSmithAdapterPath = path.join(
   packageRoot,
   'dist/cjs/ultramodern-workspace/codesmith.cjs',
 );
-
-const hermeticEnv = {
-  ...process.env,
-  MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION: '3.2.0-ultramodern.108',
-};
 
 function read(workspaceDir: string, relativePath: string) {
   return fs.readFileSync(path.join(workspaceDir, relativePath), 'utf-8');
@@ -25,44 +18,6 @@ function read(workspaceDir: string, relativePath: string) {
 
 function readJson(workspaceDir: string, relativePath: string): any {
   return JSON.parse(read(workspaceDir, relativePath));
-}
-
-function comparableCompactConfig(config: any) {
-  const scrub = (value: any): any => {
-    if (Array.isArray(value)) {
-      return value.map(scrub);
-    }
-
-    if (value && typeof value === 'object') {
-      return Object.fromEntries(
-        Object.entries(value).map(([key, nested]) => [
-          key,
-          key === 'buildMarker' || (key === 'build' && 'uiSurface' in value)
-            ? '<ignored>'
-            : scrub(nested),
-        ]),
-      );
-    }
-
-    return value;
-  };
-
-  return scrub({
-    ...config,
-    generator: {
-      ...config.generator,
-      version: '<ignored>',
-    },
-  });
-}
-
-function runCli(cwd: string, args: string[]) {
-  assert.equal(fs.existsSync(builtCliPath), true, builtCliPath);
-  return spawnSync(process.execPath, [builtCliPath, ...args], {
-    cwd,
-    encoding: 'utf8',
-    env: hermeticEnv,
-  });
 }
 
 function createAdapterPackage(tempRoot: string) {
@@ -140,48 +95,6 @@ test('CodeSmith adapter creates a workspace with non-interactive config', async 
         path.join(workspaceDir, 'apps/shell-super-app/tailwind.config.ts'),
       ),
       false,
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('CodeSmith adapter MicroVertical output matches CLI contract output', async () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-codesmith-'));
-
-  try {
-    const generatorDir = createAdapterPackage(tempRoot);
-    const codesmithWorkspace = path.join(
-      tempRoot,
-      'codesmith',
-      'contract-workspace',
-    );
-    const cliWorkspace = path.join(tempRoot, 'cli', 'contract-workspace');
-    fs.mkdirSync(path.dirname(codesmithWorkspace), { recursive: true });
-    fs.mkdirSync(path.dirname(cliWorkspace), { recursive: true });
-    createWorkspace(codesmithWorkspace);
-    createWorkspace(cliWorkspace);
-
-    const codesmithResult = await runCodeSmith(
-      codesmithWorkspace,
-      generatorDir,
-      {
-        mode: 'vertical',
-        name: 'catalog',
-        modernVersion: '3.2.1',
-      },
-    );
-    const cliResult = runCli(cliWorkspace, ['--vertical=catalog']);
-    assert.equal(cliResult?.status, 0, cliResult?.stderr);
-
-    assert.equal(codesmithResult.operation, 'vertical');
-    assert.deepEqual(
-      comparableCompactConfig(
-        readJson(codesmithWorkspace, '.modernjs/ultramodern.json'),
-      ),
-      comparableCompactConfig(
-        readJson(cliWorkspace, '.modernjs/ultramodern.json'),
-      ),
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

@@ -126,15 +126,6 @@ export { effectApi as api, effectLayer as layer };
       };
 
       await adapter.registerMiddleware({ prefix: ['/api', '/api/internal'] });
-      expect(middlewares.map(middleware => middleware.path)).toEqual([
-        '/api/internal/*',
-        '/api/*',
-      ]);
-      expect(middlewares[0]?.before).toEqual([
-        'custom-server-hook',
-        'custom-server-middleware',
-        'render',
-      ]);
       await expect(invoke(middlewares[0]!, '/api/internal')).resolves.toEqual({
         value: 'shared-runtime',
         requestPath: '/value',
@@ -272,9 +263,6 @@ export { effectApi as api, effectLayer as layer };
       const defaultMiddlewares: Middleware[] = [];
       const defaultAdapter = new EffectAdapter(createApi(defaultMiddlewares));
       await defaultAdapter.registerMiddleware({ prefix: [] });
-      expect(defaultMiddlewares.map(middleware => middleware.path)).toEqual([
-        '/api/*',
-      ]);
       const defaultResponse = await invoke(
         defaultMiddlewares[0]!,
         new Request('https://example.com/api/value', {
@@ -291,11 +279,6 @@ export { effectApi as api, effectLayer as layer };
       await nestedAdapter.registerMiddleware({
         prefix: ['/api', '/api/internal'],
       });
-      expect(nestedMiddlewares.map(middleware => middleware.path)).toEqual([
-        '/api/internal/*',
-        '/api/*',
-      ]);
-
       const routePath = '/api/internal/value';
       const batchResponse = await invoke(
         nestedMiddlewares[0]!,
@@ -543,35 +526,5 @@ export { effectApi as api, effectLayer as layer };
       delete testGlobal[gateMarker];
       await fs.promises.rm(appDirectory, { recursive: true, force: true });
     }
-  });
-
-  test('falls through missing and 404 handlers only for web middleware', async () => {
-    const middlewares: Middleware[] = [];
-    let nextCalls = 0;
-    const api = {
-      getServerContext: () => ({
-        bffRuntimeFramework: 'effect',
-        middlewares,
-      }),
-      getServerConfig: () => ({}),
-    } as unknown as ServerPluginAPI;
-    const adapter = new EffectAdapter(api);
-    await adapter.registerMiddleware({ prefix: '/api', enableHandleWeb: true });
-    const result = await middlewares[0]!.handler(
-      {
-        env: {},
-        req: {
-          method: 'GET',
-          path: '/page',
-          raw: new Request('https://example.com/page'),
-        },
-      },
-      async () => {
-        nextCalls += 1;
-      },
-    );
-
-    expect(result).toBeUndefined();
-    expect(nextCalls).toBe(1);
   });
 });

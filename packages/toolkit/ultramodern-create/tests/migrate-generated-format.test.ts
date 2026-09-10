@@ -13,13 +13,56 @@ import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace/index';
-import { migratedWorkspaceScriptArtifacts } from '../src/ultramodern-workspace/workspace-scripts';
 import {
+  createWorkspace,
   linkWorkspaceFormatterDependencies,
   snapshotWorkspace,
 } from './helpers/workspace-kit';
 
 const packageSource = { strategy: 'workspace' } as const;
+const packageRoot = path.resolve(__dirname, '..');
+const toolDependencyNodeModules = path.dirname(
+  fs.realpathSync(path.join(packageRoot, 'node_modules/ultracite')),
+);
+const oxfmtCliPath = path.join(toolDependencyNodeModules, 'oxfmt/bin/oxfmt');
+const oxlintCliPath = path.join(toolDependencyNodeModules, 'oxlint/bin/oxlint');
+
+interface OxlintReport {
+  diagnostics: unknown[];
+}
+
+function runTool(cliPath: string, args: string[], workspaceRoot: string) {
+  return spawnSync(process.execPath, [cliPath, ...args], {
+    cwd: workspaceRoot,
+    encoding: 'utf-8',
+    env: {
+      ...process.env,
+      FORCE_COLOR: '0',
+    },
+  });
+}
+
+function toolOutput(result: ReturnType<typeof runTool>) {
+  return `${result.stdout}\n${result.stderr}`;
+}
+
+function parseOxlintReport(
+  stdout: string,
+  commandOutput: string,
+): OxlintReport {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch (error) {
+    assert.fail(
+      `Oxlint did not return JSON: ${String(error)}\n${commandOutput}`,
+    );
+  }
+  assert.ok(parsed !== null && typeof parsed === 'object');
+  const diagnostics = Reflect.get(parsed, 'diagnostics');
+  assert.ok(Array.isArray(diagnostics), commandOutput);
+  return { diagnostics };
+}
 
 function readFiles(workspaceRoot: string, relativePaths: readonly string[]) {
   return new Map(
@@ -103,8 +146,6 @@ test('authentic .4 flattened-locale runtime migration passes native import sorti
     assert.equal(native.status, 0, native.stderr);
     run();
     assertGeneratedFilesAreFormatted(root, [runtime.path]);
-    assert.equal(fs.readFileSync(runtimePath, 'utf8'), native.stdout);
-    run();
     assert.equal(fs.readFileSync(runtimePath, 'utf8'), native.stdout);
     const authored = runtime.content.replace(
       'return prefix.length > 0',
@@ -261,7 +302,7 @@ test.each([
   { printWidth: 80, singleQuote: false, trailingComma: 'none' },
   { printWidth: 120, singleQuote: true, trailingComma: 'all' },
   { printWidth: 160, singleQuote: false, trailingComma: 'es5' },
-])('migrate preserves authored formatter settings %j and stays byte-idempotent', async formatterSettings => {
+])('migrate preserves authored formatter settings %j', async formatterSettings => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-migrate-format-'));
   const workspaceRoot = path.join(tempRoot, 'format-workspace');
   try {
@@ -348,28 +389,14 @@ test.each([
     );
 
     const generatedPaths = [
-      ...new Set([
-        ...migratedWorkspaceScriptArtifacts({
-          shellOnly: false,
-          hasBackendSurface: true,
-        }).map(artifact => artifact.relativePath),
-        'scripts/validate-ultramodern-workspace.mts',
-        'zerops.yaml',
-        'apps/shell-super-app/modern.config.ts',
-        'apps/shell-super-app/module-federation.config.ts',
-        'apps/shell-super-app/shared/ultramodern-build.ts',
-        shellUiMarker,
-        'apps/shell-super-app/src/routes/vertical-components.tsx',
-        'apps/shell-super-app/src/routes/vertical-components.worker.tsx',
-        'apps/shell-super-app/src/federated-components.tsx',
-        'apps/shell-super-app/src/federated-components.worker.tsx',
-        'verticals/catalog/modern.config.ts',
-        'verticals/catalog/module-federation.config.ts',
-        'verticals/catalog/backend-federation.config.ts',
-        'verticals/catalog/shared/ultramodern-build.ts',
-        'verticals/catalog/api/backend-federation.ts',
-      ]),
-    ].sort((left, right) => left.localeCompare(right));
+      'apps/shell-super-app/modern.config.ts',
+      'apps/shell-super-app/module-federation.config.ts',
+      'apps/shell-super-app/src/routes/vertical-components.tsx',
+      'verticals/catalog/modern.config.ts',
+      'verticals/catalog/module-federation.config.ts',
+      'zerops.yaml',
+      fragmentPath,
+    ];
 
     assert.equal(fs.existsSync(removedUiMarker), false);
     assert.match(
@@ -387,25 +414,6 @@ test.each([
       /export const ultramodernUiMarker/u,
     );
     assertGeneratedFilesAreFormatted(workspaceRoot, generatedPaths);
-    assert.equal(
-      fs.readFileSync(path.join(workspaceRoot, fragmentPath), 'utf-8'),
-      fragmentSource,
-    );
-    assert.deepEqual(fs.readFileSync(consumerConfigPath), consumerConfig);
-    assert.deepEqual(
-      fs.readFileSync(path.join(workspaceRoot, consumerProbePath)),
-      consumerProbe,
-    );
-
-    const firstMigration = readFiles(workspaceRoot, generatedPaths);
-    assert.equal(
-      await runUltramodernToolingCli(
-        ['migrate-strict-effect', '--skip-install'],
-        workspaceRoot,
-      ),
-      0,
-    );
-    assert.deepEqual(readFiles(workspaceRoot, generatedPaths), firstMigration);
     assert.equal(
       fs.readFileSync(path.join(workspaceRoot, fragmentPath), 'utf-8'),
       fragmentSource,
@@ -586,5 +594,99 @@ test('dry-run reports finalized formatting with native consumer imports and nest
   } finally {
     output.mockRestore();
     fs.rmSync(workspaceRoot, { force: true, recursive: true });
+  }
+});
+
+test('migration restores executable Ultracite format and component-style policies', async () => {
+  const { tempRoot, workspaceDir: workspaceRoot } = createWorkspace(
+    'migrated-tool-config',
+    { tempPrefix: 'um-migrated-tool-config-' },
+  );
+  linkWorkspaceFormatterDependencies(workspaceRoot);
+  fs.writeFileSync(
+    path.join(workspaceRoot, 'oxfmt.config.ts'),
+    `import { defineConfig } from 'oxfmt';
+import ultracite from 'ultracite/oxfmt';
+
+export default defineConfig({
+  extends: [ultracite],
+  ignorePatterns: [],
+});
+`,
+  );
+  fs.writeFileSync(
+    path.join(workspaceRoot, 'oxlint.config.ts'),
+    `import core from 'ultracite/oxlint/core';
+import react from 'ultracite/oxlint/react';
+
+export default {
+  extends: [core, react],
+};
+`,
+  );
+
+  const relativeFormatProbe = path.join('packages', 'format-probe.tsx');
+  fs.writeFileSync(
+    path.join(workspaceRoot, relativeFormatProbe),
+    'export const Probe = () => <div className="p-4 flex items-center">probe</div>;\n',
+  );
+  const relativeLintProbe = path.join('packages', 'component-probe.tsx');
+  fs.writeFileSync(
+    path.join(workspaceRoot, relativeLintProbe),
+    `export function FunctionComponent() {
+  return <div />;
+}
+
+export const ArrowComponent = () => <div />;
+`,
+  );
+
+  try {
+    assert.equal(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--skip-install'],
+        workspaceRoot,
+      ),
+      0,
+    );
+
+    const initialFormatCheck = runTool(
+      oxfmtCliPath,
+      ['--config', 'oxfmt.config.ts', '--check', relativeFormatProbe],
+      workspaceRoot,
+    );
+    assert.equal(
+      initialFormatCheck.status,
+      1,
+      `migrated formatter did not apply the Ultracite policy.\n${toolOutput(initialFormatCheck)}`,
+    );
+    const format = runTool(
+      oxfmtCliPath,
+      ['--config', 'oxfmt.config.ts', relativeFormatProbe],
+      workspaceRoot,
+    );
+    assert.equal(format.status, 0, toolOutput(format));
+    const finalFormatCheck = runTool(
+      oxfmtCliPath,
+      ['--config', 'oxfmt.config.ts', '--check', relativeFormatProbe],
+      workspaceRoot,
+    );
+    assert.equal(finalFormatCheck.status, 0, toolOutput(finalFormatCheck));
+
+    const lint = runTool(
+      oxlintCliPath,
+      ['--config', 'oxlint.config.ts', '--format', 'json', relativeLintProbe],
+      workspaceRoot,
+    );
+    const lintOutput = toolOutput(lint);
+    assert.equal(lint.error, undefined, lintOutput);
+    assert.deepEqual(
+      parseOxlintReport(lint.stdout, lintOutput).diagnostics,
+      [],
+      lintOutput,
+    );
+    assert.equal(lint.status, 0, lintOutput);
+  } finally {
+    fs.rmSync(tempRoot, { force: true, recursive: true });
   }
 });

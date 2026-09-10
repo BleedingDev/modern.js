@@ -2,6 +2,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { materializeGeneratedWorkspaceDependencies } from '../../../utils/generatedWorkspaceDependencies';
+import {
+  getPort,
+  killApp,
+  modernBuild,
+  modernServe,
+} from '../../../utils/modernTestUtils';
 
 const repoRoot = path.resolve(__dirname, '../../../../');
 const createBin = path.resolve(
@@ -15,23 +22,6 @@ type ExecSyncError = Error & {
   stdout?: Buffer | string;
   stderr?: Buffer | string;
 };
-
-function expectWorkspaceModernVersions(packageJson: {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-}) {
-  const mergedDependencies = {
-    ...(packageJson.dependencies || {}),
-    ...(packageJson.devDependencies || {}),
-  };
-  const modernDependencies = Object.entries(mergedDependencies).filter(
-    ([name]) => name.startsWith('@modern-js/'),
-  );
-  expect(modernDependencies.length).toBeGreaterThan(0);
-  for (const [, version] of modernDependencies) {
-    expect(version).toBe('workspace:*');
-  }
-}
 
 function runCreate(projectDir: string, args: string[]) {
   execFileSync(process.execPath, [createBin, projectDir, ...args], {
@@ -57,22 +47,6 @@ function runCreateInWorkspace(workspaceDir: string, args: string[]) {
   });
 }
 
-function readText(root: string, relativePath: string) {
-  return fs.readFileSync(path.join(root, relativePath), 'utf-8');
-}
-
-function readJson<T = any>(root: string, relativePath: string): T {
-  return JSON.parse(readText(root, relativePath));
-}
-
-function expectPath(root: string, relativePath: string) {
-  expect(fs.existsSync(path.join(root, relativePath))).toBe(true);
-}
-
-function expectNoPath(root: string, relativePath: string) {
-  expect(fs.existsSync(path.join(root, relativePath))).toBe(false);
-}
-
 function scaffoldWorkspaceWithVertical(
   workspaceDir: string,
   workspaceArgs: string[],
@@ -83,15 +57,14 @@ function scaffoldWorkspaceWithVertical(
   runCreateInWorkspace(workspaceDir, verticalArgs);
 }
 
-function expectGeneratedWorkspaceValid(workspaceDir: string) {
-  expect(() =>
-    execFileSync(
-      process.execPath,
-      ['scripts/validate-ultramodern-workspace.mts'],
-      { cwd: workspaceDir, stdio: 'pipe' },
-    ),
-  ).not.toThrow();
-}
+const generatedBuildPackages = [
+  '@modern-js/app-tools',
+  '@modern-js/plugin-bff',
+  '@modern-js/plugin-i18n',
+  '@modern-js/plugin-tanstack',
+  '@modern-js/runtime',
+  '@modern-js/runtime-extensions',
+];
 
 function captureCreateFailure(projectDir: string, args: string[]): string {
   try {
@@ -122,118 +95,63 @@ describe('create-bff-runtime', () => {
     }
   });
 
-  test('scaffolds the strict Effect approach by default with --bff', () => {
-    const workspaceDir = path.join(tempRoot, 'with-bff-effect-default');
-    scaffoldWorkspaceWithVertical(
-      workspaceDir,
-      ['--bff', '--lang', 'en'],
-      ['greetings', '--vertical', '--lang', 'en'],
-    );
-
-    const rootPackage = readJson(workspaceDir, 'package.json');
-    expect(rootPackage.name).toBe('with-bff-effect-default');
-
-    const verticalPackage = readJson(
-      workspaceDir,
-      'verticals/greetings/package.json',
-    );
-    expect(verticalPackage.dependencies['@modern-js/plugin-tanstack']).toBe(
-      'workspace:*',
-    );
-    expect(verticalPackage.dependencies['@modern-js/plugin-bff']).toBe(
-      'workspace:*',
-    );
-    expect(verticalPackage.dependencies['@tanstack/react-router']).toBe(
-      '1.170.32',
-    );
-    expect(verticalPackage.devDependencies.tailwindcss).toBe('^4.3.3');
-    expect(verticalPackage.devDependencies['@rsbuild/plugin-tailwindcss']).toBe(
-      '^2.0.3',
-    );
-
-    expectNoPath(workspaceDir, 'verticals/greetings/api/lambda');
-    expectPath(workspaceDir, 'verticals/greetings/api/index.ts');
-    expectPath(workspaceDir, 'verticals/greetings/shared/api.ts');
-    expectNoPath(workspaceDir, 'verticals/greetings/postcss.config.mjs');
-    expectPath(workspaceDir, 'verticals/greetings/tailwind.config.ts');
-    expectGeneratedWorkspaceValid(workspaceDir);
-  });
-
-  test('scaffolds the strict Effect approach with an explicit --bff-runtime effect', () => {
+  test('generates, builds, and serves a strict Effect BFF app', async () => {
     const workspaceDir = path.join(tempRoot, 'with-bff-effect');
     scaffoldWorkspaceWithVertical(
       workspaceDir,
       ['--bff-runtime', 'effect', '--lang', 'en'],
       ['greetings', '--vertical', '--bff-runtime', 'effect', '--lang', 'en'],
     );
+    const cleanupDependencies =
+      materializeGeneratedWorkspaceDependencies(workspaceDir);
+    try {
+      const verticalDir = path.join(workspaceDir, 'verticals/greetings');
+      const buildResult = await modernBuild(verticalDir, [], {
+        ensureWorkspacePackages: generatedBuildPackages,
+        stdout: false,
+        stderr: false,
+      });
+      expect(buildResult.code).toBe(0);
 
-    expectNoPath(workspaceDir, 'verticals/greetings/api/lambda');
-    expectPath(workspaceDir, 'verticals/greetings/api/index.ts');
-    expectPath(workspaceDir, 'verticals/greetings/shared/api.ts');
-    expectPath(workspaceDir, 'verticals/greetings/src/api/greetings-client.ts');
-
-    const tsConfig = readJson<{ include: string[] }>(
-      workspaceDir,
-      'verticals/greetings/tsconfig.json',
-    );
-    expect(tsConfig.include).toContain('api');
-    expect(tsConfig.include).toContain('shared');
-    expectGeneratedWorkspaceValid(workspaceDir);
+      const port = await getPort();
+      const server = await modernServe(verticalDir, port, {
+        ensureWorkspacePackages: generatedBuildPackages,
+      });
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:${port}/greetings-api/greetings?limit=1`,
+        );
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+          items: [
+            {
+              id: 'starter-greetings',
+              title: 'Wire a real greetings source here',
+            },
+          ],
+        });
+      } finally {
+        await killApp(server);
+      }
+    } finally {
+      cleanupDependencies();
+    }
   });
 
-  test('rejects the removed hono BFF runtime with an actionable error', () => {
-    const appDir = path.join(tempRoot, 'with-bff-hono');
-
-    const stderr = captureCreateFailure(appDir, [
-      '--bff-runtime',
-      'hono',
-      '--lang',
-      'en',
-    ]);
-    expect(stderr).toContain('Unsupported BFF runtime "hono"');
-    expect(stderr).toContain('supported: effect');
-    expect(fs.existsSync(appDir)).toBe(false);
-  });
-
-  test('scaffolds workspace protocol versions with --workspace', () => {
-    const workspaceDir = path.join(tempRoot, 'with-bff-workspace');
-    scaffoldWorkspaceWithVertical(
-      workspaceDir,
-      ['--bff-runtime', 'effect', '--workspace', '--lang', 'en'],
-      ['greetings', '--vertical', '--lang', 'en'],
-    );
-
-    const ultramodernConfig = readJson(
-      workspaceDir,
-      '.modernjs/ultramodern.json',
-    );
-    expect(ultramodernConfig.packageSource.strategy).toBe('workspace');
-    expect(ultramodernConfig.packageSource.modernPackageVersion).toBe(
-      'workspace:*',
-    );
-
-    expectWorkspaceModernVersions(readJson(workspaceDir, 'package.json'));
-    expectWorkspaceModernVersions(
-      readJson(workspaceDir, 'apps/shell-super-app/package.json'),
-    );
-    expectWorkspaceModernVersions(
-      readJson(workspaceDir, 'verticals/greetings/package.json'),
-    );
-
-    expectGeneratedWorkspaceValid(workspaceDir);
-  });
-
-  test('fails on an unsupported BFF runtime', () => {
-    const appDir = path.join(tempRoot, 'with-bff-invalid');
-
-    const stderr = captureCreateFailure(appDir, [
-      '--bff-runtime',
-      'unknown-runtime',
-      '--lang',
-      'en',
-    ]);
-    expect(stderr).toContain('Unsupported BFF runtime "unknown-runtime"');
-    expect(stderr).toContain('supported: effect');
-    expect(fs.existsSync(appDir)).toBe(false);
+  test('rejects unsupported BFF runtimes before writing', () => {
+    for (const [name, runtime] of [
+      ['hono', 'hono'],
+      ['unknown', 'unknown-runtime'],
+    ] as const) {
+      const appDir = path.join(tempRoot, `with-bff-${name}`);
+      const stderr = captureCreateFailure(appDir, [
+        '--bff-runtime',
+        runtime,
+        '--lang',
+        'en',
+      ]);
+      expect(stderr).toContain('Unsupported BFF runtime');
+      expect(fs.existsSync(appDir)).toBe(false);
+    }
   });
 });

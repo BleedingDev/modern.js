@@ -2,14 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from '@rstest/core';
+import postcss from 'postcss';
 import { createBuilder } from '../../../../../cli/builder/src';
 import { loadPostcssPlugin } from '../../../../../cli/builder/src/plugins/postcss';
 import {
   matchRules,
   unwrapConfig,
 } from '../../../../../cli/builder/tests/helper';
-
-const fixturesDir = path.join(__dirname, 'fixtures');
 
 const getPluginName = (plugin: unknown): string | undefined => {
   if (plugin && typeof plugin === 'object' && 'postcssPlugin' in plugin) {
@@ -18,79 +17,104 @@ const getPluginName = (plugin: unknown): string | undefined => {
   return undefined;
 };
 
-/** Collect the plugins array of every resolved postcss-loader entry. */
-const collectPostcssPluginsArrays = (value: unknown): unknown[][] => {
+/** Collect every PostCSS plugin array attached to a matched loader rule. */
+const collectPostcssPluginsArrays = (config: any): unknown[][] => {
   const result: unknown[][] = [];
   const seen = new WeakSet<object>();
 
-  const visit = (current: unknown) => {
-    if (!current || typeof current !== 'object') {
+  const visitRule = (rule: any) => {
+    if (!rule || typeof rule !== 'object' || seen.has(rule)) {
       return;
     }
-    if (seen.has(current)) {
-      return;
-    }
-    seen.add(current);
+    seen.add(rule);
 
-    if (Array.isArray(current)) {
-      for (const item of current) {
-        visit(item);
+    const uses = Array.isArray(rule.use) ? rule.use : [rule.use];
+    for (const use of uses) {
+      if (
+        use &&
+        typeof use === 'object' &&
+        typeof use.loader === 'string' &&
+        use.loader.includes('postcss-loader') &&
+        Array.isArray(use.options?.postcssOptions?.plugins)
+      ) {
+        result.push(use.options.postcssOptions.plugins);
       }
-      return;
     }
 
-    const record = current as Record<string, any>;
-    if (
-      typeof record.loader === 'string' &&
-      record.loader.includes('postcss-loader') &&
-      Array.isArray(record.options?.postcssOptions?.plugins)
-    ) {
-      result.push(record.options.postcssOptions.plugins);
-      return;
-    }
-
-    for (const item of Object.values(record)) {
-      visit(item);
+    for (const children of [rule.oneOf, rule.rules]) {
+      if (!Array.isArray(children)) {
+        continue;
+      }
+      for (const child of children) {
+        visitRule(child);
+      }
     }
   };
 
-  visit(value);
+  for (const rule of matchRules({ config, testFile: 'a.css' })) {
+    visitRule(rule);
+  }
   return result;
 };
 
 describe('plugin-postcss', () => {
-  it('should apply user postcss.config plugins exactly once', async () => {
-    const rsbuild = await createBuilder({
-      bundlerType: 'rspack',
-      config: {
-        output: {
-          overrideBrowserslist: ['chrome >= 87'],
-        },
-      },
-      cwd: path.join(fixturesDir, 'postcss-user-config'),
-    });
+  it('should configure user postcss.config plugins exactly once in each matching loader', async () => {
+    const appRoot = mkdtempSync(path.join(tmpdir(), 'builder-postcss-run-'));
 
-    const config = await unwrapConfig(rsbuild);
-    const pluginsArrays = collectPostcssPluginsArrays(
-      matchRules({ config, testFile: 'a.css' }),
-    );
-
-    expect(pluginsArrays.length).toBeGreaterThan(0);
-
-    for (const plugins of pluginsArrays) {
-      const names = plugins.map(getPluginName);
-      // the user plugin from postcss.config.cjs must not be duplicated
-      expect(names.filter(name => name === 'test-marker-user-plugin')).toEqual([
-        'test-marker-user-plugin',
-      ]);
-      // builder defaults are appended exactly once
-      expect(names.filter(name => name === 'autoprefixer')).toEqual([
-        'autoprefixer',
-      ]);
-      // user plugins run before the builder defaults
-      expect(names.indexOf('test-marker-user-plugin')).toBeLessThan(
-        names.indexOf('autoprefixer'),
+    try {
+      writeFileSync(
+        path.join(appRoot, 'package.json'),
+        JSON.stringify({ name: 'postcss-run-root', version: '1.0.0' }),
       );
+      writeFileSync(
+        path.join(appRoot, 'postcss.config.cjs'),
+        `const markerPlugin = () => ({
+  postcssPlugin: 'test-marker-user-plugin',
+  Once(root) {
+    root.append({ prop: '--test-marker-user-runs', value: '1' });
+  },
+});
+markerPlugin.postcss = true;
+module.exports = { plugins: [markerPlugin] };
+`,
+      );
+
+      const rsbuild = await createBuilder({
+        bundlerType: 'rspack',
+        config: {
+          output: {
+            overrideBrowserslist: ['chrome >= 87'],
+          },
+        },
+        cwd: appRoot,
+      });
+      const config = await unwrapConfig(rsbuild);
+      const pluginsArrays = collectPostcssPluginsArrays(config);
+
+      expect(pluginsArrays.length).toBeGreaterThan(0);
+
+      for (const plugins of pluginsArrays) {
+        const names = plugins.map(getPluginName);
+        expect(
+          names.filter(name => name === 'test-marker-user-plugin'),
+        ).toEqual(['test-marker-user-plugin']);
+        expect(names.filter(name => name === 'autoprefixer')).toEqual([
+          'autoprefixer',
+        ]);
+        expect(names.indexOf('test-marker-user-plugin')).toBeLessThan(
+          names.indexOf('autoprefixer'),
+        );
+
+        const result = await postcss(plugins as any).process(
+          '.marker { color: red; }',
+          { from: undefined },
+        );
+        expect(
+          result.css.match(/--test-marker-user-runs/gu) ?? [],
+        ).toHaveLength(1);
+      }
+    } finally {
+      rmSync(appRoot, { recursive: true, force: true });
     }
   });
 

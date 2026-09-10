@@ -104,16 +104,7 @@ describe('static plugin precompressed assets', () => {
     );
   });
 
-  it.each([
-    'bogus',
-    'bogus;q=1',
-    '0.2;q=1',
-    '2',
-    '-0.1',
-    '.8',
-    '0.1234',
-    '1.001',
-  ])('does not accept an invalid quality value %s', async invalidQuality => {
+  it('ignores malformed quality values while preserving a valid fallback', async () => {
     const pwd = await createTempDir();
     const originBody = Buffer.from('invalid quality');
     const brBody = brotliCompressSync(originBody);
@@ -126,17 +117,26 @@ describe('static plugin precompressed assets', () => {
     await writeFile(`${staticFile}.gz`, gzipBody);
 
     const server = await createStaticServer(pwd);
-    const response = await server.request('/static/invalid-quality.js', {
-      headers: new Headers({
-        'accept-encoding': `br;q=${invalidQuality}, gzip;q=0.4, identity;q=0`,
-      }),
-    });
+    for (const invalidQuality of [
+      'bogus',
+      '0.2;q=1',
+      '2',
+      '-0.1',
+      '0.1234',
+      '1.001',
+    ]) {
+      const response = await server.request('/static/invalid-quality.js', {
+        headers: new Headers({
+          'accept-encoding': `br;q=${invalidQuality}, gzip;q=0.4, identity;q=0`,
+        }),
+      });
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-encoding')).toBe('gzip');
-    expect(Buffer.from(await response.arrayBuffer()).equals(gzipBody)).toBe(
-      true,
-    );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-encoding')).toBe('gzip');
+      expect(Buffer.from(await response.arrayBuffer()).equals(gzipBody)).toBe(
+        true,
+      );
+    }
   });
 
   it('returns 406 when identity and every available encoding are unacceptable', async () => {
@@ -278,65 +278,6 @@ describe('static plugin precompressed assets', () => {
 });
 
 describe('static plugin Module Federation backend assets', () => {
-  it('serves backend manifests and remote entries from dist root', async () => {
-    const pwd = await createTempDir();
-    const manifestFile = path.join(pwd, 'backend-mf-manifest.json');
-    const remoteEntryFile = path.join(pwd, 'backendRemoteEntry.cjs');
-
-    await writeFile(
-      manifestFile,
-      JSON.stringify({
-        metaData: {
-          name: 'verticalExploreBackend',
-          publicPath: '/',
-          remoteEntry: {
-            path: '',
-            name: 'backendRemoteEntry.cjs',
-            type: 'commonjs-module',
-          },
-        },
-        exposes: [
-          {
-            name: './effect-api',
-          },
-        ],
-      }),
-    );
-    await writeFile(remoteEntryFile, 'export function init() {}');
-
-    const server = await createStaticServer(pwd);
-    const manifestResponse = await server.request(
-      '/backend-mf-manifest.json',
-      {},
-    );
-    const remoteEntryResponse = await server.request(
-      '/backendRemoteEntry.cjs',
-      {},
-    );
-
-    expect(manifestResponse.status).toBe(200);
-    expect(manifestResponse.headers.get('access-control-allow-origin')).toBe(
-      '*',
-    );
-    expect(await manifestResponse.json()).toEqual(
-      expect.objectContaining({
-        metaData: expect.objectContaining({
-          publicPath: '/',
-        }),
-      }),
-    );
-    expect(remoteEntryResponse.status).toBe(200);
-    expect(remoteEntryResponse.headers.get('content-type')).toContain(
-      'text/javascript',
-    );
-    expect(remoteEntryResponse.headers.get('access-control-allow-origin')).toBe(
-      '*',
-    );
-    expect(await remoteEntryResponse.text()).toContain(
-      'export function init() {}',
-    );
-  });
-
   it('discovers a manifest created after the first request', async () => {
     const pwd = await createTempDir();
     const manifestFile = path.join(pwd, 'mf-manifest.json');

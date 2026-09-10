@@ -41,12 +41,12 @@ type AppTarget = {
 
 type MatrixCase = {
   browserName: 'chromium' | 'firefox' | 'webkit';
-  profile: 'desktop' | 'mobile-slow';
-  slowNetwork: boolean;
+  profile: 'desktop' | 'mobile';
 };
 
 const host = 'http://localhost';
 const fullMatrix = process.env.SUPERAPP_BROWSER_MATRIX === '1';
+const captureArtifacts = process.env.SUPERAPP_BROWSER_MATRIX_CAPTURE === '1';
 const artifactRoot =
   process.env.SUPERAPP_BROWSER_MATRIX_ARTIFACT_DIR ??
   '/tmp/modernjs-superapp-browser-matrix';
@@ -56,16 +56,15 @@ const browserTypes: Record<MatrixCase['browserName'], BrowserType> = {
   webkit,
 };
 
-const matrixCases: MatrixCase[] = (
-  fullMatrix
+const matrixCases: MatrixCase[] = [
+  { browserName: 'chromium', profile: 'desktop' },
+  ...(fullMatrix
     ? [
-        { browserName: 'chromium', profile: 'desktop', slowNetwork: false },
-        { browserName: 'chromium', profile: 'mobile-slow', slowNetwork: true },
-        { browserName: 'firefox', profile: 'desktop', slowNetwork: false },
-        { browserName: 'webkit', profile: 'mobile-slow', slowNetwork: true },
+        { browserName: 'firefox', profile: 'desktop' },
+        { browserName: 'webkit', profile: 'mobile' },
       ]
-    : [{ browserName: 'chromium', profile: 'desktop', slowNetwork: false }]
-) as MatrixCase[];
+    : []),
+] as MatrixCase[];
 
 const appTargets: AppTarget[] = [
   {
@@ -125,31 +124,27 @@ async function createContext(
 ) {
   const artifactDir = createArtifactDir(appId, matrixCase);
   const context = await browser.newContext({
-    ...(matrixCase.profile === 'mobile-slow'
+    ...(matrixCase.profile === 'mobile'
       ? devices['iPhone 13']
       : {
           viewport: { width: 1440, height: 960 },
         }),
-    recordVideo: {
-      dir: path.join(artifactDir, 'video'),
-    },
+    ...(captureArtifacts
+      ? {
+          recordVideo: {
+            dir: path.join(artifactDir, 'video'),
+          },
+        }
+      : {}),
   });
 
-  if (matrixCase.slowNetwork) {
-    await context.route(
-      '**/*',
-      async (route: { continue: () => Promise<void> }) => {
-        await new Promise(resolve => setTimeout(resolve, 40));
-        await route.continue();
-      },
-    );
+  if (captureArtifacts) {
+    await context.tracing.start({
+      screenshots: true,
+      snapshots: true,
+      sources: true,
+    });
   }
-
-  await context.tracing.start({
-    screenshots: true,
-    snapshots: true,
-    sources: true,
-  });
   return context;
 }
 
@@ -160,10 +155,15 @@ async function finishArtifacts(input: {
   page: Page;
   failed: boolean;
   errors: string[];
+  captureArtifacts: boolean;
 }) {
   const artifactDir = createArtifactDir(input.appId, input.matrixCase);
-  const tracePath = path.join(artifactDir, 'trace.zip');
-  await input.context.tracing.stop({ path: tracePath });
+  const tracePath = input.captureArtifacts
+    ? path.join(artifactDir, 'trace.zip')
+    : undefined;
+  if (tracePath) {
+    await input.context.tracing.stop({ path: tracePath });
+  }
 
   const screenshotPath = path.join(artifactDir, 'failure.png');
   if (input.failed) {
@@ -179,10 +179,11 @@ async function finishArtifacts(input: {
         appId: input.appId,
         browserName: input.matrixCase.browserName,
         profile: input.matrixCase.profile,
-        slowNetwork: input.matrixCase.slowNetwork,
         tracePath,
         screenshotPath: input.failed ? screenshotPath : undefined,
-        videoDir: path.join(artifactDir, 'video'),
+        videoDir: input.captureArtifacts
+          ? path.join(artifactDir, 'video')
+          : undefined,
         errors: input.errors,
       },
       null,
@@ -227,6 +228,7 @@ async function runWorkflow(
       page,
       failed,
       errors,
+      captureArtifacts,
     });
     await context.close();
     await browser.close();

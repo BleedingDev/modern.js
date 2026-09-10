@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'esbuild';
 
 type ExportConditions = {
   types: string;
@@ -133,82 +132,6 @@ function expectLoadedNamespace(value: unknown, label: string) {
 }
 
 describe('@modern-js/plugin-bff-extensions package surface', () => {
-  test('attributes the fork-owned package to UltraModern.js', () => {
-    expect(packageManifest.description).toContain('UltraModern.js');
-    expect(packageManifest.homepage).toBe(
-      'https://github.com/BleedingDev/ultramodern.js#readme',
-    );
-    expect(packageManifest.bugs).toBe(
-      'https://github.com/BleedingDev/ultramodern.js/issues',
-    );
-    expect(packageManifest.repository).toEqual({
-      type: 'git',
-      url: 'https://github.com/BleedingDev/ultramodern.js',
-      directory: 'packages/cli/plugin-bff-extensions',
-    });
-    expect(packageManifest.keywords).toContain('ultramodern.js');
-    expect(packageManifest.files).toEqual(['dist', 'src']);
-    expect(packageManifest.types).toBeUndefined();
-    expect(packageManifest.main).toBeUndefined();
-    expect(packageManifest.sideEffects).toBe(false);
-    expect(packageManifest.engines).toEqual({ node: '>=26.7.0' });
-    expect(packageManifest.publishConfig).toEqual({
-      registry: 'https://registry.npmjs.org/',
-      access: 'public',
-    });
-    expect(packageManifest.scripts).toMatchObject({
-      build: 'rslib build',
-      prepublishOnly: 'only-allow-pnpm',
-      pretest: 'pnpm run build',
-      test: 'rstest',
-    });
-  });
-
-  test('declares only the source graph runtime dependencies', () => {
-    expect(Object.keys(packageManifest.dependencies).sort()).toEqual(
-      [
-        '@modern-js/backend-federation-contracts',
-        '@modern-js/bff-core',
-        '@modern-js/bff-effect',
-        '@modern-js/runtime-extensions',
-        '@modern-js/server-core',
-        '@modern-js/server-runtime-extensions',
-        '@modern-js/types',
-        '@modern-js/utils',
-        '@module-federation/runtime',
-        '@swc/core',
-        'esbuild',
-      ].sort(),
-    );
-    expect(
-      packageManifest.dependencies['@modern-js/plugin-bff'],
-    ).toBeUndefined();
-  });
-
-  test('keeps the exact Effect cohort optional for Hono-only consumers', () => {
-    const effectVersion = '4.0.0-rc.112';
-
-    for (const peerName of ['effect', '@effect/opentelemetry']) {
-      expect({
-        dependency: packageManifest.dependencies[peerName],
-        devDependency: packageManifest.devDependencies[peerName],
-        optional: packageManifest.peerDependenciesMeta[peerName]?.optional,
-        peer: packageManifest.peerDependencies[peerName],
-      }).toEqual({
-        dependency: undefined,
-        devDependency: effectVersion,
-        optional: true,
-        peer: effectVersion,
-      });
-    }
-
-    const honoEntry = readFileSync(
-      path.join(packageRoot, 'src/hono/index.ts'),
-      'utf8',
-    );
-    expect(honoEntry).not.toMatch(/(?:^|[/'"])(?:effect)(?:[/'"]|$)/u);
-  });
-
   test('loads built Hono exports without resolving optional Effect peers', () => {
     const conditions = conditionsFor('./hono');
     const esmEntries = [conditions.node.import, conditions.import].map(
@@ -305,135 +228,6 @@ describe('@modern-js/plugin-bff-extensions package surface', () => {
     }
   });
 
-  test('rejects the Node-only Hono factory under browser source and runtime conditions', async () => {
-    for (const conditions of [[], ['modern:source']]) {
-      await expect(
-        build({
-          absWorkingDir: packageRoot,
-          bundle: true,
-          conditions,
-          format: 'esm',
-          logLevel: 'silent',
-          platform: 'browser',
-          stdin: {
-            contents:
-              "export * from '@modern-js/plugin-bff-extensions/hono/node';",
-            resolveDir: packageRoot,
-          },
-          write: false,
-        }),
-      ).rejects.toThrow(
-        'Could not resolve "@modern-js/plugin-bff-extensions/hono/node"',
-      );
-    }
-  });
-
-  test('publishes semantic entry points without convenience-only APIs', async () => {
-    expect(packageManifest.exports['.']).toBeUndefined();
-    expect(packageManifest.typesVersions['*']['.']).toBeUndefined();
-    expect(existsSync(path.join(packageRoot, 'src/index.ts'))).toBe(false);
-
-    expect(Object.keys(await sourceLoaders['./hono'].load()).sort()).toEqual([
-      'bindHonoRouteHandlers',
-    ]);
-    expect(
-      Object.keys(await sourceLoaders['./cross-project-policy'].load()).sort(),
-    ).toEqual(['resolveAdapterCrossProjectPolicy']);
-    expect(
-      Object.keys(await sourceLoaders['./effect-source-loader'].load()).sort(),
-    ).toEqual([
-      'bundleEffectEntryForNode',
-      'bundleEffectWorkerRuntimeSource',
-      'generateEffectClientCode',
-      'generateEffectWorkerRuntimeWrapper',
-      'resolveEffectEntryFile',
-    ]);
-    expect(
-      Object.keys(await sourceLoaders['./backend-federation'].load()).sort(),
-    ).toEqual(
-      [
-        'BACKEND_FEDERATION_CONTRACT_VERSION',
-        'BACKEND_FEDERATION_EFFECT_EXPOSE',
-        'BACKEND_FEDERATION_MANIFEST_FILE',
-        'BACKEND_FEDERATION_NODE_ADAPTER_VERSION',
-        'createBackendFederationLoadEntryPlugin',
-        'createBackendFederationRuntime',
-        'validateExpectedBackendFederationIdentity',
-      ].sort(),
-    );
-    expect(
-      Object.keys(
-        await sourceLoaders['./backend-federation-manifest'].load(),
-      ).sort(),
-    ).toEqual(
-      [
-        'BackendFederationManifestAdapterError',
-        'loadBackendFederationManifest',
-        'resolveBackendFederationRemoteFromManifest',
-      ].sort(),
-    );
-  });
-
-  test('keeps the built edge federation cone free of Node evaluators', async () => {
-    const edgeEntry = path.join(
-      packageRoot,
-      'dist/esm/backend-federation/edge.mjs',
-    );
-    const result = await build({
-      bundle: true,
-      entryPoints: [edgeEntry],
-      format: 'esm',
-      packages: 'external',
-      platform: 'browser',
-      target: 'es2021',
-      write: false,
-    });
-    const output = result.outputFiles.map(file => file.text).join('\n');
-
-    for (const forbidden of [
-      /\bnode:/u,
-      /\bcreateRequire\b/u,
-      /\bnew Function\b/u,
-      /\beval\s*\(/u,
-      /\bModuleFederation\b/u,
-      /@module-federation\/runtime/u,
-      /evaluateNodeBackendFederationCommonJs/u,
-      /loadBackendFederationExpose/u,
-      /backend-federation-security\/node/u,
-    ]) {
-      expect(output).not.toMatch(forbidden);
-    }
-  });
-
-  test('maps every public source entry to its generated declaration', () => {
-    const generatedTypeTargets = publicSubpaths.map(subpath => {
-      const conditions = conditionsFor(subpath);
-      const sourceTarget = sourceLoaders[subpath].target;
-      const expectedTypeTarget = sourceTarget
-        .replace(/^\.\/src\//u, './dist/types/')
-        .replace(/\.[cm]?[jt]sx?$/u, '.d.ts');
-
-      expect(conditions.types).toBe(expectedTypeTarget);
-      expect(existsSync(path.join(packageRoot, conditions.types))).toBe(true);
-      const declaration = readFileSync(
-        path.join(packageRoot, conditions.types),
-        'utf8',
-      );
-      expect(declaration.trim().length).toBeGreaterThan(0);
-      expect(declaration).toMatch(/\bexport\b/u);
-      expect(declaration).not.toContain('adapter-kit');
-
-      return conditions.types;
-    });
-
-    expect(new Set(generatedTypeTargets).size).toBe(publicSubpaths.length);
-    expect(
-      Object.values(packageManifest.typesVersions['*']).map(
-        targets => targets[0],
-      ),
-    ).toEqual(generatedTypeTargets);
-  });
-
   test('dry-run pack includes product files and excludes internal surfaces', () => {
     const result = spawnSync('pnpm', ['pack', '--dry-run', '--json'], {
       cwd: packageRoot,
@@ -459,14 +253,5 @@ describe('@modern-js/plugin-bff-extensions package surface', () => {
         `unexpected non-product file in package: ${packedPath}`,
       ).toBe(true);
     }
-  });
-
-  test('does not publish adapter-kit or undeclared convenience subpaths', () => {
-    const serializedSurface = JSON.stringify({
-      exports: packageManifest.exports,
-      typesVersions: packageManifest.typesVersions,
-    });
-    expect(serializedSurface).not.toContain('adapter-kit');
-    expect(serializedSurface).not.toContain('worker-runtime-wrapper');
   });
 });

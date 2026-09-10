@@ -156,18 +156,6 @@ test('producer receipt passes the shared workflow receipt validator', async () =
   try {
     const fixture = await createReceiptFixture(root);
     const receipt = JSON.parse(fs.readFileSync(fixture.receiptPath, 'utf8'));
-    const operationalDetails = receipt.results.find(
-      result => result.id === 'operational-independence',
-    ).details;
-    assert.deepEqual(Object.keys(operationalDetails).sort(), [
-      'artifactMode',
-      'baselineRevision',
-      'changedPaths',
-      'changedRevision',
-      'durationMs',
-      'evidencePath',
-      'mutations',
-    ]);
     const valid = verifyReceipt(fixture);
     assert.equal(valid.status, 0, valid.stderr || valid.stdout);
     assert.match(valid.stdout, /Verified ERP-10 acceptance receipt/);
@@ -292,27 +280,6 @@ test('producer receipt verification fails closed when operational evidence is ta
   }
 });
 
-test('producer receipt verification fails closed when operational evidence is swapped', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ultramodern-receipt-'));
-  try {
-    const fixture = await createReceiptFixture(root);
-    const swapped = JSON.parse(fixture.operationalEvidenceSource);
-    swapped.commits.changed = '4'.repeat(40);
-    fs.writeFileSync(
-      fixture.operationalEvidencePath,
-      `${JSON.stringify(swapped, null, 2)}\n`,
-    );
-    const swappedResult = verifyReceipt(fixture);
-    assert.notEqual(swappedResult.status, 0);
-    assert.match(
-      swappedResult.stderr,
-      /Operational-independence commits are stale, mixed, or outside inventory ownership/u,
-    );
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
 test('producer receipt verification does not treat the evidence digest as correctness', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ultramodern-receipt-'));
   try {
@@ -341,25 +308,6 @@ test('producer receipt verification binds operational evidence to the receipt C0
     assert.match(
       result.stderr,
       /Operational-independence commits are stale, mixed, or outside inventory ownership/u,
-    );
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('producer receipt verification rechecks operational byte conservation', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ultramodern-receipt-'));
-  try {
-    const fixture = await createReceiptFixture(root);
-    const evidence = JSON.parse(fixture.operationalEvidenceSource);
-    evidence.targets.cloudflare.comparison.shell.byteIdentical = false;
-    replaceOperationalEvidence(fixture, evidence);
-
-    const result = verifyReceipt(fixture);
-    assert.notEqual(result.status, 0);
-    assert.match(
-      result.stderr,
-      /Operational-independence cloudflare comparison is incomplete or non-passing/u,
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

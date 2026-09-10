@@ -29,6 +29,7 @@ test('security.sri', async ({ page }) => {
       ),
     ),
   ).toBe(true);
+  await expect(page.locator('body')).toHaveCSS('margin', '0px');
 
   builder.close();
 });

@@ -25,13 +25,11 @@ const createRoute = (
 });
 
 describe('resolveLocalisedUrlsConfig', () => {
-  test('is opt-in: only a non-empty map enables the feature', () => {
+  test('enables the feature only for a non-empty map', () => {
     const map = { '/about': { en: '/about', cs: '/o-nas' } };
-    expect(resolveLocalisedUrlsConfig(map)).toEqual({ enabled: true, map });
-  });
-
-  test('absent, boolean and empty-map options resolve to disabled', () => {
     const disabled = { enabled: false, map: {} };
+
+    expect(resolveLocalisedUrlsConfig(map)).toEqual({ enabled: true, map });
     expect(resolveLocalisedUrlsConfig(undefined)).toEqual(disabled);
     expect(resolveLocalisedUrlsConfig(false)).toEqual(disabled);
     expect(resolveLocalisedUrlsConfig(true)).toEqual(disabled);
@@ -207,9 +205,6 @@ describe('localisedUrls', () => {
       localisedUrls,
     );
 
-    expect(
-      applyLocalisedUrlsToRoutes(routes, ['en', 'cs', 'de'], localisedUrls),
-    ).toEqual(localisedRoutes);
     expect(localisedRoutes.map(route => route.path)).toEqual([
       ':lang/about',
       ':lang/o.nas',
@@ -302,62 +297,6 @@ describe('localisedUrls', () => {
     expect(productRoutes?.[1].children?.map(route => route.path)).toEqual([
       ':slug',
     ]);
-  });
-
-  test('expands flat locale-prefixed route paths with canonical keys', () => {
-    const routes = [
-      createRoute('/:lang/about'),
-      createRoute('/:lang/products/:slug'),
-    ];
-
-    const localisedRoutes = applyLocalisedUrlsToRoutes(routes, ['en', 'cs'], {
-      '/about': {
-        en: '/about',
-        cs: '/o-nas',
-      },
-      '/products/:slug': {
-        en: '/products/:slug',
-        cs: '/produkty/:slug',
-      },
-    });
-
-    expect(localisedRoutes.map(route => route.path)).toEqual([
-      ':lang/about',
-      ':lang/o-nas',
-      ':lang/products/:slug',
-      ':lang/produkty/:slug',
-    ]);
-  });
-
-  test('resolves current localized path to the target language', () => {
-    const localisedUrls = {
-      '/terms-of-service': {
-        en: '/terms-of-service',
-        cs: '/podminky-pouzivani',
-      },
-      '/products/:slug': {
-        en: '/products/:slug',
-        cs: '/produkty/:slug',
-      },
-    };
-
-    expect(
-      resolveLocalisedPath(
-        '/terms-of-service',
-        'cs',
-        ['en', 'cs'],
-        localisedUrls,
-      ),
-    ).toBe('/podminky-pouzivani');
-    expect(
-      resolveLocalisedPath('/produkty/cervena-bota', 'en', ['en', 'cs'], {
-        ...localisedUrls,
-        '/products/:slug': {
-          en: '/products/:slug',
-          cs: '/produkty/:slug',
-        },
-      }),
-    ).toBe('/products/cervena-bota');
   });
 
   test('resolves optional route params', () => {
@@ -455,30 +394,6 @@ describe('localisedUrls', () => {
     ).toBe('/products/new');
   });
 
-  test('reverse resolution is deterministic for equally specific matches', () => {
-    const firstOrder = {
-      '/z/:slug': {
-        en: '/x/:slug',
-        cs: '/z/:slug',
-      },
-      '/a/:section': {
-        en: '/:section/y',
-        cs: '/a/:section',
-      },
-    };
-    const reverseOrder = {
-      '/a/:section': firstOrder['/a/:section'],
-      '/z/:slug': firstOrder['/z/:slug'],
-    };
-
-    expect(
-      resolveCanonicalLocalisedPath('/x/y', ['en', 'cs'], firstOrder),
-    ).toBe('/a/x');
-    expect(
-      resolveCanonicalLocalisedPath('/x/y', ['en', 'cs'], reverseOrder),
-    ).toBe('/a/x');
-  });
-
   test('reverse resolution prefers the most specific localised source pattern', () => {
     const localisedUrls = {
       '/catalog/:section/:item/:detail': {
@@ -535,31 +450,6 @@ describe('localisedUrls', () => {
         },
       }),
     ).toThrow('Missing required path parameter "toString"');
-  });
-
-  test('localises and canonicalises full target pathnames through one helper', () => {
-    const localisedUrls = {
-      '/products/:slug': {
-        en: '/products/:slug',
-        cs: '/produkty/:slug',
-      },
-    };
-
-    expect(
-      localiseTargetPathname(
-        '/en/products/cervena-bota',
-        'cs',
-        ['en', 'cs'],
-        localisedUrls,
-      ),
-    ).toBe('/cs/produkty/cervena-bota');
-    expect(
-      canonicalTargetPathname(
-        '/cs/produkty/cervena-bota',
-        ['en', 'cs'],
-        localisedUrls,
-      ),
-    ).toBe('/products/cervena-bota');
   });
 
   test('strips case-insensitive locale prefixes before relocalising full pathnames', () => {

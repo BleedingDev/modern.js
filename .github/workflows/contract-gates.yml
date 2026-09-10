@@ -64,12 +64,36 @@ permissions:
   contents: read
 
 jobs:
+  contract-tests:
+    name: Contract validator behavior
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Node.js 26.7.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26.7.0'
+
+      - name: Run contract validator tests
+        run: node --test scripts/release-gates/__tests__/*.test.js scripts/boundary-guards/__tests__/*.test.js
+
   contract-gates:
     name: ${{ matrix.label }}
     runs-on: ${{ fromJSON(vars.SELF_LINUX_LABELS || '"ubuntu-latest"') }}
     timeout-minutes: 60
-    # Never run untrusted fork-PR code on (potentially) self-hosted runners.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -125,11 +149,7 @@ jobs:
 
           RUN_COMMANDS="$RUN_COMMANDS_INPUT"
           if [ -z "$RUN_COMMANDS" ]; then
-            if [ "$EVENT_NAME" = "pull_request" ]; then
-              RUN_COMMANDS="false"
-            else
-              RUN_COMMANDS="true"
-            fi
+            RUN_COMMANDS="true"
           fi
 
           EVIDENCE_DIR="$DEFAULT_EVIDENCE_DIR"
@@ -144,9 +164,7 @@ jobs:
             echo "allow_missing_evidence=$ALLOW_MISSING_EVIDENCE_INPUT"
           } >> "$GITHUB_ENV"
 
-      # mise (pnpm) and the monorepo install are only needed when the gate
-      # executes its real command matrix; pull_request validation defaults to
-      # dependency-free profile checks with --skip-commands.
+      # Manual validation-only runs do not install dependencies or claim qualification.
       - name: Setup mise
         if: env.skip_gate != 'true' && env.run_commands == 'true'
         uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
@@ -167,10 +185,6 @@ jobs:
       - name: Build Required Pkg
         if: env.skip_gate != 'true' && env.run_commands == 'true'
         run: pnpm run build:required
-
-      - name: Install Playwright Chromium
-        if: env.skip_gate != 'true' && env.run_commands == 'true'
-        run: pnpm --dir tests/integration/rstest/basic-app-rstest-browser exec playwright install --with-deps chromium
 
       - name: Validate Contract Gate
         if: env.skip_gate != 'true'
@@ -194,22 +208,29 @@ jobs:
 
   contract-gates-summary:
     name: Contract Gates Summary
-    runs-on: namespace-profile-testing
+    runs-on: ubuntu-latest
     if: always()
     needs:
+      - contract-tests
       - contract-gates
     timeout-minutes: 5
     steps:
-      - name: Check contract gate result
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+      - name: Check selected validation result
         env:
-          NEEDS_RESULTS: ${{ toJSON(needs.*.result) }}
+          EVENT_NAME: ${{ github.event_name }}
+          TEST_RESULT: ${{ needs.contract-tests.result }}
+          GATE_RESULT: ${{ needs.contract-gates.result }}
+          RUN_COMMANDS: ${{ inputs.run_commands || github.event.inputs.run_commands || 'true' }}
+          ALLOW_MISSING_EVIDENCE: ${{ inputs.allow_missing_evidence || github.event.inputs.allow_missing_evidence || 'false' }}
         run: |
-          echo "::error::contract-gates required jobs did not all succeed: $NEEDS_RESULTS"
-          exit 1
-
-      - name: Report contract gate success
-        env:
-          NEEDS_RESULTS: ${{ toJSON(needs.*.result) }}
-        run: |
-          echo "contract-gates required jobs succeeded: $NEEDS_RESULTS"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            [ "$TEST_RESULT" = "success" ] || exit 1
+            echo 'Contract validator behavior tests passed; release qualification was not run.'
+          else
+            [ "$GATE_RESULT" = "success" ] || exit 1
+            if [ "$RUN_COMMANDS" = "false" ] || [ "$ALLOW_MISSING_EVIDENCE" = "true" ]; then
+              echo 'Profile validation completed; release qualification was not performed.'
+            else
+              echo 'Selected contract gates executed and qualified.'
+            fi
+          fi

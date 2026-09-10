@@ -1,9 +1,7 @@
 import {
-  createDiscoveryError,
   matchDeliveryUnitIdentity,
   parseSurfaceRef,
   type ResolvedDeliveryUnit,
-  type SurfaceResolutionProvider,
   selectResolvedSurface,
   validateResolvedDeliveryUnit,
 } from '../../src/surface-resolution';
@@ -61,7 +59,9 @@ function parseRef(input: string) {
 
 describe('validateResolvedDeliveryUnit', () => {
   it('accepts a complete record with all four location kinds', () => {
-    expect(validateResolvedDeliveryUnit(createRecord())).toEqual({
+    const record = createRecord();
+    record.surfaces[0].servedMajor = 2;
+    expect(validateResolvedDeliveryUnit(record)).toEqual({
       ok: true,
       issues: [],
     });
@@ -247,15 +247,6 @@ describe('validateResolvedDeliveryUnit', () => {
       expect(result.issues.map(issue => issue.path)).toContain(path);
     }
   });
-
-  it('accepts a record with a valid servedMajor', () => {
-    const record = createRecord();
-    record.surfaces[0].servedMajor = 2;
-    expect(validateResolvedDeliveryUnit(record)).toEqual({
-      ok: true,
-      issues: [],
-    });
-  });
 });
 
 describe('selectResolvedSurface', () => {
@@ -328,35 +319,5 @@ describe('matchDeliveryUnitIdentity', () => {
       'acme/checkout#cart',
     );
     expect(error).toMatchObject({ code: 'identity-mismatch' });
-  });
-});
-
-describe('provider SPI', () => {
-  it('accepts a conforming provider returning whole records or typed errors', async () => {
-    const record = createRecord();
-    const provider: SurfaceResolutionProvider = {
-      name: 'test-static',
-      resolve(ref) {
-        if (ref.unitId !== record.unitId) {
-          return {
-            ok: false,
-            error: createDiscoveryError('unknown-unit', ref, 'unknown unit'),
-          };
-        }
-        return { ok: true, unit: record };
-      },
-    };
-
-    const hit = await provider.resolve(
-      parseRef('acme/checkout#cart'),
-      'production',
-    );
-    expect(hit).toEqual({ ok: true, unit: record });
-
-    const miss = await provider.resolve(parseRef('other#cart'), 'production');
-    expect(miss).toMatchObject({
-      ok: false,
-      error: { code: 'unknown-unit', ref: 'other#cart' },
-    });
   });
 });

@@ -35,7 +35,14 @@ describe('SSR useId Hydration', () => {
     }
   });
 
-  test('SSR should generate useId with modern-js- prefix', async () => {
+  test('should hydrate useId markup without a mismatch', async () => {
+    const consoleErrors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+
     await page.goto(`http://localhost:${appPort}`, {
       waitUntil: ['networkidle0'],
     });
@@ -49,19 +56,6 @@ describe('SSR useId Hydration', () => {
     );
     expect(generatedIds.length).toBeGreaterThan(0);
     expect(generatedIds.every(id => id.includes('modern-js-'))).toBe(true);
-  });
-
-  test('should not have hydration mismatch', async () => {
-    const consoleErrors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
-      }
-    });
-
-    await page.goto(`http://localhost:${appPort}`, {
-      waitUntil: ['networkidle0'],
-    });
 
     const hydrationError = consoleErrors.find(
       err =>

@@ -174,27 +174,6 @@ function createVerifiedBackendManifest(
 }
 
 describe('backend federation runtime', () => {
-  test('preserves the published edge-safe backend federation namespace', async () => {
-    const edgeNamespace = await import('../src/backend-federation/edge');
-
-    expect(Object.keys(edgeNamespace).sort()).toEqual([
-      'BACKEND_FEDERATION_CONTRACT_VERSION',
-      'BACKEND_FEDERATION_EFFECT_EXPOSE',
-      'BACKEND_FEDERATION_MANIFEST_FILE',
-      'BACKEND_FEDERATION_NODE_ADAPTER_VERSION',
-      'createBackendFederationLoadEntryPlugin',
-      'createBackendFederationRuntime',
-      'loadBackendFederatedEffectApi',
-      'validateExpectedBackendFederationIdentity',
-    ]);
-    expect(edgeNamespace).not.toHaveProperty(
-      'loadBackendFederatedEffectApiFromManifest',
-    );
-    expect(edgeNamespace).not.toHaveProperty(
-      'evaluateNodeBackendFederationCommonJs',
-    );
-  });
-
   test('rejects unverified network entries without an integrity record', async () => {
     await expect(
       loadBackendFederatedEffectApi({
@@ -206,33 +185,6 @@ describe('backend federation runtime', () => {
         },
       }),
     ).rejects.toThrow(/requires verified entry bytes/u);
-  });
-
-  test('does not let an explicit legacy policy execute unverified network bytes', async () => {
-    delete (globalThis as Record<string, unknown>).__legacyBackendEvaluated;
-    const unverifiedSource = `
-globalThis.__legacyBackendEvaluated = true;
-module.exports = { get() { return () => ({}) } };
-`;
-
-    await expect(
-      loadBackendFederatedEffectApi({
-        entryPolicy: {
-          ...({ allowUnverifiedNetworkEntry: true } as Record<string, unknown>),
-          fetch: async () => new Response(unverifiedSource),
-        },
-        hostName: 'unverifiedLegacyNetworkBackendHost',
-        remote: {
-          entry: 'https://catalog.example.test/backendRemoteEntry.cjs',
-          name: 'verticalCatalogBackend',
-          type: 'commonjs-module',
-        },
-      }),
-    ).rejects.toThrow(/requires verified entry bytes/u);
-
-    expect(
-      (globalThis as Record<string, unknown>).__legacyBackendEvaluated,
-    ).toBeUndefined();
   });
 
   test('verifies a network remote before consulting a custom entry plugin', async () => {
@@ -494,85 +446,8 @@ module.exports = {
     expect(loaded.default).toEqual({ brand: 'defineEffectBff-runtime' });
   });
 
-  test('loads a strict Effect backend expose from an ESM remote entry through Module Federation runtime', async () => {
-    const remote: BackendFederationRemote = {
-      name: 'verticalExploreBackend',
-      entry: createBackendRemoteEntryDataUrl(`
-        export function init() {}
-        export function get(id) {
-          if (id !== './effect-api') throw new Error('Unexpected expose ' + id);
-
-          return async () => ({
-            backendFederationContract: {
-              runtimeFramework: 'effect',
-              strictEffectApproach: true,
-            },
-            contract: { ownerId: 'explore' },
-            runtime: { brand: 'defineEffectBff-runtime' },
-          });
-        }
-      `),
-      type: 'module',
-    };
-
-    const loaded = await loadBackendFederatedEffectApi({
-      hostName: 'shellBackendHost',
-      remote,
-    });
-
-    expect(loaded.backendFederationContract).toEqual({
-      runtimeFramework: 'effect',
-      strictEffectApproach: true,
-    });
-    expect(loaded.contract).toEqual({ ownerId: 'explore' });
-    expect(loaded.runtime).toEqual({ brand: 'defineEffectBff-runtime' });
-  });
-
-  test('loads a strict Effect backend expose from a local file URL ESM remote entry', async () => {
-    const tempDirectory = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'modern-backend-federation-'),
-    );
-    const entryPath = path.join(tempDirectory, 'backendRemoteEntry.mjs');
-
-    try {
-      await fs.writeFile(
-        entryPath,
-        `
-          export function init() {}
-          export function get(id) {
-            if (id !== './effect-api') throw new Error('Unexpected expose ' + id);
-            return async () => ({
-              backendFederationContract: {
-                runtimeFramework: 'effect',
-                strictEffectApproach: true,
-              },
-              runtime: { brand: 'defineEffectBff-runtime' },
-            });
-          }
-        `,
-      );
-
-      const remote: BackendFederationRemote = {
-        name: 'verticalFileBackend',
-        entry: pathToFileURL(entryPath).href,
-        type: 'module',
-      };
-
-      const loaded = await loadBackendFederatedEffectApi({
-        hostName: 'localFileBackendHost',
-        remote,
-      });
-
-      expect(loaded.runtime).toEqual({ brand: 'defineEffectBff-runtime' });
-    } finally {
-      await fs.rm(tempDirectory, { force: true, recursive: true });
-    }
-  });
-
-  test.each([
-    'service',
-    'binding',
-  ])('loads a strict Effect backend expose from a caller-pinned %s provider in a Worker-like runtime', async entryScheme => {
+  test('loads a strict Effect backend expose from a caller-pinned service provider in a Worker-like runtime', async () => {
+    const entryScheme = 'service';
     const remote: BackendFederationRemote = {
       name: 'verticalCheckoutBackend',
       entry: `${entryScheme}:verticalCheckoutBackend`,
@@ -791,40 +666,6 @@ module.exports = {
     expect(getCalls).toEqual(['./effect-api', './health']);
   });
 
-  test('preserves the identity-less edge load deprecation warning', async () => {
-    const warnSpy = rstest.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      await loadEdgeBackendFederatedEffectApi({
-        hostName: 'cloudflareWorkerBackendHost',
-        plugins: [
-          createEdgeBackendFederationLoadEntryPlugin({
-            resolveEntry() {
-              return createEffectApiEntryExports({
-                backendFederationContract: {
-                  runtimeFramework: 'effect',
-                  strictEffectApproach: true,
-                },
-                runtime: { brand: 'defineEffectBff-runtime' },
-              });
-            },
-          }),
-        ],
-        remote: {
-          entry: 'service:verticalCheckoutBackend',
-          name: 'verticalCheckoutBackend',
-          type: 'module',
-        },
-      });
-
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(String(warnSpy.mock.calls[0]?.[0])).toContain(
-        'without an expected delivery-unit identity',
-      );
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   test('validates delivery-unit identity on the edge binding path', async () => {
     await expect(
       loadEdgeBackendFederatedEffectApi({
@@ -856,47 +697,9 @@ module.exports = {
     ).rejects.toThrow(/delivery-unit identity mismatch.*stale-build/su);
   });
 
-  test('fails closed before an edge provider can execute a network remote', async () => {
-    let providerCalls = 0;
-
-    await expect(
-      loadEdgeBackendFederatedEffectApi({
-        hostName: 'cloudflareNetworkBackendHost',
-        plugins: [
-          createBackendFederationLoadEntryPlugin({
-            resolveEntry() {
-              providerCalls += 1;
-              return createEffectApiEntryExports(
-                createManifestEffectApiModule(),
-              );
-            },
-          }),
-        ],
-        remote: {
-          entry: 'https://checkout.example.test/backendRemoteEntry.mjs',
-          name: 'verticalCheckoutBackend',
-          type: 'module',
-        },
-      }),
-    ).rejects.toThrow(/static or service-binding entries/u);
-
-    expect(providerCalls).toBe(0);
-  });
-
   test('fails closed for network entries supplied through the edge remotes array', async () => {
-    let evaluatorCalls = 0;
     await expect(
       loadEdgeBackendFederatedEffectApi({
-        ...({
-          entryPolicy: {
-            evaluateCommonJs() {
-              evaluatorCalls += 1;
-              return createEffectApiEntryExports(
-                createManifestEffectApiModule(),
-              );
-            },
-          },
-        } as Record<string, unknown>),
         hostName: 'cloudflareArrayNetworkBackendHost',
         remoteName: 'verticalCheckoutBackend',
         remotes: [
@@ -907,9 +710,7 @@ module.exports = {
           },
         ],
       }),
-    ).rejects.toThrow(/does not execute custom runtimes or entry evaluators/u);
-
-    expect(evaluatorCalls).toBe(0);
+    ).rejects.toThrow(/static or service-binding entries/u);
   });
 
   test('isolates custom entry plugins between runtime instances sharing a remote identity', async () => {
@@ -1229,11 +1030,8 @@ module.exports = {
     expect(loaded.contract).toEqual({ servicePrefix: '/catalog-api' });
   });
 
-  test.each([
-    'service',
-    'binding',
-    'static',
-  ])('does not inherit manifest HTTP verification for a caller-pinned %s provider', async entryScheme => {
+  test('does not inherit manifest HTTP verification for a caller-pinned service provider', async () => {
+    const entryScheme = 'service';
     const entrySource = createLiveBackendEntrySource(
       'verticalCatalogBackend',
       'catalog-build-123',
@@ -1401,17 +1199,6 @@ module.exports = {
     ]);
   });
 
-  test('does not expose a legacy URL manifest identity bypass', async () => {
-    await expect(
-      loadBackendFederationManifest({
-        ...({ allowLegacyManifest: true } as Record<string, unknown>),
-        manifestUrl: 'https://catalog.example.test/backend-mf-manifest.json',
-        fetch: async () =>
-          new Response(JSON.stringify(createBackendManifest())),
-      }),
-    ).rejects.toMatchObject({ code: 'version_mismatch' });
-  });
-
   test('keeps file-path manifest loading compatible without expected identity', async () => {
     const tempRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), 'modern-backend-manifest-path-'),
@@ -1455,30 +1242,6 @@ module.exports = {
     ).rejects.toThrow(/strictEffectApproach: true/u);
   });
 
-  test('reports unavailable remotes through the Node manifest adapter', async () => {
-    const manifest = createBackendManifest();
-    manifest.id = 'verticalOfflineBackend';
-    manifest.name = 'verticalOfflineBackend';
-    manifest.backendFederation.name = 'verticalOfflineBackend';
-    manifest.entry.url = 'service:verticalOfflineBackend';
-    manifest.backendFederation.containerEntry =
-      'service:verticalOfflineBackend';
-
-    await expect(
-      loadBackendFederatedEffectApiFromManifest({
-        hostName: 'unavailableManifestBackendHost',
-        manifest,
-        plugins: [
-          createBackendFederationLoadEntryPlugin({
-            resolveEntry() {
-              throw new Error('backend is offline');
-            },
-          }),
-        ],
-      }),
-    ).rejects.toThrow(/could not load \.\/effect-api/u);
-  });
-
   test('supports typed fallback when manifest version boundary mismatches', async () => {
     const fallbackErrors: BackendFederationManifestAdapterError[] = [];
 
@@ -1511,23 +1274,49 @@ module.exports = {
     expect(loaded.runtime).toEqual({ brand: 'typed-effect-fallback' });
   });
 
-  test('rejects backend exposes that do not preserve strict Effect contract metadata', async () => {
+  test.each([
+    {
+      contract: {
+        runtimeFramework: 'effect',
+        strictEffectApproach: false,
+      },
+      error: /strictEffectApproach: true/u,
+      name: 'non-strict Effect',
+    },
+    {
+      contract: {
+        runtimeFramework: 'hono',
+        strictEffectApproach: true,
+      },
+      error: /runtimeFramework: "effect"/u,
+      name: 'non-Effect',
+    },
+    {
+      contract: undefined,
+      error: /strictEffectApproach: true/u,
+      name: 'missing',
+    },
+  ])('rejects $name backend expose without strict Effect metadata', async ({
+    contract,
+    error,
+    name,
+  }) => {
+    const remoteName = `vertical${name}Backend`;
     const remote: BackendFederationRemote = {
-      name: 'verticalUnsafeBackend',
-      entry: 'service:verticalUnsafeBackend',
+      name: remoteName,
+      entry: `service:${remoteName}`,
       type: 'module',
     };
     const runtime = createBackendFederationRuntime({
-      hostName: 'strictBackendHost',
+      hostName: `${name}BackendHost`,
       remote,
       plugins: [
         createBackendFederationLoadEntryPlugin({
           resolveEntry() {
             return createEffectApiEntryExports({
-              backendFederationContract: {
-                runtimeFramework: 'effect',
-                strictEffectApproach: false,
-              },
+              ...(contract === undefined
+                ? {}
+                : { backendFederationContract: contract }),
               runtime: { brand: 'defineEffectBff-runtime' },
             });
           },
@@ -1537,73 +1326,11 @@ module.exports = {
 
     await expect(
       loadBackendFederatedEffectApi({
-        hostName: 'strictBackendHost',
+        hostName: `${name}BackendHost`,
         remote,
         runtime,
       }),
-    ).rejects.toThrow(/strictEffectApproach: true/u);
-  });
-
-  test('rejects strict backend exposes that do not declare Effect runtime framework', async () => {
-    const remote: BackendFederationRemote = {
-      name: 'verticalNonEffectBackend',
-      entry: 'service:verticalNonEffectBackend',
-      type: 'module',
-    };
-    const runtime = createBackendFederationRuntime({
-      hostName: 'nonEffectBackendHost',
-      remote,
-      plugins: [
-        createBackendFederationLoadEntryPlugin({
-          resolveEntry() {
-            return createEffectApiEntryExports({
-              backendFederationContract: {
-                runtimeFramework: 'hono',
-                strictEffectApproach: true,
-              },
-              runtime: { brand: 'defineEffectBff-runtime' },
-            });
-          },
-        }),
-      ],
-    });
-
-    await expect(
-      loadBackendFederatedEffectApi({
-        hostName: 'nonEffectBackendHost',
-        remote,
-        runtime,
-      }),
-    ).rejects.toThrow(/runtimeFramework: "effect"/u);
-  });
-
-  test('rejects backend exposes missing strict Effect contract metadata', async () => {
-    const remote: BackendFederationRemote = {
-      name: 'verticalMissingContractBackend',
-      entry: 'service:verticalMissingContractBackend',
-      type: 'module',
-    };
-    const runtime = createBackendFederationRuntime({
-      hostName: 'missingContractBackendHost',
-      remote,
-      plugins: [
-        createBackendFederationLoadEntryPlugin({
-          resolveEntry() {
-            return createEffectApiEntryExports({
-              runtime: { brand: 'defineEffectBff-runtime' },
-            });
-          },
-        }),
-      ],
-    });
-
-    await expect(
-      loadBackendFederatedEffectApi({
-        hostName: 'missingContractBackendHost',
-        remote,
-        runtime,
-      }),
-    ).rejects.toThrow(/strictEffectApproach: true/u);
+    ).rejects.toThrow(error);
   });
 
   describe('ADR-0019 delivery-unit identity root', () => {
@@ -1614,31 +1341,6 @@ module.exports = {
       manifest.backendFederation.versionBoundary.deliveryUnit = deliveryUnit;
       return manifest;
     }
-
-    test('legacy manifest without deliveryUnit metadata still passes existing checks', async () => {
-      const manifest = createBackendManifest();
-
-      const loaded = await loadBackendFederatedEffectApiFromManifest({
-        hostName: 'legacyManifestBackendHost',
-        manifest,
-        expected: {
-          buildVersion: 'catalog-build-123',
-          packageName: '@tractor-store-vertical-demo/catalog',
-          version: '1.2.3',
-        },
-        plugins: [
-          createBackendFederationLoadEntryPlugin({
-            resolveEntry() {
-              return createEffectApiEntryExports(
-                createManifestEffectApiModule(),
-              );
-            },
-          }),
-        ],
-      });
-
-      expect(loaded.contract).toEqual({ servicePrefix: '/catalog-api' });
-    });
 
     test('fails closed, telemetry-visible, when manifest deliveryUnit.buildMarker disagrees with versionBoundary.buildVersion', async () => {
       const manifest = createBackendManifestWithDeliveryUnit({

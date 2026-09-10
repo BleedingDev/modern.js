@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -108,7 +108,6 @@ const compileHydrationBundle = async (chunkLoadingGlobal: string) => {
       });
     });
 
-    const bundle = await readFile(bundlePath, 'utf8');
     const compiledModule = createRequire(
       path.join(__dirname, 'hydrate-bundle-loader.cjs'),
     )(bundlePath) as {
@@ -120,7 +119,7 @@ const compileHydrationBundle = async (chunkLoadingGlobal: string) => {
       ) => Promise<unknown>;
     };
 
-    return { bundle, compiledModule };
+    return { compiledModule };
   } finally {
     await rm(outputPath, { force: true, recursive: true });
   }
@@ -159,19 +158,28 @@ describe('LoadableBundlerPlugin chunk loading global', () => {
     {
       name: 'preserves a configured compiler output value',
       configured: '__REMOTE_INVENTORY_CHUNKS__',
+      option: undefined,
       expected: '__REMOTE_INVENTORY_CHUNKS__',
     },
     {
       name: 'uses the legacy fallback when no value is configured',
       configured: undefined,
+      option: undefined,
       expected: '__LOADABLE_LOADED_CHUNKS__',
     },
-  ])('$name', ({ configured, expected }) => {
+    {
+      name: 'prefers the explicit plugin option over compiler output',
+      configured: '__REMOTE_INVENTORY_CHUNKS__',
+      option: '__EXPLICIT_CHUNKS__',
+      expected: '__EXPLICIT_CHUNKS__',
+    },
+  ])('$name', ({ configured, option, expected }) => {
     const { compiler, definitions, definePluginApply } =
       createCompiler(configured);
     const plugin = new LoadablePlugin({
       filename: 'loadable-stats.json',
       outputAsset: false,
+      ...(option === undefined ? {} : { chunkLoadingGlobal: option }),
     });
 
     plugin.apply(compiler as never);
@@ -185,28 +193,6 @@ describe('LoadableBundlerPlugin chunk loading global', () => {
     expect(definePluginApply).toHaveBeenCalledWith(compiler);
   });
 
-  test('an explicit plugin option wins over configured compiler output', () => {
-    const { compiler, definitions } = createCompiler(
-      '__REMOTE_INVENTORY_CHUNKS__',
-    );
-    const plugin = new LoadablePlugin({
-      filename: 'loadable-stats.json',
-      outputAsset: false,
-      chunkLoadingGlobal: '__EXPLICIT_CHUNKS__',
-    });
-
-    plugin.apply(compiler as never);
-
-    expect(compiler.options.output.chunkLoadingGlobal).toBe(
-      '__EXPLICIT_CHUNKS__',
-    );
-    expect(definitions).toEqual([
-      {
-        __MODERN_CHUNK_LOADING_GLOBAL__: JSON.stringify('__EXPLICIT_CHUNKS__'),
-      },
-    ]);
-  });
-
   test('compiled hydration uses the configured per-app chunk loading global', async () => {
     const chunkLoadingGlobal = '__REMOTE_INVENTORY_CHUNKS__';
     const originalWindow = Reflect.get(globalThis, 'window');
@@ -218,7 +204,7 @@ describe('LoadableBundlerPlugin chunk loading global', () => {
     });
 
     try {
-      const { bundle, compiledModule } =
+      const { compiledModule } =
         await compileHydrationBundle(chunkLoadingGlobal);
       const hydratedRoot = { kind: 'compiled-hydration' };
 
@@ -234,9 +220,6 @@ describe('LoadableBundlerPlugin chunk loading global', () => {
       expect(Reflect.get(globalThis, '__LOADABLE_READY_OPTIONS__')).toEqual({
         chunkLoadingGlobal,
       });
-      expect(bundle).toContain(chunkLoadingGlobal);
-      expect(bundle).not.toContain('process.env.MODERN_CHUNK_LOADING_GLOBAL');
-      expect(bundle).not.toContain('__MODERN_CHUNK_LOADING_GLOBAL__');
     } finally {
       Reflect.deleteProperty(globalThis, '__LOADABLE_READY_OPTIONS__');
       if (originalWindow === undefined) {

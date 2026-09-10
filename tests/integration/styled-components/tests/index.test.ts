@@ -32,6 +32,23 @@ async function expectStyledComponentBehavior(page: Page) {
   });
 }
 
+async function expectStyledComponentBehaviorWithoutJavaScript(
+  browser: Browser,
+  url: string,
+) {
+  const page = await browser.newPage();
+  await page.setJavaScriptEnabled(false);
+  try {
+    await page.goto(url, {
+      waitUntil: ['domcontentloaded'],
+      timeout: 60000,
+    });
+    await expectStyledComponentBehavior(page);
+  } finally {
+    await page.close();
+  }
+}
+
 describe('Styled Components with Streaming SSR', () => {
   let app: any;
   let appPort: number;
@@ -77,7 +94,10 @@ describe('Styled Components with Streaming SSR', () => {
   });
 
   test('should apply correct styles to components in initial HTML', async () => {
-    await expectStyledComponentBehavior(page);
+    await expectStyledComponentBehaviorWithoutJavaScript(
+      browser,
+      `http://localhost:${appPort}`,
+    );
   });
 });
 
@@ -125,6 +145,9 @@ describe('Styled Components with string SSR', () => {
   });
 
   test('should apply correct styles to components in initial HTML', async () => {
-    await expectStyledComponentBehavior(page);
+    await expectStyledComponentBehaviorWithoutJavaScript(
+      browser,
+      `http://localhost:${appPort}`,
+    );
   });
 });

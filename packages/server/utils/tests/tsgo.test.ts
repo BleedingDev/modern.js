@@ -1,11 +1,15 @@
+import { createRequire } from 'node:module';
 import { fs } from '@modern-js/utils';
 import os from 'os';
 import path from 'path';
 import {
+  compileByTs,
   createResolvedTsgoConfig,
   getTsgoBinPath,
 } from '../src/compilers/typescript';
 import { createIsolatedTsExample } from './helpers';
+
+const require = createRequire(import.meta.url);
 
 describe('getTsgoBinPath', () => {
   let tmpDir: string;
@@ -187,171 +191,57 @@ describe('createResolvedTsgoConfig', () => {
     }
   });
 
-  it('uses unique file names for concurrent compiles in one process', async () => {
-    const { example, tempRoot } = await createIsolatedTsExample();
-    const tsconfigPath = path.join(example, 'tsconfig.json');
-    const sourceDirs = [path.join(example, 'api')];
-    const binPath = getTsgoBinPath(example);
-
-    const [first, second] = await Promise.all([
-      createResolvedTsgoConfig(
-        example,
-        tsconfigPath,
-        path.join(example, 'dist-a'),
-        sourceDirs,
-        undefined,
-        binPath,
-      ),
-      createResolvedTsgoConfig(
-        example,
-        tsconfigPath,
-        path.join(example, 'dist-b'),
-        sourceDirs,
-        undefined,
-        binPath,
-      ),
-    ]);
-
-    try {
-      expect(first.resolvedConfigPath).not.toBe(second.resolvedConfigPath);
-    } finally {
-      await fs.remove(tempRoot);
-    }
-  });
-
-  it('forces emit even when app tsconfig sets noEmit', async () => {
-    const { example, tempRoot } = await createIsolatedTsExample();
-    const tsconfigPath = path.join(example, 'tsconfig.noemit.json');
-    const sourceDirs = [path.join(example, 'api')];
-
-    const { config, resolvedConfigPath } = await createResolvedTsgoConfig(
-      example,
-      tsconfigPath,
-      path.join(example, 'dist-noemit'),
-      sourceDirs,
-      undefined,
-      getTsgoBinPath(example),
+  it('emits executable output for concurrent consumers with app build flags', async () => {
+    const { example, tempRoot } = await createIsolatedTsExample(
+      'server-utils-tsgo-consumer-',
     );
+    const consumerDir = path.join(example, 'consumer');
+    const tsconfigPath = path.join(example, 'tsconfig.consumer.json');
 
-    try {
-      expect(config.compilerOptions?.noEmit).toBe(false);
-      await expect(fs.readJSON(resolvedConfigPath)).resolves.toMatchObject({
-        compilerOptions: {
-          noEmit: false,
-        },
-      });
-    } finally {
-      await fs.remove(tempRoot);
-    }
-  });
-
-  it('disables composite project settings but keeps declaration emit', async () => {
-    const { example, tempRoot } = await createIsolatedTsExample();
-    const tsconfigPath = path.join(example, 'tsconfig.composite.json');
-    const sourceDirs = [
-      path.join(example, 'api'),
-      path.join(example, 'shared'),
-    ];
-
+    await fs.outputFile(
+      path.join(consumerDir, 'dependency.ts'),
+      'export const value = 41;\n',
+    );
+    await fs.outputFile(
+      path.join(consumerDir, 'entry.ts'),
+      "import { value } from './dependency.ts';\nexport default value + 1;\n",
+    );
     await fs.outputJSON(tsconfigPath, {
-      extends: './tsconfig.json',
       compilerOptions: {
+        allowImportingTsExtensions: true,
         composite: true,
         declaration: true,
         declarationMap: true,
         emitDeclarationOnly: true,
         incremental: true,
-        noEmit: false,
-        tsBuildInfoFile: './node_modules/.cache/app.tsbuildinfo',
-      },
-      include: ['api', 'shared', 'modern-app-env.d.ts'],
-      references: [{ path: '../shared-contracts' }],
-    });
-
-    const { config, resolvedConfigPath } = await createResolvedTsgoConfig(
-      example,
-      tsconfigPath,
-      path.join(example, 'dist-composite'),
-      sourceDirs,
-      undefined,
-      getTsgoBinPath(example),
-    );
-
-    try {
-      // `declaration` is the app's decision: crossProject BFF apps publish
-      // handler declarations and the generated client facades re-export them,
-      // so a resolved `declaration: true` must survive. Only the
-      // project-build-shaped options are normalized away, and the emit stays a
-      // one-shot JS emit (`emitDeclarationOnly: false`).
-      expect(config.compilerOptions).toMatchObject({
-        composite: false,
-        declaration: true,
-        declarationMap: false,
-        emitDeclarationOnly: false,
-        incremental: false,
-        noEmit: false,
-      });
-      expect(config.compilerOptions).not.toHaveProperty('tsBuildInfoFile');
-      expect(config).not.toHaveProperty('references');
-      await expect(fs.readJSON(resolvedConfigPath)).resolves.toMatchObject({
-        compilerOptions: {
-          composite: false,
-          declaration: true,
-          declarationMap: false,
-          emitDeclarationOnly: false,
-          incremental: false,
-          noEmit: false,
-        },
-      });
-      await expect(fs.readJSON(resolvedConfigPath)).resolves.not.toHaveProperty(
-        'references',
-      );
-    } finally {
-      await fs.remove(resolvedConfigPath);
-      await fs.remove(tempRoot);
-    }
-  });
-
-  it('keeps allowImportingTsExtensions valid when forcing emit', async () => {
-    const { example, tempRoot } = await createIsolatedTsExample();
-    const tsconfigPath = path.join(example, 'tsconfig.allow-importing-ts.json');
-    const sourceDirs = [path.join(example, 'api')];
-
-    await fs.outputJSON(tsconfigPath, {
-      compilerOptions: {
-        allowImportingTsExtensions: true,
         module: 'preserve',
         moduleResolution: 'Bundler',
         noEmit: true,
-        target: 'ESNext',
       },
-      files: ['api/index.ts'],
+      include: ['consumer'],
     });
 
-    const { config, resolvedConfigPath } = await createResolvedTsgoConfig(
-      example,
-      tsconfigPath,
-      path.join(example, 'dist-allow-importing-ts'),
-      sourceDirs,
-      'module',
-      getTsgoBinPath(example),
-    );
+    const compile = (distName: string) =>
+      compileByTs(example, { alias: {} } as any, {
+        sourceDirs: [consumerDir],
+        distDir: path.join(example, distName),
+        moduleType: 'commonjs',
+        throwErrorInsteadOfExit: true,
+        tsconfigPath,
+      });
 
     try {
-      expect(config.compilerOptions?.allowImportingTsExtensions).toBe(true);
-      expect(config.compilerOptions?.noEmit).toBe(false);
-      expect(config.compilerOptions?.rewriteRelativeImportExtensions).toBe(
-        true,
-      );
-      await expect(fs.readJSON(resolvedConfigPath)).resolves.toMatchObject({
-        compilerOptions: {
-          allowImportingTsExtensions: true,
-          noEmit: false,
-          rewriteRelativeImportExtensions: true,
-        },
-      });
+      await Promise.all([compile('dist-a'), compile('dist-b')]);
+
+      for (const distName of ['dist-a', 'dist-b']) {
+        const outputPath = path.join(example, distName, 'consumer/entry.js');
+        expect(await fs.pathExists(outputPath)).toBe(true);
+        expect(require(outputPath).default).toBe(42);
+        await expect(fs.readFile(outputPath, 'utf8')).resolves.toContain(
+          './dependency.js',
+        );
+      }
     } finally {
-      await fs.remove(resolvedConfigPath);
       await fs.remove(tempRoot);
     }
   });

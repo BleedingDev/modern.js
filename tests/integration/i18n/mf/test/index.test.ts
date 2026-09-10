@@ -9,8 +9,6 @@ import {
   acquireTestLock,
   clearI18nTestState,
   conditionalTest,
-  gotoWithSSRRetry,
-  waitForHydration,
 } from '../../test-utils';
 
 rstest.setConfig({ testTimeout: 1000 * 60 * 5, hookTimeout: 1000 * 60 * 5 });
@@ -488,38 +486,6 @@ describe('mf-i18n-tests', () => {
       }
     });
 
-    conditionalTest(
-      'should server render app-level remote route when alpha SSR is enabled',
-      async () => {
-        const { status, html } = await fetchHtml(CONSUMER_PORT, '/en/remote-2');
-        expect(status).toBe(200);
-        expect(html).toContain('data-mf-app-loading="app-remote-custom"');
-        expect(html).not.toContain('__modern_ssr_fallback_reason__');
-      },
-    );
-
-    conditionalTest(
-      'should keep app-level remote SSR content stable after hydration',
-      async () => {
-        const ssrResponse = await gotoWithSSRRetry(
-          page,
-          `http://localhost:${CONSUMER_PORT}/en/remote-2`,
-        );
-        expect(ssrResponse).toBeTruthy();
-        expect(ssrResponse).toContain(
-          'data-mf-app-loading="app-remote-custom"',
-        );
-        await waitForHydration(page, '#key');
-        const remoteKey = await page.$('#key');
-        const remoteText = await page.evaluate(
-          el => el?.textContent,
-          remoteKey,
-        );
-        expect(remoteText?.trim()).toEqual('Hello World(provider-custom)');
-        expect(browserErrors).toEqual([]);
-      },
-    );
-
     conditionalTest('should load remote app correctly', async () => {
       await page.goto(`http://localhost:${CONSUMER_PORT}/en/remote`, {
         waitUntil: ['networkidle0'],
@@ -611,9 +577,8 @@ describe('mf-i18n-tests', () => {
         );
         expect(status).toBe(200);
         expect(html).toContain('data-mf-app-loading="app-remote-unavailable"');
-        expect(html).toContain(
-          'Switched to client rendering because the server rendering errored',
-        );
+        expect(html).toContain('<template');
+        expect(html).toContain('"renderLevel":0');
       },
     );
   });

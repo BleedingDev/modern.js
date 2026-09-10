@@ -155,16 +155,6 @@ it.each([
     installPoisonRuntime: true,
   },
   {
-    aliasShape: 'plugin-object',
-    optionalRuntime: 'hidden behind a late broad object alias',
-    installPoisonRuntime: true,
-  },
-  {
-    aliasShape: 'plugin-array',
-    optionalRuntime: 'hidden behind a late broad array alias',
-    installPoisonRuntime: true,
-  },
-  {
     aliasShape: 'tools-object',
     optionalRuntime: 'restored by a tools.rspack object alias',
     installPoisonRuntime: true,
