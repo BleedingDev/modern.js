@@ -26,9 +26,9 @@ import {
   ZOD_VERSION,
 } from '../src/ultramodern-workspace/versions';
 
-const pluginBffPackagePath = path.resolve(
+const bffEffectPackagePath = path.resolve(
   __dirname,
-  '../../../cli/plugin-bff/package.json',
+  '../../../server/bff-effect/package.json',
 );
 const pluginBffExtensionsPackagePath = path.resolve(
   __dirname,
@@ -299,59 +299,57 @@ test('a stale source projection cannot authorize local generation', () => {
   }
 });
 
-// FORK: guards a fork-only manifest shape. Upstream plugin-bff declares no
-// `effect` dependency and no `peerDependencies` block, so this test only fails
-// when a sync merge reverts the fork side of
-// packages/cli/plugin-bff/package.json.
-test('plugin-bff declares the same Effect cohort generated workspaces pin', () => {
-  const pluginBffPackage = JSON.parse(
-    fs.readFileSync(pluginBffPackagePath, 'utf-8'),
+// Runtime dependency ownership follows the canonical fork Effect package.
+// Generated applications and runtime peers must resolve one Effect cohort.
+test('bff-effect declares the same Effect cohort generated workspaces pin', () => {
+  const bffEffectPackage = JSON.parse(
+    fs.readFileSync(bffEffectPackagePath, 'utf-8'),
   );
 
   assert.equal(
-    pluginBffPackage.dependencies.effect,
+    bffEffectPackage.dependencies.effect,
     undefined,
-    '@modern-js/plugin-bff must declare Effect as a peer so consumers keep a single Effect identity',
+    '@modern-js/bff-effect must declare Effect as a peer so consumers keep a single Effect identity',
   );
   assert.equal(
-    pluginBffPackage.peerDependencies.effect,
+    bffEffectPackage.peerDependencies.effect,
     EFFECT_VERSION,
-    '@modern-js/plugin-bff must not force a different Effect version than generated pnpm overrides',
+    '@modern-js/bff-effect must not force a different Effect version than generated pnpm overrides',
   );
   assert.equal(
-    pluginBffPackage.devDependencies.effect,
+    bffEffectPackage.devDependencies.effect,
     EFFECT_VERSION,
-    '@modern-js/plugin-bff must install the Effect cohort locally (autoInstallPeers is disabled)',
+    '@modern-js/bff-effect must install the Effect cohort locally (autoInstallPeers is disabled)',
   );
   // `@effect/opentelemetry` declares a REQUIRED `effect` peer of its own, so it
   // must move with `effect` into the optional-peer lane. Leaving it in
   // `dependencies` would re-impose that peer on every hono-only consumer
   // transitively and make the optional `effect` peer a fiction.
   assert.equal(
-    pluginBffPackage.dependencies['@effect/opentelemetry'],
+    bffEffectPackage.dependencies['@effect/opentelemetry'],
     undefined,
-    '@modern-js/plugin-bff must declare @effect/opentelemetry as a peer, not a dependency',
+    '@modern-js/bff-effect must declare @effect/opentelemetry as a peer, not a dependency',
   );
   assert.equal(
-    pluginBffPackage.peerDependencies['@effect/opentelemetry'],
+    bffEffectPackage.peerDependencies['@effect/opentelemetry'],
     EFFECT_VERSION,
-    '@modern-js/plugin-bff must keep @effect/opentelemetry on the generated Effect cohort',
+    '@modern-js/bff-effect must keep @effect/opentelemetry on the generated Effect cohort',
   );
   assert.equal(
-    pluginBffPackage.peerDependenciesMeta['@effect/opentelemetry'].optional,
+    bffEffectPackage.peerDependenciesMeta['@effect/opentelemetry'].optional,
     true,
-    '@modern-js/plugin-bff must keep the @effect/opentelemetry peer optional',
+    '@modern-js/bff-effect must keep the @effect/opentelemetry peer optional',
   );
   assert.equal(
-    pluginBffPackage.devDependencies['@effect/opentelemetry'],
+    bffEffectPackage.devDependencies['@effect/opentelemetry'],
     EFFECT_VERSION,
-    '@modern-js/plugin-bff must install @effect/opentelemetry locally (autoInstallPeers is disabled)',
+    '@modern-js/bff-effect must install @effect/opentelemetry locally (autoInstallPeers is disabled)',
   );
   assert.equal(
     [
-      ...Object.values(pluginBffPackage.dependencies ?? {}),
-      ...Object.values(pluginBffPackage.devDependencies ?? {}),
-      ...Object.values(pluginBffPackage.peerDependencies ?? {}),
+      ...Object.values(bffEffectPackage.dependencies ?? {}),
+      ...Object.values(bffEffectPackage.devDependencies ?? {}),
+      ...Object.values(bffEffectPackage.peerDependencies ?? {}),
     ].includes('4.0.0-beta.91'),
     false,
   );
