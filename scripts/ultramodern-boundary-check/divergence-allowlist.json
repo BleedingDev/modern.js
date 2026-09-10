@@ -4,9 +4,9 @@
   "upstreamRef": "2f4d9c4559e26209a0d77f02c6757f29fe3699a2",
   "pathspec": ["packages"],
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
-  "totalFiles": 812,
-  "totalHunks": 3025,
-  "totalChangedLines": 51815,
+  "totalFiles": 813,
+  "totalHunks": 3035,
+  "totalChangedLines": 51880,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -360,8 +360,13 @@
     },
     {
       "file": "packages/cli/plugin-ssg/package.json",
-      "hunks": 6,
-      "changedLines": 22
+      "hunks": 8,
+      "changedLines": 32
+    },
+    {
+      "file": "packages/cli/plugin-ssg/rslib.config.mts",
+      "hunks": 2,
+      "changedLines": 18
     },
     {
       "file": "packages/cli/plugin-ssg/src/index.ts",
@@ -410,8 +415,13 @@
     },
     {
       "file": "packages/cli/plugin-styled-components/package.json",
-      "hunks": 5,
-      "changedLines": 16
+      "hunks": 8,
+      "changedLines": 31
+    },
+    {
+      "file": "packages/cli/plugin-styled-components/rslib.config.mts",
+      "hunks": 2,
+      "changedLines": 18
     },
     {
       "file": "packages/cli/plugin-styled-components/src/runtime.ts",
@@ -1065,8 +1075,8 @@
     },
     {
       "file": "packages/document/src/sandbox/csr-auth/src/routes/Auth-tsx.txt",
-      "hunks": 3,
-      "changedLines": 16
+      "hunks": 5,
+      "changedLines": 26
     },
     {
       "file": "packages/document/src/sandbox/csr-auth/src/routes/layout-tsx.txt",
@@ -1080,8 +1090,8 @@
     },
     {
       "file": "packages/document/src/sandbox/csr-auth/src/routes/page-tsx.txt",
-      "hunks": 1,
-      "changedLines": 2
+      "hunks": 2,
+      "changedLines": 3
     },
     {
       "file": "packages/runtime/plugin-i18n/package.json",
@@ -1407,11 +1417,6 @@
       "file": "packages/runtime/plugin-image/package.json",
       "hunks": 6,
       "changedLines": 16
-    },
-    {
-      "file": "packages/runtime/plugin-image/rslib.config.mts",
-      "hunks": 2,
-      "changedLines": 7
     },
     {
       "file": "packages/runtime/plugin-image/src/cli.ts",
