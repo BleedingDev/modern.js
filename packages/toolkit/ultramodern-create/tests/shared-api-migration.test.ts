@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { parse } from '@babel/parser';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 import { ensureSharedApiInfrastructure } from '../src/ultramodern-tooling/commands/migrate-strict-effect/shared-api-infrastructure';
@@ -55,9 +56,22 @@ test('shared API infrastructure is additive, byte-stable, and preserves consumer
   expect(index).toBe(business);
   expect(index).not.toContain('microvertical-api-baseline');
   expect(read(root, 'verticals/catalog/api/index.ts')).toBe(handler);
-  expect(read(root, `${shared}/src/effect-bff-runtime.ts`)).toContain(
-    "export { assembleEffectBffRuntime } from '@modern-js/bff-effect/assembly';",
-  );
+  expect(
+    parse(read(root, `${shared}/src/effect-bff-runtime.ts`), {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    }).program.body[0],
+  ).toMatchObject({
+    type: 'ExportNamedDeclaration',
+    source: { value: '@modern-js/bff-effect/assembly' },
+    specifiers: [
+      {
+        type: 'ExportSpecifier',
+        local: { name: 'assembleEffectBffRuntime' },
+        exported: { name: 'assembleEffectBffRuntime' },
+      },
+    ],
+  });
   expect(
     fs.existsSync(path.join(root, shared, 'src/microvertical-api-baseline.ts')),
   ).toBe(false);

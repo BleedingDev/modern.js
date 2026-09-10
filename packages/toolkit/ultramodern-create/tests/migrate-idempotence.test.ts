@@ -14,7 +14,10 @@ import {
 import { runWorkspaceTransaction } from '../src/ultramodern-workspace/add-vertical/transaction';
 import { MODULE_FEDERATION_VERSION } from '../src/ultramodern-workspace/versions';
 import { writeNodeCommandFixture } from './helpers/node-command-fixture';
-import { createWorkspace } from './helpers/workspace-kit';
+import {
+  createWorkspace,
+  linkWorkspaceFormatterDependencies,
+} from './helpers/workspace-kit';
 
 const migrationVersion = '3.5.0-ultramodern.1';
 const retiredPackageSourceKeys = [
@@ -240,6 +243,7 @@ test('source-checkout migrate uses workspace links and is byte-idempotent after 
   const { tempRoot, workspaceDir } = createWorkspace('migration-idempotence', {
     tempPrefix: 'um-migration-idempotence-',
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
   const previousPath = process.env.PATH;
   const previousInvocationLog = process.env.ULTRAMODERN_TEST_PNPM_LOG;
 
@@ -380,6 +384,7 @@ test('migrate restores the byte-identical tree when lock refresh exits nonzero',
     'migration-lock-refresh-failure',
     { tempPrefix: 'um-migration-lock-refresh-failure-' },
   );
+  linkWorkspaceFormatterDependencies(workspaceDir);
   const previousPath = process.env.PATH;
   const previousInvocationLog = process.env.ULTRAMODERN_TEST_PNPM_LOG;
 
@@ -437,6 +442,7 @@ test('migrate CLI returns status 1 when async release-age validation rejects', a
     'migration-async-release-age-failure',
     { tempPrefix: 'um-migration-async-release-age-failure-' },
   );
+  linkWorkspaceFormatterDependencies(workspaceDir);
   const previousPath = process.env.PATH;
   const previousInvocationLog = process.env.ULTRAMODERN_TEST_PNPM_LOG;
 

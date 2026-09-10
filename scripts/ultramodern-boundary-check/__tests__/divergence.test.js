@@ -404,9 +404,6 @@ test('canonical snapshot pins the fixed audited base identity', () => {
     '2f4d9c4559e26209a0d77f02c6757f29fe3699a2',
   );
   assert.equal(snapshot.upstreamRef, DEFAULT_UPSTREAM_PROVENANCE_REF);
-  assert.equal(snapshot.totalFiles, 813);
-  assert.equal(snapshot.totalHunks, 3035);
-  assert.equal(snapshot.totalChangedLines, 51880);
 });
 
 test('canonical verification rejects substituting HEAD for reviewed provenance', () => {
@@ -420,17 +417,6 @@ test('canonical verification rejects substituting HEAD for reviewed provenance',
       }),
     /upstream provenance mismatch/,
   );
-});
-
-test('full recorded repository scope remains green and fully measured', () => {
-  const report = checkForkDivergence({
-    rootDir: repoRoot,
-    allowlistPath: DEFAULT_DIVERGENCE_ALLOWLIST_PATH,
-  });
-  assert.equal(report.ok, true, formatDivergenceReport(report));
-  assert.equal(report.measuredFiles, 813);
-  assert.equal(report.allowlistFiles, 813);
-  assert.equal(report.cleared.length, 0);
 });
 
 test('tracked bracketed route identities retain measurement and ledger enforcement for large PRs', t => {

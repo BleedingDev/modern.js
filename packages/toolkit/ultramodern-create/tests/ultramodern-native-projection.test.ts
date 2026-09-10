@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { parse } from '@babel/parser';
 import { buildSync } from 'esbuild';
 import { updateGeneratedBuildIdentityModules } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-build-identity';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
@@ -313,12 +314,25 @@ test('legacy identity projection preserves artifact-only identity and extensions
       normalized.config,
     );
     expect(fs.readFileSync(path.join(root, relative), 'utf8')).toBe(source);
-    expect(
+    const projected = parse(
       fs.readFileSync(
         path.join(root, 'custom/app/shared/ultramodern-build.ts'),
         'utf8',
       ),
-    ).toContain("require('./ultramodern-build.json')");
+      { sourceType: 'module', plugins: ['typescript'] },
+    );
+    expect(
+      projected.program.body.find(
+        statement => statement.type === 'TSImportEqualsDeclaration',
+      ),
+    ).toMatchObject({
+      type: 'TSImportEqualsDeclaration',
+      id: { name: 'buildArtifact' },
+      moduleReference: {
+        type: 'TSExternalModuleReference',
+        expression: { value: './ultramodern-build.json' },
+      },
+    });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

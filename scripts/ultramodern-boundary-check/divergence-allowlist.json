@@ -4,9 +4,9 @@
   "upstreamRef": "2f4d9c4559e26209a0d77f02c6757f29fe3699a2",
   "pathspec": ["packages"],
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
-  "totalFiles": 813,
-  "totalHunks": 3035,
-  "totalChangedLines": 51880,
+  "totalFiles": 812,
+  "totalHunks": 3030,
+  "totalChangedLines": 51849,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -3534,14 +3534,9 @@
       "changedLines": 2
     },
     {
-      "file": "packages/toolkit/create/template/biome.json",
-      "hunks": 4,
-      "changedLines": 16
-    },
-    {
-      "file": "packages/toolkit/create/template/src/routes/index.css",
-      "hunks": 2,
-      "changedLines": 17
+      "file": "packages/toolkit/create/src/index.ts",
+      "hunks": 1,
+      "changedLines": 2
     },
     {
       "file": "packages/toolkit/i18n-utils/package.json",

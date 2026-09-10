@@ -18,7 +18,10 @@ import {
   prependCommandFixturePath,
   writeNodeCommandFixture,
 } from './helpers/node-command-fixture';
-import { snapshotWorkspace } from './helpers/workspace-kit';
+import {
+  linkWorkspaceFormatterDependencies,
+  snapshotWorkspace,
+} from './helpers/workspace-kit';
 
 const readJson = (root: string, relativePath: string) =>
   JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf-8'));
@@ -822,6 +825,7 @@ test('migration updates declared nested local bridge packages and preserves thei
         ],
       },
     });
+    linkWorkspaceFormatterDependencies(workspaceDir);
     const participant = path.join(workspaceDir, 'domain/core');
     fs.mkdirSync(participant, { recursive: true });
     fs.writeFileSync(

@@ -57,7 +57,7 @@ function provisionPackageBinary(
 function provisionGeneratedLintDependencies(workspaceDir: string) {
   const nodeModulesDir = path.join(workspaceDir, 'node_modules');
   fs.mkdirSync(nodeModulesDir, { recursive: true });
-  for (const packageName of ['oxlint', 'ultracite']) {
+  for (const packageName of ['oxfmt', 'oxlint', 'ultracite']) {
     fs.symlinkSync(
       path.join(lintDependencyNodeModules, packageName),
       path.join(nodeModulesDir, packageName),

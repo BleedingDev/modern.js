@@ -62,8 +62,6 @@ export function createWorkspace(
     enableTailwind: true,
     packageSource: { strategy: 'workspace' },
   });
-  linkWorkspaceFormatterDependencies(workspaceDir);
-
   return { tempRoot, workspaceDir };
 }
 

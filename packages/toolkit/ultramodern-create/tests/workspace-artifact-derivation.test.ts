@@ -16,7 +16,10 @@ import {
   createWorkspaceScriptArtifacts,
   writeGeneratedWorkspaceScripts,
 } from '../src/ultramodern-workspace/workspace-scripts';
-import { createWorkspace } from './helpers/workspace-kit';
+import {
+  createWorkspace,
+  linkWorkspaceFormatterDependencies,
+} from './helpers/workspace-kit';
 
 const configPath = '.modernjs/ultramodern.json';
 const topologyPath = 'topology/reference-topology.json';
@@ -54,6 +57,7 @@ for (const shape of [
     const { tempRoot, workspaceDir } = createWorkspace('artifact-parity', {
       tempPrefix: 'um-artifact-parity-',
     });
+    linkWorkspaceFormatterDependencies(workspaceDir);
     const freshRoot = fs.mkdtempSync(
       path.join(os.tmpdir(), 'um-script-projection-'),
     );
@@ -167,6 +171,7 @@ test('add-vertical and migration conserve authored config, script segments and l
   const { tempRoot, workspaceDir } = createWorkspace('artifact-custom', {
     tempPrefix: 'um-artifact-custom-',
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
   try {
     const config = readJson(workspaceDir, configPath);
     config.consumer = { custom: ['keep'] };
@@ -272,6 +277,7 @@ test('adding to another shell retains explicit empty primary composition', () =>
   const { tempRoot, workspaceDir } = createWorkspace('artifact-empty-primary', {
     tempPrefix: 'um-artifact-empty-',
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
   try {
     addUltramodernVertical({
       workspaceRoot: workspaceDir,
@@ -321,6 +327,7 @@ test('migration derives remote URLs from live ports and preserves authored URL o
   const { tempRoot, workspaceDir } = createWorkspace('artifact-live-remote', {
     tempPrefix: 'um-artifact-remote-',
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
   try {
     addUltramodernVertical({
       workspaceRoot: workspaceDir,
