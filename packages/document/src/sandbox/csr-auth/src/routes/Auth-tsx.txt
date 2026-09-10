@@ -1,6 +1,6 @@
 import {
   Navigate,
-  useLocation,
+  useMatch,
   useNavigate,
 } from '@modern-js/plugin-tanstack/runtime';
 import React from 'react';
@@ -52,8 +52,9 @@ export function AuthStatus() {
       Welcome {auth.user}!{' '}
       <button
         type="button"
-        onClick={() => {
-          auth.signout(() => void navigate({ to: '/' }));
+        onClick={async () => {
+          await navigate({ to: '/' });
+          auth.signout(() => {});
         }}
       >
         Sign out
@@ -62,9 +63,12 @@ export function AuthStatus() {
   );
 }
 
-export function RequireAuth({ children }: { children: JSX.Element }) {
+export function RequireAuth({ children }: { children: React.JSX.Element }) {
   const auth = useAuth();
-  const location = useLocation();
+  const pathname = useMatch({
+    strict: false,
+    select: match => match.pathname,
+  });
 
   if (!auth.user) {
     // Redirect them to the /login page, but save the current location they were
@@ -74,7 +78,7 @@ export function RequireAuth({ children }: { children: JSX.Element }) {
     return (
       <Navigate
         replace
-        search={{ redirect: location.pathname }}
+        search={{ redirect: pathname }}
         to="/login"
       />
     );
