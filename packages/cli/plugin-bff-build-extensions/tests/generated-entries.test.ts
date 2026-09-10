@@ -113,8 +113,6 @@ describe('fork producer generated entries', () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-client-module-'),
     );
-    const previousCwd = process.cwd();
-
     try {
       const apiDir = path.join(appDir, 'api');
       const lambdaDir = path.join(apiDir, 'lambda');
@@ -147,7 +145,6 @@ const api = HttpApi.make('ModuleApi').add(
         `,
       );
 
-      process.chdir(appDir);
       await clientGenerator({
         prefix: '/api',
         appDir,
@@ -176,13 +173,7 @@ const api = HttpApi.make('ModuleApi').add(
         fs.promises.stat(path.join(appDir, '.modern-js', 'client', 'index.js')),
       ).resolves.toBeDefined();
     } finally {
-      process.chdir(previousCwd);
-      await fs.promises.rm(appDir, {
-        recursive: true,
-        force: true,
-        maxRetries: 5,
-        retryDelay: 100,
-      });
+      await fs.promises.rm(appDir, { recursive: true, force: true });
     }
   });
 
