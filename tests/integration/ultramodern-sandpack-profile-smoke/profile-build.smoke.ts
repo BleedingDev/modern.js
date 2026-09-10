@@ -17,12 +17,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
+import { ultramodernSandpackFiles } from '@modern-js/ultramodern-sandpack-profile';
 import { type Browser, chromium } from 'playwright';
-import processKit from '../../../../scripts/lib/process-kit.js';
-import { ultramodernSandpackFiles } from '../src/index.ts';
+import processKit from '../../../scripts/lib/process-kit.js';
 
 const fixtureRoots: string[] = [];
-const repositoryRoot = path.resolve(import.meta.dirname, '../../../..');
+const repositoryRoot = path.resolve(import.meta.dirname, '../../..');
 const { killChild } = processKit;
 
 async function listFiles(root: string, directory = root): Promise<string[]> {
