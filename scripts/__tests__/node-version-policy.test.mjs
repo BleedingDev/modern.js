@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import yaml from '../../packages/toolkit/utils/compiled/js-yaml/index.js';
 import {
   assertSupportedNodeVersion,
   MINIMUM_NODE_VERSION,
@@ -88,18 +89,40 @@ test('repository and executable package metadata declare the runtime floor', () 
   );
 
   let nodeSetupCount = 0;
+  const nightlyJobs = new Set([
+    '.github/workflows/ultramodern-nightly.yml:script-tests',
+    '.github/workflows/ultramodern-nightly.yml:superapp-certification-nightly',
+  ]);
+  const nightlySetupCounts = new Map([...nightlyJobs].map(job => [job, 0]));
   for (const workflowPath of fs.globSync('.github/workflows/*.{yml,yaml}', {
     cwd: repoRoot,
   })) {
-    const workflow = fs.readFileSync(path.join(repoRoot, workflowPath), 'utf8');
-    for (const match of workflow.matchAll(
-      /^\s*node-version:\s*['"]?([^'"\s]+)['"]?\s*$/gm,
-    )) {
-      nodeSetupCount += 1;
-      assert.equal(match[1], '26.7.0', workflowPath);
+    const workflow = yaml.load(
+      fs.readFileSync(path.join(repoRoot, workflowPath), 'utf8'),
+    );
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const jobId = `${workflowPath.split(path.sep).join('/')}:${jobName}`;
+      for (const step of job.steps ?? []) {
+        if (!step.uses?.startsWith('actions/setup-node@')) {
+          continue;
+        }
+        nodeSetupCount += 1;
+        const isNightly = nightlyJobs.has(jobId);
+        assert.equal(
+          String(step.with?.['node-version']),
+          isNightly ? '26.x' : '26.7.0',
+          jobId,
+        );
+        if (isNightly) {
+          nightlySetupCounts.set(jobId, nightlySetupCounts.get(jobId) + 1);
+        }
+      }
     }
   }
   assert.ok(nodeSetupCount > 0, 'expected explicit workflow Node setup');
+  for (const [jobId, count] of nightlySetupCounts) {
+    assert.equal(count, 1, `${jobId} must provision nightly Node exactly once`);
+  }
 });
 
 test('private examples that execute app-tools declare the same runtime floor', () => {
