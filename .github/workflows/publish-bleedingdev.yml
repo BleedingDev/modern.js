@@ -83,7 +83,7 @@ concurrency:
 jobs:
   publish-security:
     name: Validate publish security
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     timeout-minutes: 20
     if: >-
       github.actor == github.repository_owner &&
@@ -144,7 +144,7 @@ jobs:
   #     run's own receipt, verified below and again in prepare-release.
   qualify-source:
     name: Qualify the release source
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     timeout-minutes: 90
     if: >-
       github.actor == github.repository_owner &&
@@ -382,7 +382,7 @@ jobs:
 
   prepare-release:
     name: Build the immutable @bleedingdev release bundle
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     timeout-minutes: 90
     if: >-
       github.actor == github.repository_owner &&
@@ -763,7 +763,7 @@ jobs:
 
   validate-release:
     name: Validate accepted @bleedingdev tarballs without publish authority
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     timeout-minutes: 45
     if: >-
       github.actor == github.repository_owner &&
@@ -897,7 +897,7 @@ jobs:
   # the npm-publish environment, no token secret.
   publish-sidecars:
     name: Publish the stable sidecars before the cohort
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     environment: npm-publish
     permissions:
       actions: read
@@ -981,7 +981,7 @@ jobs:
 
   publish:
     name: Publish accepted @bleedingdev tarballs
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     environment: npm-publish
     permissions:
       actions: read
@@ -1450,7 +1450,7 @@ jobs:
 
   record-publish-outcome:
     name: Record the authenticated publish outcome
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     timeout-minutes: 20
     outputs:
       artifact_name: ${{ steps.publish-outcome.outputs.artifact_name }}
@@ -1676,7 +1676,7 @@ jobs:
   publish-change-record:
     name: Publish the cohort change record
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     timeout-minutes: 15
     # The only job that may write to the repository, and it runs strictly after
     # the publish outcome is recorded.
