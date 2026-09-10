@@ -4,13 +4,13 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   Schema,
-} from '@modern-js/plugin-bff/effect-client';
+} from '@modern-js/bff-effect/effect-client';
 import {
   defineEffectBff,
   Effect,
   HttpApiBuilder,
   Layer,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/bff-effect/effect-edge';
 
 export const catalogApi = HttpApi.make('NativeCatalog').add(
   HttpApiGroup.make('catalog').add(

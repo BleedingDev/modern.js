@@ -20,6 +20,8 @@ export const ULTRAMODERN_SINGLE_APP_MODERN_PACKAGES = [
   '@modern-js/plugin-i18n',
   '@modern-js/plugin-tanstack',
   '@modern-js/plugin-bff',
+  '@modern-js/plugin-bff-build-extensions',
+  '@modern-js/plugin-bff-extensions',
   '@modern-js/adapter-rstest',
 ] as const;
 
@@ -30,7 +32,10 @@ export const ULTRAMODERN_WORKSPACE_MODERN_PACKAGES = [
   '@modern-js/code-tools',
   '@modern-js/app-tools',
   '@modern-js/plugin-bff',
+  '@modern-js/plugin-bff-build-extensions',
+  '@modern-js/plugin-bff-extensions',
   '@modern-js/plugin-i18n',
+  '@modern-js/i18n-integration',
   '@modern-js/plugin-tanstack',
   '@modern-js/runtime',
   '@modern-js/runtime-extensions',

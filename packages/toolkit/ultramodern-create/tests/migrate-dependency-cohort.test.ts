@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { updateModernDependencies } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
+import { shellApp } from '../src/ultramodern-workspace/descriptors';
 
 test('migration updates declared extension packages throughout the authenticated cohort', () => {
   const source = {
@@ -194,7 +195,9 @@ test('historical migration registers app providers by declared surface and prese
       runtime: [
         '@modern-js/federation-runtime',
         '@modern-js/boundary-debugger',
+        '@modern-js/plugin-bff-extensions',
         '@modern-js/runtime-renderer-extensions',
+        '@modern-js/i18n-integration',
       ],
     },
     {
@@ -202,11 +205,15 @@ test('historical migration registers app providers by declared surface and prese
       runtime: [
         '@modern-js/federation-runtime',
         '@modern-js/runtime-renderer-extensions',
+        '@modern-js/i18n-integration',
       ],
     },
     {
       app: { ...shellApp, kind: 'vertical', surfaceProfile: 'api-only' },
-      runtime: ['@modern-js/runtime-renderer-extensions'],
+      runtime: [
+        '@modern-js/runtime-renderer-extensions',
+        '@modern-js/i18n-integration',
+      ],
     },
     { runtime: [] },
   ];
@@ -263,4 +270,182 @@ test('historical app provider registration rejects an incomplete target cohort b
     /absent from the authenticated target cohort/,
   );
   assert.deepEqual(manifest, { dependencies: { consumer: '^1.2.3' } });
+});
+
+test('historical BFF build adoption authenticates providers without adding build tooling to shared runtime packages', () => {
+  const source = {
+    strategy: 'install' as const,
+    modernPackageVersion: '3.9.0-ultramodern.4',
+  };
+  const app = { ...shellApp };
+  const providers = [
+    '@modern-js/ultramodern-app-tools',
+    '@modern-js/app-tools-extensions',
+    '@modern-js/runtime-renderer-extensions',
+    '@modern-js/i18n-integration',
+    '@modern-js/federation-runtime',
+    '@modern-js/boundary-debugger',
+    '@modern-js/plugin-bff-extensions',
+  ];
+  const packages = providers.map(sourceName => ({
+    sourceName,
+    targetName: sourceName,
+    version: source.modernPackageVersion,
+  }));
+  const manifest: Record<string, any> = {
+    dependencies: {
+      '@modern-js/plugin-bff': '3.9.0-ultramodern.3',
+      consumer: 'keep',
+    },
+  };
+  const original = structuredClone(manifest);
+  assert.throws(
+    () => updateModernDependencies(manifest, source, { packages }, { app }),
+    /plugin-bff-build-extensions is absent from the authenticated target cohort/u,
+  );
+  assert.deepEqual(manifest, original);
+  packages.push({
+    sourceName: '@modern-js/plugin-bff-build-extensions',
+    targetName: '@modern-js/plugin-bff-build-extensions',
+    version: source.modernPackageVersion,
+  });
+  assert.equal(
+    updateModernDependencies(manifest, source, { packages }, { app }),
+    true,
+  );
+  assert.equal(
+    manifest.devDependencies['@modern-js/plugin-bff-build-extensions'],
+    source.modernPackageVersion,
+  );
+  assert.equal(
+    manifest.dependencies['@modern-js/plugin-bff'],
+    source.modernPackageVersion,
+  );
+  assert.equal(manifest.dependencies.consumer, 'keep');
+  assert.equal(
+    updateModernDependencies(manifest, source, { packages }, { app }),
+    false,
+  );
+
+  const shared = {
+    dependencies: { '@modern-js/plugin-bff': '3.9.0-ultramodern.3' },
+  };
+  assert.equal(updateModernDependencies(shared, source, { packages }), true);
+  assert.deepEqual(shared, {
+    dependencies: { '@modern-js/plugin-bff': source.modernPackageVersion },
+  });
+});
+
+test('same-contract BFF cohort updates only declared dependencies and never adopts the build plugin', () => {
+  const source = cohort('3.9.0-ultramodern.3');
+  const target = cohort('3.9.0-ultramodern.4');
+  for (const item of [source, target]) {
+    item.packages.push({
+      sourceName: '@modern-js/plugin-bff',
+      targetName: '@bleedingdev/modern-js-plugin-bff',
+      version: item.release.version,
+    });
+    item.aliases['@modern-js/plugin-bff'] = '@bleedingdev/modern-js-plugin-bff';
+  }
+  target.packages.push({
+    sourceName: '@modern-js/plugin-bff-build-extensions',
+    targetName: '@bleedingdev/modern-js-plugin-bff-build-extensions',
+    version: target.release.version,
+  });
+  target.aliases['@modern-js/plugin-bff-build-extensions'] =
+    '@bleedingdev/modern-js-plugin-bff-build-extensions';
+  const manifest = {
+    dependencies: {
+      '@modern-js/plugin-bff':
+        'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.3',
+    },
+  };
+  assert.deepEqual(updateSameContractDependencies(manifest, source, target), [
+    {
+      section: 'dependencies',
+      name: '@modern-js/plugin-bff',
+      value: 'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.4',
+    },
+  ]);
+  assert.deepEqual(manifest, {
+    dependencies: {
+      '@modern-js/plugin-bff':
+        'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.4',
+    },
+  });
+});
+
+test('i18n descriptor adoption authenticates the target and preserves native packages and consumer selections', () => {
+  const source = {
+    strategy: 'install' as const,
+    modernPackageVersion: '3.9.0-ultramodern.4',
+    aliasScope: 'bleedingdev',
+    aliasPackageNamePrefix: 'modern-js-',
+  };
+  const integration = '@modern-js/i18n-integration';
+  const packages = [
+    '@modern-js/ultramodern-app-tools',
+    '@modern-js/app-tools-extensions',
+    '@modern-js/runtime-renderer-extensions',
+    '@modern-js/federation-runtime',
+    '@modern-js/boundary-debugger',
+    '@modern-js/plugin-bff-extensions',
+    integration,
+  ].map(sourceName => ({
+    sourceName,
+    targetName: sourceName.replace('@modern-js/', '@bleedingdev/modern-js-'),
+    version: source.modernPackageVersion,
+  }));
+  const manifest: Record<string, any> = {
+    dependencies: {
+      '@modern-js/plugin-i18n': '3.8.2',
+      i18next: 'consumer-version',
+    },
+    scripts: { custom: 'consumer-script' },
+  };
+  for (const rejected of [
+    packages.filter(item => item.sourceName !== integration),
+    packages.map(item =>
+      item.sourceName === integration ? { ...item, version: '3.8.2' } : item,
+    ),
+  ]) {
+    const original = structuredClone(manifest);
+    assert.throws(
+      () =>
+        updateModernDependencies(
+          manifest,
+          source,
+          { packages: rejected },
+          { app: shellApp },
+        ),
+      /i18n-integration is absent from the authenticated target cohort/u,
+    );
+    assert.deepEqual(manifest, original);
+  }
+  assert.equal(
+    updateModernDependencies(manifest, source, { packages }, { app: shellApp }),
+    true,
+  );
+  assert.equal(
+    manifest.dependencies[integration],
+    'npm:@bleedingdev/modern-js-i18n-integration@3.9.0-ultramodern.4',
+  );
+  assert.equal(
+    manifest.dependencies['@modern-js/plugin-i18n'],
+    'npm:@bleedingdev/modern-js-plugin-i18n@3.9.0-ultramodern.4',
+  );
+  assert.equal(manifest.dependencies.i18next, 'consumer-version');
+  assert.deepEqual(manifest.scripts, { custom: 'consumer-script' });
+  assert.equal(
+    updateModernDependencies(manifest, source, { packages }, { app: shellApp }),
+    false,
+  );
+  const unrelated = { dependencies: { i18next: 'consumer-version' } };
+  assert.equal(
+    updateModernDependencies(unrelated, source, { packages }),
+    false,
+  );
+  assert.deepEqual(unrelated, {
+    dependencies: { i18next: 'consumer-version' },
+  });
 });

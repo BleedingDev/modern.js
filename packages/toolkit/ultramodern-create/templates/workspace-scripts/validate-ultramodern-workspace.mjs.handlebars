@@ -1947,7 +1947,7 @@ const createAppContract = (app, apps) => ({
           (app.api.protocol ?? 'rest') === 'rpc'
             ? {
                 runtime: 'effect',
-                import: '@modern-js/plugin-bff/effect-edge',
+                import: '@modern-js/bff-effect/effect-edge',
                 prefix: app.api.prefix,
                 protocol: 'rpc',
                 strictEffectApproach: true,
@@ -1960,7 +1960,7 @@ const createAppContract = (app, apps) => ({
               }
             : {
                 runtime: 'effect',
-                import: '@modern-js/plugin-bff/effect-edge',
+                import: '@modern-js/bff-effect/effect-edge',
                 prefix: app.api.prefix,
                 openapi: '/openapi.json',
                 strictEffectApproach: true,

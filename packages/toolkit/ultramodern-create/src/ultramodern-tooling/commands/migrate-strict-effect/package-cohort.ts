@@ -6,7 +6,10 @@ import {
   ULTRAMODERN_WORKSPACE_MODERN_PACKAGES,
 } from '../../../ultramodern-package-source';
 import type { UltramodernReleaseCohort } from '../../../ultramodern-release-cohort';
-import { appEmitsBrowserUi } from '../../../ultramodern-workspace/descriptors';
+import {
+  appEmitsBrowserUi,
+  appHasApi,
+} from '../../../ultramodern-workspace/descriptors';
 import { ULTRAMODERN_PACKAGE_PINS } from '../../../ultramodern-workspace/policy';
 import type { WorkspaceApp } from '../../../ultramodern-workspace/types';
 import {
@@ -69,6 +72,7 @@ export function updateModernDependencies(
         ['devDependencies', '@modern-js/ultramodern-app-tools'],
         ['devDependencies', '@modern-js/app-tools-extensions'],
         ['dependencies', '@modern-js/runtime-renderer-extensions'],
+        ['dependencies', '@modern-js/i18n-integration'],
         ...(appEmitsBrowserUi(options.app)
           ? [
               ['dependencies', '@modern-js/federation-runtime'] as [
@@ -100,6 +104,34 @@ export function updateModernDependencies(
     for (const section of rendererSections) {
       providers.push([section, '@modern-js/runtime-renderer-extensions']);
     }
+  }
+  if (
+    (options.app &&
+      (appHasApi(options.app) ||
+        ['dependencies', 'devDependencies'].some(section =>
+          Object.hasOwn(packageJson[section] ?? {}, '@modern-js/plugin-bff'),
+        ))) ||
+    packageJson.modernjs?.workspace === 'ultramodern-superapp'
+  ) {
+    providers.push([
+      'devDependencies',
+      '@modern-js/plugin-bff-build-extensions',
+    ]);
+  }
+  if (
+    options.app &&
+    (appHasApi(options.app) ||
+      options.app.kind === 'shell' ||
+      ['dependencies', 'devDependencies'].some(section =>
+        [
+          '@modern-js/plugin-bff',
+          '@modern-js/plugin-bff-build-extensions',
+        ].some(name => Object.hasOwn(packageJson[section] ?? {}, name)),
+      ))
+  ) {
+    providers.push(['dependencies', '@modern-js/plugin-bff-extensions']);
+  } else if (packageJson.modernjs?.workspace === 'ultramodern-superapp') {
+    providers.push(['devDependencies', '@modern-js/plugin-bff-extensions']);
   }
   for (const [section, name] of providers) {
     if (
@@ -219,7 +251,7 @@ export function updateGeneratedToolingDependencies(
 }
 
 /**
- * `@modern-js/plugin-bff` declares `effect` and `@effect/opentelemetry` as
+ * The native and fork BFF build packages declare `effect` and `@effect/opentelemetry` as
  * OPTIONAL peers, so whoever depends on plugin-bff has to supply them. A
  * workspace generated before that change declares neither, and nothing else
  * pulls Effect in — so on migration the BFF lane has no Effect to load, and the
@@ -237,7 +269,9 @@ export function ensureBffEffectDependencies(packageJson: Record<string, any>) {
       !dependencies ||
       typeof dependencies !== 'object' ||
       Array.isArray(dependencies) ||
-      !Object.hasOwn(dependencies, '@modern-js/plugin-bff')
+      !['@modern-js/plugin-bff', '@modern-js/plugin-bff-build-extensions'].some(
+        name => Object.hasOwn(dependencies, name),
+      )
     ) {
       continue;
     }

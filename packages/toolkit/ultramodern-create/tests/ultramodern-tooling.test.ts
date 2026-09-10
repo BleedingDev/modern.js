@@ -2528,6 +2528,10 @@ declare module '*.css' {}
       shellPackage.dependencies['@modern-js/plugin-bff'],
       'workspace:*',
     );
+    assert.equal(
+      shellPackage.devDependencies['@modern-js/plugin-bff-build-extensions'],
+      'workspace:*',
+    );
     // plugin-bff declares both as optional peers, so migration has to add them
     // to whoever depends on plugin-bff. Without them the workspace resolves no
     // Effect at all and pnpm rejects the generated `effect@<version>` patch
@@ -3830,6 +3834,16 @@ test('migration supplies the optional Effect peers to workspaces generated befor
   };
   assert.equal(ensureBffEffectDependencies(root), true);
   assert.equal(root.devDependencies.effect, EFFECT_VERSION);
+  const buildOnly = {
+    devDependencies: { '@modern-js/plugin-bff-build-extensions': '3.8.3' },
+  };
+  assert.equal(ensureBffEffectDependencies(buildOnly), true);
+  assert.equal(buildOnly.devDependencies.effect, EFFECT_VERSION);
+  assert.equal(
+    buildOnly.devDependencies['@effect/opentelemetry'],
+    EFFECT_VERSION,
+  );
+  assert.equal(ensureBffEffectDependencies(buildOnly), false);
 });
 
 test('migration replaces the retired create alias before regenerating the lockfile', () => {
@@ -3934,7 +3948,10 @@ test('migration authenticates direct renderer dependencies and preserves consume
       '@modern-js/app-tools-extensions',
       '@modern-js/federation-runtime',
       '@modern-js/boundary-debugger',
+      '@modern-js/plugin-bff-build-extensions',
+      '@modern-js/plugin-bff-extensions',
       renderer,
+      '@modern-js/i18n-integration',
     ].map(sourceName => ({
       sourceName,
       targetName: sourceName.replace('@modern-js/', '@bleedingdev/modern-js-'),

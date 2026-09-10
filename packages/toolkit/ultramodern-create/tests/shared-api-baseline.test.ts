@@ -34,7 +34,7 @@ const validate = (content: string) => {
       baselinePackageDirectory: owner,
       apiPrefix: '/warehouse-api',
       basePath: '/warehouse-api/warehouse-items',
-      effectClientPackage: '@modern-js/plugin-bff/effect-client',
+      effectClientPackage: '@modern-js/bff-effect/effect-client',
       ownerId: 'inventory-stock',
       readinessPath: '/warehouse-api/warehouse-items/readiness',
     });

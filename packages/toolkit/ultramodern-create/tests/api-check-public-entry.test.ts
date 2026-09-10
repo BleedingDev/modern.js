@@ -37,7 +37,7 @@ test('source qualification builds code-tools before generated API fixtures', () 
 });
 
 const valid = `
-import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/plugin-bff/effect-edge';
+import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';
 import { fixtureApi } from '../shared/api.ts';
 const group = HttpApiBuilder.group(fixtureApi, 'fixture', h => h.handle('get', () => undefined));
 const handlers = Layer.mergeAll(group);

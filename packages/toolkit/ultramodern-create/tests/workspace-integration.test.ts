@@ -37,9 +37,17 @@ const generatedConfigRuntimePackages = {
     packageRoot,
     '../../solutions/app-tools-extensions',
   ),
+  'plugin-bff-build-extensions': path.resolve(
+    packageRoot,
+    '../../cli/plugin-bff-build-extensions',
+  ),
   'ultramodern-app-tools': path.resolve(
     packageRoot,
     '../../solutions/ultramodern-app-tools',
+  ),
+  'i18n-integration': path.resolve(
+    packageRoot,
+    '../../runtime/i18n-integration',
   ),
   'plugin-i18n': path.resolve(packageRoot, '../../runtime/plugin-i18n'),
   'plugin-tanstack': path.resolve(packageRoot, '../../runtime/plugin-tanstack'),
@@ -825,6 +833,24 @@ function assertIntegratedVertical(
     verticalPackage.dependencies['@modern-js/plugin-bff'],
     'workspace:*',
   );
+  assert.equal(
+    verticalPackage.devDependencies['@modern-js/plugin-bff-build-extensions'],
+    'workspace:*',
+  );
+  assert.match(
+    read(workspaceDir, `verticals/${id}/modern.config.ts`),
+    /import \{ bffPlugin \} from ['"]@modern-js\/plugin-bff-build-extensions['"]/u,
+  );
+  for (const manifest of [shellPackage, verticalPackage]) {
+    assert.equal(
+      manifest.dependencies['@modern-js/i18n-integration'],
+      'workspace:*',
+    );
+    assert.equal(
+      manifest.dependencies['@modern-js/plugin-i18n'],
+      'workspace:*',
+    );
+  }
   assert.equal(shellPackage.dependencies['react-router'], undefined);
   assert.equal(verticalPackage.dependencies['react-router'], undefined);
   assert.equal(shellPackage.dependencies['react-router-dom'], undefined);
@@ -1573,7 +1599,7 @@ test('generated Cloudflare proof records backend server execution metadata offli
     );
     assert.equal(
       catalogTarget.backendFederation.executionSurfaces.node.runtimePackage,
-      '@modern-js/plugin-bff/effect',
+      '@modern-js/plugin-bff-extensions/backend-federation-manifest/node',
     );
     assert.equal(catalogTarget.backendFederation.manifestUrl, undefined);
     assert.equal(catalogTarget.backendFederation.containerEntry, undefined);
@@ -1840,7 +1866,7 @@ test('generated API boundary check structurally rejects raw handler drift', () =
     fs.writeFileSync(
       path.join(workspaceDir, 'verticals/catalog/api/index.ts'),
       `
-import { createHandler } from '@modern-js/plugin-bff/hono-server';
+import { createHandler } from '@modern-js/plugin-bff/server';
 
 export const handler = async (request: Request) => {
   const body = await request.json();

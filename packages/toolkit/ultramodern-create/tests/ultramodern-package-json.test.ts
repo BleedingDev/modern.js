@@ -48,6 +48,7 @@ const bridgeConfig = {
 const installAppDependencies = {
   '@modern-js/plugin-tanstack': packageVersion,
   '@modern-js/plugin-i18n': packageVersion,
+  '@modern-js/i18n-integration': packageVersion,
   '@modern-js/runtime': packageVersion,
   '@modern-js/runtime-extensions': packageVersion,
   '@modern-js/runtime-renderer-extensions': packageVersion,
@@ -96,6 +97,7 @@ test('app dependencies pin generated framework deps and distinguish shell-only f
     ...bffEffectDependencies,
     '@modern-js/boundary-debugger': packageVersion,
     '@modern-js/plugin-bff': packageVersion,
+    '@modern-js/plugin-bff-extensions': packageVersion,
   });
   assert.deepEqual(
     appDependencies(scope, installPackageSource, shellHost, [
@@ -107,6 +109,7 @@ test('app dependencies pin generated framework deps and distinguish shell-only f
       ...bffEffectDependencies,
       '@modern-js/boundary-debugger': packageVersion,
       '@modern-js/plugin-bff': packageVersion,
+      '@modern-js/plugin-bff-extensions': packageVersion,
       '@tractor-store/catalog': 'workspace:*',
       '@tractor-store/checkout': 'workspace:*',
     },
@@ -124,6 +127,7 @@ test('bridge dependencies are added after generated app deps and collisions fail
       ...bffEffectDependencies,
       '@modern-js/bff-effect': packageVersion,
       '@modern-js/plugin-bff': packageVersion,
+      '@modern-js/plugin-bff-extensions': packageVersion,
     },
   );
   assert.throws(
@@ -152,6 +156,7 @@ test('workspace package source uses workspace versions for generated framework d
   assert.deepEqual(packageJson.dependencies, {
     '@modern-js/plugin-tanstack': 'workspace:*',
     '@modern-js/plugin-i18n': 'workspace:*',
+    '@modern-js/i18n-integration': 'workspace:*',
     '@modern-js/runtime': 'workspace:*',
     '@modern-js/runtime-extensions': 'workspace:*',
     '@modern-js/runtime-renderer-extensions': 'workspace:*',
@@ -169,12 +174,14 @@ test('workspace package source uses workspace versions for generated framework d
     ...bffEffectDependencies,
     '@modern-js/bff-effect': 'workspace:*',
     '@modern-js/plugin-bff': 'workspace:*',
+    '@modern-js/plugin-bff-extensions': 'workspace:*',
   });
   assert.equal(packageJson.devDependencies['cross-env'], '10.1.0');
   for (const name of [
     '@modern-js/app-tools',
     '@modern-js/app-tools-extensions',
     '@modern-js/ultramodern-app-tools',
+    '@modern-js/plugin-bff-build-extensions',
   ]) {
     assert.equal(packageJson.devDependencies[name], 'workspace:*');
   }
@@ -252,6 +259,8 @@ test('root package json pins workspace package versions and bridge workspace glo
     '@modern-js/ultramodern-create': packageVersion,
     '@modern-js/bff-effect': packageVersion,
     '@modern-js/plugin-bff': packageVersion,
+    '@modern-js/plugin-bff-extensions': packageVersion,
+    '@modern-js/plugin-bff-build-extensions': packageVersion,
     ...bffEffectDependencies,
     '@typescript/native': 'npm:typescript@7.0.2',
     'cross-env': '10.1.0',
@@ -328,5 +337,56 @@ process.stdout.write(appRequire.resolve('@modern-js/runtime-renderer-extensions'
     assert.match(result.stdout, /renderer-extensions/u);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('BFF build dependencies follow app capabilities and retain runtime packages', () => {
+  for (const preset of ['full-stack', 'api-only', 'ui-only'] as const) {
+    const app = createVerticalDescriptor('catalog', 4101, { preset });
+    const manifest = packageRecord(
+      createAppPackage(scope, app, installPackageSource, false),
+    );
+    const expected = preset === 'ui-only' ? undefined : packageVersion;
+    assert.equal(
+      manifest.devDependencies['@modern-js/plugin-bff-build-extensions'],
+      expected,
+    );
+    assert.equal(manifest.dependencies['@modern-js/plugin-bff'], expected);
+    assert.equal(
+      manifest.dependencies['@modern-js/plugin-bff-extensions'],
+      expected,
+    );
+  }
+});
+
+test('every generated i18n profile directly declares the descriptor provider', () => {
+  const apps = [
+    shellApp,
+    ...(['full-stack', 'api-only', 'ui-only'] as const).map(preset =>
+      createVerticalDescriptor('catalog', 4101, { preset }),
+    ),
+    createVerticalDescriptor('navigation', 4102, { horizontalRemote: true }),
+  ];
+  const packageSource = {
+    ...installPackageSource,
+    aliasScope: 'bleedingdev',
+    aliasPackageNamePrefix: 'modern-js-',
+  };
+  for (const app of apps) {
+    const manifest = packageRecord(
+      createAppPackage(scope, app, packageSource, false),
+    );
+    assert.equal(
+      manifest.dependencies['@modern-js/i18n-integration'],
+      `npm:@bleedingdev/modern-js-i18n-integration@${packageVersion}`,
+    );
+    assert.equal(
+      manifest.dependencies['@modern-js/plugin-i18n'],
+      `npm:@bleedingdev/modern-js-plugin-i18n@${packageVersion}`,
+    );
+    assert.equal(
+      manifest.dependencies['@modern-js/i18n-runtime-extensions'],
+      undefined,
+    );
   }
 });

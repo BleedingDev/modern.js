@@ -43,6 +43,7 @@ import {
   updateReferenceTopology,
   updateUltramodernConfig,
 } from './migrate-strict-effect/api-metadata';
+import { migrateBffRuntimeImports } from './migrate-strict-effect/bff-runtime-import-migration';
 import { ensureGeneratedDeclarationPatches } from './migrate-strict-effect/declaration-patches';
 import { workspaceUsesDependency } from './migrate-strict-effect/dependency-usage';
 import {
@@ -985,6 +986,13 @@ function migrateStrictEffect(
 
   updateGeneratedBuildIdentityModules(io, migrated);
   updateGeneratedTypeScriptSurfaces(io, migrated);
+
+  migrateBffRuntimeImports(io, packageSource, releaseCohort, {
+    appDirectories: migratedWorkspace.apps.map(app => app.directory),
+    workspacePatterns: migratedWorkspace.config.bridge?.workspacePackages.map(
+      entry => entry.pattern,
+    ),
+  });
 
   const canRetireLegacyOxfmtCliExclusion =
     ensureGeneratedOxfmtIgnorePatterns(io);

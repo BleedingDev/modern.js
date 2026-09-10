@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { format } from 'oxfmt';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
+import { migrateBffBuildPluginImports } from '../src/ultramodern-tooling/commands/migrate-strict-effect/bff-build-plugin-migration';
 import { updateGeneratedModernConfigs } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-modern-configs';
 import { updateGeneratedTypeScriptSurfaces } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-typescript';
 import {
@@ -473,7 +474,10 @@ const cloudflareDeployEnabled =`,
 
     assert.equal(
       fs.readFileSync(modernConfigPath, 'utf-8'),
-      consumerModernConfig,
+      consumerModernConfig.replace(
+        "from '@modern-js/plugin-bff';",
+        "from '@modern-js/plugin-bff-build-extensions';",
+      ),
     );
     const migratedShellPackage = readJson(workspaceRoot, shellPackagePath);
     assert.equal(migratedShellPackage.dependencies['react-router'], undefined);
@@ -1370,5 +1374,179 @@ test.each([
   } finally {
     templateSpy?.mockRestore();
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test.each([
+  'LF',
+  'CRLF',
+] as const)('BFF import migration preserves %s consumer text and static binding forms', lineEnding => {
+  const newline = lineEnding === 'CRLF' ? '\r\n' : '\n';
+  for (const [clause, call] of [
+    ['{ bffPlugin as productApi }', 'productApi()'],
+    ['productApi', 'productApi()'],
+    ['* as productApi', 'productApi.bffPlugin()'],
+    ['{ default as productApi }', 'productApi()'],
+  ]) {
+    for (const oldPackage of [
+      '@modern-js/plugin-bff',
+      '@modern-js/plugin-bff/cli',
+    ]) {
+      const original = [
+        '// Consumer comment retains the old name @modern-js/plugin-bff',
+        `import ${clause} from "${oldPackage}"; // keep import comment`,
+        "import { defineEffectBff } from '@modern-js/plugin-bff/effect-edge';",
+        "const text = `import { bffPlugin } from '@modern-js/plugin-bff';`;",
+        "const lazy = () => import('@modern-js/plugin-bff');",
+        `export default { bff: { runtimeFramework: 'effect' }, plugins: [${call}], consumerPolicy: 'keep' };`,
+        '',
+      ].join(newline);
+      const expected = original.replace(
+        `from "${oldPackage}"`,
+        'from "@modern-js/plugin-bff-build-extensions"',
+      );
+      assert.equal(migrateBffBuildPluginImports(original), expected);
+      assert.equal(migrateBffBuildPluginImports(expected), expected);
+    }
+  }
+});
+
+test('BFF import migration splits native mixed imports and preserves unrelated declarations', () => {
+  const original =
+    "import { bffPlugin as productApi, /* consumer comment */ consumerValue } from '@modern-js/plugin-bff';\nexport const policy = consumerValue;\nexport const plugin = productApi();\nexport default { bff: { runtimeFramework: 'effect' }, plugins: [plugin] };\n";
+  const expected =
+    "import { bffPlugin as productApi } from '@modern-js/plugin-bff-build-extensions';\nimport {  /* consumer comment */ consumerValue } from '@modern-js/plugin-bff';\nexport const policy = consumerValue;\nexport const plugin = productApi();\nexport default { bff: { runtimeFramework: 'effect' }, plugins: [plugin] };\n";
+  assert.equal(migrateBffBuildPluginImports(original), expected);
+  assert.equal(migrateBffBuildPluginImports(expected), expected);
+  for (const unchanged of [
+    "import type { bffPlugin } from '@modern-js/plugin-bff';",
+    "import { type bffPlugin } from '@modern-js/plugin-bff';",
+    "import '@modern-js/plugin-bff';",
+    "const example = `import { bffPlugin } from '@modern-js/plugin-bff';`;",
+    "const plugin = require('@modern-js/plugin-bff');",
+    "import { bffPlugin } from '@modern-js/plugin-bff'; export const incomplete = ;",
+  ])
+    assert.equal(migrateBffBuildPluginImports(unchanged), unchanged);
+});
+
+test('BFF build migration recognizes generated predecessors and changes only authored import paths', () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-bff-build-migration-'),
+  );
+  try {
+    generateUltramodernWorkspace({
+      targetDir: root,
+      packageName: 'bff-migration',
+      modernVersion: '3.8.3',
+      packageSource: { strategy: 'workspace' },
+    });
+    addUltramodernVertical({
+      workspaceRoot: root,
+      name: 'catalog',
+      modernVersion: '3.8.3',
+      packageSource: { strategy: 'workspace' },
+    });
+    const config = readUltramodernConfig(root);
+    const file = path.join(root, 'verticals/catalog/modern.config.ts');
+    const current = fs.readFileSync(file, 'utf8');
+    assert.match(
+      current,
+      /import \{ bffPlugin \} from '@modern-js\/plugin-bff-build-extensions'/u,
+    );
+    const previous = current.replace(
+      "from '@modern-js/plugin-bff-build-extensions'",
+      "from '@modern-js/plugin-bff'",
+    );
+    fs.writeFileSync(file, previous);
+    const run = () =>
+      updateGeneratedModernConfigs(createMigrationIo(root, false), config);
+    run();
+    assert.equal(fs.readFileSync(file, 'utf8'), current);
+    const comment = '\n// Consumer deployment rationale\n';
+    fs.writeFileSync(file, previous + comment);
+    run();
+    assert.equal(fs.readFileSync(file, 'utf8'), current + comment);
+    const businessPolicy =
+      "\n// Consumer policy\nexport const businessPolicy = { owner: 'catalog', retry: 7 };\n";
+    fs.writeFileSync(file, previous + businessPolicy);
+    run();
+    assert.equal(fs.readFileSync(file, 'utf8'), current + businessPolicy);
+    run();
+    assert.equal(fs.readFileSync(file, 'utf8'), current + businessPolicy);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('BFF build import adoption requires active supported config provenance', () => {
+  const bffImport = "import { bffPlugin } from '@modern-js/plugin-bff';\n";
+  const nativeImports =
+    "import { appTools, defineConfig } from '@modern-js/app-tools';\n";
+  const nativeConfig =
+    'export default defineConfig({ plugins: [appTools(), bffPlugin()] });\n';
+  for (const original of [
+    bffImport + nativeImports + nativeConfig,
+    bffImport +
+      nativeImports +
+      "export default defineConfig({ bff: { runtimeFramework: 'effect', runtimeFramework: 'hono' }, plugins: [appTools(), bffPlugin()] });",
+    bffImport +
+      nativeImports +
+      "import { ultramodernAppTools } from '@modern-js/ultramodern-app-tools';\nexport default defineConfig({ plugins: [ultramodernAppTools()], plugins: [appTools(), bffPlugin()] });",
+    bffImport +
+      nativeImports +
+      "export default defineConfig({ bff: { runtimeFramework: 'effect' }, ...unknownConfig, plugins: [appTools(), bffPlugin()] });",
+    bffImport +
+      nativeImports +
+      "export default defineConfig({ plugins: [appTools(), bffPlugin()] }, { bff: { runtimeFramework: 'effect' } });",
+    bffImport +
+      nativeImports +
+      "export default defineConfig({ bff: { runtimeFramework: 'hono' }, plugins: [appTools(), bffPlugin()] });",
+    bffImport +
+      nativeImports +
+      "import { presetUltramodern } from '@modern-js/ultramodern-app-tools';\n" +
+      nativeConfig,
+    bffImport +
+      nativeImports +
+      "const unused = { bff: { runtimeFramework: 'effect' } };\n" +
+      nativeConfig,
+    bffImport +
+      nativeImports +
+      'const presetUltramodern = value => value;\nexport default defineConfig(presetUltramodern({ plugins: [appTools(), bffPlugin()] }));',
+    bffImport +
+      nativeImports +
+      "import { ultramodernAppTools } from '@modern-js/ultramodern-app-tools';\nexport default defineConfig({ custom: () => ultramodernAppTools(), plugins: [appTools(), bffPlugin()] });",
+    bffImport +
+      nativeImports +
+      "import { ultramodernAppTools } from '@modern-js/ultramodern-app-tools';\nexport default defineConfig({ metadata: { plugins: [ultramodernAppTools()] }, plugins: [appTools(), bffPlugin()] });",
+  ])
+    assert.equal(migrateBffBuildPluginImports(original), original);
+
+  const forkImport =
+    "import { ultramodernAppTools } from '@modern-js/ultramodern-app-tools';\n";
+  for (const body of [
+    'const plugins = [ultramodernAppTools(), bffPlugin()]; plugins[0] = appTools(); export default defineConfig({ plugins });',
+    'const config = { plugins: [ultramodernAppTools(), bffPlugin()] }; config.plugins = [appTools(), bffPlugin()]; export default defineConfig(config);',
+    'const plugins = [ultramodernAppTools(), bffPlugin()]; configurePlugins(plugins); export default defineConfig({ plugins });',
+    'const plugins = [ultramodernAppTools(), bffPlugin()]; const escaped = plugins; escaped[0] = appTools(); export default defineConfig({ plugins });',
+    'const plugins = [ultramodernAppTools(), bffPlugin()]; const mutate = () => plugins.splice(0, 1, appTools()); mutate(); export default defineConfig({ plugins });',
+  ]) {
+    const original = bffImport + nativeImports + forkImport + body;
+    assert.equal(migrateBffBuildPluginImports(original), original);
+  }
+
+  for (const body of [
+    "const defaults = { bff: { runtimeFramework: 'effect' } };\nexport const config = defineConfig({ ...defaults, plugins: [appTools(), bffPlugin()] });\nexport default config;",
+    "import { ultramodernAppTools as framework } from '@modern-js/ultramodern-app-tools';\nconst plugins = [framework(), bffPlugin()];\nconst config = defineConfig({ plugins });\nexport default config;",
+    "import { presetUltramodern as preset } from '@modern-js/app-tools';\nexport default defineConfig(preset({ plugins: [appTools(), bffPlugin()] }));",
+    "import * as framework from '@modern-js/ultramodern-app-tools';\nexport default defineConfig({ plugins: [framework.ultramodernAppTools(), bffPlugin()] });",
+    "const bff = { runtimeFramework: 'effect' } as const;\nconst config = defineConfig({ bff, plugins: [appTools(), bffPlugin()] });\nexport { config as default };",
+  ]) {
+    const original = bffImport + nativeImports + body;
+    const expected = original.replace(
+      "from '@modern-js/plugin-bff'",
+      "from '@modern-js/plugin-bff-build-extensions'",
+    );
+    assert.equal(migrateBffBuildPluginImports(original), expected);
+    assert.equal(migrateBffBuildPluginImports(expected), expected);
   }
 });

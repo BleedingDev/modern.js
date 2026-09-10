@@ -40,6 +40,10 @@ export function appDependencies(
       '@modern-js/plugin-tanstack',
       packageSource,
     ),
+    '@modern-js/i18n-integration': modernPackageSpecifier(
+      '@modern-js/i18n-integration',
+      packageSource,
+    ),
     '@modern-js/plugin-i18n': modernPackageSpecifier(
       '@modern-js/plugin-i18n',
       packageSource,
@@ -64,6 +68,13 @@ export function appDependencies(
     [packageName(scope, 'shared-contracts')]: WORKSPACE_PACKAGE_VERSION,
     [packageName(scope, 'shared-design-tokens')]: WORKSPACE_PACKAGE_VERSION,
   };
+
+  if (appHasApi(app) || app.kind === 'shell') {
+    dependencies['@modern-js/plugin-bff-extensions'] = modernPackageSpecifier(
+      '@modern-js/plugin-bff-extensions',
+      packageSource,
+    );
+  }
 
   const appRemotes = resolveRemoteRefs(app, remotes);
 
@@ -116,6 +127,7 @@ export function appDependencies(
 function appDevDependencies(
   packageSource: ResolvedPackageSource,
   enableTailwind: boolean,
+  app: WorkspaceApp,
 ): Record<string, string> {
   const {
     '@rsbuild/plugin-tailwindcss': tailwindPluginVersion,
@@ -124,6 +136,14 @@ function appDevDependencies(
   } = ULTRAMODERN_PACKAGE_PINS.appDevDependencies;
 
   return {
+    ...(appHasApi(app) || app.kind === 'shell'
+      ? {
+          '@modern-js/plugin-bff-build-extensions': modernPackageSpecifier(
+            '@modern-js/plugin-bff-build-extensions',
+            packageSource,
+          ),
+        }
+      : {}),
     '@modern-js/ultramodern-app-tools': modernPackageSpecifier(
       '@modern-js/ultramodern-app-tools',
       packageSource,
@@ -243,6 +263,14 @@ export function createRootPackageJson(
     },
     devDependencies: {
       ...ULTRAMODERN_PACKAGE_PINS.rootDevDependencies,
+      '@modern-js/plugin-bff-extensions': modernPackageSpecifier(
+        '@modern-js/plugin-bff-extensions',
+        packageSource,
+      ),
+      '@modern-js/plugin-bff-build-extensions': modernPackageSpecifier(
+        '@modern-js/plugin-bff-build-extensions',
+        packageSource,
+      ),
       '@modern-js/runtime-renderer-extensions': modernPackageSpecifier(
         '@modern-js/runtime-renderer-extensions',
         packageSource,
@@ -329,7 +357,7 @@ export function createAppPackage(
     },
     'zephyr:dependencies': createZephyrDependencies(scope, app, remotes),
     dependencies: appDependencies(scope, packageSource, app, remotes, bridge),
-    devDependencies: appDevDependencies(packageSource, enableTailwind),
+    devDependencies: appDevDependencies(packageSource, enableTailwind, app),
   };
 
   if (appHasApi(app)) {

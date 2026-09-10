@@ -78,7 +78,7 @@ function findLocalRuntimePath(createBin) {
 async function importBackendFederationRuntime() {
   let importError;
   try {
-    const runtimePath = workspaceRequire.resolve('@modern-js/plugin-bff/effect');
+    const runtimePath = workspaceRequire.resolve('@modern-js/plugin-bff-extensions/backend-federation-manifest/node');
     const runtime = await import(pathToFileURL(runtimePath).href);
     if (hasBackendFederationManifestAdapter(runtime)) {
       return runtime;
