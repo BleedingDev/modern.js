@@ -234,6 +234,13 @@ test('migration fills historical deployment metadata and validates authored busi
       else delete app.deploy;
     }
     writeJson(workspaceRoot, '.modernjs/ultramodern.json', compact);
+    const ownership = readJson(workspaceRoot, 'topology/ownership.json');
+    const catalogOwner = ownership.owners.find(
+      (owner: { id: string }) => owner.id === 'catalog',
+    );
+    catalogOwner.ownership.team = 'consumer-catalog';
+    catalogOwner.ownership.runbookRef = 'runbooks/catalog-operations.md';
+    writeJson(workspaceRoot, 'topology/ownership.json', ownership);
     expect(
       await runUltramodernToolingCli(
         ['migrate-strict-effect', '--skip-install'],
@@ -251,6 +258,13 @@ test('migration fills historical deployment metadata and validates authored busi
     );
     migrated.topology.apps[0].moduleFederation.ssr = false;
     writeJson(workspaceRoot, '.modernjs/ultramodern.json', migrated);
+    expect(
+      runValidate({ workspaceRoot, invocationCwd: workspaceRoot }),
+    ).not.toBe(0);
+    migrated.topology.apps[0].moduleFederation.ssr = true;
+    writeJson(workspaceRoot, '.modernjs/ultramodern.json', migrated);
+    catalogOwner.path = 'verticals/wrong-owner';
+    writeJson(workspaceRoot, 'topology/ownership.json', ownership);
     expect(
       runValidate({ workspaceRoot, invocationCwd: workspaceRoot }),
     ).not.toBe(0);

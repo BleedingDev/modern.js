@@ -73,6 +73,9 @@ export function runValidate(context: CommandContext) {
     additionalShells,
     primaryShell,
     compactConfig,
+    // Team attribution is authored configuration. The validator separately
+    // checks each owner's package/path against the normalized app topology.
+    readJsonObject(path.join(context.workspaceRoot, 'topology/ownership.json')),
   );
 
   return runRenderedModule(source, context);
