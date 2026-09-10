@@ -526,12 +526,17 @@ test('i18n descriptor adoption authenticates the target and preserves native pac
   });
 });
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { yaml } from '@modern-js/utils';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 import { updateGeneratedPnpmWorkspacePolicy } from '../src/ultramodern-tooling/commands/migrate-strict-effect/pnpm-policy';
-import { createWorkspace, snapshotWorkspace } from './helpers/workspace-kit';
+import {
+  createWorkspace,
+  linkWorkspaceFormatterDependencies,
+  snapshotWorkspace,
+} from './helpers/workspace-kit';
 
 test('release-age YAML edits touch only authenticated sequence scalar values', () => {
   const source = cohort('3.9.0-ultramodern.5');
@@ -556,9 +561,52 @@ test('release-age YAML edits touch only authenticated sequence scalar values', (
     );
 });
 
-test('native same-contract classifier accepts only exact cohort policy advancement and repeats without writes', () => {
+test.each([
+  false,
+  true,
+])('native same-contract classifier accepts only exact cohort policy advancement and repeats without writes with consumer formatting %s', consumerFormatting => {
   const { tempRoot, workspaceDir } = createWorkspace('cohort-policy');
   try {
+    const validatorPath = path.join(
+      workspaceDir,
+      'scripts/validate-ultramodern-workspace.mts',
+    );
+    linkWorkspaceFormatterDependencies(workspaceDir);
+    if (consumerFormatting) {
+      const fixture = JSON.parse(
+        fs.readFileSync(
+          path.join(__dirname, 'fixtures/migration-runtime-historical-4.json'),
+          'utf8',
+        ),
+      ) as { files: Array<{ path: string; content: string }> };
+      const formatter = fixture.files.find(
+        file => file.path === 'oxfmt.config.ts',
+      )!;
+      fs.writeFileSync(
+        path.join(workspaceDir, formatter.path),
+        formatter.content,
+      );
+    }
+    const nativePaths = Object.keys(snapshotWorkspace(workspaceDir)).filter(
+      file =>
+        file === 'scripts/validate-ultramodern-workspace.mts' ||
+        file.endsWith('/shared/ultramodern-build.ts'),
+    );
+    const formatted = spawnSync(
+      process.execPath,
+      [
+        path.resolve(__dirname, '../node_modules/oxfmt/bin/oxfmt'),
+        '--write',
+        ...nativePaths,
+      ],
+      { cwd: workspaceDir, encoding: 'utf8' },
+    );
+    assert.equal(
+      formatted.status,
+      0,
+      `${formatted.stdout}\n${formatted.stderr}`,
+    );
+
     const source = cohort('3.9.0-ultramodern.5');
     const target = cohort('3.9.0-ultramodern.6');
     const packageSource = {
@@ -679,6 +727,21 @@ test('native same-contract classifier accepts only exact cohort policy advanceme
     );
     assert.equal(repeated.classification, 'same-contract', repeated.reason);
     assert.deepEqual(repeated.writes, []);
+    const authoredValidator =
+      fs.readFileSync(validatorPath, 'utf8') +
+      "\nexport const consumerValidationPolicy = 'keep';\n";
+    fs.writeFileSync(validatorPath, authoredValidator);
+    const authoredBefore = snapshotWorkspace(workspaceDir);
+    const authoredPlan = prepareSameContractUpdate(
+      createMigrationIo(workspaceDir, true),
+      JSON.parse(fs.readFileSync(compactPath, 'utf8')),
+      { ...packageSource, modernPackageVersion: target.release.version },
+      target,
+      target,
+    );
+    assert.equal(authoredPlan.classification, 'historical-migration');
+    assert.match(authoredPlan.reason, /validator/);
+    assert.deepEqual(snapshotWorkspace(workspaceDir), authoredBefore);
     const file = (content: string) => ({
       content: Buffer.from(content),
       mode: 0o644,

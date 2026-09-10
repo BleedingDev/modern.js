@@ -271,7 +271,11 @@ function matchesNativeSource(
   const source = fs.readFileSync(file, 'utf8');
   return (
     source === expected ||
-    source === formatGeneratedSourceCandidates([[relativePath, expected]])[0]
+    source ===
+      formatGeneratedSourceCandidates(
+        [[relativePath, expected]],
+        workspaceRoot,
+      )[0]
   );
 }
 
