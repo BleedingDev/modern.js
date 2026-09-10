@@ -525,6 +525,7 @@ test('dry-run reports finalized formatting with native consumer imports and nest
           .filter(relative =>
             fs.lstatSync(path.join(workspaceRoot, relative)).isFile(),
           )
+          .map(relative => relative.split(path.sep).join('/'))
           .sort(),
       );
     const before = allFiles();

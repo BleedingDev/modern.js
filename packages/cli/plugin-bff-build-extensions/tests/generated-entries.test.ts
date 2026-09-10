@@ -177,7 +177,12 @@ const api = HttpApi.make('ModuleApi').add(
       ).resolves.toBeDefined();
     } finally {
       process.chdir(previousCwd);
-      await fs.promises.rm(appDir, { recursive: true, force: true });
+      await fs.promises.rm(appDir, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   });
 
