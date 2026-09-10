@@ -52,9 +52,9 @@ function readJsonObject(filePath: string) {
 }
 
 /**
- * Move imports only when the complete program still matches a generated
- * target. A filename, metadata marker, or old package name alone is not
- * ownership evidence for an authored runtime or federation component.
+ * Move named imports only when the generated target identifies one provider.
+ * Authored programs retain every byte outside the migrated module literals;
+ * complete generated programs may also use the generated-source formatter.
  */
 function migrateGeneratedProviderImports(
   io: MigrationIo,
@@ -94,6 +94,7 @@ function migrateGeneratedProviderImports(
           legacyProviders[target.source.value]?.includes(
             statement.source.value,
           ) &&
+          statement.specifiers.length > 0 &&
           statement.specifiers.every(
             specifier =>
               specifier.type === 'ImportSpecifier' &&
@@ -124,9 +125,9 @@ function migrateGeneratedProviderImports(
         updated.slice(0, edit.start) + edit.content + updated.slice(edit.end);
     if (generatedUiSourceRequiresRewrite(updated, generatedSource)) {
       io.log(
-        `${path.relative(io.workspaceRoot, filePath)} preserved authored source: native provider migration requires the complete generated program.`,
+        `${path.relative(io.workspaceRoot, filePath)} migrated native provider imports while preserving authored source.`,
       );
-      return false;
+      return io.write(filePath, updated);
     }
   } catch {
     io.log(

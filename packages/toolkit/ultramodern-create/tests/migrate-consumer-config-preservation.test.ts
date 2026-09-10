@@ -1313,12 +1313,62 @@ test.each([
         `${source}\nexport const authoredBusinessPolicy = 'keep';\n`,
       );
     run();
-    for (const [file, source] of old)
+    for (const [file, source] of old) {
+      const authored = `${source}\nexport const authoredBusinessPolicy = 'keep';\n`;
+      const expected = file.includes('/src/')
+        ? authored
+            .replace(
+              /(['"])@modern-js\/runtime\/module-federation\/distributed-ssr\1/gu,
+              '"@modern-js/federation-runtime/distributed-ssr"',
+            )
+            .replace(
+              /(['"])@modern-js\/runtime\/module-federation\1/gu,
+              '"@modern-js/federation-runtime"',
+            )
+            .replace(
+              /(['"])@modern-js\/runtime-extensions\/boundary-debugger\1/gu,
+              '"@modern-js/boundary-debugger"',
+            )
+        : authored;
       assert.equal(
         fs.readFileSync(path.join(root, file), 'utf8'),
-        `${source}\nexport const authoredBusinessPolicy = 'keep';\n`,
+        expected,
         file,
       );
+    }
+    const runtimePath = path.join(
+      root,
+      'apps/shell-super-app/src/modern.runtime.ts',
+    );
+    for (const importClause of [
+      'unknownProvider',
+      '* as boundaryDebugger',
+      '{ unknownProvider }',
+      '{ ultramodernBoundaryDebuggerPlugin, unknownProvider }',
+    ]) {
+      const authored = `import ${importClause} from '@modern-js/runtime/boundary-debugger';\nexport const authored = true;\n`;
+      fs.writeFileSync(runtimePath, authored);
+      run();
+      assert.equal(fs.readFileSync(runtimePath, 'utf8'), authored);
+    }
+    const historical = `// Historical runtime keeps its own locale resource helper.\nimport { ultramodernBoundaryDebuggerPlugin as debuggerPlugin } from '@modern-js/runtime/boundary-debugger';\nexport const flattenLocaleResource = (value: string) => ({ value });\nexport const plugins = [debuggerPlugin];\n`;
+    fs.writeFileSync(runtimePath, historical);
+    run();
+    assert.equal(
+      fs.readFileSync(runtimePath, 'utf8'),
+      historical.replace(
+        "'@modern-js/runtime/boundary-debugger'",
+        '"@modern-js/boundary-debugger"',
+      ),
+    );
+    run();
+    assert.equal(
+      fs.readFileSync(runtimePath, 'utf8'),
+      historical.replace(
+        "'@modern-js/runtime/boundary-debugger'",
+        '"@modern-js/boundary-debugger"',
+      ),
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
