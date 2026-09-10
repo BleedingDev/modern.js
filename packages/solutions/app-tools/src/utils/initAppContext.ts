@@ -1,3 +1,4 @@
+import type { BffRuntimeFramework } from '@modern-js/plugin/server';
 import { address, fs } from '@modern-js/utils';
 import path from 'path';
 
@@ -36,7 +37,7 @@ export const initAppContext = ({
     apiDir?: string;
     distDir?: string;
     sharedDir?: string;
-    bffRuntimeFramework?: 'hono' | 'effect';
+    bffRuntimeFramework?: BffRuntimeFramework;
   };
   tempDir?: string;
 }) => {

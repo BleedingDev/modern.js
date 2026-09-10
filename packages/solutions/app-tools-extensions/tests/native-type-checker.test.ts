@@ -2,13 +2,20 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { UltramodernNativeTypeChecker } from '../src/native-type-checker';
 
 const require = createRequire(import.meta.url);
-const compiler = path.join(
-  path.dirname(require.resolve('@typescript/native-preview/package.json')),
-  'bin/tsgo',
+// The package bin is a Node.js launcher; use its own resolver for the Go executable.
+const { default: getExePath } = await import(
+  pathToFileURL(
+    path.join(
+      path.dirname(require.resolve('@typescript/native-preview/package.json')),
+      'lib/getExePath.js',
+    ),
+  ).href
 );
+const compiler: string = getExePath();
 
 test('checks and rebuilds referenced projects without overriding their emit contracts', async () => {
   const root = fs.mkdtempSync(
@@ -79,7 +86,7 @@ test('ordinary project checks emit nothing and surface compiler startup failures
         ...options,
         compiler: () => path.join(root, 'missing'),
       }).check(),
-    ).rejects.toThrow('UltramodernNativeTypeChecker failed');
+    ).rejects.toThrow(/UltramodernNativeTypeChecker failed:\n.*ENOENT/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

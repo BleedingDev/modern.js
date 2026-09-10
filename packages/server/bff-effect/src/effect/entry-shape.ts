@@ -42,8 +42,11 @@ function loadNodeValidatorAwareHandlerFactoryRegistry(): ValidatorAwareHandlerFa
   }
 }
 
+declare const __MODERN_EFFECT_NODE_RUNTIME__: boolean;
+
 const validatorAwareHandlerFactoryRegistry =
-  process.env.MODERN_EFFECT_NODE_RUNTIME === 'true'
+  typeof __MODERN_EFFECT_NODE_RUNTIME__ !== 'undefined' &&
+  __MODERN_EFFECT_NODE_RUNTIME__
     ? loadNodeValidatorAwareHandlerFactoryRegistry()
     : createLocalValidatorAwareHandlerFactoryRegistry();
 

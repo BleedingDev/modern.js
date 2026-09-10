@@ -1,5 +1,6 @@
 import type { Plugin } from '@modern-js/plugin';
 import { type ServerCreateOptions, server } from '@modern-js/plugin/server';
+import { logger } from '@modern-js/utils';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { run } from './context';
 import { handleSetupResult } from './plugins/compat/hooks';
@@ -26,7 +27,19 @@ export class ServerBase<E extends Env = any> {
 
   private app: Hono<E>;
 
-  private plugins: ServerPlugin[] = [];
+  private plugins: ServerPlugin[] = [
+    {
+      name: '@modern-js/server-lifecycle',
+      _registryApi: () => ({
+        onDispose: (disposer: () => void | Promise<void>) =>
+          this.onDispose(disposer),
+      }),
+    },
+  ];
+
+  private disposers = new Set<() => void | Promise<void>>();
+
+  private disposePromise?: Promise<void>;
 
   private serverContext: ServerContext | null = null;
 
@@ -43,25 +56,65 @@ export class ServerBase<E extends Env = any> {
    * - apply middlewares
    */
   async init() {
-    const { serverConfig, config: cliConfig } = this.serverOptions;
-    const mergedConfig = loadConfig({
-      cliConfig,
-      serverConfig: serverConfig || {},
-    });
+    try {
+      const { serverConfig, config: cliConfig } = this.serverOptions;
+      const mergedConfig = loadConfig({
+        cliConfig,
+        serverConfig: serverConfig || {},
+      });
 
-    const { serverContext } = await server.run({
-      plugins: this.plugins as Plugin[],
-      options: this.serverOptions,
-      config: mergedConfig,
-      handleSetupResult,
-    });
-    (serverContext as Record<string, any>).serverBase = this;
-    this.serverContext = serverContext as unknown as ServerContext;
-    // need after serverContext to run onPrepare
-    await serverContext.hooks.onPrepare.call();
-    this.#applyMiddlewares();
+      const { serverContext } = await server.run({
+        plugins: this.plugins as Plugin[],
+        options: this.serverOptions,
+        config: mergedConfig,
+        handleSetupResult,
+      });
+      (serverContext as Record<string, any>).serverBase = this;
+      this.serverContext = serverContext as unknown as ServerContext;
+      // need after serverContext to run onPrepare
+      await serverContext.hooks.onPrepare.call();
+      this.#applyMiddlewares();
 
-    return this;
+      return this;
+    } catch (error) {
+      await this.dispose().catch((disposeError: unknown) => {
+        logger.error(disposeError);
+      });
+      throw error;
+    }
+  }
+
+  /** Register instance resources before initialization can fail. */
+  onDispose(disposer: () => void | Promise<void>): () => void {
+    if (this.disposePromise) {
+      throw new Error('Cannot register a disposer on a retired server.');
+    }
+    this.disposers.add(disposer);
+    return () => {
+      this.disposers.delete(disposer);
+    };
+  }
+
+  /** Retire this instance and release every resource in reverse order once. */
+  dispose(): Promise<void> {
+    if (!this.disposePromise) {
+      const disposers = [...this.disposers].reverse();
+      this.disposers.clear();
+      this.disposePromise = Promise.resolve().then(async () => {
+        const errors: unknown[] = [];
+        for (const disposer of disposers) {
+          try {
+            await disposer();
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+        if (errors.length > 0) {
+          throw new AggregateError(errors, 'Failed to dispose server.');
+        }
+      });
+    }
+    return this.disposePromise;
   }
 
   addPlugins(plugins: ServerPlugin[]) {

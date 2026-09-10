@@ -3,7 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
-import { preserveConsumerWorkspaceArtifacts } from '../src/ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
+import {
+  preserveConsumerWorkspaceArtifacts,
+  recognizesReleaseCohortRead,
+} from '../src/ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
 
 test('generated contract data can refresh without treating authored behavior as generated', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-artifact-ownership-'));
@@ -57,7 +60,7 @@ test('generated contract data can refresh without treating authored behavior as 
   }
 });
 
-test('preserved validators refresh only literal authenticated cohort data, including renamed bindings and legacy paths', () => {
+test('preserved validators extract literal cohort data once, including renamed bindings and legacy paths', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-authored-cohort-'));
   const oldCohort = {
     aliases: { '@modern-js/runtime': '@bleedingdev/modern-js-runtime' },
@@ -87,6 +90,8 @@ test('preserved validators refresh only literal authenticated cohort data, inclu
   const suffix =
     "}};\nthrow new Error('The migration must never execute this source');\n";
   const source = prefix + JSON.stringify(oldCohort) + suffix;
+  const nativeImport =
+    "import ultramodernReleaseCohortDocument from '../.modernjs/release-cohort.json' with { type: 'json' };\n";
   try {
     fs.mkdirSync(path.join(root, 'scripts'));
     for (const extension of ['mts', 'mjs']) {
@@ -104,7 +109,9 @@ test('preserved validators refresh only literal authenticated cohort data, inclu
       ]);
       assert.equal(guarded.preservedPaths.has(relativePath), true);
       guarded.refreshReleaseCohort(nextCohort);
-      const expected = prefix + JSON.stringify(nextCohort, null, 2) + suffix;
+      const expected =
+        nativeImport + prefix + 'ultramodernReleaseCohortDocument' + suffix;
+      assert.equal(recognizesReleaseCohortRead(expected), true);
       assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
       guarded.refreshReleaseCohort(nextCohort);
       assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
@@ -139,10 +146,15 @@ test('preserved validators refresh only literal authenticated cohort data, inclu
         ],
       );
       guarded.refreshReleaseCohort(nextCohort);
-      const nextLiteral = JSON.stringify(nextCohort, null, 2);
-      const expected = hasOtherReader
-        ? `const versionPin = '${oldCohort.release.version}';\n${prefix}${nextLiteral}${suffix}${otherReader}`
-        : `const versionPin = ${JSON.stringify(nextCohort.release.version)};\n${prefix}${nextLiteral.replaceAll(`"version": ${JSON.stringify(nextCohort.release.version)}`, '"version": versionPin')}${suffix}`;
+      const expected =
+        nativeImport +
+        (hasOtherReader
+          ? `const versionPin = '${oldCohort.release.version}';\n`
+          : '\n') +
+        prefix +
+        'ultramodernReleaseCohortDocument' +
+        suffix +
+        otherReader;
       assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
       guarded.refreshReleaseCohort(nextCohort);
       assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
@@ -188,10 +200,33 @@ test('preserved validators refresh only literal authenticated cohort data, inclu
           },
         ],
       );
-      guarded.refreshReleaseCohort(nextCohort);
+      assert.throws(
+        () => guarded.refreshReleaseCohort(nextCohort),
+        /Workspace validator migration conflict/,
+      );
+      assert.equal(recognizesReleaseCohortRead(variant), false);
       assert.equal(fs.readFileSync(filePath, 'utf8'), variant);
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('native cohort recognition requires the contract use and JSON import together', () => {
+  const source =
+    "import data from '../.modernjs/release-cohort.json' with { type: 'json' };\n" +
+    "const definition = { kind: 'modernjs.ultramodern-workspace-validation-contract', cohort: { releaseCohort: data } };\n";
+  assert.equal(recognizesReleaseCohortRead(source), true);
+  for (const variant of [
+    source.replace('releaseCohort: data', 'releaseCohort: customData'),
+    source.replace("with { type: 'json' }", ''),
+    source.replace('import data', 'import * as data'),
+    source.replace(
+      "'../.modernjs/release-cohort.json'",
+      "'../consumer-release.json'",
+    ),
+    source.replace('cohort: {', '...consumerPolicy, cohort: {'),
+    source.replace('const definition', 'let definition'),
+  ])
+    assert.equal(recognizesReleaseCohortRead(variant), false);
 });

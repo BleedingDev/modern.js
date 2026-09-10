@@ -68,12 +68,12 @@ function reverseObjectKeys(value: unknown): unknown {
   return value;
 }
 
-function generateWorkspace(workspaceDir: string) {
+function generateWorkspace(workspaceDir: string, enableTailwind = true) {
   generateUltramodernWorkspace({
     targetDir: workspaceDir,
     packageName: path.basename(workspaceDir),
     modernVersion: '3.2.1',
-    enableTailwind: true,
+    enableTailwind,
     packageSource: {
       strategy: 'workspace',
     },
@@ -83,6 +83,17 @@ function generateWorkspace(workspaceDir: string) {
     name: 'catalog',
     modernVersion: '3.2.1',
   });
+  linkInstalledCompiler(workspaceDir);
+}
+
+function linkInstalledCompiler(workspaceDir: string) {
+  const compilerScope = path.join(workspaceDir, 'node_modules/@typescript');
+  fs.mkdirSync(compilerScope, { recursive: true });
+  fs.symlinkSync(
+    fs.realpathSync(path.resolve(__dirname, '../node_modules/typescript')),
+    path.join(compilerScope, 'native'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
 }
 
 function runValidation(workspaceDir: string) {
@@ -164,7 +175,8 @@ test('generated validator rejects schema, cohort, topology, policy, and legacy d
           });
         }
       },
-      expected: /Unsupported workspace metadata schemaVersion 9/,
+      expected:
+        /Unsupported UltraModern config schemaVersion 9 in .*ultramodern\.json\. Supported schema versions: 1\./,
     },
     {
       name: 'mixed-schema',
@@ -195,7 +207,8 @@ test('generated validator rejects schema, cohort, topology, policy, and legacy d
           value.topology.apps.push(structuredClone(catalog));
         });
       },
-      expected: /Duplicate id "catalog" in .*topology\.apps/,
+      expected:
+        /Duplicate value "catalog" in workspace validation contract app cohort/,
     },
     {
       name: 'omitted-app-across-observed-metadata',
@@ -237,7 +250,7 @@ test('generated validator rejects schema, cohort, topology, policy, and legacy d
         );
       },
       expected:
-        /MicroVertical contract self-check failed: \.modernjs\/ultramodern\.json topology\.apps cohort/,
+        /Unknown remote vertical reference catalog for shell-super-app\. Available remotes: none\./,
     },
     {
       name: 'retired-metadata-file',
@@ -303,13 +316,68 @@ test('generated validator rejects schema, cohort, topology, policy, and legacy d
 
     for (const scenario of scenarios) {
       const workspaceDir = path.join(tempRoot, scenario.name);
-      fs.cpSync(baselineDir, workspaceDir, { recursive: true });
+      fs.cpSync(baselineDir, workspaceDir, {
+        recursive: true,
+        filter: source => source !== path.join(baselineDir, 'node_modules'),
+      });
+      linkInstalledCompiler(workspaceDir);
       scenario.mutate(workspaceDir);
 
       const result = runValidation(workspaceDir);
       const output = commandOutput(result);
       assert.notEqual(result.status, 0, `${scenario.name}\n${output}`);
       assert.match(output, scenario.expected, scenario.name);
+    }
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('generated validator checks active Tailwind wiring rather than unused dependencies', () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-tailwind-policy-'),
+  );
+  try {
+    for (const enabled of [true, false]) {
+      const workspaceDir = path.join(tempRoot, `tailwind-${enabled}`);
+      generateWorkspace(workspaceDir, enabled);
+      const configPath = 'apps/shell-super-app/modern.config.ts';
+      if (enabled) {
+        replaceText(
+          workspaceDir,
+          configPath,
+          '{ pluginTailwindcss }',
+          '{ pluginTailwindcss as stylesPlugin }',
+        );
+        replaceText(
+          workspaceDir,
+          configPath,
+          'pluginTailwindcss()',
+          'stylesPlugin()',
+        );
+      } else {
+        mutateJson(workspaceDir, 'apps/shell-super-app/package.json', value => {
+          value.devDependencies['@rsbuild/plugin-tailwindcss'] = '2.0.4';
+        });
+        appendText(
+          workspaceDir,
+          configPath,
+          "\nimport { pluginTailwindcss as unusedTailwind } from '@rsbuild/plugin-tailwindcss';\nconst unusedBuilderConfiguration = { builderPlugins: [unusedTailwind()] };\n",
+        );
+      }
+      const consistent = runValidation(workspaceDir);
+      assert.equal(consistent.status, 0, commandOutput(consistent));
+      mutateJson(workspaceDir, '.modernjs/ultramodern.json', value => {
+        value.features.tailwind = !enabled;
+      });
+      const inconsistent = runValidation(workspaceDir);
+      assert.notEqual(inconsistent.status, 0, commandOutput(inconsistent));
+      assert.match(
+        commandOutput(inconsistent),
+        enabled
+          ? /policy\.features\.tailwind/
+          : /Missing apps\/shell-super-app\/tailwind\.config\.ts/,
+      );
     }
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -379,7 +447,11 @@ test('generated validator enforces additional-shell ownership, build, degraded, 
 
     for (const scenario of scenarios) {
       const workspaceDir = path.join(tempRoot, scenario.name);
-      fs.cpSync(baselineDir, workspaceDir, { recursive: true });
+      fs.cpSync(baselineDir, workspaceDir, {
+        recursive: true,
+        filter: source => source !== path.join(baselineDir, 'node_modules'),
+      });
+      linkInstalledCompiler(workspaceDir);
       scenario.mutate(workspaceDir);
       const result = runValidation(workspaceDir);
       const output = commandOutput(result);

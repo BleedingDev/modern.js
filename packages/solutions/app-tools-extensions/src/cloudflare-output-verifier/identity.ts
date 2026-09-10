@@ -2,7 +2,7 @@ import {
   DELIVERY_UNIT_IDENTITY_FIELDS,
   type DeliveryUnitIdentity,
   deliveryUnitIdentityFieldValue,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import type { CloudflareOutputVerifierIssue, JsonObject } from './issues';
 import { addIssue, assertEqual } from './issues';
 

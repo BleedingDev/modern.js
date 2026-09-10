@@ -123,4 +123,24 @@ describe('tanstack prefetch link adapter - aria-current override', () => {
     });
     expect(anchor.textContent).toBe('Settings');
   });
+
+  it('passes the native anchor ref through the router hook', async () => {
+    const ref = React.createRef<HTMLAnchorElement>();
+    const { anchor } = await renderLink({
+      initialPath: '/',
+      linkProps: { ref, prefetch: 'none' },
+    });
+    expect(ref.current).toBe(anchor);
+  });
+
+  it('preserves NavLink render children and aria-current overrides', async () => {
+    const { anchor } = await renderLink({
+      initialPath: '/settings',
+      useNavLink: true,
+      linkProps: { 'aria-current': 'step', preload: false },
+      children: ({ isActive }) => (isActive ? 'Current step' : 'Other step'),
+    });
+    expect(anchor.textContent).toBe('Current step');
+    expect(anchor.getAttribute('aria-current')).toBe('step');
+  });
 });

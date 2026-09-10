@@ -3,6 +3,15 @@
 > `migrate.mjs` 已自动处理：`index.*`→`entry.*`（含 bootstrap 改写）、`App.config` 抽取到 `src/modern.runtime.ts`。
 > 本文覆盖**需人工**的：`App.init`、`routes/layout` 的 `config`/`init` 导出、多入口。依据 `guides/upgrade/entry`。
 
+## UltraModern 原生路由
+
+UltraModern 应用保留生成器现有的 TanStack 路由注册。使用
+`@tanstack/react-router` 的 `Link`、`useNavigate` 和路由 search 校验；
+locale 使用现有路由参数及路由自有的翻译路径。不要添加自定义导航 wrapper、
+点击拦截或合成 `<a>` handler，也不要把此 v2→v3 入口迁移套到已存在的
+UltraModern 路由上。发布更新使用 `migrate-strict-effect`，具体见
+[UltraModern workflows](../../../docs/ultramodern-native-workflows.md)。
+
 ## App.init → 运行时插件
 
 **迁移前（src/App.tsx）**

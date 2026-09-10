@@ -5,7 +5,7 @@ import {
   type DeliveryUnitRecord,
   formatBackendFederationValidationErrors,
   validateBackendFederationMetadata,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import { verticalApiExport, verticalApiGroupName } from './api';
 import {
   rpcPath,
@@ -134,7 +134,8 @@ function createNodeExecutionSurface(
     containerEntry: createBackendFederationContainerEntry(app),
     remoteType: 'commonjs-module',
     expose: BACKEND_FEDERATION_EFFECT_EXPOSE,
-    runtimePackage: '@modern-js/plugin-bff/effect',
+    runtimePackage:
+      '@modern-js/plugin-bff-extensions/backend-federation-manifest/node',
     ...(deliveryUnit
       ? {
           expected: {

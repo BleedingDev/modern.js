@@ -1,21 +1,21 @@
 import {
-  buildOperationContractMap,
-  deriveOperationVersion,
-  type OperationContractMap,
-} from '@modern-js/bff-core';
-import {
   createEffectEndpointContractHash,
   type EffectEndpointMeta,
   ensureLeadingSlash,
   normalizeEffectPrefix,
   toOperationContractSources,
 } from '@modern-js/bff-effect/effect';
+import {
+  buildOperationContractMap,
+  deriveOperationVersion,
+  type OperationContractMap,
+} from '@modern-js/server-runtime-extensions/bff-policy/node';
 import { fs, upath as path } from '@modern-js/utils';
 import type { EffectClientCodegenOptions } from './types';
 
 const DEFAULT_REQUEST_CREATOR = '@modern-js/plugin-bff/client';
 const EFFECT_CLIENT_RUNTIME_IMPORT =
-  '@modern-js/plugin-bff/effect-client-runtime';
+  '@modern-js/bff-effect/effect-client-runtime';
 
 function isAbsoluteUrl(value: string) {
   try {

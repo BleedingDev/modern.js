@@ -1,3 +1,4 @@
+import { resolvePreloadFromPrefetch } from '@modern-js/runtime-extensions';
 import {
   type AnyRouter,
   type LinkComponentProps,
@@ -7,29 +8,6 @@ import {
 import type { AnchorHTMLAttributes, ReactElement, ReactNode, Ref } from 'react';
 
 export type PrefetchBehavior = 'intent' | 'render' | 'viewport' | 'none';
-
-function resolvePreloadFromPrefetch(
-  prefetch: PrefetchBehavior | undefined,
-  preload: unknown,
-) {
-  if (typeof preload !== 'undefined') {
-    return preload;
-  }
-
-  if (prefetch === 'none') {
-    return false;
-  }
-
-  if (
-    prefetch === 'intent' ||
-    prefetch === 'render' ||
-    prefetch === 'viewport'
-  ) {
-    return prefetch;
-  }
-
-  return 'viewport';
-}
 
 export type LinkProps<
   TRouter extends AnyRouter = RegisteredRouter,

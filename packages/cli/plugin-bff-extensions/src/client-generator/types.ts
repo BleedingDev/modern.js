@@ -1,5 +1,5 @@
-import type { OperationContractMap } from '@modern-js/bff-core';
 import type { EffectEndpointMeta } from '@modern-js/bff-effect/effect';
+import type { OperationContractMap } from '@modern-js/server-runtime-extensions/bff-policy/node';
 import type { HttpMethodDecider } from '@modern-js/types';
 
 export type EffectClientCodegenOptions = {

@@ -1,0 +1,70 @@
+{
+  "name": "@modern-js/boundary-debugger",
+  "description": "Fork-owned browser boundary instrumentation registered through the native Modern.js runtime plugin API.",
+  "homepage": "https://modernjs.dev",
+  "bugs": "https://github.com/web-infra-dev/modern.js/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bleedingdev/modern.js",
+    "directory": "packages/runtime/boundary-debugger"
+  },
+  "license": "MIT",
+  "version": "3.8.3",
+  "engines": {
+    "node": ">=26.7.0"
+  },
+  "types": "./dist/types/boundary-debugger/index.d.ts",
+  "main": "./dist/cjs/boundary-debugger/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/types/boundary-debugger/index.d.ts",
+      "modern:source": "./src/boundary-debugger/index.tsx",
+      "node": {
+        "import": "./dist/esm-node/boundary-debugger/index.mjs",
+        "require": "./dist/cjs/boundary-debugger/index.js"
+      },
+      "default": "./dist/esm/boundary-debugger/index.mjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/types/boundary-debugger/index.d.ts",
+        "./src/boundary-debugger/index.tsx"
+      ]
+    }
+  },
+  "scripts": {
+    "prepublishOnly": "only-allow-pnpm",
+    "dev": "rslib build --watch",
+    "build": "rslib build",
+    "test": "rstest"
+  },
+  "dependencies": {
+    "@modern-js/plugin": "workspace:*"
+  },
+  "devDependencies": {
+    "@modern-js/rslib": "workspace:*",
+    "@rslib/core": "1.0.0",
+    "@scripts/rstest-config": "workspace:*",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "types": "./dist/types/boundary-debugger/index.d.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  }
+}

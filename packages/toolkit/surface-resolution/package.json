@@ -1,0 +1,62 @@
+{
+  "name": "@modern-js/surface-resolution",
+  "version": "3.8.3",
+  "description": "Universal surface references, atomic discovery records, and environment-static resolution.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BleedingDev/ultramodern.js",
+    "directory": "packages/toolkit/surface-resolution"
+  },
+  "main": "./dist/cjs/surface-resolution/index.js",
+  "module": "./dist/esm/surface-resolution/index.mjs",
+  "types": "./dist/types/surface-resolution/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/surface-resolution/index.d.ts",
+      "modern:source": "./src/surface-resolution/index.ts",
+      "node": {
+        "import": "./dist/esm-node/surface-resolution/index.mjs",
+        "require": "./dist/cjs/surface-resolution/index.js"
+      },
+      "default": "./dist/esm/surface-resolution/index.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "prepublishOnly": "only-allow-pnpm",
+    "build": "rslib build",
+    "dev": "rslib build --watch",
+    "test": "rstest run"
+  },
+  "dependencies": {
+    "@modern-js/backend-federation-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@modern-js/rslib": "workspace:*",
+    "@modern-js/tsconfig": "workspace:*",
+    "@rslib/core": "1.0.0",
+    "@rstest/core": "0.11.12",
+    "@scripts/rstest-config": "workspace:*",
+    "@types/node": "^26.4.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/types/surface-resolution/index.d.ts",
+        "node": {
+          "import": "./dist/esm-node/surface-resolution/index.mjs",
+          "require": "./dist/cjs/surface-resolution/index.js"
+        },
+        "default": "./dist/esm/surface-resolution/index.mjs"
+      }
+    }
+  }
+}

@@ -1,11 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { normalizeCompactConfig } from '../../ultramodern-tooling/config';
+import { normalizeWorkspaceInputs } from '../../ultramodern-tooling/config';
 import type { UltramodernBridgeConfig } from '../bridge-config';
 import {
   createRemoteManifestEnv,
   createVerticalDescriptor,
-  shellApp,
   ULTRAMODERN_CONFIG_PATH,
 } from '../descriptors';
 import { readJsonFile } from '../fs-io';
@@ -14,7 +13,6 @@ import {
   normalizePath,
   toPackageScope,
 } from '../naming';
-import { resolveConfiguredAdditionalShells } from '../shells';
 import type {
   AddUltramodernVerticalOptions,
   JsonValue,
@@ -27,7 +25,6 @@ import {
   OWNERSHIP_PATH,
   TOPOLOGY_PATH,
 } from './constants';
-import { verticalsFromTopology } from './topology';
 import {
   assertCanCreate,
   assertGlobalPortUniqueness,
@@ -37,6 +34,8 @@ import {
   existingTailwindEnabled,
   nextAvailablePort,
 } from './workspace-state';
+
+export { createPrimaryShellDescriptor } from './topology';
 
 export type AddUltramodernVerticalPreflight = {
   name: string;
@@ -111,7 +110,9 @@ export function prepareAddUltramodernVertical(
   const topology = readRequiredJsonObject(topologyPath);
   const ownership = readRequiredJsonObject(ownershipPath);
   const overlay = readRequiredJsonObject(overlayPath);
-  const config = readRequiredWorkspaceConfig(options.workspaceRoot);
+  const config = readRequiredJsonObject(
+    path.join(options.workspaceRoot, ULTRAMODERN_CONFIG_PATH),
+  );
 
   assertOptionalJsonObject(topology.shell, 'topology.shell', topologyPath);
   assertOptionalJsonArray(
@@ -123,6 +124,12 @@ export function prepareAddUltramodernVertical(
   assertOptionalJsonObject(overlay.ports, 'overlay.ports', overlayPath);
   assertOptionalJsonObject(overlay.manifests, 'overlay.manifests', overlayPath);
   assertOptionalJsonObject(overlay.apis, 'overlay.apis', overlayPath);
+
+  const workspace = normalizeWorkspaceInputs(options.workspaceRoot, {
+    config,
+    topology,
+    overlay,
+  });
 
   overlay.ports ??= {};
   const scope = toPackageScope(
@@ -136,17 +143,10 @@ export function prepareAddUltramodernVertical(
   const enableTailwind =
     options.enableTailwind ?? existingTailwindEnabled(options.workspaceRoot);
   const bridge = existingBridgeConfig(options.workspaceRoot);
-  const existingVerticals = verticalsFromTopology(topology, overlay.ports);
-  const additionalShells = resolveConfiguredAdditionalShells(config);
-  const primaryShell = createPrimaryShellDescriptor(topology, config);
-  // Prefer the LIVE overlay port for the primary shell: operators may have
-  // moved it (e.g. to 3120), and the compact/default descriptor port would
-  // silently reintroduce a collision window.
-  const primaryShellPort =
-    typeof overlay.ports[primaryShell.id] === 'number'
-      ? (overlay.ports[primaryShell.id] as number)
-      : primaryShell.port;
-  const resolvedPrimaryShell = { ...primaryShell, port: primaryShellPort };
+  const existingVerticals = workspace.verticals;
+  const additionalShells = workspace.additionalShells;
+  // Supplying topology always resolves the primary shell, including defaults.
+  const resolvedPrimaryShell = workspace.primaryShell!;
   const targetShell = resolveTargetShell(
     options.shell,
     resolvedPrimaryShell,
@@ -155,7 +155,7 @@ export function prepareAddUltramodernVertical(
   );
   const portsWithPrimary = {
     ...overlay.ports,
-    [primaryShell.id]: primaryShellPort,
+    [resolvedPrimaryShell.id]: resolvedPrimaryShell.port,
   };
   assertGlobalPortUniqueness(portsWithPrimary, additionalShells);
   const port = nextAvailablePort(portsWithPrimary, additionalShells);
@@ -218,47 +218,6 @@ function readRequiredJsonObject(filePath: string): Record<string, any> {
   }
 
   return value;
-}
-
-function readRequiredWorkspaceConfig(workspaceRoot: string) {
-  const compactPath = path.join(workspaceRoot, ULTRAMODERN_CONFIG_PATH);
-  const config = readRequiredJsonObject(compactPath);
-  normalizeCompactConfig(workspaceRoot, compactPath, config);
-  return config;
-}
-
-export function createPrimaryShellDescriptor(
-  topology: Record<string, any>,
-  config: Record<string, any>,
-): WorkspaceApp {
-  const compactShell = config.topology?.apps?.find(
-    (app: { id?: unknown }) => app?.id === shellApp.id,
-  );
-  const verticalRefs = Array.isArray(topology.shell?.verticalRefs)
-    ? topology.shell.verticalRefs.filter(
-        (id: unknown): id is string => typeof id === 'string',
-      )
-    : Array.isArray(compactShell?.moduleFederation?.verticalRefs)
-      ? compactShell.moduleFederation.verticalRefs.filter(
-          (id: unknown): id is string => typeof id === 'string',
-        )
-      : [];
-  return {
-    ...shellApp,
-    verticalRefs,
-    ...(typeof compactShell?.path === 'string'
-      ? { directory: compactShell.path }
-      : {}),
-    ...(typeof compactShell?.port === 'number'
-      ? { port: compactShell.port }
-      : {}),
-    ...(typeof compactShell?.portEnv === 'string'
-      ? { portEnv: compactShell.portEnv }
-      : {}),
-    ...(typeof compactShell?.moduleFederation?.name === 'string'
-      ? { mfName: compactShell.moduleFederation.name }
-      : {}),
-  };
 }
 
 function resolveTargetShell(

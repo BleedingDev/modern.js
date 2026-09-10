@@ -45,6 +45,7 @@ async function createEvidenceFixture({
   createSourceName = '@modern-js/ultramodern-create',
   createTargetName = '@bleedingdev/modern-js-ultramodern-create',
   includePublishedOperationalEvidence = false,
+  includeTractorFormattingEvidence = true,
   receiptApiOverride,
   releaseArtifactsApiOverride,
   releaseManifestApiOverride,
@@ -325,6 +326,7 @@ async function createEvidenceFixture({
         },
         ...[
           'install---frozen-lockfile',
+          ...(includeTractorFormattingEvidence ? ['format'] : []),
           'check',
           'promotable-application-source',
           'build',
@@ -722,6 +724,8 @@ test('backfill reconstructs schema-v4 outcomes with the archived historical crea
     createSourceName: '@modern-js/create',
     createTargetName: '@bleedingdev/modern-js-create',
     includePublishedOperationalEvidence: true,
+    // This archived contract predates the explicit formatter lifecycle step.
+    includeTractorFormattingEvidence: false,
     receiptApiOverride: historicalReceiptApi,
     releaseArtifactsApiOverride: historicalReleaseArtifactsApi,
     releaseManifestApiOverride: historicalReleaseManifestApi,
@@ -1415,6 +1419,39 @@ test('artifact discovery fails closed for malformed, delayed, expired, and name-
     assert.throws(
       () => api.selectPublishOutcomeArtifact(pages, options),
       pattern,
+    );
+  }
+});
+
+test('canonical artifact verification retains outcome-specific expected identity and digest paths', async t => {
+  const api = await outcomeApi();
+  const fixture = await createEvidenceFixture();
+  t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
+  const artifactName = api.publishOutcomeArtifactName({
+    runAttempt: outcomeRunAttempt,
+    runId,
+  });
+  const options = createOptions(fixture, artifactName, true);
+  for (const overrides of [
+    { sourceCommit: 'f'.repeat(40) },
+    { version: '3.8.2-ultramodern.999' },
+    { tag: 'other-tag' },
+    {
+      repository: 'foreign/repository',
+      producerRunIdentity: `github:foreign/repository:run:${runId}:attempt:${producerRunAttempt}`,
+    },
+  ]) {
+    assert.throws(
+      () => api.createPublishOutcome({ ...options, ...overrides }),
+      /Release manifest does not match the expected source and version/u,
+    );
+  }
+  const foreignDigest = path.join(fixture.root, 'foreign-digest');
+  fs.writeFileSync(foreignDigest, `${'0'.repeat(64)}\n`);
+  for (const field of ['manifestDigestPath', 'cohortDigestPath']) {
+    assert.throws(
+      () => api.createPublishOutcome({ ...options, [field]: foreignDigest }),
+      /Detached release (?:manifest|cohort) digest is invalid/u,
     );
   }
 });

@@ -33,8 +33,7 @@
     "prepublishOnly": "only-allow-pnpm",
     "build": "rslib build",
     "dev": "rslib build --watch",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "test:build-smoke": "node --experimental-strip-types --test tests/*.smoke.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "engines": {
     "node": ">=26.7.0"
@@ -43,7 +42,8 @@
     "@modern-js/rslib": "workspace:*",
     "@rslib/core": "1.0.0",
     "@types/node": "^26.4.1",
-    "@typescript/native-preview": "7.0.0-dev.20260707.2"
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@modern-js/tsconfig": "workspace:*"
   },
   "sideEffects": false,
   "publishConfig": {

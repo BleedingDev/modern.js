@@ -34,15 +34,6 @@
       },
       "default": "./dist/esm-node/node.mjs"
     },
-    "./rsc-html-stream": {
-      "types": "./dist/types/rscHtmlStream.d.ts",
-      "modern:source": "./src/rscHtmlStream.ts",
-      "node": {
-        "import": "./dist/esm-node/rscHtmlStream.mjs",
-        "require": "./dist/cjs/rscHtmlStream.js"
-      },
-      "default": "./dist/esm-node/rscHtmlStream.mjs"
-    },
     "./safe-failure": {
       "types": "./dist/types/safeFailure.d.ts",
       "modern:source": "./src/safeFailure.ts",
@@ -60,6 +51,15 @@
         "require": "./dist/cjs/buildIdentity.js"
       },
       "default": "./dist/esm/buildIdentity.mjs"
+    },
+    "./workspace-events": {
+      "types": "./dist/types/workspaceEvents.d.ts",
+      "modern:source": "./src/workspaceEvents.ts",
+      "node": {
+        "import": "./dist/esm-node/workspaceEvents.mjs",
+        "require": "./dist/cjs/workspaceEvents.js"
+      },
+      "default": "./dist/esm/workspaceEvents.mjs"
     },
     "./rsc-disabled/*": {
       "types": "./dist/types/rsc-disabled/*.d.ts",
@@ -82,6 +82,130 @@
         "require": "./dist/cjs/reactContext.js"
       },
       "default": "./dist/esm/reactContext.mjs"
+    },
+    "./context-extensions": {
+      "types": "./dist/types/contextExtensions.d.ts",
+      "modern:source": "./src/contextExtensions.ts",
+      "node": {
+        "import": "./dist/esm-node/contextExtensions.mjs",
+        "require": "./dist/cjs/contextExtensions.js"
+      },
+      "default": "./dist/esm/contextExtensions.mjs"
+    },
+    "./helmet-context": {
+      "types": "./dist/types/helmetContext.d.ts",
+      "modern:source": "./src/helmetContext.ts",
+      "node": {
+        "import": "./dist/esm-node/helmetContext.mjs",
+        "require": "./dist/cjs/helmetContext.js"
+      },
+      "default": "./dist/esm/helmetContext.mjs"
+    },
+    "./head-runtime": {
+      "types": "./dist/types/headRuntime.d.ts",
+      "modern:source": "./src/headRuntime.tsx",
+      "node": {
+        "import": "./dist/esm-node/headRuntime.mjs",
+        "require": "./dist/cjs/headRuntime.js"
+      },
+      "default": "./dist/esm/headRuntime.mjs"
+    },
+    "./context-projection": {
+      "types": "./dist/types/runtimeContextProjection.d.ts",
+      "modern:source": "./src/runtimeContextProjection.ts",
+      "node": {
+        "import": "./dist/esm-node/runtimeContextProjection.mjs",
+        "require": "./dist/cjs/runtimeContextProjection.js"
+      },
+      "default": "./dist/esm/runtimeContextProjection.mjs"
+    },
+    "./server-config": {
+      "types": "./dist/types/server-config/index.d.ts",
+      "modern:source": "./src/server-config/index.ts",
+      "node": {
+        "import": "./dist/esm-node/server-config/index.mjs",
+        "require": "./dist/cjs/server-config/index.js"
+      },
+      "default": "./dist/esm/server-config/index.mjs"
+    },
+    "./router-state": {
+      "types": "./dist/types/routerState.d.ts",
+      "modern:source": "./src/routerState.ts",
+      "node": {
+        "import": "./dist/esm-node/routerState.mjs",
+        "require": "./dist/cjs/routerState.js"
+      },
+      "default": "./dist/esm/routerState.mjs"
+    },
+    "./request-policy": {
+      "types": "./dist/types/request-policy/browser.d.ts",
+      "node": {
+        "modern:source": "./src/request-policy/node.ts",
+        "import": "./dist/esm-node/request-policy/node.mjs",
+        "require": "./dist/esm-node/request-policy/node.mjs",
+        "default": "./dist/esm-node/request-policy/node.mjs"
+      },
+      "modern:source": "./src/request-policy/browser.ts",
+      "import": "./dist/esm/request-policy/browser.mjs",
+      "require": "./dist/esm/request-policy/browser.mjs",
+      "default": "./dist/esm/request-policy/browser.mjs"
+    },
+    "./request-policy/client": {
+      "types": "./dist/types/request-policy/browser.d.ts",
+      "modern:source": "./src/request-policy/browser.ts",
+      "import": "./dist/esm/request-policy/browser.mjs",
+      "require": "./dist/esm/request-policy/browser.mjs",
+      "default": "./dist/esm/request-policy/browser.mjs"
+    },
+    "./request-policy/server": {
+      "types": "./dist/types/request-policy/node.d.ts",
+      "node": {
+        "modern:source": "./src/request-policy/node.ts",
+        "import": "./dist/esm-node/request-policy/node.mjs",
+        "require": "./dist/esm-node/request-policy/node.mjs",
+        "default": "./dist/esm-node/request-policy/node.mjs"
+      }
+    },
+    "./request-context": {
+      "types": "./dist/types/request-policy/requestContext.d.ts",
+      "modern:source": "./src/request-policy/requestContext.ts",
+      "node": {
+        "modern:source": "./src/request-policy/requestContext.ts",
+        "import": "./dist/esm-node/request-policy/requestContext.mjs",
+        "require": "./dist/esm-node/request-policy/requestContext.mjs",
+        "default": "./dist/esm-node/request-policy/requestContext.mjs"
+      },
+      "import": "./dist/esm/request-policy/requestContext.mjs",
+      "require": "./dist/esm/request-policy/requestContext.mjs",
+      "default": "./dist/esm/request-policy/requestContext.mjs"
+    },
+    "./package.json": "./package.json",
+    "./router-state-plugin": {
+      "types": "./dist/types/routerStatePlugin.d.ts",
+      "modern:source": "./src/routerStatePlugin.ts",
+      "node": {
+        "import": "./dist/esm-node/routerStatePlugin.mjs",
+        "require": "./dist/cjs/routerStatePlugin.js"
+      },
+      "default": "./dist/esm/routerStatePlugin.mjs"
+    },
+    "./router-provider": {
+      "types": "./dist/types/routerProvider.d.ts",
+      "modern:source": "./src/routerProvider.ts",
+      "node": {
+        "import": "./dist/esm-node/routerProvider.mjs",
+        "require": "./dist/cjs/routerProvider.js"
+      },
+      "default": "./dist/esm/routerProvider.mjs"
+    },
+    "./router-prefetch-policy": {
+      "types": "./dist/types/routerPrefetchPolicy.d.ts",
+      "modern:source": "./src/routerPrefetchPolicy.ts",
+      "node": {
+        "import": "./dist/esm-node/routerPrefetchPolicy.mjs",
+        "require": "./dist/cjs/routerPrefetchPolicy.js"
+      },
+      "default": "./dist/esm/routerPrefetchPolicy.mjs"
     }
   },
   "typesVersions": {
@@ -94,10 +218,6 @@
         "./dist/types/node.d.ts",
         "./src/node.ts"
       ],
-      "rsc-html-stream": [
-        "./dist/types/rscHtmlStream.d.ts",
-        "./src/rscHtmlStream.ts"
-      ],
       "safe-failure": [
         "./dist/types/safeFailure.d.ts",
         "./src/safeFailure.ts"
@@ -106,6 +226,10 @@
         "./dist/types/buildIdentity.d.ts",
         "./src/buildIdentity.ts"
       ],
+      "workspace-events": [
+        "./dist/types/workspaceEvents.d.ts",
+        "./src/workspaceEvents.ts"
+      ],
       "localised-loader-identity": [
         "./dist/types/localisedLoaderIdentity.d.ts",
         "./src/localisedLoaderIdentity.ts"
@@ -113,6 +237,58 @@
       "react-context": [
         "./dist/types/reactContext.d.ts",
         "./src/reactContext.ts"
+      ],
+      "context-extensions": [
+        "./dist/types/contextExtensions.d.ts",
+        "./src/contextExtensions.ts"
+      ],
+      "helmet-context": [
+        "./dist/types/helmetContext.d.ts",
+        "./src/helmetContext.ts"
+      ],
+      "head-runtime": [
+        "./dist/types/headRuntime.d.ts",
+        "./src/headRuntime.tsx"
+      ],
+      "context-projection": [
+        "./dist/types/runtimeContextProjection.d.ts",
+        "./src/runtimeContextProjection.ts"
+      ],
+      "server-config": [
+        "./dist/types/server-config/index.d.ts",
+        "./src/server-config/index.ts"
+      ],
+      "router-state": [
+        "./dist/types/routerState.d.ts",
+        "./src/routerState.ts"
+      ],
+      "request-policy": [
+        "./dist/types/request-policy/browser.d.ts",
+        "./src/request-policy/browser.ts"
+      ],
+      "request-policy/client": [
+        "./dist/types/request-policy/browser.d.ts",
+        "./src/request-policy/browser.ts"
+      ],
+      "request-policy/server": [
+        "./dist/types/request-policy/node.d.ts",
+        "./src/request-policy/node.ts"
+      ],
+      "request-context": [
+        "./dist/types/request-policy/requestContext.d.ts",
+        "./src/request-policy/requestContext.ts"
+      ],
+      "router-state-plugin": [
+        "./dist/types/routerStatePlugin.d.ts",
+        "./src/routerStatePlugin.ts"
+      ],
+      "router-provider": [
+        "./dist/types/routerProvider.d.ts",
+        "./src/routerProvider.ts"
+      ],
+      "router-prefetch-policy": [
+        "./dist/types/routerPrefetchPolicy.d.ts",
+        "./src/routerPrefetchPolicy.ts"
       ]
     }
   },
@@ -126,14 +302,38 @@
     "@modern-js/rslib": "workspace:*",
     "@rslib/core": "1.0.0",
     "@scripts/rstest-config": "workspace:*",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "typescript": "^7.0.2"
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2",
+    "@rsbuild/core": "2.2.3",
+    "@modern-js/utils": "workspace:*",
+    "@loadable/component": "5.16.7",
+    "nock": "^14.0.17"
   },
   "sideEffects": false,
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public",
     "types": "./dist/types/index.d.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "react-helmet-async": "3.0.0",
+    "@modern-js/create-request": "workspace:*",
+    "@modern-js/runtime-utils": "workspace:*"
   }
 }

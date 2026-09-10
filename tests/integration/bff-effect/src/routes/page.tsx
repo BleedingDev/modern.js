@@ -5,7 +5,7 @@ import {
   runEffectRequest,
   runEffectView,
   view,
-} from '@modern-js/plugin-bff/effect-client';
+} from '@modern-js/bff-effect/effect-client';
 import { useEffect, useState } from 'react';
 import { bffRpcGroup } from '../../shared/effect-rpc';
 

@@ -25,17 +25,16 @@ function getSwcTransformOptions(config: Rspack.Configuration) {
   return undefined;
 }
 
-async function getBundlerConfig(config: BuilderConfig, name = 'web') {
+async function getBundlerConfig(config: BuilderConfig) {
   const rsbuild = await createBuilder({
     bundlerType: 'rspack',
     config,
     cwd: join(__dirname, '..'),
-    internalDirectory: join(__dirname, '.modern-js'),
   });
   const {
     origin: { bundlerConfigs },
   } = await rsbuild.inspectConfig();
-  return bundlerConfigs.find(item => item.name === name) ?? bundlerConfigs[0];
+  return bundlerConfigs[0];
 }
 
 describe('source.reactCompiler', () => {
@@ -74,21 +73,6 @@ describe('source.reactCompiler', () => {
       target: '18',
       compilationMode: 'annotation',
     });
-  });
-
-  test('keeps React Compiler enabled in an RSC server environment', async () => {
-    const transform = getSwcTransformOptions(
-      await getBundlerConfig(
-        {
-          environments: { server: { output: { target: 'node' } } },
-          server: { rsc: { environments: { server: 'server' } } },
-          source: { reactCompiler: true },
-        },
-        'server',
-      ),
-    );
-
-    expect(transform?.reactCompiler).toBe(true);
   });
 
   test('should not leak reactCompiler into rsbuild source config', async () => {

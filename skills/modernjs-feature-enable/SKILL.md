@@ -10,6 +10,19 @@ description: 在已有的 Modern.js 3.0 应用里启用可选功能：自动启�
 > ⚠️ **`modern new` 在 Modern.js 3.0 已移除**（见 `packages/document/docs/zh/guides/upgrade/other.md:107`、`:111`：「移除了 `modern new` 和 `modern upgrade` 命令，需要按照文档手动操作」「`modern new` 命令在 Modern.js 3.0 中不再支持，无法通过命令添加入口或启用功能」）。
 > `packages/document/docs/{zh,en}/apis/app/commands.mdx` 里残留的 `## modern new` 是 **stale doc**，不可作为现行依据，**不要让用户去跑 `modern new`**。本 skill 即官方推荐的「按文档手动操作」的自动化等价物。
 
+## UltraModern 工作区先分流
+
+若项目包含 `.modernjs/ultramodern.json`，添加业务域使用现有生成器：
+`pnpm dlx @bleedingdev/modern-js-ultramodern-create@<V> catalog --vertical`。
+`<V>` 必须是工作区选定的真实发布 cohort。只需要 API 时加
+`--preset api-only`，只需要 UI 时加 `--preset ui-only`。完成后运行
+`pnpm install` 和 `pnpm check`。不要用下面的函数式 BFF 启用脚本替换
+UltraModern 的 Effect API，也不要创建路由适配器来隐藏框架问题。
+
+UltraModern 的创建、更新、原生 Effect/TanStack、shell 和运行时命令见
+[`docs/ultramodern-native-workflows.md`](../../docs/ultramodern-native-workflows.md)。
+以下步骤适用于普通 Modern.js v3 应用。
+
 ## 能力矩阵（按自动化级别分层）
 
 > **不是「Modern.js v3 只能启用这几个」**。v3 里很多能力是**内置约定/配置**（Less/Sass 默认支持、Data Loader 是 `.data.ts` 约定、SSR/RSC 是配置/架构选择），不存在「启用插件」这一步，故不在本矩阵；微前端是架构决策。本 skill 覆盖的是「装插件/改配置就能开」的可选能力。

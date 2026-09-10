@@ -5,10 +5,10 @@ import {
   createNodeServer,
   loadServerRuntimeConfig,
 } from '@modern-js/server-core/node';
-import { initializeDisposableServerRuntime } from '@modern-js/server-runtime-extensions/runtime-lifecycle';
 import { logger } from '@modern-js/utils';
 import { devRuntimeMiddlewarePlugin, setupDevInfra } from './dev';
 import {
+  createDrainingHandle,
   createReloadManager,
   type ReloadableHandle,
 } from './dev-tools/reloadManager';
@@ -115,16 +115,19 @@ export async function createDevServer(
     runtimeServer.addPlugins([
       devRuntimeMiddlewarePlugin({ ...options, builderDevServer }, compiler),
     ]);
-    const handle = await initializeDisposableServerRuntime(
-      runtimeServer,
-      runtimeServer.handle,
-      async () => {
-        await applyPlugins(runtimeServer, runtimeOptions, nodeServer);
-        await runtimeServer.init();
-      },
-    );
+    try {
+      await applyPlugins(runtimeServer, runtimeOptions, nodeServer);
+      await runtimeServer.init();
+    } catch (error) {
+      await runtimeServer.dispose().catch((disposeError: unknown) => {
+        logger.error(disposeError);
+      });
+      throw error;
+    }
     nextRuntimeServer = runtimeServer;
-    return handle;
+    return createDrainingHandle(runtimeServer.handle, () =>
+      runtimeServer.dispose(),
+    );
   };
 
   // Files changed since the last completed reload. The debounced reload
@@ -172,8 +175,22 @@ export async function createDevServer(
    * boot failure propagates instead of being swallowed as "keep the previous
    * handle". The resulting handle seeds the ReloadManager.
    */
-  reloadManager.setHandle(await buildRuntimeServer());
-  currentRuntimeServer = nextRuntimeServer;
+  try {
+    reloadManager.setHandle(await buildRuntimeServer());
+    currentRuntimeServer = nextRuntimeServer;
+  } catch (error) {
+    reloadManager.close();
+    const cleanup = await Promise.allSettled([
+      Promise.resolve().then(() => builderDevServer?.close()),
+      Promise.resolve().then(() => nodeServer.close()),
+    ]);
+    for (const result of cleanup) {
+      if (result.status === 'rejected') {
+        logger.error(result.reason);
+      }
+    }
+    throw error;
+  }
 
   /**
    * Process-level dev infra, created once. The file watcher triggers a unified

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { mergeConfig } from '@modern-js/plugin/cli';
+import { compile } from '@modern-js/server-utils';
 import type { Entrypoint } from '@modern-js/types';
 import { fs, NESTED_ROUTE_SPEC_FILE } from '@modern-js/utils';
 import {
@@ -19,6 +20,16 @@ const strictestTsconfigPath = path.resolve(
   __dirname,
   '../../node_modules/@tsconfig/strictest/tsconfig.json',
 );
+
+function createAppContextApi<T extends object>(initial: T) {
+  let context: T & { serverCompileExcludedFiles?: string[] } = { ...initial };
+  return {
+    getAppContext: () => context,
+    updateAppContext: (update: Partial<typeof context>) => {
+      context = { ...context, ...update };
+    },
+  };
+}
 
 async function typecheckGeneratedRegistration(options: {
   entries: string[];
@@ -201,6 +212,92 @@ describe('tanstack router cli plugin', () => {
     }
   });
 
+  test.each([
+    { sourceDirectory: 'src', generatedDirName: undefined },
+    { sourceDirectory: 'client', generatedDirName: 'routing-types' },
+  ])('excludes its generated declaration from server roots only when installed: %s', async ({
+    sourceDirectory,
+    generatedDirName,
+  }) => {
+    tempDir = await fs.realpath(
+      await mkdtemp(path.join(tmpdir(), 'tanstack-server-roots-')),
+    );
+    const srcDirectory = path.join(tempDir, sourceDirectory);
+    const generatedDirectory = generatedDirName ?? 'modern-tanstack';
+    const declaration = path.join(
+      srcDirectory,
+      generatedDirectory,
+      'register.gen.d.ts',
+    );
+    const apiDirectory = path.join(tempDir, 'api');
+    const compileOptions = {
+      sourceDirs: [apiDirectory],
+      distDir: path.join(tempDir, 'dist'),
+      tsconfigPath: path.join(tempDir, 'tsconfig.json'),
+      throwErrorInsteadOfExit: true,
+    };
+    await fs.outputJSON(compileOptions.tsconfigPath, {
+      compilerOptions: {
+        module: 'commonjs',
+        target: 'ES2022',
+        types: [],
+        noEmitOnError: true,
+        skipLibCheck: false,
+      },
+      include: ['api', sourceDirectory],
+    });
+    await fs.outputFile(
+      path.join(apiDirectory, 'index.ts'),
+      'export const server = true;\n',
+    );
+    await fs.outputFile(
+      path.join(srcDirectory, 'routes/page.tsx'),
+      "import type { Missing } from 'missing-browser-only-types';\nexport const page: Missing = undefined;\n",
+    );
+    await fs.outputFile(
+      path.join(srcDirectory, generatedDirectory, 'main/router.gen.ts'),
+      "import { page } from '../../routes/page';\nexport const router = { page };\n",
+    );
+    await writeTanstackRegisterFile({
+      entries: ['main'],
+      srcDirectory,
+      generatedDirName,
+    });
+
+    await expect(compile(tempDir, {}, compileOptions)).rejects.toThrow(
+      /missing-browser-only-types/,
+    );
+
+    const previousExclusions = [path.join(tempDir, 'other-client.d.ts')];
+    const api = {
+      ...createAppContextApi({
+        srcDirectory,
+        serverCompileExcludedFiles: previousExclusions,
+      }),
+      _internalRuntimePlugins: () => {},
+      checkEntryPoint: () => {},
+      config: () => {},
+      modifyEntrypoints: () => {},
+      generateEntryCode: () => {},
+      onFileChanged: () => {},
+      modifyFileSystemRoutes: () => {},
+      onBeforeGenerateRoutes: () => {},
+    };
+    tanstackRouterPlugin({ generatedDirName }).setup!(api as never);
+    const excludeFiles = api.getAppContext().serverCompileExcludedFiles;
+    expect(excludeFiles).toEqual([...previousExclusions, declaration]);
+    expect(previousExclusions).toEqual([
+      path.join(tempDir, 'other-client.d.ts'),
+    ]);
+    await compile(tempDir, {}, { ...compileOptions, excludeFiles });
+    expect(
+      await fs.pathExists(path.join(compileOptions.distDir, 'api/index.js')),
+    ).toBe(true);
+    expect(
+      await fs.pathExists(path.join(compileOptions.distDir, sourceDirectory)),
+    ).toBe(false);
+  });
+
   test('typechecks plugin-owned routers and register metadata under strictest', async () => {
     tempDir = await mkdtemp(path.join(tmpdir(), 'modern-tanstack-cli-'));
     const srcDirectory = path.join(tempDir, 'src');
@@ -345,7 +442,7 @@ describe('tanstack router cli plugin', () => {
 
     const taps: Record<string, any> = {};
     const api = {
-      getAppContext: () => ({
+      ...createAppContextApi({
         srcDirectory,
         distDirectory,
         metaName: 'modern-js',
@@ -446,7 +543,7 @@ describe('tanstack router cli plugin', () => {
   test('injects the framework-resolving router wrapper for non-file-route entrypoints', async () => {
     const taps: Record<string, any> = {};
     const api = {
-      getAppContext: () => ({
+      ...createAppContextApi({
         srcDirectory: '/tmp/app/src',
         metaName: 'modern-js',
         serverRoutes: [{ entryName: 'custom', urlPath: '/' }],
@@ -508,7 +605,7 @@ describe('tanstack router cli plugin', () => {
   test('leaves built-in and foreign-owned route entrypoints to their own router', () => {
     const taps: Record<string, any> = {};
     const api = {
-      getAppContext: () => ({
+      ...createAppContextApi({
         srcDirectory: '/tmp/app/src',
         metaName: 'modern-js',
         serverRoutes: [{ entryName: 'home', urlPath: '/' }],
@@ -588,7 +685,7 @@ describe('tanstack router cli plugin', () => {
   test('source.include covers the package dist and TanStack runtime deps without string surgery', () => {
     const taps: Record<string, any> = {};
     const api = {
-      getAppContext: () => ({
+      ...createAppContextApi({
         srcDirectory: '/tmp/app/src',
         serverRoutes: [],
       }),
@@ -668,7 +765,7 @@ describe('tanstack router cli plugin', () => {
 
       const taps: Record<string, any> = {};
       const api = {
-        getAppContext: () => ({
+        ...createAppContextApi({
           srcDirectory,
           internalSrcAlias: '@/_',
           entrypoints: [entrypoint],
@@ -765,7 +862,7 @@ describe('tanstack router cli plugin', () => {
 
     const taps: Record<string, any> = {};
     const api = {
-      getAppContext: () => ({
+      ...createAppContextApi({
         srcDirectory,
         internalSrcAlias: '@/_',
         entrypoints: [entrypoint],
@@ -830,7 +927,7 @@ describe('tanstack router cli plugin', () => {
       __modernRoutesDir: 'views',
     } as any as Entrypoint;
     const api = {
-      getAppContext: () => ({
+      ...createAppContextApi({
         srcDirectory: '/tmp/app/src',
         internalSrcAlias: '@/_',
         entrypoints: [entrypoint],
@@ -878,7 +975,7 @@ describe('tanstack router cli plugin', () => {
   test('can opt out of Modern-owned route code splitting', async () => {
     const taps: Record<string, any> = {};
     const api = {
-      getAppContext: () => ({
+      ...createAppContextApi({
         srcDirectory: '/tmp/app/src',
         serverRoutes: [],
       }),

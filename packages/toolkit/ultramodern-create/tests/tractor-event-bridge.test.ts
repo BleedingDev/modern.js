@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import vm from 'node:vm';
 import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
+import { linkBuiltRuntimeExtensions } from './helpers/build-module';
 import { runStableTypeScript } from './helpers/stable-typescript';
 
 function scaffoldSharedContractsWorkspace() {
@@ -48,45 +49,44 @@ function loadGeneratedSharedContracts(workspaceDir: string) {
   const outputDirectory = path.join(compilerRoot, 'dist');
   fs.mkdirSync(compilerRoot, { recursive: true });
   fs.writeFileSync(sourcePath, source);
+  fs.writeFileSync(
+    path.join(compilerRoot, 'package.json'),
+    JSON.stringify({ type: 'commonjs' }),
+  );
+  linkBuiltRuntimeExtensions(
+    path.join(compilerRoot, 'node_modules'),
+    'workspace-events',
+  );
   const result = runStableTypeScript(
     [
       sourcePath,
       '--ignoreConfig',
       '--module',
-      'commonjs',
+      'NodeNext',
+      '--moduleResolution',
+      'NodeNext',
       '--outDir',
       outputDirectory,
       '--pretty',
       'false',
-      '--skipLibCheck',
+      '--strict',
       '--target',
       'es2022',
     ],
     compilerRoot,
   );
   assert.equal(result.status, 0, result.output);
-  const outputText = fs.readFileSync(
+  const require = createRequire(sourcePath);
+  const contracts = require(
     path.join(outputDirectory, 'generated-shared-contracts.js'),
-    'utf-8',
+  ) as Record<string, any>;
+  const provider = require('@modern-js/runtime-extensions/workspace-events');
+  assert.equal(
+    contracts.createUltramodernWorkspaceEvent,
+    provider.createUltramodernWorkspaceEvent,
+    'generated contracts must expose the actual public event implementation',
   );
-  const module = { exports: {} as Record<string, any> };
-  const context = vm.createContext({
-    CustomEvent,
-    Error,
-    Event,
-    EventTarget,
-    exports: module.exports,
-    module,
-    Number,
-    Object,
-    console,
-  });
-
-  vm.runInContext(outputText, context, {
-    filename: 'generated-shared-contracts.cjs',
-  });
-
-  return module.exports;
+  return contracts;
 }
 
 test('generated shared contracts expose neutral workspace event helpers', () => {

@@ -50,6 +50,39 @@ import type {
   EffectRuntimeLayer,
 } from '@modern-js/bff-effect/effect';
 
+import {
+  createMicroVerticalOperationContext,
+  MicroVerticalReadinessSchema,
+  type MicroVerticalBuildMarker,
+  type MicroVerticalOperationContext,
+  type MicroVerticalOperationSource,
+  type MicroVerticalReadiness,
+} from '@modern-js/bff-effect/microvertical-api';
+
+const operation = createMicroVerticalOperationContext({
+  method: 'GET', operationId: 'catalog.list', routePath: '/catalog',
+});
+const method: 'GET' = operation.method;
+const operationId: 'catalog.list' = operation.operationId;
+const routePath: '/catalog' = operation.routePath;
+const source: 'generated-client' = operation.source;
+const compatible: MicroVerticalOperationContext = operation;
+const operationSource: MicroVerticalOperationSource = source;
+// @ts-expect-error traceId is an optional key, not an explicit undefined value
+const invalidTrace: MicroVerticalOperationContext = { ...operation, traceId: undefined };
+// @ts-expect-error generated-client inference is readonly
+operation.method = 'GET';
+const consumerReadiness = Schema.Struct({
+  ...MicroVerticalReadinessSchema.fields,
+  database: Schema.Literal('ready'),
+});
+declare const healthy: typeof consumerReadiness.Type;
+const readiness: MicroVerticalReadiness = healthy;
+const marker: MicroVerticalBuildMarker = healthy.marker;
+const appId: string = marker.appId;
+// @ts-expect-error validator brands are not public baseline exports
+import { MicroVerticalAppIdSchema } from '@modern-js/bff-effect/microvertical-api';
+
 const PingApi = HttpApi.make('PingApi').add(
   HttpApiGroup.make('ping', { topLevel: true }).add(
     HttpApiEndpoint.get('ping', '/ping', {
@@ -154,13 +187,14 @@ void runtime;
         compilerManifest.bin.tsgo,
       );
       const result = spawnSync(
-        compilerPath,
-        ['--project', path.join(fixtureRoot, 'tsconfig.json')],
+        process.execPath,
+        [compilerPath, '--project', path.join(fixtureRoot, 'tsconfig.json')],
         {
           encoding: 'utf8',
         },
       );
 
+      expect(result.error).toBeUndefined();
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true });

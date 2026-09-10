@@ -1,8 +1,8 @@
+import type { MiddlewareHandler } from '@modern-js/server-core';
 import {
   buildOperationContractMap,
   resolveCrossProjectPolicy,
-} from '@modern-js/bff-core';
-import type { MiddlewareHandler } from '@modern-js/server-core';
+} from '@modern-js/server-runtime-extensions/bff-policy/node';
 
 import { bindHonoRouteHandlers } from '../src/hono';
 

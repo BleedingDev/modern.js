@@ -1,4 +1,4 @@
-import { applyRouterRuntimeState } from '../../../src/core/context';
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import {
   createRouterCleanup,
   ROUTER_CLEANUP_ERROR,

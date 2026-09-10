@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveEffectTsgoCompiler } from '@modern-js/app-tools-extensions/config';
 import { transformSync } from 'esbuild';
-import { resolveEffectTsgoCompiler } from '../../../solutions/app-tools/src/config/public';
 import { addUltramodernVertical } from '../src/ultramodern-workspace';
 import { createWorkspace, listFiles } from './helpers/workspace-kit';
 
@@ -17,7 +17,7 @@ const packageExportProbe = `import {
   getBuildConfigEnvironment,
   resolveEffectTsgoCompiler,
   withBuildConfigEnvironment,
-} from '@modern-js/app-tools/config';
+} from '@modern-js/app-tools-extensions/config';
 
 export const generatedCompilerPath: string = resolveEffectTsgoCompiler({
   from: import.meta.url,
@@ -49,7 +49,7 @@ function linkRepositoryPackageModules(workspaceDir: string) {
     'pnpm repository package links must exist before running diagnostics',
   );
   // pnpm's hidden hoisted store does not reliably link every workspace
-  // package (app-tools is absent under some hoisting configurations), so
+  // package (app-tools-extensions is absent under some hoisting configurations), so
   // compose an overlay: every hoisted entry plus explicit workspace links.
   const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
   const overlayModules = path.join(workspaceDir, 'node_modules');
@@ -70,18 +70,25 @@ function linkRepositoryPackageModules(workspaceDir: string) {
       fs.symlinkSync(source, path.join(overlayModules, entry), symlinkType);
     }
   }
-  const workspaceAppTools = path.join(
+  const workspaceAppToolsExtensions = path.join(
     repositoryRoot,
-    'packages/solutions/app-tools',
+    'packages/solutions/app-tools-extensions',
   );
-  const overlayAppTools = path.join(overlayModules, '@modern-js/app-tools');
-  if (!fs.existsSync(overlayAppTools)) {
-    fs.symlinkSync(workspaceAppTools, overlayAppTools, symlinkType);
+  const overlayAppToolsExtensions = path.join(
+    overlayModules,
+    '@modern-js/app-tools-extensions',
+  );
+  if (!fs.existsSync(overlayAppToolsExtensions)) {
+    fs.symlinkSync(
+      workspaceAppToolsExtensions,
+      overlayAppToolsExtensions,
+      symlinkType,
+    );
   }
   assert.equal(
-    fs.realpathSync(overlayAppTools),
-    workspaceAppTools,
-    'diagnostics must resolve the workspace app-tools package',
+    fs.realpathSync(overlayAppToolsExtensions),
+    workspaceAppToolsExtensions,
+    'diagnostics must resolve the workspace app-tools-extensions package',
   );
 }
 

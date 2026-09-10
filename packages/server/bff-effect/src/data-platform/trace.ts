@@ -1,5 +1,5 @@
 // @effect-diagnostics asyncFunction:off globalDate:off globalRandom:off globalTimers:off newPromise:off strictBooleanExpressions:off
-import { parseTraceparent } from '@modern-js/create-request';
+import { parseTraceparent } from '@modern-js/runtime-extensions/request-context';
 
 import type { TraceContext } from './types';
 

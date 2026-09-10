@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { generateUltramodernWorkspace } from '../src/ultramodern-workspace';
+import { workspaceTemplateDir } from '../src/ultramodern-workspace/fs-io';
 
 /**
  * Supply-chain guardrails for generated workspaces: a plain `pnpm install`
@@ -146,12 +147,17 @@ function withCreateBinEnv() {
   };
 }
 
-test('bootstrap-agent-skills --postinstall installs vendored Codex skills and keeps user skills offline', () => {
+test('generated postinstall installs vendored Codex skills without formatting consumer source', () => {
   const { tempRoot, workspaceDir } = scaffoldWorkspace();
 
   try {
+    // Bootstrap copies the authoritative vendored bytes. Initial generation
+    // formats Markdown, which can differ from a Windows CRLF source checkout.
     const expectedSkill = fs.readFileSync(
-      path.join(workspaceDir, '.codex/skills/rsbuild-best-practices/SKILL.md'),
+      path.join(
+        workspaceTemplateDir,
+        '.codex/skills/rsbuild-best-practices/SKILL.md',
+      ),
     );
     fs.rmSync(path.join(workspaceDir, '.codex/skills/rsbuild-best-practices'), {
       force: true,
@@ -169,21 +175,30 @@ test('bootstrap-agent-skills --postinstall installs vendored Codex skills and ke
       failNetwork: true,
       topLevel: undefined,
     });
+    const consumerSourcePath = path.join(workspaceDir, 'consumer.ts');
+    const consumerSource = 'export const value={unchanged:true}\n';
+    fs.writeFileSync(consumerSourcePath, consumerSource);
+    writeCommandShim(
+      fakeBinDir,
+      'oxfmt',
+      `require('node:fs').writeFileSync(${JSON.stringify(consumerSourcePath)}, 'formatted');`,
+    );
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(workspaceDir, 'package.json'), 'utf8'),
+    );
     const env = withFakeToolEnv(fakeBinDir);
     delete env.ULTRAMODERN_CODEX_SKILLS;
     delete env.ULTRAMODERN_SKIP_CODEX_SKILLS;
 
-    const result = spawnSync(
-      process.execPath,
-      ['scripts/bootstrap-agent-skills.mts', '--postinstall'],
-      {
-        cwd: workspaceDir,
-        encoding: 'utf-8',
-        env,
-      },
-    );
+    const result = spawnSync(packageJson.scripts.postinstall, {
+      cwd: workspaceDir,
+      encoding: 'utf-8',
+      env,
+      shell: true,
+    });
 
     assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(consumerSourcePath, 'utf8'), consumerSource);
     assert.deepEqual(
       fs.readFileSync(
         path.join(
@@ -213,9 +228,24 @@ test('bootstrap-agent-skills --postinstall installs vendored Codex skills and ke
       true,
     );
     assert.equal(
+      fs.readFileSync(
+        path.join(workspaceDir, '.codex/skills/local-user-skill/SKILL.md'),
+        'utf8',
+      ),
+      '# Local user skill\n',
+    );
+    assert.equal(
       fs.existsSync(path.join(workspaceDir, '.codex/skills/mf')),
       false,
     );
+    const formatted = spawnSync(packageJson.scripts.format, {
+      cwd: workspaceDir,
+      encoding: 'utf-8',
+      env,
+      shell: true,
+    });
+    assert.equal(formatted.status, 0, formatted.stderr);
+    assert.equal(fs.readFileSync(consumerSourcePath, 'utf8'), 'formatted');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

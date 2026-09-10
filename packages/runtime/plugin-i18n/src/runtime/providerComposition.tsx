@@ -1,19 +1,52 @@
-import { useLanguageSync } from '@modern-js/i18n-runtime-extensions';
 import { RuntimeContext } from '@modern-js/runtime';
 import { Helmet } from '@modern-js/runtime/head';
 import type React from 'react';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { BaseLocaleDetectionOptions } from '../shared/type';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
 import { ModernI18nProvider } from './context';
 import {
   createContextValue,
   useClientSideRedirect,
+  useLanguageSync,
   useSdkResourcesLoader,
 } from './hooks';
 import type { I18nInstance } from './i18n';
 import { getI18nextInstanceForProvider } from './i18n/instance';
 import type { RuntimeContextWithI18n } from './pluginSetup';
 import { useI18nRouterAdapter } from './routerAdapter';
+
+export interface I18nLanguageSynchronizationProps {
+  i18nInstance: I18nInstance | undefined;
+  localePathRedirect: boolean;
+  languages: string[];
+  pathname: string | undefined;
+  prevLangRef: React.MutableRefObject<string>;
+  setLang: (language: string) => void;
+  children: (
+    synchronizeLanguage: (language: string) => void,
+  ) => React.ReactNode;
+}
+
+const NativeLanguageSynchronization = ({
+  i18nInstance,
+  localePathRedirect,
+  languages,
+  pathname,
+  prevLangRef,
+  setLang,
+  children,
+}: I18nLanguageSynchronizationProps) => {
+  const synchronizeLanguage = useLanguageSync(
+    i18nInstance,
+    localePathRedirect,
+    languages,
+    pathname,
+    prevLangRef,
+    setLang,
+  );
+  return children(synchronizeLanguage);
+};
 
 interface I18nRootWrapperOptions {
   entryName?: string;
@@ -22,14 +55,18 @@ interface I18nRootWrapperOptions {
   languages: string[];
   fallbackLanguage: string;
   ignoreRedirectRoutes?: BaseLocaleDetectionOptions['ignoreRedirectRoutes'];
-  localisedUrls?: BaseLocaleDetectionOptions['localisedUrls'];
+  urlStrategy?: I18nUrlStrategy;
+  NavigationProvider?: React.ComponentType<React.PropsWithChildren>;
+  LanguageSynchronization?: React.ComponentType<I18nLanguageSynchronizationProps>;
   getLatestI18nInstance: () => I18nInstance | undefined;
   getI18nextProvider: () => React.ComponentType<any> | null | undefined;
 }
 
 export const createI18nRootWrapper =
   (options: I18nRootWrapperOptions) => (App: React.ComponentType<any>) => {
-    return (props: Record<string, unknown>) => {
+    const LanguageSynchronization =
+      options.LanguageSynchronization ?? NativeLanguageSynchronization;
+    const I18nRoot = (props: Record<string, unknown>) => {
       const {
         entryName,
         htmlLangAttr,
@@ -37,7 +74,7 @@ export const createI18nRootWrapper =
         languages,
         fallbackLanguage,
         ignoreRedirectRoutes,
-        localisedUrls,
+        urlStrategy,
         getLatestI18nInstance,
         getI18nextProvider,
       } = options;
@@ -69,15 +106,6 @@ export const createI18nRootWrapper =
       }, [lang]);
 
       useSdkResourcesLoader(i18nInstance, setForceUpdate);
-      const synchronizeLanguage = useLanguageSync(
-        i18nInstance,
-        localePathRedirect,
-        languages,
-        location?.pathname,
-        prevLangRef,
-        setLang,
-      );
-
       // Handle client-side redirect for static deployments.
       useClientSideRedirect(
         i18nInstance,
@@ -85,7 +113,7 @@ export const createI18nRootWrapper =
         languages,
         fallbackLanguage,
         ignoreRedirectRoutes,
-        localisedUrls,
+        urlStrategy,
       );
 
       const contextValue = useMemo(
@@ -97,9 +125,8 @@ export const createI18nRootWrapper =
             languages,
             localePathRedirect,
             ignoreRedirectRoutes,
-            localisedUrls,
             setLang,
-            synchronizeLanguage,
+            urlStrategy,
           ),
         [
           lang,
@@ -108,9 +135,8 @@ export const createI18nRootWrapper =
           languages,
           localePathRedirect,
           ignoreRedirectRoutes,
-          localisedUrls,
+          urlStrategy,
           forceUpdate,
-          synchronizeLanguage,
         ],
       );
       const I18nextProvider = getI18nextProvider();
@@ -140,13 +166,35 @@ export const createI18nRootWrapper =
       return (
         <>
           {Boolean(htmlLangAttr) && <Helmet htmlAttributes={{ lang }} />}
-          <ModernI18nProvider
-            i18nextProvider={I18nextProvider}
-            value={contextValue}
+          <LanguageSynchronization
+            i18nInstance={i18nInstance}
+            localePathRedirect={localePathRedirect}
+            languages={languages}
+            pathname={location?.pathname}
+            prevLangRef={prevLangRef}
+            setLang={setLang}
           >
-            {appContent}
-          </ModernI18nProvider>
+            {synchronizeLanguage => (
+              <ModernI18nProvider
+                i18nextProvider={I18nextProvider}
+                value={{ ...contextValue, synchronizeLanguage }}
+              >
+                {appContent}
+              </ModernI18nProvider>
+            )}
+          </LanguageSynchronization>
         </>
+      );
+    };
+    const { NavigationProvider } = options;
+    if (!NavigationProvider) {
+      return I18nRoot;
+    }
+    return function I18nRootWithNavigation(props: Record<string, unknown>) {
+      return (
+        <NavigationProvider>
+          <I18nRoot {...props} />
+        </NavigationProvider>
       );
     };
   };

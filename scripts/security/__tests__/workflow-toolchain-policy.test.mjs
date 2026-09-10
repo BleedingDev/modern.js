@@ -128,6 +128,24 @@ test('release workflows use exact Node 26 while nightly remains forward-looking'
       'nightly should detect future Node 26 patches',
     );
   }
+
+  const nightly = readWorkflow('.github/workflows/ultramodern-nightly.yml');
+  for (const jobName of ['script-tests', 'superapp-certification-nightly']) {
+    const steps = nightly.jobs[jobName].steps;
+    const miseIndex = steps.findIndex(step => step.uses === miseActionUse);
+    const nodeIndex = steps.findIndex(step => step.uses === setupNodeUse);
+    assert.ok(
+      miseIndex >= 0 && nodeIndex > miseIndex,
+      `${jobName} must select nightly Node after mise installs the pinned tools`,
+    );
+    for (const step of steps.slice(nodeIndex + 1)) {
+      assert.doesNotMatch(
+        step.run ?? '',
+        /\bmise\s+(?:exec|x)\b/u,
+        `${jobName} must keep setup-node's runtime instead of .mise.toml's pin`,
+      );
+    }
+  }
 });
 
 test('macOS unit tests run on the supported Apple Silicon image', () => {
@@ -153,8 +171,8 @@ test('nightly installs the frozen workspace, then builds, then runs script tests
   );
   assert.deepEqual(steps[installIndex], {
     name: 'Install Dependencies',
-    run: 'mise exec -- pnpm install --frozen-lockfile',
+    run: 'pnpm install --frozen-lockfile',
   });
-  assert.equal(steps[buildIndex]?.run, 'mise exec -- pnpm run prepare-build');
+  assert.equal(steps[buildIndex]?.run, 'pnpm run prepare-build');
   assert.equal(steps[testIndex]?.run, 'pnpm run test:scripts');
 });

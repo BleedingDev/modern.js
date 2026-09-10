@@ -101,10 +101,6 @@ export function ensureSharedApiInfrastructure(
     readFileTemplate('packages/effect-bff-runtime.ts'),
   );
   writeMissing(
-    'src/microvertical-api-baseline.ts',
-    readFileTemplate('packages/microvertical-api-baseline.ts'),
-  );
-  writeMissing(
     'tsconfig.json',
     `${JSON.stringify(createSharedPackageTsConfig(directory), null, 2)}\n`,
   );

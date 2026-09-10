@@ -1,6 +1,7 @@
-import { appTools, defineConfig } from '@modern-js/app-tools';
-import { bffPlugin } from '@modern-js/plugin-bff';
+import { defineConfig } from '@modern-js/app-tools';
+import { bffPlugin } from '@modern-js/plugin-bff-build-extensions';
 import { tanstackRouterPlugin } from '@modern-js/plugin-tanstack';
+import { ultramodernAppTools } from '@modern-js/ultramodern-app-tools';
 import { moduleFederationPlugin } from '@module-federation/modern-js-v3';
 
 const remoteTwoPort = Number(process.env.MF_REMOTE_TWO_PORT ?? 3012);
@@ -43,7 +44,7 @@ export default defineConfig({
     },
   },
   plugins: [
-    appTools(),
+    ultramodernAppTools(),
     tanstackRouterPlugin(),
     bffPlugin(),
     moduleFederationPlugin(),

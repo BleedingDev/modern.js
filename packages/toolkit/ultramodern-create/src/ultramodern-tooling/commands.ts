@@ -2,6 +2,7 @@ import path from 'node:path';
 import { GENERATED_TOOLING_COMMANDS } from '../ultramodern-workspace/tooling-command-catalog';
 import { runCloudflareOutputVerify } from './commands/cloudflare-output-verify';
 import {
+  AD_HOC_TOOLING_COMMANDS,
   type CommandContext,
   printHelp,
   runTemplateBackedToolingCommand,
@@ -40,9 +41,9 @@ export async function runUltramodernToolingCli(
         return runCloudflareOutputVerify(rest, context);
       case GENERATED_TOOLING_COMMANDS.routesGenerate.command:
         return runRoutesGenerate(rest, context);
-      case 'sync-delivery-unit':
+      case AD_HOC_TOOLING_COMMANDS.syncDeliveryUnit:
         return runSyncDeliveryUnit(rest, context);
-      case 'skills':
+      case AD_HOC_TOOLING_COMMANDS.skills:
         return runSkills(rest, context);
       default:
         {

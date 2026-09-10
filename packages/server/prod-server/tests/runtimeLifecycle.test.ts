@@ -5,7 +5,7 @@ import {
   loadServerEnv,
   loadServerRuntimeConfig,
 } from '@modern-js/server-core/node';
-import { registerServerRuntimeDisposer } from '../../runtime-extensions/src/runtimeLifecycle';
+import { logger } from '@modern-js/utils';
 import { applyPlugins } from '../src/apply';
 import { createProdServer } from '../src/index';
 
@@ -34,6 +34,7 @@ const setup = (init: () => Promise<void>) => {
   const server = {
     handle: rstest.fn(),
     init: rstest.fn(init),
+    dispose: rstest.fn(async () => {}),
   };
   const nodeServer = new EventEmitter();
   rstest.mocked(createServerBase).mockReturnValue(server as never);
@@ -47,8 +48,7 @@ const setup = (init: () => Promise<void>) => {
 describe('production server runtime lifecycle', () => {
   test('releases the active runtime once when the node server closes', async () => {
     const { nodeServer, server } = setup(async () => {});
-    const dispose = rstest.fn(async () => {});
-    registerServerRuntimeDisposer(server, dispose);
+    const dispose = server.dispose;
 
     const result = await createProdServer(options());
     expect(result).toBe(nodeServer);
@@ -64,10 +64,28 @@ describe('production server runtime lifecycle', () => {
     const { server } = setup(async () => {
       throw setupError;
     });
-    const dispose = rstest.fn(async () => {});
-    registerServerRuntimeDisposer(server, dispose);
+    const dispose = server.dispose;
 
     await expect(createProdServer(options())).rejects.toBe(setupError);
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves startup failure when cleanup fails and close follows', async () => {
+    const setupError = new Error('server init failed');
+    const cleanupError = new Error('server cleanup failed');
+    const { nodeServer, server } = setup(async () => {
+      throw setupError;
+    });
+    const errorSpy = rstest.spyOn(logger, 'error').mockImplementation(() => {});
+    server.dispose.mockRejectedValue(cleanupError);
+    try {
+      await expect(createProdServer(options())).rejects.toBe(setupError);
+      nodeServer.emit('close');
+      await Promise.resolve();
+      expect(server.dispose).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledWith(cleanupError);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

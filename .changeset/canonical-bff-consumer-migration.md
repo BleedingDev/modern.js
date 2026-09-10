@@ -1,0 +1,11 @@
+---
+"@modern-js/ultramodern-create": minor
+---
+
+Generate BFF consumers with the fork-owned runtime and build packages, and migrate historical runtime imports transactionally. Resolve static imports, scoped aliases, templates, and concatenated specifiers before applying updates so unsupported dynamic imports leave the workspace unchanged.
+
+Declare the native app-tools peer at the generated workspace root using the selected package source, and authenticate the same provider when migrating a recognized historical workspace.
+
+Include generated build identity JSON in composite TypeScript inputs, and update only exact recognized predecessor app configurations while preserving consumer changes.
+
+Treat exact authenticated release-cohort selector replacement as a compatible update, preserving unrelated workspace policy and including the replacement in the guarded transaction.

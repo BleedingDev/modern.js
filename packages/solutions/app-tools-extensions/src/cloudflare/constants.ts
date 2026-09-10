@@ -34,7 +34,7 @@ export const BFF_EFFECT_WORKER_ENTRY = `${WORKER_BUNDLE_DIRECTORY}/__modern_bff_
 export const BFF_EFFECT_WORKER_DISPATCHER_EXPORT =
   '__modern_create_effect_bff_dispatcher';
 export const EFFECT_BFF_CLOUDFLARE_IMPORT_GUIDANCE =
-  'Ensure the Effect API entry exists at api/index.ts or bff.effect.entry, and import Cloudflare edge handlers from @modern-js/plugin-bff/effect-edge instead of lambda/Hono server helpers.';
+  'Ensure the Effect API entry exists at api/index.ts or bff.effect.entry, and import Cloudflare edge handlers from @modern-js/bff-effect/effect-edge instead of lambda/Hono server helpers.';
 export const DEFAULT_COMPATIBILITY_DATE = '2026-06-02';
 export const COMPATIBILITY_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 export const REQUIRED_COMPATIBILITY_FLAGS =

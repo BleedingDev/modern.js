@@ -4,12 +4,19 @@ import type {
   BaseBackendOptions,
   BaseLocaleDetectionOptions,
 } from '../shared/type';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
 import type { I18nInitOptions, I18nInstance } from './i18n';
 import {
   type RuntimeContextWithI18n,
   setupI18nBeforeRender,
 } from './pluginSetup';
-import { createI18nRootWrapper } from './providerComposition';
+import {
+  createI18nRootWrapper,
+  type I18nLanguageSynchronizationProps,
+} from './providerComposition';
+
+export type { I18nLanguageSynchronizationProps } from './providerComposition';
+
 import {
   type LoadReactI18nextIntegration,
   resolveReactI18nextIntegration,
@@ -17,6 +24,7 @@ import {
 import './types';
 
 export type { I18nSdkLoader, I18nSdkLoadOptions } from '../shared/type';
+export type { I18nUrlStrategy } from '../shared/urlStrategy';
 export type {
   I18nInitOptions,
   I18nInstance,
@@ -27,6 +35,13 @@ export type {
   LoadReactI18nextIntegration,
   ReactI18nextIntegration,
 } from './reactI18next';
+export {
+  I18nNavigationProvider,
+  type I18nRouterAdapter,
+  type I18nRouterLinkTarget,
+  useI18nRouterAdapter,
+  useNativeI18nRouterAdapter,
+} from './routerAdapter';
 
 export interface I18nPluginOptions {
   entryName?: string;
@@ -37,6 +52,9 @@ export interface I18nPluginOptions {
   initOptions?: I18nInitOptions;
   htmlLangAttr?: boolean;
   reactI18next?: boolean;
+  urlStrategy?: I18nUrlStrategy;
+  NavigationProvider?: React.ComponentType<React.PropsWithChildren>;
+  LanguageSynchronization?: React.ComponentType<I18nLanguageSynchronizationProps>;
   [key: string]: any;
 }
 
@@ -55,6 +73,9 @@ export const createI18nPlugin =
         backend,
         htmlLangAttr = false,
         reactI18next = true,
+        urlStrategy,
+        NavigationProvider,
+        LanguageSynchronization,
       } = options;
       const {
         localePathRedirect = false,
@@ -63,7 +84,6 @@ export const createI18nPlugin =
         fallbackLanguage = 'en',
         detection,
         ignoreRedirectRoutes,
-        localisedUrls,
       } = localeDetection || {};
       const { enabled: backendEnabled = false } = backend || {};
       let latestI18nInstance: I18nInstance | undefined;
@@ -100,7 +120,9 @@ export const createI18nPlugin =
           languages,
           fallbackLanguage,
           ignoreRedirectRoutes,
-          localisedUrls,
+          urlStrategy,
+          NavigationProvider,
+          LanguageSynchronization,
           getLatestI18nInstance: () => latestI18nInstance,
           getI18nextProvider: () => I18nextProvider,
         }),
@@ -128,12 +150,10 @@ export {
   type LinkProps,
 } from './Link';
 export {
-  canonicalPath,
   type LocalizedPathsConfig,
-  localizePath,
   type UseLocalizedLocationReturn,
   type UseLocalizedPathsReturn,
   useLocalizedLocation,
   useLocalizedPaths,
 } from './localizedPaths';
-export { buildLocalizedUrl, splitUrlTarget } from './utils';
+export { splitUrlTarget } from './utils';

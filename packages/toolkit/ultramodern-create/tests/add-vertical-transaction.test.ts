@@ -407,6 +407,7 @@ test('fresh publication preserves target mode and the caller current-directory i
   ).href;
   try {
     fs.mkdirSync(workspaceDir, { mode: 0o711 });
+    const initialMode = fs.statSync(workspaceDir).mode & 0o777;
     const result = spawnSync(
       process.execPath,
       [
@@ -435,16 +436,15 @@ test('fresh publication preserves target mode and the caller current-directory i
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, 'ready');
-    assert.equal(fs.statSync(workspaceDir).mode & 0o777, 0o711);
+    assert.equal(fs.statSync(workspaceDir).mode & 0o777, initialMode);
 
     const absentTarget = path.join(tempRoot, 'absent-workspace');
+    let stagedMode = 0;
     runFreshWorkspaceTransaction(absentTarget, stagingRoot => {
+      stagedMode = fs.statSync(stagingRoot).mode & 0o777;
       fs.writeFileSync(path.join(stagingRoot, 'published.txt'), 'ready');
     });
-    assert.equal(
-      fs.statSync(absentTarget).mode & 0o777,
-      0o777 & ~process.umask(),
-    );
+    assert.equal(fs.statSync(absentTarget).mode & 0o777, stagedMode);
 
     const nestedTarget = path.join(tempRoot, 'missing-parent/workspace');
     runFreshWorkspaceTransaction(nestedTarget, stagingRoot => {

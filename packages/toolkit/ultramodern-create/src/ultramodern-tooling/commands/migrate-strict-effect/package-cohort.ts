@@ -6,12 +6,17 @@ import {
   ULTRAMODERN_WORKSPACE_MODERN_PACKAGES,
 } from '../../../ultramodern-package-source';
 import type { UltramodernReleaseCohort } from '../../../ultramodern-release-cohort';
+import {
+  appEmitsBrowserUi,
+  appHasApi,
+} from '../../../ultramodern-workspace/descriptors';
 import { ULTRAMODERN_PACKAGE_PINS } from '../../../ultramodern-workspace/policy';
 import type { WorkspaceApp } from '../../../ultramodern-workspace/types';
 import {
   createWorkspaceAppPackageScripts,
   createWorkspaceRootPackageScripts,
   GENERATED_POSTINSTALL_SCRIPT,
+  WORKSPACE_SCRIPT_SEGMENT_PATTERN,
 } from '../../../ultramodern-workspace/workspace-script-plan';
 import { migratedWorkspaceScriptBasenames } from '../../../ultramodern-workspace/workspace-scripts';
 
@@ -58,8 +63,108 @@ export function updateModernDependencies(
   packageJson: Record<string, any>,
   packageSource: ResolvedUltramodernPackageSource,
   releaseCohort?: Pick<UltramodernReleaseCohort, 'packages'>,
+  options: { app?: WorkspaceApp } = {},
 ) {
+  // Provider registration is a historical migration for declared Modern apps.
+  // The narrow same-contract helper intentionally cannot add these names.
+  const providers: Array<[string, string]> = options.app
+    ? [
+        ['devDependencies', '@modern-js/ultramodern-app-tools'],
+        ['devDependencies', '@modern-js/app-tools-extensions'],
+        ['dependencies', '@modern-js/runtime-renderer-extensions'],
+        ['dependencies', '@modern-js/i18n-integration'],
+        ...(appEmitsBrowserUi(options.app)
+          ? [
+              ['dependencies', '@modern-js/federation-runtime'] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
+        ...(options.app.kind === 'shell'
+          ? [
+              ['dependencies', '@modern-js/boundary-debugger'] as [
+                string,
+                string,
+              ],
+            ]
+          : []),
+      ]
+    : [];
+  if (!options.app) {
+    const rendererSections = new Set<string>();
+    for (const section of ['dependencies', 'devDependencies']) {
+      if (Object.hasOwn(packageJson[section] ?? {}, '@modern-js/runtime')) {
+        rendererSections.add(section);
+      }
+    }
+    if (packageJson.modernjs?.workspace === 'ultramodern-superapp') {
+      rendererSections.add('devDependencies');
+      providers.push(['devDependencies', '@modern-js/app-tools']);
+    }
+    for (const section of rendererSections) {
+      providers.push([section, '@modern-js/runtime-renderer-extensions']);
+    }
+  }
+  if (
+    (options.app &&
+      (appHasApi(options.app) ||
+        ['dependencies', 'devDependencies'].some(section =>
+          Object.hasOwn(packageJson[section] ?? {}, '@modern-js/plugin-bff'),
+        ))) ||
+    packageJson.modernjs?.workspace === 'ultramodern-superapp'
+  ) {
+    providers.push([
+      'devDependencies',
+      '@modern-js/plugin-bff-build-extensions',
+    ]);
+  }
+  if (
+    options.app &&
+    (appHasApi(options.app) ||
+      options.app.kind === 'shell' ||
+      ['dependencies', 'devDependencies'].some(section =>
+        [
+          '@modern-js/plugin-bff',
+          '@modern-js/plugin-bff-build-extensions',
+        ].some(name => Object.hasOwn(packageJson[section] ?? {}, name)),
+      ))
+  ) {
+    providers.push(['dependencies', '@modern-js/plugin-bff-extensions']);
+  } else if (packageJson.modernjs?.workspace === 'ultramodern-superapp') {
+    providers.push(['devDependencies', '@modern-js/plugin-bff-extensions']);
+  }
+  for (const [section, name] of providers) {
+    if (
+      packageJson[section] !== undefined &&
+      (!packageJson[section] ||
+        typeof packageJson[section] !== 'object' ||
+        Array.isArray(packageJson[section]))
+    ) {
+      throw new Error(`${section} must be an object to register ${name}.`);
+    }
+    if (
+      releaseCohort &&
+      !releaseCohort.packages.some(
+        item =>
+          item.sourceName === name &&
+          item.version === packageSource.modernPackageVersion,
+      )
+    ) {
+      throw new Error(
+        `Required migrated app provider ${name} is absent from the authenticated target cohort.`,
+      );
+    }
+  }
   let changed = false;
+  for (const [section, name] of providers) {
+    const dependencies = packageJson[section] ?? (packageJson[section] = {});
+    const specifier = modernPackageSpecifier(name, packageSource);
+    if (dependencies[name] !== specifier) {
+      dependencies[name] = specifier;
+      changed = true;
+    }
+  }
   for (const section of ['dependencies', 'devDependencies']) {
     const dependencies = packageJson[section];
     if (dependencies && Object.hasOwn(dependencies, '@modern-js/runtime')) {
@@ -147,7 +252,7 @@ export function updateGeneratedToolingDependencies(
 }
 
 /**
- * `@modern-js/plugin-bff` declares `effect` and `@effect/opentelemetry` as
+ * The native and fork BFF build packages declare `effect` and `@effect/opentelemetry` as
  * OPTIONAL peers, so whoever depends on plugin-bff has to supply them. A
  * workspace generated before that change declares neither, and nothing else
  * pulls Effect in — so on migration the BFF lane has no Effect to load, and the
@@ -165,7 +270,9 @@ export function ensureBffEffectDependencies(packageJson: Record<string, any>) {
       !dependencies ||
       typeof dependencies !== 'object' ||
       Array.isArray(dependencies) ||
-      !Object.hasOwn(dependencies, '@modern-js/plugin-bff')
+      !['@modern-js/plugin-bff', '@modern-js/plugin-bff-build-extensions'].some(
+        name => Object.hasOwn(dependencies, name),
+      )
     ) {
       continue;
     }
@@ -220,13 +327,19 @@ const legacyPortableRootScripts = new Map([
   ['format:check', ["oxfmt --check . '!repos/**'", 'oxfmt --check .']],
 ] as const);
 
-// Split an aggregate script (`a && b && c`) into its `&&`-joined segments.
-
-const splitScriptSegments = (command: string): string[] =>
-  command
-    .split('&&')
-    .map(segment => segment.trim())
-    .filter(segment => segment.length > 0);
+// Only split a fully recognized flat chain. Opaque shell programs must remain
+// intact rather than exposing quoted or substituted text as generated commands.
+const splitScriptSegments = (command: string): string[] => {
+  const segments = command.match(WORKSPACE_SCRIPT_SEGMENT_PATTERN);
+  if (
+    !segments ||
+    segments.join('&&') !== command ||
+    segments.some(segment => segment.trim().length === 0)
+  ) {
+    return [command];
+  }
+  return segments.map(segment => segment.trim());
+};
 
 // The pnpm script target a segment invokes (e.g. `pnpm api:check --foo` -> `api:check`).
 
@@ -246,6 +359,7 @@ const FRAMEWORK_CHECK_TARGETS: ReadonlySet<string> = new Set([
   'skills:check',
   'i18n:boundaries',
   'api:check',
+  'api:check:files',
   'contract:check',
   'node:backend-federation:generate',
   'node:proof',
@@ -450,6 +564,7 @@ export function updateGeneratedPackageScripts(
     relativePackageFile?: string;
     apps?: WorkspaceApp[];
     shellOnly?: boolean;
+    bridgeEnabled?: boolean;
     canRetireLegacyOxfmtCliExclusion?: boolean;
     onPreserveScript?: (scriptName: string) => void;
     preservedArtifacts?: ReadonlySet<string>;
@@ -483,7 +598,22 @@ export function updateGeneratedPackageScripts(
       }
     }
 
-    const existingPostinstall = scripts.postinstall;
+    let existingPostinstall = scripts.postinstall;
+    if (typeof existingPostinstall === 'string') {
+      const segments = splitScriptSegments(existingPostinstall);
+      // The exact bootstrap proves this chain contains generated segments.
+      // Retire only its historical broad format commands; keep custom ones.
+      if (segments.includes(GENERATED_POSTINSTALL_SCRIPT)) {
+        existingPostinstall = segments
+          .filter(
+            segment =>
+              !legacyPortableRootScripts
+                .get('format')
+                ?.some(format => format === segment),
+          )
+          .join(' && ');
+      }
+    }
     const mergedPostinstall =
       typeof existingPostinstall === 'string'
         ? mergeGeneratedScript(
@@ -509,6 +639,9 @@ export function updateGeneratedPackageScripts(
         apps.filter(candidate => candidate.kind !== 'shell'),
         {
           shells: apps.filter(candidate => candidate.kind === 'shell'),
+          bridgeCheck: options.bridgeEnabled
+            ? ' && pnpm bridge:check'
+            : undefined,
         },
       )
     : app
@@ -603,4 +736,65 @@ export function updateGeneratedPackageScripts(
   }
 
   return changed;
+}
+
+/** Only change already-declared leaves whose source identity is authenticated. */
+export function updateSameContractDependencies(
+  packageJson: Record<string, any>,
+  sourceCohort: UltramodernReleaseCohort,
+  targetCohort: UltramodernReleaseCohort,
+) {
+  const sourcePins = new Map(
+    sourceCohort.packages.flatMap(
+      item =>
+        [
+          [item.sourceName, `npm:${item.targetName}@${item.version}`],
+          [item.targetName, item.version],
+        ] as Array<[string, string]>,
+    ),
+  );
+  const targetPins = new Map(
+    targetCohort.packages.flatMap(
+      item =>
+        [
+          [item.sourceName, `npm:${item.targetName}@${item.version}`],
+          [item.targetName, item.version],
+        ] as Array<[string, string]>,
+    ),
+  );
+  const changes: Array<{ section: string; name: string; value: string }> = [];
+  for (const section of [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ]) {
+    const dependencies = packageJson[section];
+    if (dependencies === undefined) continue;
+    if (
+      !dependencies ||
+      typeof dependencies !== 'object' ||
+      Array.isArray(dependencies)
+    ) {
+      throw new Error(`${section} must be an object.`);
+    }
+    for (const [name, previous] of Object.entries(dependencies)) {
+      const source = sourcePins.get(name);
+      if (source === undefined) continue;
+      if (previous !== source)
+        throw new Error(
+          `${section}.${name} does not match the authenticated source cohort.`,
+        );
+      const target = targetPins.get(name);
+      if (target === undefined)
+        throw new Error(
+          `${section}.${name} has no authenticated target cohort member.`,
+        );
+      if (previous !== target) {
+        dependencies[name] = target;
+        changes.push({ section, name, value: target });
+      }
+    }
+  }
+  return changes;
 }

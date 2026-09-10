@@ -1,4 +1,8 @@
 {
   "private": true,
-  "name": "@modern-js-test/routes-tanstack-mf-remote-shared-effect"
+  "name": "@modern-js-test/routes-tanstack-mf-remote-shared-effect",
+  "dependencies": {
+    "@modern-js/bff-effect": "workspace:*",
+    "effect": "4.0.0-rc.112"
+  }
 }

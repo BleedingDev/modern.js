@@ -151,7 +151,7 @@ them may be amended by a follow-up ADR revision:
 5. For every changed upstream-owned path, add or update its
    `FORK-DIVERGENCE.md` row in the same change. Assign the default owner
    `bleedingdev` unless the row names another owner, and apply only the ledger
-   vocabulary: `upstream-PR`, `extension-point`, `capped-patch`, `fixed-in-fork`,
+   vocabulary: `upstream-PR`, `extension-point`, `inline-patch`, `fixed-in-fork`,
    `keep-deleted`, `keep-[F]`, `keep-[M]`, `revert`, `fix`, or `owner-decision`.
 6. Run both boundary gates against their recorded bases:
    ```sh
@@ -230,7 +230,7 @@ aligned to upstream minors). Syncs become scheduled work, not emergencies.
   the merge-base, ledger regeneration with rename detection pinned
   (`git diff -M`), divergence-budget recording, and the conflict policy already
   encoded in the ledger's **"Disposition vocabulary"** table (`upstream-PR`,
-  `extension-point`, `capped-patch`, `keep-[F]`, `keep-[M]`, `revert`, `fix`,
+  `extension-point`, `inline-patch`, `keep-[F]`, `keep-[M]`, `revert`, `fix`,
   `owner-decision`).
 - **The upstream PR lane becomes mandatory** for fork fixes that are really
   upstream bugs (e.g. the 404 fix, the upload `formData` fix). Carrying an

@@ -17,7 +17,10 @@
     "ultramodern.js"
   ],
   "version": "3.8.3",
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "types": "./dist/types/index.d.ts",
   "main": "./dist/cjs/index.js",
   "imports": {
@@ -66,6 +69,16 @@
       "import": "./dist/esm/effect-client/index.mjs",
       "default": "./dist/esm/effect-client/index.mjs"
     },
+    "./microvertical-api": {
+      "types": "./dist/types/microvertical-api.d.ts",
+      "modern:source": "./src/microvertical-api.ts",
+      "node": {
+        "import": "./dist/esm-node/microvertical-api.mjs",
+        "require": "./dist/cjs/microvertical-api.js"
+      },
+      "import": "./dist/esm/microvertical-api.mjs",
+      "default": "./dist/esm/microvertical-api.mjs"
+    },
     "./effect-client-runtime": {
       "types": "./dist/types/effect-client/runtime.d.ts",
       "modern:source": "./src/effect-client/runtime.ts",
@@ -85,16 +98,38 @@
       },
       "import": "./dist/esm/data-platform/index.mjs",
       "default": "./dist/esm/data-platform/index.mjs"
+    },
+    "./assembly": {
+      "types": "./dist/types/assembly.d.ts",
+      "modern:source": "./src/assembly.ts",
+      "node": {
+        "import": "./dist/esm-node/assembly.mjs",
+        "require": "./dist/cjs/assembly.js"
+      },
+      "default": "./dist/esm/assembly.mjs"
     }
   },
   "typesVersions": {
     "*": {
-      ".": ["./dist/types/index.d.ts", "./src/index.ts"],
-      "effect": ["./dist/types/effect/index.d.ts", "./src/effect/index.ts"],
-      "effect-edge": ["./dist/types/effect/edge.d.ts", "./src/effect/edge.ts"],
+      ".": [
+        "./dist/types/index.d.ts",
+        "./src/index.ts"
+      ],
+      "effect": [
+        "./dist/types/effect/index.d.ts",
+        "./src/effect/index.ts"
+      ],
+      "effect-edge": [
+        "./dist/types/effect/edge.d.ts",
+        "./src/effect/edge.ts"
+      ],
       "effect-client": [
         "./dist/types/effect-client/index.d.ts",
         "./src/effect-client/index.ts"
+      ],
+      "microvertical-api": [
+        "./dist/types/microvertical-api.d.ts",
+        "./src/microvertical-api.ts"
       ],
       "effect-client-runtime": [
         "./dist/types/effect-client/runtime.d.ts",
@@ -103,6 +138,10 @@
       "data-platform": [
         "./dist/types/data-platform/index.d.ts",
         "./src/data-platform/index.ts"
+      ],
+      "assembly": [
+        "./dist/types/assembly.d.ts",
+        "./src/assembly.ts"
       ]
     }
   },
@@ -127,7 +166,8 @@
     "@opentelemetry/sdk-trace-base": "2.11.0",
     "@opentelemetry/sdk-trace-node": "2.11.0",
     "@opentelemetry/sdk-trace-web": "2.11.0",
-    "@opentelemetry/semantic-conventions": "1.43.0"
+    "@opentelemetry/semantic-conventions": "1.43.0",
+    "@modern-js/server-runtime-extensions": "workspace:*"
   },
   "peerDependencies": {
     "@effect/opentelemetry": "4.0.0-rc.112",

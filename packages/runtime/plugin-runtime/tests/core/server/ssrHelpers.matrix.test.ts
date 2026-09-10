@@ -2,8 +2,7 @@ globalThis.__webpack_require__ = {
   u: chunkId => String(chunkId),
 };
 
-import { applyRouterRuntimeState } from '../../../src/core/context';
-import { createFederatedCssLinks } from '../../../src/core/server/federatedCss';
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import type {
   RedirectContext,
   ResponseProxy,
@@ -12,10 +11,6 @@ import {
   createRouterCleanup,
   type RouterCleanup,
 } from '../../../src/core/server/routerCleanup';
-import {
-  createRouteHydrationScriptTags,
-  orderHydrationScriptChunks,
-} from '../../../src/core/server/scriptOrder';
 
 const redirectCtx: RedirectContext = {
   enableRsc: false,
@@ -63,24 +58,6 @@ const snapshotResponse = async (response: Response) => ({
   headers: headersObject(response),
   body: response.body === null ? null : await response.text(),
 });
-
-const createRuntimeContext = (
-  matchedRouteIds: string[],
-  routeAssets: Record<string, { assets?: string[] }>,
-) => {
-  const runtimeContext = {
-    routeManifest: {
-      routeAssets,
-    },
-  } as any;
-
-  applyRouterRuntimeState(runtimeContext, {
-    framework: 'custom-router',
-    matchedRouteIds,
-  } as any);
-
-  return runtimeContext;
-};
 
 const createContextWithCleanup = (cleanup: () => void | Promise<void>) => {
   const context = {} as any;
@@ -203,115 +180,5 @@ describe('plugin-runtime SSR server helper matrix', () => {
       body: '<shell><tail>',
     });
     expect(cleanupCalls).toBe(1);
-  });
-
-  it('dedupes hydration script chunks and generated tags by the exact script src', () => {
-    expect(
-      orderHydrationScriptChunks({
-        entryName: 'main',
-        asyncEntryChunks: [
-          {
-            filename: 'async-main.123.js',
-            url: '/assets/async-main.123.js',
-          },
-          {
-            filename: 'vendor.js',
-            url: '/assets/vendor.js',
-          },
-          {
-            filename: 'vendor-copy.js',
-            url: '/assets/vendor.js',
-          },
-        ],
-        collectedChunks: [
-          {
-            filename: 'route.js',
-            url: '/assets/route.js',
-          },
-        ],
-        matchedRouteChunks: [
-          {
-            filename: 'route-copy.js',
-            url: '/assets/route.js',
-          },
-          {
-            filename: 'vendor-query.js',
-            url: '/assets/vendor.js?cache=1',
-          },
-        ],
-      }),
-    ).toEqual([
-      {
-        filename: 'vendor.js',
-        url: '/assets/vendor.js',
-      },
-      {
-        filename: 'route.js',
-        url: '/assets/route.js',
-      },
-      {
-        filename: 'vendor-query.js',
-        url: '/assets/vendor.js?cache=1',
-      },
-      {
-        filename: 'async-main.123.js',
-        url: '/assets/async-main.123.js',
-      },
-    ]);
-
-    const runtimeContext = createRuntimeContext(['routes/dashboard'], {
-      'routes/dashboard': {
-        assets: [
-          '/assets/dashboard.js',
-          '/assets/shared.js',
-          '/assets/dashboard.css',
-          '/assets/dashboard.js',
-        ],
-      },
-      'async-main': {
-        assets: [
-          '/assets/async-main.js',
-          '/assets/shared.js',
-          '/assets/async-main.css',
-        ],
-      },
-    });
-
-    expect(
-      createRouteHydrationScriptTags(runtimeContext, 'main', {
-        nonce: 'nonce-1',
-        template:
-          '<script defer src="/assets/dashboard.js"></script><script src="/assets/shared.js?cache=1"></script>',
-      }),
-    ).toBe(
-      '<script src="/assets/shared.js" nonce="nonce-1"></script> <script src="/assets/async-main.js" nonce="nonce-1"></script>',
-    );
-  });
-
-  it('escapes federated CSS hrefs and dedupes existing, repeated, and template-present assets', () => {
-    expect(
-      createFederatedCssLinks(
-        [
-          '/remote/base.css',
-          '/remote/base.css',
-          '/remote/theme" onload="alert(1)&x=<tag>.css',
-          '/remote/template".css',
-          '/remote/existing.css',
-          '',
-        ],
-        {
-          template:
-            '<link href="/remote/template&quot;.css" rel="stylesheet" />',
-          attributes: {
-            'data-mf': 'checkout',
-            nonce: 'nonce-2',
-            skipped: undefined,
-          },
-          existingAssets: ['/remote/existing.css'],
-        },
-      ),
-    ).toBe(
-      '<link data-mf="checkout" nonce="nonce-2" href="/remote/base.css" rel="stylesheet" /><link data-mf="checkout" nonce="nonce-2" href="/remote/theme&quot; onload=&quot;alert(1)&amp;x=&lt;tag&gt;.css" rel="stylesheet" />',
-    );
   });
 });

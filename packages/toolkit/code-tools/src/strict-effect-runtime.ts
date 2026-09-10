@@ -4,7 +4,8 @@ import { parse } from '@babel/parser';
 import traverse, { type Binding, Hub, NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 
-const edge = '@modern-js/plugin-bff/effect-edge';
+const edge = '@modern-js/bff-effect/effect-edge';
+const nodeRuntime = '@modern-js/bff-effect/effect';
 const sharedRuntime = /^@[^/]+\/shared-contracts\/server\/effect-bff-runtime$/u;
 const failure =
   'Generated API entries must export defineEffectBff(...) or the server-only shared Effect BFF assembly helper with an explicitly composed handler Layer and an unshadowed executable root; entries must implement handlers through HttpApiBuilder.group.';
@@ -180,27 +181,50 @@ export function strictEffectRuntimeTopologyViolation(
     const imported = (node: t.Node) => {
       const value = binding(node);
       const decl = value?.path.node;
-      if (!decl || !t.isImportSpecifier(decl) || decl.importKind === 'type')
+      if (
+        !decl ||
+        (!t.isImportSpecifier(decl) && !t.isImportNamespaceSpecifier(decl)) ||
+        (t.isImportSpecifier(decl) && decl.importKind === 'type')
+      )
         return undefined;
       const statement = value.path.parent;
       if (!t.isImportDeclaration(statement) || statement.importKind === 'type')
         return undefined;
       return {
-        name: t.isIdentifier(decl.imported)
-          ? decl.imported.name
-          : decl.imported.value,
+        namespace: t.isImportNamespaceSpecifier(decl),
+        name: t.isImportNamespaceSpecifier(decl)
+          ? '*'
+          : t.isIdentifier(decl.imported)
+            ? decl.imported.name
+            : decl.imported.value,
         specifier: statement.source.value,
       };
     };
-    const native = (node: t.Node, name: string, sources = [edge]): boolean => {
+    const namespaceSources: Record<string, readonly string[]> = {
+      HttpApi: [edge, 'effect/unstable/httpapi'],
+      HttpApiBuilder: [edge, 'effect/unstable/httpapi'],
+      HttpRouter: [edge, 'effect/unstable/http'],
+    };
+    const native = (
+      node: t.Node,
+      name: string,
+      sources?: readonly string[],
+    ): boolean => {
       const value = imported(node);
-      return value?.name === name && sources.includes(value.specifier);
+      if (!value) return false;
+      const importedNameMatches = value.namespace
+        ? value.specifier === `effect/${name}`
+        : value.name === name && value.specifier !== `effect/${name}`;
+      return (
+        importedNameMatches &&
+        (sources ?? namespaceSources[name] ?? [edge]).includes(value.specifier)
+      );
     };
     const method = (
       node: t.Node,
       namespace: string,
       member: string,
-      sources = [edge],
+      sources?: readonly string[],
     ): boolean => {
       node = unwrap(node);
       return (
@@ -312,7 +336,7 @@ export function strictEffectRuntimeTopologyViolation(
         active.delete(node);
       }
     };
-    const layerSources = [edge, 'effect'];
+    const layerSources = [edge, 'effect', 'effect/Layer'];
     const returned = (body: t.BlockStatement | t.Expression) => {
       if (!t.isBlockStatement(body)) return body;
       const statements = body.body;
@@ -455,7 +479,7 @@ export function strictEffectRuntimeTopologyViolation(
         !t.isCallExpression(groupInit) ||
         !method(groupInit.callee, 'RpcGroup', 'make', [
           'effect/unstable/rpc',
-          '@modern-js/plugin-bff/effect-client',
+          '@modern-js/bff-effect/effect-client',
         ])
       )
         return false;
@@ -495,7 +519,8 @@ export function strictEffectRuntimeTopologyViolation(
         if (!t.isCallExpression(node)) return false;
         const value = imported(node.callee);
         if (
-          (value?.name === 'defineEffectBff' && value.specifier === edge) ||
+          (value?.name === 'defineEffectBff' &&
+            [edge, nodeRuntime].includes(value.specifier)) ||
           (value?.name === 'assembleEffectBffRuntime' &&
             sharedRuntime.test(value.specifier))
         ) {

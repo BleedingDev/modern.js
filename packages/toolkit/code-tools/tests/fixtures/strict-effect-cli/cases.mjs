@@ -4,7 +4,7 @@ export const contract =
   'export const fixtureApi = {}; export const aliasApi = fixtureApi;';
 const imports = `
 import { assembleEffectBffRuntime } from '@fixture/shared-contracts/server/effect-bff-runtime';
-import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/plugin-bff/effect-edge';
+import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';
 import { fixtureApi } from '../shared/api.ts';
 `;
 const groups = `const group = HttpApiBuilder.group(fixtureApi, 'fixture', handlers =>
@@ -27,6 +27,17 @@ export const positives = {
       '',
     ),
   },
+  'node-split': {
+    source: direct
+      .replace(
+        "import { assembleEffectBffRuntime } from '@fixture/shared-contracts/server/effect-bff-runtime';",
+        '',
+      )
+      .replace(
+        "import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';",
+        "import { defineEffectBff } from '@modern-js/bff-effect/effect';\nimport { HttpApiBuilder } from 'effect/unstable/httpapi';\nimport * as Layer from 'effect/Layer';",
+      ),
+  },
   shared: { source: cleanShared },
   factory: {
     source:
@@ -45,7 +56,7 @@ export const positives = {
   },
   local: {
     source: local.replace(
-      "import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/plugin-bff/effect-edge';",
+      "import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge';",
       '',
     ),
     handlers: localHandlers,
@@ -57,6 +68,12 @@ export const negatives = {
     source: `const decoy = ${JSON.stringify(shared)}; export default undefined;`,
   },
   discarded: { source: direct.replace('export default apiRuntime;', '') },
+  'hono-root': {
+    source: direct.replace(
+      '@modern-js/bff-effect/effect-edge',
+      '@modern-js/plugin-bff/server',
+    ),
+  },
   'spoofed-root': {
     source: direct.replace('defineEffectBff,', 'fake as defineEffectBff,'),
   },

@@ -150,3 +150,260 @@ describe('clientGenerator', () => {
     });
   });
 });
+
+describe('BFF extension artifact publication', () => {
+  async function fixture() {
+    const appDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bff-artifacts-'));
+    const apiDir = path.join(appDir, 'api');
+    await fs.ensureDir(apiDir);
+    await fs.outputJSON(path.join(appDir, 'package.json'), {
+      name: 'artifact-producer',
+    });
+    const options = {
+      appDir,
+      apiDir,
+      lambdaDir: path.join(apiDir, 'lambda'),
+      prefix: '/api',
+      existLambda: false,
+      relativeDistPath: 'output',
+      relativeApiPath: 'api',
+      apiFiles: [],
+    };
+    const generation = {
+      appDirectory: appDir,
+      apiDirectory: apiDir,
+      lambdaDirectory: options.lambdaDir,
+      prefix: '/api',
+      existLambda: false,
+      relativeDistPath: 'output',
+      apiFiles: [],
+      requestId: 'artifact-producer',
+    };
+    return { appDir, options, generation };
+  }
+
+  test('publishes extension code and declarations with one final manifest write after entries', async () => {
+    const { appDir, options, generation } = await fixture();
+    try {
+      const write = rstest.spyOn(fs.promises, 'writeFile');
+      await clientGenerator(options, {
+        generation,
+        modifyArtifacts: async context => ({
+          ...context,
+          additionalArtifacts: [
+            {
+              sourcePath: 'effect/index.ts',
+              code: 'export const client = 42;',
+              declaration: 'export declare const client: 42;',
+            },
+          ],
+        }),
+        beforePublish: async () => {
+          expect(
+            await fs.readFile(
+              path.join(appDir, 'output/client/effect/index.js'),
+              'utf8',
+            ),
+          ).toBe('export const client = 42;');
+          expect(
+            (await fs.readJSON(path.join(appDir, 'package.json'))).exports,
+          ).toBeUndefined();
+          return { '@fixture/producer-runtime': '1.2.3' };
+        },
+      });
+      expect(
+        write.mock.calls.filter(
+          ([file]) => file === path.join(appDir, 'package.json'),
+        ),
+      ).toHaveLength(1);
+      const manifest = await fs.readJSON(path.join(appDir, 'package.json'));
+      expect(manifest.dependencies).toEqual({
+        '@fixture/producer-runtime': '1.2.3',
+      });
+      expect(manifest.exports['./api/effect/index']).toMatchObject({
+        import: './output/client/effect/index.js',
+        types: './output/client/effect/index.d.ts',
+      });
+      expect(
+        await fs.readFile(
+          path.join(appDir, 'output/client/effect/index.d.ts'),
+          'utf8',
+        ),
+      ).toBe('export declare const client: 42;');
+      expect(
+        (await fs.readJSON(path.join(appDir, 'output/client/package.json')))
+          .type,
+      ).toBe('module');
+    } finally {
+      rstest.restoreAllMocks();
+      await fs.remove(appDir);
+    }
+  });
+
+  test.each([
+    '../outside.ts',
+    '/absolute.ts',
+    'a/../entry.ts',
+    'nested\\entry.ts',
+    'entry.txt',
+  ])('rejects invalid artifact source path %s', async sourcePath => {
+    const { appDir, options, generation } = await fixture();
+    try {
+      await expect(
+        clientGenerator(options, {
+          generation,
+          modifyArtifacts: async context => ({
+            ...context,
+            additionalArtifacts: [{ sourcePath, code: '', declaration: '' }],
+          }),
+          beforePublish: async () => {},
+        }),
+      ).rejects.toThrow('Invalid BFF client artifact source path');
+    } finally {
+      await fs.remove(appDir);
+    }
+  });
+
+  test('rejects duplicate generated export/output identities before publishing', async () => {
+    const { appDir, options, generation } = await fixture();
+    try {
+      await expect(
+        clientGenerator(options, {
+          generation,
+          modifyArtifacts: async context => ({
+            ...context,
+            additionalArtifacts: ['index.ts', 'index.js'].map(sourcePath => ({
+              sourcePath,
+              code: '',
+              declaration: '',
+            })),
+          }),
+          beforePublish: async () => {
+            throw new Error('must not reach publisher');
+          },
+        }),
+      ).rejects.toThrow('BFF client artifact collision');
+      expect(
+        (await fs.readJSON(path.join(appDir, 'package.json'))).exports,
+      ).toBeUndefined();
+    } finally {
+      await fs.remove(appDir);
+    }
+  });
+
+  test('rejects dependency conflicts without changing the existing manifest', async () => {
+    const { appDir, options, generation } = await fixture();
+    const manifest = {
+      name: 'artifact-producer',
+      dependencies: { '@fixture/runtime': '1.0.0' },
+    };
+    await fs.outputJSON(path.join(appDir, 'package.json'), manifest);
+    try {
+      await expect(
+        clientGenerator(options, {
+          generation,
+          modifyArtifacts: async context => context,
+          beforePublish: async () => ({ '@fixture/runtime': '2.0.0' }),
+        }),
+      ).rejects.toThrow('package.json dependency conflict');
+      expect(await fs.readJSON(path.join(appDir, 'package.json'))).toEqual(
+        manifest,
+      );
+    } finally {
+      await fs.remove(appDir);
+    }
+  });
+
+  test('extension failures propagate and cannot replace generation identity', async () => {
+    const { appDir, options, generation } = await fixture();
+    try {
+      await expect(
+        clientGenerator(options, {
+          generation,
+          modifyArtifacts: async () => {
+            throw new Error('extension rejected');
+          },
+          beforePublish: async () => {},
+        }),
+      ).rejects.toThrow('extension rejected');
+      await expect(
+        clientGenerator(options, {
+          generation,
+          modifyArtifacts: async context => ({
+            ...context,
+            generation: { ...generation },
+          }),
+          beforePublish: async () => {},
+        }),
+      ).rejects.toThrow('generation identity');
+    } finally {
+      await fs.remove(appDir);
+    }
+  });
+});
+
+describe('native client transform publication', () => {
+  test.each([
+    false,
+    true,
+  ])('routes the configured plugin to lambda rendering and preserves publication on failure=%s', async reject => {
+    const appDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'bff-transform-publish-'),
+    );
+    try {
+      const lambdaDir = path.join(appDir, 'api/lambda');
+      const resourcePath = path.join(lambdaDir, 'ping.ts');
+      await fs.outputFile(resourcePath, 'export default () => "pong";');
+      await fs.outputFile(
+        path.join(appDir, 'dist/api/lambda/ping.d.ts'),
+        'declare const handler: () => string; export default handler;',
+      );
+      const manifest = { name: 'neutral-transform-producer' };
+      await fs.outputJSON(path.join(appDir, 'package.json'), manifest);
+      const plugin = path.join(appDir, 'transform.cjs');
+      await fs.writeFile(
+        plugin,
+        reject
+          ? 'exports.modifyClient = () => { throw new Error("rejected publication"); };'
+          : 'exports.modifyClient = draft => { draft.statements.push("export const neutralValue = 42;"); };',
+      );
+      const publication = clientGenerator({
+        appDir,
+        apiDir: path.join(appDir, 'api'),
+        lambdaDir,
+        prefix: '/api',
+        port: 3000,
+        existLambda: true,
+        relativeDistPath: 'dist',
+        relativeApiPath: 'api',
+        apiFiles: [resourcePath],
+        clientCodegenPlugin: plugin,
+        requestId: 'configured-client-id',
+      });
+      if (reject) {
+        await expect(publication).rejects.toMatchObject({
+          name: 'ClientCodegenError',
+        });
+        expect(await fs.readJSON(path.join(appDir, 'package.json'))).toEqual(
+          manifest,
+        );
+      } else {
+        await publication;
+        expect(
+          await fs.readFile(path.join(appDir, 'dist/client/ping.js'), 'utf8'),
+        ).toContain('neutralValue = 42');
+        expect(
+          await fs.readFile(path.join(appDir, 'dist/client/ping.js'), 'utf8'),
+        ).toContain('requestId: "configured-client-id"');
+        expect(
+          await fs.readFile(path.join(appDir, 'dist/client/ping.d.ts'), 'utf8'),
+        ).toContain('../api/lambda/ping.js');
+        expect(
+          (await fs.readJSON(path.join(appDir, 'package.json'))).exports,
+        ).toHaveProperty('./api/ping');
+      }
+    } finally {
+      await fs.remove(appDir);
+    }
+  });
+});

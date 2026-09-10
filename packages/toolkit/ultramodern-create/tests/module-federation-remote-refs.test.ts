@@ -30,7 +30,7 @@ module.exports = createRemoteManifestUrl({
     module,
     exports: module.exports,
     require(specifier: string) {
-      assert.equal(specifier, '@modern-js/app-tools/config');
+      assert.equal(specifier, '@modern-js/app-tools-extensions/config');
       return {
         getBuildConfigEnvironment: (name: string) => env[name],
       };

@@ -65,7 +65,7 @@ describe('bundleBuiltEffectEntryForNode', () => {
           format: 'esm',
         }),
       ).rejects.toThrow(
-        `Effect BFF entry was not emitted into ${distDirectory}: ${sourceEntry}`,
+        `Effect BFF entry was not emitted into ${distDirectory}: ${sourceEntry.replaceAll(path.sep, '/')}`,
       );
     });
   });
@@ -84,7 +84,9 @@ describe('resolveEffectEntryPaths', () => {
         apiDir: apiDirectory,
       });
 
-      expect(resolved.sourceEffectEntry).toBe(sourceEntry);
+      expect(resolved.sourceEffectEntry).toBe(
+        sourceEntry.replaceAll(path.sep, '/'),
+      );
       expect(resolved.relativeEffectEntry).toBe('api/index.js');
     });
   });

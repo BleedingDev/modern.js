@@ -1,7 +1,20 @@
 import { createSyncHook } from '@modern-js/plugin';
 import type { RouteObject } from '@modern-js/runtime-utils/router';
-import type { TRuntimeContext } from '../../core/context/runtime';
-import type { RouterLifecycleContext } from './lifecycle';
+import type {
+  TInternalRuntimeContext,
+  TRuntimeContext,
+} from '../../core/context/runtime';
+
+export type RouterLifecycleContext = {
+  framework: string;
+  phase: 'ssr-prepare' | 'client-create' | 'hydrate';
+  routes: RouteObject[];
+  runtimeContext: TInternalRuntimeContext;
+  basename?: string;
+  hydrationData?: unknown;
+  router?: unknown;
+  [key: string]: unknown;
+};
 
 export type RouterSyncHook<Handler extends (...args: any[]) => any> = {
   call: (...args: Parameters<Handler>) => ReturnType<Handler>;
@@ -32,6 +45,15 @@ export {
   onBeforeCreateRouter,
   onBeforeCreateRoutes,
   onBeforeHydrateRouter,
+};
+
+export const routerProviderRegistryHooks = {
+  modifyRoutes,
+  onBeforeCreateRoutes,
+  onBeforeCreateRouter,
+  onAfterCreateRouter,
+  onBeforeHydrateRouter,
+  onAfterHydrateRouter,
 };
 
 export type RouterExtendsHooks = {

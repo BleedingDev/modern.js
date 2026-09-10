@@ -224,12 +224,8 @@ jobs:
           # importing nothing but `node:` builtins — publish-security.test.js
           # asserts that too, which is what keeps the closure above complete.
           #
-          # The skip is the single publish-tooling test that needs built package
-          # bytes: it stages @modern-js/image's dist into the packed-consumer
-          # proof. The source lane covers it in `pnpm test:scripts` below, after
-          # the build.
-          NODE_OPTIONS='--test-skip-pattern=^the\x20packed-consumer\x20proof\x20stages\x20the\x20cohort\x20image\x20with\x20its\x20aliases\x20intact$' \
-            mise exec -- pnpm run test:publish-tooling
+          # Built-package image staging runs in the disjoint after-build suite.
+          mise exec -- pnpm run test:publish-tooling
 
       # Every step below through "Upload the source qualification receipt" is
       # skipped in the recovery lane: that dispatch publishes the recovered
@@ -302,11 +298,9 @@ jobs:
           # Repository-state boundary snapshots remain enforced by the dedicated
           # boundary workflow; stale bookkeeping must not reject valid release bytes.
           NODE_OPTIONS='--test-skip-pattern=^(?:repo\x20allowlist\x20has\x20no\x20new\x20upstream-owned\x20imports\x20of\x20fork-only\x20code|full\x20recorded\x20repository\x20scope\x20remains\x20green\x20and\x20fully\x20measured)$' \
-            mise exec -- pnpm test:scripts
-          # `pnpm lint` and the publish-tooling suites already ran above, in
-          # both lanes. `test:scripts` re-runs the tooling suites deliberately:
-          # here they run against built package bytes, which is the only place
-          # the skipped cohort-image proof can execute.
+            mise exec -- pnpm run test:scripts:after-build
+          # Source tooling already passed above in both release lanes.
+          # This suite adds the remaining script contracts and real image bytes.
           mise exec -- pnpm run check-changeset
           # @modern-js/ultramodern-create's own test script rebuilds only itself; every
           # installed framework boundary it exercises is already built above.
@@ -509,11 +503,6 @@ jobs:
             --verify-receipt \
             --manifest "$BLEEDINGDEV_RELEASE_MANIFEST" \
             --scale-profile erp-10 \
-            --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
-            --run-identity "$recovery_run_identity"
-          node scripts/ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs \
-            --verify \
-            --manifest "$BLEEDINGDEV_RELEASE_MANIFEST" \
             --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
             --run-identity "$recovery_run_identity"
 
@@ -818,12 +807,6 @@ jobs:
             --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
             --run-identity "${{ needs.accept-release.outputs.producer_run_identity }}"
 
-          node scripts/ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs \
-            --verify \
-            --manifest "$BLEEDINGDEV_RELEASE_MANIFEST" \
-            --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
-            --run-identity "${{ needs.accept-release.outputs.producer_run_identity }}"
-
       - name: Validate only the accepted tarballs
         env:
           PUBLISH_VERSION: ${{ inputs.version }}
@@ -960,12 +943,6 @@ jobs:
             --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
             --run-identity "${{ needs.accept-release.outputs.producer_run_identity }}"
 
-          node scripts/ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs \
-            --verify \
-            --manifest "$BLEEDINGDEV_RELEASE_MANIFEST" \
-            --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
-            --run-identity "${{ needs.accept-release.outputs.producer_run_identity }}"
-
       - name: Publish the staged sidecars in alias order
         run: |
           # Publish the exact tarball bytes bound by the accepted release identity.
@@ -1047,12 +1024,6 @@ jobs:
             --verify-receipt \
             --manifest "$BLEEDINGDEV_RELEASE_MANIFEST" \
             --scale-profile erp-10 \
-            --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
-            --run-identity "${{ needs.accept-release.outputs.producer_run_identity }}"
-
-          node scripts/ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs \
-            --verify \
-            --manifest "$BLEEDINGDEV_RELEASE_MANIFEST" \
             --receipt "$BLEEDINGDEV_RELEASE_ACCEPTANCE_RECEIPT" \
             --run-identity "${{ needs.accept-release.outputs.producer_run_identity }}"
 
@@ -1295,25 +1266,10 @@ jobs:
           PUBLISH_VERSION: ${{ inputs.version }}
         run: |
           (
-            status=1
-            for attempt in {1..12}; do
-              if node scripts/ultramodern-publish/prepare-bleedingdev-packages.mjs \
-                --publish-existing \
-                --dry-run \
-                --out "$BLEEDINGDEV_RELEASE_DIR" \
-                --version "$PUBLISH_VERSION" \
-                --tag "$PUBLISH_TAG" \
-                --publish-concurrency "$PUBLISH_CONCURRENCY"; then
-                status=0
-                break
-              fi
-              if [[ "$attempt" == "12" ]]; then
-                echo "Exact registry cohort did not become verifiable" >&2
-                status=1
-                break
-              fi
-              sleep 15
-            done
+            status=0
+            bash scripts/ultramodern-publish/wait-for-registry-cohort.sh \
+              "$BLEEDINGDEV_RELEASE_DIR" "$PUBLISH_CONCURRENCY" \
+              "$PUBLISH_VERSION" "$PUBLISH_TAG" || status=$?
             printf '%s\n' "$status" > "$RUNNER_TEMP/registry-cohort-wait.status"
             exit "$status"
           ) > "$RUNNER_TEMP/registry-cohort-wait.log" 2>&1 &

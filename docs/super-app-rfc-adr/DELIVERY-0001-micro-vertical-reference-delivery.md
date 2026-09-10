@@ -121,7 +121,7 @@ Preferred path:
 
 Canonical references:
 
-- strict Effect propagation helpers: [packages/server/create-request/src/requestContext.ts](/Users/satan/side/experiments/modernjs/packages/server/create-request/src/requestContext.ts)
+- strict Effect propagation helpers: [`@modern-js/runtime-extensions/request-context`](../../packages/runtime/runtime-extensions/src/request-policy/requestContext.ts)
 - generated Effect client propagation seam: [packages/cli/plugin-bff/src/utils/effectClientGenerator.ts](/Users/satan/side/experiments/modernjs/packages/cli/plugin-bff/src/utils/effectClientGenerator.ts)
 
 ## 4. Shared Design-System Strategy

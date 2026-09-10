@@ -196,6 +196,61 @@ test('builds the supported pnpm dlx package command contract from the authentica
   });
 });
 
+test('orders exact bootstrap specifiers when a reachable package name prefixes another', async () => {
+  const { createPnpmDlxArgs, resolveCreatePackage } = await import(
+    '../published-create-proof/package-cohort.mjs'
+  );
+  const release = makeBootstrapRelease('3.9.0-ultramodern.5');
+  const { version } = release.release;
+  const pluginTarget = '@bleedingdev/modern-js-plugin';
+  const dataLoaderTarget = '@bleedingdev/modern-js-plugin-data-loader';
+  Object.assign(release.aliases, {
+    '@modern-js/plugin': pluginTarget,
+    '@modern-js/plugin-data-loader': dataLoaderTarget,
+  });
+  release.createPackage.packageJson.dependencies[
+    '@modern-js/plugin-data-loader'
+  ] = `npm:${dataLoaderTarget}@${version}`;
+  release.dependencyGraph[release.createPackage.targetName].push(
+    dataLoaderTarget,
+  );
+  release.dependencyGraph[dataLoaderTarget] = [pluginTarget];
+  release.dependencyGraph[pluginTarget] = [];
+  release.packages.push(
+    {
+      sourceName: '@modern-js/plugin-data-loader',
+      targetName: dataLoaderTarget,
+      version,
+      packageJson: {
+        dependencies: {
+          '@modern-js/plugin': `npm:${pluginTarget}@${version}`,
+        },
+      },
+    },
+    {
+      sourceName: '@modern-js/plugin',
+      targetName: pluginTarget,
+      version,
+      packageJson: {},
+    },
+  );
+  release.publishOrder.push(pluginTarget, dataLoaderTarget);
+
+  const args = createPnpmDlxArgs(resolveCreatePackage(release), ['my-app']);
+  assert.deepEqual(
+    args.filter(argument =>
+      argument.startsWith('--config.minimum-release-age-exclude='),
+    ),
+    [
+      `--config.minimum-release-age-exclude=@bleedingdev/modern-js-i18n-utils@${version}`,
+      `--config.minimum-release-age-exclude=${dataLoaderTarget}@${version}`,
+      `--config.minimum-release-age-exclude=${pluginTarget}@${version}`,
+      `--config.minimum-release-age-exclude=@bleedingdev/modern-js-ultramodern-create@${version}`,
+      `--config.minimum-release-age-exclude=@bleedingdev/modern-js-utils@${version}`,
+    ],
+  );
+});
+
 test('fails closed when the authenticated create closure is omitted, broadened, or version-skewed', async () => {
   const { resolveCreatePackage } = await import(
     '../published-create-proof/package-cohort.mjs'
@@ -549,96 +604,240 @@ test('default-off clean-room install excludes and cannot resolve RSC runtimes', 
   );
 });
 
-test('snapshots install-materialized generated source before building', async () => {
+test('acceptance Git setup rejects a nested parent without changing it and accepts a canonical workspace root', async () => {
+  const { configureAcceptanceWorkspaceGit } = await import(
+    '../published-create-proof/acceptance-profile.mjs'
+  );
+  const fixture = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'acceptance-git-root-'),
+  );
+  const parent = path.join(fixture, 'parent');
+  const nested = path.join(parent, 'generated');
+  const ownRoot = path.join(fixture, 'standalone');
+  const env = {
+    GIT_CONFIG_GLOBAL: path.join(fixture, 'empty-gitconfig'),
+    GIT_CONFIG_NOSYSTEM: '1',
+  };
+  const calls = [];
+  const runImpl = (command, args, options = {}) => {
+    calls.push(args);
+    const result = spawnSync(command, args, {
+      cwd: options.cwd ?? parent,
+      encoding: 'utf8',
+      env: createProcessEnv({ ...env, ...options.env }),
+      stdio: 'pipe',
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    return result.stdout.trim();
+  };
+  try {
+    fs.mkdirSync(nested, { recursive: true });
+    fs.mkdirSync(ownRoot);
+    fs.writeFileSync(env.GIT_CONFIG_GLOBAL, '');
+    runImpl('git', ['init', '--quiet']);
+    runImpl('git', ['config', 'user.name', 'Parent Author']);
+    runImpl('git', ['config', 'user.email', 'parent@example.test']);
+    runImpl('git', [
+      'remote',
+      'add',
+      'origin',
+      'https://example.test/parent.git',
+    ]);
+    fs.writeFileSync(path.join(parent, 'tracked.txt'), 'initial\n');
+    runImpl('git', ['add', 'tracked.txt']);
+    runImpl('git', ['-c', 'commit.gpgsign=false', 'commit', '-m', 'initial']);
+    fs.writeFileSync(path.join(parent, 'tracked.txt'), 'staged\n');
+    runImpl('git', ['add', 'tracked.txt']);
+    fs.writeFileSync(path.join(parent, 'tracked.txt'), 'unstaged\n');
+    fs.writeFileSync(path.join(nested, 'package.json'), '{"private":true}\n');
+    const originalHead = runImpl('git', ['rev-parse', 'HEAD']);
+    const originalRemotes = runImpl('git', ['remote', '-v']);
+    const originalFiles = new Map(
+      ['HEAD', 'index', 'config'].map(name => [
+        name,
+        fs.readFileSync(path.join(parent, '.git', name)),
+      ]),
+    );
+    const nestedAlias = path.join(fixture, 'nested-alias');
+    fs.symlinkSync(nested, nestedAlias, 'dir');
+    for (const projectDir of [nested, nestedAlias]) {
+      calls.length = 0;
+      assert.throws(
+        () => configureAcceptanceWorkspaceGit(projectDir, env, runImpl),
+        /workspace must be its own Git root:.*Use a work directory outside an existing repository/u,
+      );
+      assert.deepEqual(calls, [['rev-parse', '--show-toplevel']]);
+      for (const [name, original] of originalFiles) {
+        assert.deepEqual(
+          fs.readFileSync(path.join(parent, '.git', name)),
+          original,
+          `parent ${name} changed`,
+        );
+      }
+      assert.equal(runImpl('git', ['rev-parse', 'HEAD']), originalHead);
+      assert.equal(runImpl('git', ['remote', '-v']), originalRemotes);
+    }
+
+    runImpl('git', ['init', '--quiet'], { cwd: ownRoot });
+    const ownAlias = path.join(fixture, 'standalone-alias');
+    fs.symlinkSync(ownRoot, ownAlias, 'dir');
+    configureAcceptanceWorkspaceGit(ownAlias, env, runImpl);
+    assert.equal(
+      runImpl('git', ['config', '--local', 'user.name'], { cwd: ownRoot }),
+      'UltraModern Acceptance',
+    );
+    assert.equal(
+      runImpl('git', ['config', '--local', 'user.email'], { cwd: ownRoot }),
+      'acceptance@ultramodern.local',
+    );
+    assert.equal(
+      runImpl('git', ['remote', 'get-url', 'origin'], { cwd: ownRoot }),
+      'https://github.com/ultramodern-ci/acceptance-superapp.git',
+    );
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('snapshots installed source with real hooks before a build can use its revision', async t => {
   const { snapshotAcceptanceWorkspaceSource } = await import(
     '../published-create-proof/acceptance-profile.mjs'
   );
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ultramodern-acceptance-source-'),
-  );
-  const runImpl = (command, args, options = {}) => {
-    const result = spawnSync(command, args, {
-      cwd: options.cwd,
-      encoding: 'utf8',
-      env: createProcessEnv(options.env ?? {}),
-      stdio: options.stdio === 'inherit' ? 'ignore' : 'pipe',
+  for (const scenario of [
+    'unborn',
+    'existing',
+    'reject-pre-commit',
+    'reject-commit-msg',
+  ]) {
+    await t.test(scenario, () => {
+      const fixture = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'acceptance-source-hooks-'),
+      );
+      const root = path.join(fixture, 'workspace');
+      const hooks = path.join(fixture, 'hooks');
+      fs.mkdirSync(root);
+      fs.mkdirSync(hooks);
+      const config = path.join(fixture, 'gitconfig');
+      fs.writeFileSync(
+        config,
+        `[user]\nuseConfigOnly = true\n[core]\nhooksPath = ${JSON.stringify(hooks)}\n`,
+      );
+      const env = { GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: '1' };
+      const runImpl = (command, args, options = {}) => {
+        const result = spawnSync(command, args, {
+          cwd: options.cwd ?? root,
+          encoding: 'utf8',
+          env: createProcessEnv({ ...env, ...options.env }),
+          stdio: 'pipe',
+        });
+        if (result.status !== 0) {
+          throw new Error(
+            result.stderr || result.stdout || `${command} failed`,
+          );
+        }
+        return result.stdout?.trim() ?? '';
+      };
+      try {
+        runImpl('git', ['init', '--quiet']);
+        fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}\n');
+        let initial;
+        if (scenario === 'existing') {
+          runImpl('git', ['add', '-A']);
+          runImpl('git', [
+            '-c',
+            'commit.gpgsign=false',
+            '-c',
+            'user.name=Fixture Author',
+            '-c',
+            'user.email=fixture@example.test',
+            'commit',
+            '-m',
+            'initial',
+          ]);
+          initial = runImpl('git', ['rev-parse', 'HEAD']);
+        }
+        fs.mkdirSync(path.join(root, 'verticals/catalog'), { recursive: true });
+        fs.writeFileSync(
+          path.join(root, 'verticals/catalog/package.json'),
+          '{"name":"catalog"}\n',
+        );
+        fs.writeFileSync(
+          path.join(root, 'pnpm-lock.yaml'),
+          'lockfileVersion: 9\n',
+        );
+        fs.mkdirSync(path.join(root, '.codex/skills/mf'), { recursive: true });
+        fs.writeFileSync(
+          path.join(root, '.codex/skills/mf/SKILL.md'),
+          '# Installed skill\n',
+        );
+        for (const hook of ['pre-commit', 'commit-msg']) {
+          fs.writeFileSync(
+            path.join(hooks, hook),
+            `#!/bin/sh
+printf '%s\n' '${hook}' >> .git/hook-events
+test -f pnpm-lock.yaml || exit 1
+test -f .codex/skills/mf/SKILL.md || exit 1
+${scenario === `reject-${hook}` ? `echo 'fixture ${hook} rejected snapshot' >&2\nexit 1` : 'exit 0'}
+`,
+            { mode: 0o755 },
+          );
+        }
+        if (scenario.startsWith('reject-')) {
+          assert.throws(
+            () => snapshotAcceptanceWorkspaceSource(root, env, runImpl),
+            /fixture (?:pre-commit|commit-msg) rejected snapshot/u,
+          );
+          assert.throws(() =>
+            runImpl('git', ['rev-parse', '--verify', 'HEAD']),
+          );
+          assert.notEqual(runImpl('git', ['status', '--porcelain=v1']), '');
+        } else {
+          const revision = snapshotAcceptanceWorkspaceSource(
+            root,
+            env,
+            runImpl,
+          );
+          assert.match(revision, /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u);
+          assert.notEqual(revision, initial);
+          assert.equal(
+            runImpl('git', [
+              'status',
+              '--porcelain=v1',
+              '--untracked-files=all',
+            ]),
+            '',
+          );
+          assert.equal(
+            runImpl('git', ['rev-list', '--count', 'HEAD']),
+            scenario === 'existing' ? '2' : '1',
+          );
+          assert.equal(
+            runImpl('git', ['show', 'HEAD:pnpm-lock.yaml']),
+            'lockfileVersion: 9',
+          );
+          assert.equal(
+            runImpl('git', ['show', 'HEAD:.codex/skills/mf/SKILL.md']),
+            '# Installed skill',
+          );
+          // An unchanged snapshot returns the same real commit without rerunning hooks.
+          assert.equal(
+            snapshotAcceptanceWorkspaceSource(root, env, runImpl),
+            revision,
+          );
+        }
+        assert.deepEqual(
+          fs
+            .readFileSync(path.join(root, '.git/hook-events'), 'utf8')
+            .trim()
+            .split('\n'),
+          scenario === 'reject-pre-commit'
+            ? ['pre-commit']
+            : ['pre-commit', 'commit-msg'],
+        );
+      } finally {
+        fs.rmSync(fixture, { recursive: true, force: true });
+      }
     });
-    if (result.status !== 0) {
-      throw new Error(result.stderr || `${command} failed`);
-    }
-    return result.stdout?.trim() ?? '';
-  };
-
-  try {
-    runImpl('git', ['init', '--quiet'], { cwd: root });
-    fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}\n');
-    runImpl('git', ['add', 'package.json'], { cwd: root });
-    runImpl(
-      'git',
-      [
-        '-c',
-        'user.name=Fixture Author',
-        '-c',
-        'user.email=fixture@example.test',
-        'commit',
-        '--quiet',
-        '-m',
-        'initial',
-      ],
-      { cwd: root },
-    );
-    const initial = runImpl('git', ['rev-parse', 'HEAD'], { cwd: root });
-    fs.mkdirSync(path.join(root, 'verticals', 'catalog'), {
-      recursive: true,
-    });
-    fs.writeFileSync(
-      path.join(root, 'verticals', 'catalog', 'package.json'),
-      '{"name":"catalog"}\n',
-    );
-    fs.writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n');
-    fs.mkdirSync(path.join(root, '.codex', 'skills', 'mf'), {
-      recursive: true,
-    });
-    fs.writeFileSync(
-      path.join(root, '.codex', 'skills', 'mf', 'SKILL.md'),
-      '# Pinned Module Federation skill\n',
-    );
-
-    const revision = snapshotAcceptanceWorkspaceSource(
-      root,
-      {
-        GIT_CONFIG_COUNT: '1',
-        GIT_CONFIG_GLOBAL: '/dev/null',
-        GIT_CONFIG_KEY_0: 'user.useConfigOnly',
-        GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_VALUE_0: 'true',
-      },
-      runImpl,
-    );
-
-    assert.match(revision, /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u);
-    assert.notEqual(revision, initial);
-    assert.equal(
-      runImpl('git', ['status', '--porcelain=v1', '--untracked-files=all'], {
-        cwd: root,
-      }),
-      '',
-    );
-    assert.equal(
-      runImpl('git', ['show', '--format=', '--name-only', 'HEAD'], {
-        cwd: root,
-      }).includes('verticals/catalog/package.json'),
-      true,
-    );
-    assert.equal(
-      runImpl('git', ['show', '--format=', '--name-only', 'HEAD'], {
-        cwd: root,
-      }).includes('.codex/skills/mf/SKILL.md'),
-      true,
-      'the promotable source identity must include first-install materialization',
-    );
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -693,11 +892,18 @@ test('browser runtime children scrub inherited source and deployment overrides',
   }
 });
 
-test('browser smoke exposes the bounded child cause through the outer acceptance failure', async () => {
+test('browser smoke exposes the bounded child cause through the outer acceptance failure', async t => {
   const { runBrowserSmoke } = await import(
     '../published-create-proof/browser-smoke.mjs'
   );
-  const logPath = '/tmp/inventory-serve.log';
+  const artifactRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'acceptance-browser-failure-'),
+  );
+  t.after(() => fs.rmSync(artifactRoot, { recursive: true, force: true }));
+  const artifactDir = path.join(artifactRoot, 'source-node');
+  const reportPath = path.join(artifactRoot, 'source-node-summary.json');
+  const logPath = path.join(artifactDir, 'inventory-serve.log');
+  fs.writeFileSync(reportPath, '{"status":"stale"}\n');
   const exactCause = "Error: Cannot find module '@modern-js/prod-server'";
   const genericFailure = new Error(
     'Command failed: node run-browser-smoke.mjs',
@@ -709,6 +915,7 @@ test('browser smoke exposes the bounded child cause through the outer acceptance
         '/tmp/generated-superapp',
         {
           artifactMode: 'source',
+          artifactRoot,
           mode: 'source',
           platform: 'node',
           shellRuntime: 'node',
@@ -739,7 +946,10 @@ test('browser smoke exposes the bounded child cause through the outer acceptance
             },
             status: 'fail',
           }),
-          runImpl: () => {
+          runImpl: (_command, args) => {
+            assert.equal(args[args.indexOf('--artifact-dir') + 1], artifactDir);
+            assert.equal(args[args.indexOf('--out') + 1], reportPath);
+            assert.equal(fs.existsSync(reportPath), false);
             throw genericFailure;
           },
         },
@@ -769,6 +979,7 @@ test('browser smoke exposes the bounded child cause through the outer acceptance
       assert.equal(evidence.appId, 'inventory');
       assert.equal(evidence.apiResponse.status, 500);
       assert.equal(error.details.logPath, logPath);
+      assert.equal(error.details.reportPath, reportPath);
       assert.ok(error.details.logTail.length <= 8_192);
       assert.equal(typeof error.details.apiResponse.body, 'string');
       assert.ok(error.details.apiResponse.body.length <= 2_048);

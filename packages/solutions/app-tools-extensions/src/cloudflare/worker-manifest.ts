@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type {} from '@modern-js/server-runtime-extensions/server-config';
 import { fs as fse } from '@modern-js/utils';
 import { readRouteSpec } from './artifacts';
 import {

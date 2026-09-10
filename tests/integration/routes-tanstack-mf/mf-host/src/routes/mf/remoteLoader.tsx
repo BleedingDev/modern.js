@@ -5,7 +5,7 @@ import {
   emitModuleFederationFallbackTelemetry,
   type ModuleFederationFallbackTelemetryPayload,
   toModuleFederationFallbackAttributes,
-} from '@modern-js/runtime/module-federation';
+} from '@modern-js/federation-runtime';
 import { loadRemote } from '@module-federation/modern-js-v3/runtime';
 import * as React from 'react';
 import {

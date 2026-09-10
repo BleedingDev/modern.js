@@ -22,10 +22,6 @@ const contractVersion = 'microvertical-server-effect-v1';
 const nodeAdapterVersion = 'backend-mf-effect-v1';
 const backendExpose = './effect-api';
 const releaseEnvelopePath = 'release/microvertical-release-envelope.json';
-const localRuntimeRelativePaths = [
-  'packages/cli/plugin-bff/dist/esm-node/runtime/effect/index.mjs',
-  'cli/plugin-bff/dist/esm-node/runtime/effect/index.mjs',
-];
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -55,60 +51,31 @@ function hasBackendFederationManifestAdapter(runtime) {
   return typeof runtime?.loadBackendFederatedEffectApiFromManifest === 'function';
 }
 
-function findLocalRuntimePath(createBin) {
-  let current = path.dirname(fileURLToPath(pathToFileURL(createBin)));
-  for (let depth = 0; depth < 8; depth += 1) {
-    for (const relativePath of localRuntimeRelativePaths) {
-      const candidate = path.join(current, relativePath);
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
-    }
-
-    const parent = path.dirname(current);
-    if (parent === current) {
-      break;
-    }
-    current = parent;
-  }
-
-  return undefined;
-}
-
-async function importBackendFederationRuntime() {
-  let importError;
-  try {
-    const runtimePath = workspaceRequire.resolve('@modern-js/plugin-bff/effect');
-    const runtime = await import(pathToFileURL(runtimePath).href);
-    if (hasBackendFederationManifestAdapter(runtime)) {
-      return runtime;
-    }
-
-    importError = new Error(
+export async function importBackendFederationRuntime() {
+  const runtimePath = workspaceRequire.resolve(
+    '@modern-js/plugin-bff-extensions/backend-federation-manifest/node',
+  );
+  const effectPath = workspaceRequire.resolve('@modern-js/bff-effect/effect');
+  const [runtime, effect] = await Promise.all([
+    import(pathToFileURL(runtimePath).href),
+    import(pathToFileURL(effectPath).href),
+  ]);
+  if (!hasBackendFederationManifestAdapter(runtime)) {
+    throw new Error(
       `${runtimePath} does not export loadBackendFederatedEffectApiFromManifest`,
     );
-  } catch (error) {
-    importError = error;
   }
-
-  const createBin = process.env.ULTRAMODERN_CREATE_BIN;
-  if (!createBin) {
-    throw importError;
-  }
-
-  const localRuntimePath = findLocalRuntimePath(createBin);
-  if (!localRuntimePath) {
-    throw importError;
-  }
-
-  const localRuntime = await import(pathToFileURL(localRuntimePath).href);
-  if (!hasBackendFederationManifestAdapter(localRuntime)) {
+  if (typeof effect.createEffectBffTestHandler !== 'function') {
     throw new Error(
-      `${localRuntimePath} does not export loadBackendFederatedEffectApiFromManifest`,
+      `${effectPath} does not export createEffectBffTestHandler`,
     );
   }
 
-  return localRuntime;
+  return {
+    loadBackendFederatedEffectApiFromManifest:
+      runtime.loadBackendFederatedEffectApiFromManifest,
+    createEffectBffTestHandler: effect.createEffectBffTestHandler,
+  };
 }
 
 function normalizeRelativePath(value) {

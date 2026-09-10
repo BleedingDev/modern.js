@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { SERVICE_WORKER_ENVIRONMENT_NAME } from '@modern-js/builder';
 import type { BffUserConfig } from '@modern-js/server-core';
+import type {} from '@modern-js/server-runtime-extensions/server-config';
 import { isProd } from '@modern-js/utils';
 import type {
   EnvironmentConfig,

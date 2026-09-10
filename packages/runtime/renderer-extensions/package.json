@@ -1,0 +1,74 @@
+{
+  "name": "@modern-js/runtime-renderer-extensions",
+  "description": "UltraModern.js head rendering plugin registered through native runtime hooks.",
+  "homepage": "https://bleedingdev.github.io/ultramodern.js/",
+  "bugs": "https://github.com/BleedingDev/ultramodern.js/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BleedingDev/ultramodern.js",
+    "directory": "packages/runtime/renderer-extensions"
+  },
+  "license": "MIT",
+  "version": "3.8.3",
+  "engines": {
+    "node": ">=26.7.0"
+  },
+  "types": "./dist/types/runtimePlugin.d.ts",
+  "main": "./dist/cjs/node.js",
+  "exports": {
+    ".": {
+      "types": "./dist/types/runtimePlugin.d.ts",
+      "node": {
+        "modern:source": "./src/node.ts",
+        "import": "./dist/esm-node/node.mjs",
+        "require": "./dist/cjs/node.js"
+      },
+      "modern:source": "./src/runtimePlugin.ts",
+      "default": "./dist/esm/runtimePlugin.mjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/types/runtimePlugin.d.ts",
+        "./src/runtimePlugin.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "prepublishOnly": "only-allow-pnpm",
+    "build": "rslib build",
+    "test": "rstest"
+  },
+  "dependencies": {
+    "@modern-js/plugin": "workspace:*",
+    "@modern-js/runtime-extensions": "workspace:*"
+  },
+  "devDependencies": {
+    "@modern-js/runtime": "workspace:*",
+    "@modern-js/render": "workspace:*",
+    "@modern-js/rslib": "workspace:*",
+    "@modern-js/tsconfig": "workspace:*",
+    "@rslib/core": "1.0.0",
+    "@scripts/rstest-config": "workspace:*",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "types": "./dist/types/runtimePlugin.d.ts"
+  }
+}

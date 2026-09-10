@@ -67,26 +67,6 @@
       "types": "./dist/types/exports/head.d.ts",
       "default": "./dist/esm/exports/head.mjs"
     },
-    "./boundary-debugger": {
-      "types": "./dist/types/boundary-debugger/index.d.ts",
-      "default": "./dist/esm/boundary-debugger/index.mjs"
-    },
-    "./module-federation": {
-      "types": "./dist/types/module-federation/index.d.ts",
-      "default": "./dist/esm/module-federation/index.mjs"
-    },
-    "./module-federation/distributed-ssr": {
-      "types": "./dist/types/module-federation/distributed-ssr.d.ts",
-      "default": "./dist/esm/module-federation/distributed-ssr.mjs"
-    },
-    "./module-federation/manifest-recovery-runtime-plugin": {
-      "types": "./dist/types/module-federation/manifest-recovery-runtime-plugin.d.ts",
-      "node": {
-        "import": "./dist/esm/module-federation/manifest-recovery-runtime-plugin.mjs",
-        "require": "./dist/cjs/module-federation/manifest-recovery-runtime-plugin.js"
-      },
-      "default": "./dist/esm/module-federation/manifest-recovery-runtime-plugin.mjs"
-    },
     "./ssr": {
       "types": "./dist/types/core/server/index.d.ts",
       "default": "./dist/esm/core/server/index.mjs"
@@ -193,15 +173,6 @@
       ],
       "head": [
         "./dist/types/exports/head.d.ts"
-      ],
-      "boundary-debugger": [
-        "./dist/types/boundary-debugger/index.d.ts"
-      ],
-      "module-federation": [
-        "./dist/types/module-federation/index.d.ts"
-      ],
-      "module-federation/manifest-recovery-runtime-plugin": [
-        "./dist/types/module-federation/manifest-recovery-runtime-plugin.d.ts"
       ],
       "document": [
         "./dist/types/document/index.d.ts"

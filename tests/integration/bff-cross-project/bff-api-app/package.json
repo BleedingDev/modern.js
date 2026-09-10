@@ -22,10 +22,13 @@
     "react-dom": "^19.2.8",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "4.2.0",
-    "zod": "^4.5.4"
+    "zod": "^4.5.4",
+    "@modern-js/bff-effect": "workspace:*",
+    "@modern-js/plugin-bff-extensions": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/app-tools": "workspace:*",
+    "@modern-js/plugin-bff-build-extensions": "workspace:*",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.4.1",

@@ -1,7 +1,7 @@
 import {
   BFF_OPERATION_CONTEXT_DETAIL_HEADER,
   BFF_TRACEPARENT_HEADER,
-} from '@modern-js/create-request';
+} from '@modern-js/runtime-extensions/request-context';
 import { rstest } from '@rstest/core';
 import {
   createEffectOperationContext,

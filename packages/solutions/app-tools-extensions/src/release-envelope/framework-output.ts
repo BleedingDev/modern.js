@@ -7,7 +7,7 @@ import {
   isUltramodernBuildArtifact,
   ULTRAMODERN_BUILD_ARTIFACT_FILE,
   type UltramodernBuildArtifact,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import {
   canonicalSerializeMicroVerticalReleaseEnvelope,
   createMicroVerticalReleaseEnvelope,

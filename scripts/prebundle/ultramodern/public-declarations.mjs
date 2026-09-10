@@ -206,7 +206,7 @@ export function emitBuilderDeclarations(types, resolvePackage) {
   }
 }
 
-export function emitAppToolsDeclarations(types, resolvePackage) {
+export function emitAppToolsExtensionsDeclarations(types, resolvePackage) {
   const target = join(types, 'precompress');
   emitOptionDeclarations(
     resolvePackage('compression-webpack-plugin'),
@@ -215,7 +215,7 @@ export function emitAppToolsDeclarations(types, resolvePackage) {
     'export type CompressionPluginOptions = BasePluginOptions<ZlibOptions> & DefinedDefaultAlgorithmAndOptions<ZlibOptions>;',
     { PathData: "import('@rsbuild/core').Rspack.PathData" },
   );
-  rewrite(join(types, 'types/config/precompress.d.ts'), text =>
+  rewrite(join(types, 'build-config/precompress/types.d.ts'), text =>
     text.replace(
       /import type CompressionPlugin from ['"]compression-webpack-plugin['"];\s*type CompressionPluginOptions = NonNullable<ConstructorParameters<typeof CompressionPlugin>\[0\]>;/,
       "import type { CompressionPluginOptions } from '../../precompress/index.js';",
@@ -254,8 +254,11 @@ export function publicDeclarationsPlugin(kind) {
           emitUtilsDeclarations(resolve(root, 'dist/compiled'), resolver);
         else if (kind === 'builder')
           emitBuilderDeclarations(resolve(root, 'dist/types'), resolver);
-        else if (kind === 'app-tools')
-          emitAppToolsDeclarations(resolve(root, 'dist/types'), resolver);
+        else if (kind === 'app-tools-extensions')
+          emitAppToolsExtensionsDeclarations(
+            resolve(root, 'dist/types'),
+            resolver,
+          );
         else throw new Error(`Unknown declaration producer: ${kind}`);
       });
     },

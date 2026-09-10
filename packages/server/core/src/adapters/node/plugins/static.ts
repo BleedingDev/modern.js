@@ -1,4 +1,7 @@
+import { fileReader } from '@modern-js/runtime-utils/fileReader';
 import type { ServerRoute } from '@modern-js/types';
+import { fs } from '@modern-js/utils';
+import { getMimeType } from 'hono/utils/mime';
 import path from 'path';
 import type {
   HonoRequest,
@@ -10,13 +13,152 @@ import type {
 } from '../../../types';
 import { sortRoutes } from '../../../utils';
 import { getPublicDirPatterns } from '../../../utils/publicDir';
-import {
-  createModuleFederationStaticServing,
-  servePreCompressedPublicRouteAsset,
-  servePublicDirectoryAsset,
-} from './staticServing';
 
-export const serverStaticPlugin = (): ServerPlugin => ({
+/** A selected file and the native response conventions to use for it. */
+export type StaticAsset = {
+  filename: string;
+  kind: 'static' | 'public';
+  /** An alternate representation retains the original resource's MIME type. */
+  mimeFilename?: string;
+  responseHeaders?: ServerRoute['responseHeaders'];
+  /** True uses the served byte length; omitted preserves native length defaults. */
+  contentLength?: boolean;
+  /** Optional lexical containment boundary. Use real paths to contain symlinks. */
+  root?: string;
+  /** Resolve symlinks before checking root. Implies a regular file is required. */
+  realpath?: boolean;
+};
+
+export type StaticAssetRequest = { root: string; pathPrefix: string };
+
+/** Native serving of the selected file, optionally choosing another representation. */
+export type ServeStaticAsset = (
+  representation?: Partial<Pick<StaticAsset, 'filename' | 'contentLength'>>,
+) => Promise<Response | null>;
+
+/**
+ * Trusted server extension. Undefined uses the native file; null skips it.
+ * A returned response is final. Exceptions use the normal server error handler.
+ */
+export type StaticAssetResponder = (
+  context: Parameters<Middleware>[0],
+  asset: StaticAsset,
+  serve: ServeStaticAsset,
+  request: StaticAssetRequest,
+) => Response | null | undefined | Promise<Response | null | undefined>;
+
+/**
+ * Handles requests outside the native static pattern. The continuation only
+ * tries native public routes; it returns null on a miss and never calls the next
+ * middleware. Returning null from this hook continues the middleware chain.
+ */
+export type StaticPublicFallbackResponder = (
+  context: Parameters<Middleware>[0],
+  respondPublic: () => Promise<Response | null>,
+  request: StaticAssetRequest,
+) => Response | null | Promise<Response | null>;
+
+// Retained from the native static middleware; extensions need not copy it.
+const isPathInside = (target: string, root: string): boolean => {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return (
+    relative === '' ||
+    (!relative.startsWith(`..${path.sep}`) &&
+      relative !== '..' &&
+      !path.isAbsolute(relative))
+  );
+};
+
+/** Read a selected file using native readers, MIME, headers and body conversion. */
+export async function serveStaticAsset(
+  context: Parameters<Middleware>[0],
+  asset: StaticAsset,
+  respond?: (
+    asset: StaticAsset,
+    serve: ServeStaticAsset,
+  ) => Promise<Response | null>,
+): Promise<Response | null> {
+  let { filename } = asset;
+  const { kind } = asset;
+  if (asset.root && !isPathInside(filename, asset.root)) {
+    return null;
+  }
+  if (asset.realpath) {
+    try {
+      const [realFilename, realRoot, stat] = await Promise.all([
+        fs.realpath(filename),
+        asset.root ? fs.realpath(asset.root) : Promise.resolve(undefined),
+        fs.stat(filename),
+      ]);
+      if (
+        !stat.isFile() ||
+        (realRoot && !isPathInside(realFilename, realRoot))
+      ) {
+        return null;
+      }
+      filename = realFilename;
+      asset = { ...asset, filename, root: realRoot };
+    } catch {
+      return null;
+    }
+  }
+  if (kind === 'static' && !(await fs.pathExists(filename))) {
+    return null;
+  }
+  if (respond) {
+    return respond(asset, representation =>
+      serveStaticAsset(context, {
+        ...asset,
+        ...representation,
+        filename: representation?.filename ?? asset.filename,
+        mimeFilename: asset.mimeFilename ?? filename,
+      }),
+    );
+  }
+  const mimeType = getMimeType(asset.mimeFilename ?? filename);
+  if (kind === 'static' && mimeType) {
+    context.header('Content-Type', mimeType);
+  }
+  const size = kind === 'static' ? (await fs.lstat(filename)).size : undefined;
+  const data =
+    kind === 'static'
+      ? await fileReader.readFileFromSystem(filename, 'buffer')
+      : await fileReader.readFile(filename, 'buffer');
+  if (kind === 'static' && (asset.contentLength ?? true)) {
+    context.header(
+      'Content-Length',
+      String(asset.contentLength === true && data ? data.byteLength : size),
+    );
+  }
+  if (data === null) {
+    return null;
+  }
+  if (kind === 'public' && mimeType) {
+    context.header('Content-Type', mimeType);
+  }
+  Object.entries(asset.responseHeaders || {}).forEach(([key, value]) => {
+    context.header(key, value as string);
+  });
+  if (kind === 'public' && asset.contentLength) {
+    context.header('Content-Length', String(data.byteLength));
+  }
+  // Hono does not accept Buffer<ArrayBufferLike>; retain native view conversion.
+  const body = new Uint8Array(
+    data.buffer as ArrayBuffer,
+    data.byteOffset,
+    data.byteLength,
+  );
+  return context.body(body, 200);
+}
+
+export type ServerStaticPluginOptions = {
+  respondAsset?: StaticAssetResponder;
+  respondPublicFallback?: StaticPublicFallbackResponder;
+};
+
+export const serverStaticPlugin = (
+  options: ServerStaticPluginOptions = {},
+): ServerPlugin => ({
   name: '@modern-js/plugin-server-static',
 
   setup(api) {
@@ -35,6 +177,8 @@ export const serverStaticPlugin = (): ServerPlugin => ({
         output: config.output || {},
         html: config.html || {},
         server: config.server || {},
+        ...api.getServerContext().staticAssetResponders,
+        ...options,
       });
 
       middlewares.push({
@@ -49,28 +193,43 @@ export const serverStaticPlugin = (): ServerPlugin => ({
 export type PublicMiddlwareOptions = {
   pwd: string;
   routes: ServerRoute[];
-};
+  pathPrefix?: string;
+} & ServerStaticPluginOptions;
 
 export function createPublicMiddleware({
   pwd,
   routes,
+  pathPrefix = '/',
+  respondAsset,
+  respondPublicFallback,
 }: PublicMiddlwareOptions): Middleware {
   return async (c, next) => {
-    const route = matchPublicRoute(c.req, routes);
-
-    if (route) {
-      const response = await servePreCompressedPublicRouteAsset(c, pwd, route);
-      if (response !== null) {
-        return response;
+    const respondPublic = async (): Promise<Response | null> => {
+      const route = matchPublicRoute(c.req, routes);
+      if (!route) {
+        return null;
       }
-    }
-
-    const generatedPublicAsset = await servePublicDirectoryAsset(c, pwd);
-    if (generatedPublicAsset !== null) {
-      return generatedPublicAsset;
-    }
-
-    return await next();
+      const asset: StaticAsset = {
+        filename: path.join(pwd, route.entryPath),
+        kind: 'public',
+        responseHeaders: route.responseHeaders,
+      };
+      const serve: ServeStaticAsset = representation =>
+        serveStaticAsset(c, {
+          ...asset,
+          ...representation,
+          filename: representation?.filename ?? asset.filename,
+          mimeFilename: asset.filename,
+        });
+      const response = respondAsset
+        ? await respondAsset(c, asset, serve, { root: pwd, pathPrefix })
+        : undefined;
+      return response === undefined ? serve() : response;
+    };
+    const response = respondPublicFallback
+      ? await respondPublicFallback(c, respondPublic, { root: pwd, pathPrefix })
+      : await respondPublic();
+    return response ?? next();
   };
 }
 
@@ -86,19 +245,6 @@ function matchPublicRoute(req: HonoRequest, routes: ServerRoute[]) {
   }
   return undefined;
 }
-
-// Check whether `target` is located inside `root` (or is `root` itself),
-// so a resolved static-asset path cannot escape the serving directory via
-// `../` traversal sequences.
-const isPathInside = (target: string, root: string): boolean => {
-  const relative = path.relative(path.resolve(root), path.resolve(target));
-  return (
-    relative === '' ||
-    (!relative.startsWith(`..${path.sep}`) &&
-      relative !== '..' &&
-      !path.isAbsolute(relative))
-  );
-};
 
 // Remove domain name from assetPrefix if it exists
 const extractPathname = (url: string): string => {
@@ -117,7 +263,7 @@ const extractPathname = (url: string): string => {
   }
 };
 
-export interface ServerStaticOptions {
+export interface ServerStaticOptions extends ServerStaticPluginOptions {
   pwd: string;
   output: OutputNormalizedConfig;
   html: HtmlNormalizedConfig;
@@ -166,14 +312,6 @@ export function createStaticMiddleware(
   const staticPathRegExp = new RegExp(
     `^${regPrefix}(${[...staticReg, ...iconReg].join('|')})`,
   );
-  const publicMiddleware = createPublicMiddleware({
-    pwd,
-    routes: routes || [],
-  });
-  const moduleFederationStaticServing = createModuleFederationStaticServing({
-    pwd,
-    pathPrefix,
-  });
 
   /**
    * The function is modified based on
@@ -192,41 +330,48 @@ export function createStaticMiddleware(
 
     // Check if path matches static resource pattern
     const hit = staticPathRegExp.test(pathname);
-    const staticServingRequest =
-      await moduleFederationStaticServing.resolveRequest(pathname);
-
-    if (staticServingRequest === null) {
-      return next();
-    }
 
     // FIXME: shoudn't hit, when cssPath, jsPath, mediaPath as '.'
     if (hit) {
-      const response = await moduleFederationStaticServing.serveStaticHit(
-        c,
-        staticServingRequest,
+      const filepath = path.join(
+        pwd,
+        pathname.replace(pathPrefix, () => ''),
       );
-      if (response !== null) {
-        return response;
+      // Prevent path traversal: `pathname` is user-controlled and may contain
+      // `../` sequences (Hono decodes `%2e%2e` in `c.req.path`), which
+      // `path.join` resolves. Reject any resolved path that escapes `pwd`.
+      if (!isPathInside(filepath, pwd)) {
+        return next();
       }
+      if (!(await fs.pathExists(filepath))) {
+        // FIXME: we shoud return a response with status is 404, if we can't found static asset
+        // return c.html(createErrorHtml(404), 404);
 
-      // FIXME: we shoud return a response with status is 404, if we can't found static asset
-      // return c.html(createErrorHtml(404), 404);
-
-      // In some case, page route would hit the staticPathRegExp.
-      // So we call next().
-      return next();
+        // In some case, page route would hit the staticPathRegExp.
+        // So we call next().
+        return next();
+      }
+      const asset: StaticAsset = { filename: filepath, kind: 'static' };
+      const serve: ServeStaticAsset = representation =>
+        serveStaticAsset(c, {
+          ...asset,
+          ...representation,
+          filename: representation?.filename ?? asset.filename,
+          mimeFilename: filepath,
+        });
+      const response = options.respondAsset
+        ? await options.respondAsset(c, asset, serve, { root: pwd, pathPrefix })
+        : undefined;
+      return (response === undefined ? await serve() : response) ?? next();
+    } else {
+      return createPublicMiddleware({
+        pwd,
+        routes: routes || [],
+        pathPrefix,
+        respondAsset: options.respondAsset,
+        respondPublicFallback: options.respondPublicFallback,
+      })(c, next);
     }
-
-    const moduleFederationResponse =
-      await moduleFederationStaticServing.serveModuleFederationAsset(
-        c,
-        staticServingRequest,
-      );
-    if (moduleFederationResponse !== null) {
-      return moduleFederationResponse;
-    }
-
-    return publicMiddleware(c, next);
   };
 }
 

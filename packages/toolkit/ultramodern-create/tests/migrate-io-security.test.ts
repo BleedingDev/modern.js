@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   createMigrationIo,
+  listWorkspacePackageFiles,
   withStagedDryRunMigrationIo,
 } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 
@@ -309,5 +310,57 @@ test('staged migration dry-run does not follow a symlinked workspace root back t
     assert.equal(fs.readFileSync(existingPath, 'utf-8'), 'original\n');
   } finally {
     fs.rmSync(temporaryRoot, { force: true, recursive: true });
+  }
+});
+
+test('declared local nested participants are enumerated without admitting external workspace paths', () => {
+  const temporaryRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-migrate-participants-'),
+  );
+  const workspaceRoot = path.join(temporaryRoot, 'workspace');
+  try {
+    fs.mkdirSync(path.join(workspaceRoot, 'features/nested/app'), {
+      recursive: true,
+    });
+    fs.mkdirSync(path.join(workspaceRoot, 'domain/core'), { recursive: true });
+    fs.mkdirSync(path.join(temporaryRoot, 'external'), { recursive: true });
+    for (const file of [
+      'package.json',
+      'features/nested/app/package.json',
+      'domain/core/package.json',
+    ]) {
+      fs.writeFileSync(path.join(workspaceRoot, file), '{}\n');
+    }
+    fs.writeFileSync(
+      path.join(temporaryRoot, 'external/package.json'),
+      '{"private":true}\n',
+    );
+    assert.deepEqual(
+      listWorkspacePackageFiles(workspaceRoot, {
+        appDirectories: ['features/nested/app'],
+        workspacePatterns: ['domain/*'],
+      }),
+      [
+        'domain/core/package.json',
+        'features/nested/app/package.json',
+        'package.json',
+      ],
+    );
+    assert.throws(
+      () =>
+        listWorkspacePackageFiles(workspaceRoot, {
+          workspacePatterns: ['../external'],
+        }),
+      /External workspace participant requires coordinated ownership/,
+    );
+    assert.equal(
+      fs.readFileSync(
+        path.join(temporaryRoot, 'external/package.json'),
+        'utf8',
+      ),
+      '{"private":true}\n',
+    );
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
   }
 });

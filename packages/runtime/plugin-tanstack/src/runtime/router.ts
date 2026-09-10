@@ -1,43 +1,28 @@
-/**
- * Entry-injected router module for entrypoints that are NOT TanStack
- * file-route entrypoints (e.g. apps configuring
- * `router: { framework: 'tanstack', createRoutes }` in modern.runtime.ts).
- *
- * The CLI plugin injects `{ name: 'router', path: '<pkg>/runtime/router' }`
- * for those entries. This module creates a framework-resolving wrapper whose
- * app-owned provider realm contains this module graph's TanStack factory.
- */
-import * as runtimeRouter from '@modern-js/runtime/router/internal';
+/** App-local composition for custom entries using runtime router selection. */
+import { routerProviderRegistryHooks } from '@modern-js/runtime/context';
+import { routerPlugin as nativeRouterPlugin } from '@modern-js/runtime/router/internal';
+import { createRouterPlugin } from '@modern-js/runtime-extensions/router-provider';
+import { createRouterStatePlugin } from '@modern-js/runtime-extensions/router-state-plugin';
 import { tanstackRouterProviderFactory } from './register';
 
-type LegacyRouterPlugin = (typeof runtimeRouter)['routerPlugin'];
-type CurrentRouterPluginCreator = (
-  localProviders: readonly {
-    name: string;
-    factory: typeof tanstackRouterProviderFactory;
-  }[],
-) => LegacyRouterPlugin;
+const createProviderPlugin = createRouterPlugin({
+  defaultProvider: { name: 'react-router', factory: nativeRouterPlugin },
+  registryHooks: routerProviderRegistryHooks,
+  localProviders: [
+    { name: 'tanstack', factory: tanstackRouterProviderFactory },
+  ],
+});
+const statePlugin = createRouterStatePlugin({
+  registryHooks: routerProviderRegistryHooks,
+});
 
-function getRouterPlugin(): LegacyRouterPlugin {
-  const createRouterPlugin = Reflect.get(runtimeRouter, 'createRouterPlugin') as
-    | CurrentRouterPluginCreator
-    | undefined;
-
-  if (typeof createRouterPlugin === 'function') {
-    return createRouterPlugin([
-      { name: 'tanstack', factory: tanstackRouterProviderFactory },
-    ]);
-  }
-
-  const legacyRouterPlugin = Reflect.get(runtimeRouter, 'routerPlugin');
-
-  if (typeof legacyRouterPlugin === 'function') {
-    return tanstackRouterProviderFactory as unknown as LegacyRouterPlugin;
-  }
-
-  throw new Error(
-    '[@modern-js/plugin-tanstack] The installed @modern-js/runtime/router/internal exports neither createRouterPlugin nor routerPlugin. Install a compatible @modern-js/runtime version.',
-  );
-}
-
-export const routerPlugin: LegacyRouterPlugin = getRouterPlugin();
+export const routerPlugin: typeof nativeRouterPlugin = (userConfig = {}) => {
+  const providerPlugin = createProviderPlugin(userConfig);
+  return {
+    ...providerPlugin,
+    setup(api) {
+      statePlugin.setup(api);
+      providerPlugin.setup(api);
+    },
+  };
+};

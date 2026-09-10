@@ -5,7 +5,7 @@ import {
   DELIVERY_UNIT_SCHEMA_VERSION,
   type DeliveryUnitRecord,
   deliveryUnitContractBlock,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import { packageName } from './naming';
 import type { WorkspaceApp } from './types';
 
@@ -48,5 +48,6 @@ export function createDeliveryUnitRecord(
     sourceRevision: 'workspace',
     unitId: `${scope}/${app.domain ?? app.id}`,
     version: '0.1.0',
+    ...app.deliveryUnit,
   };
 }

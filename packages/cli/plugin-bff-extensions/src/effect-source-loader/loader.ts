@@ -39,31 +39,37 @@ function preserveSourceModuleSemantics(): Plugin {
   return {
     name: 'modern-js-effect-source-semantics',
     setup(buildApi) {
-      buildApi.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, async args => {
-        const loader = sourceLoader(args);
-        if (!loader) {
-          return undefined;
-        }
+      buildApi.onLoad(
+        { filter: /\.[cm]?[jt]sx?$/, namespace: 'file' },
+        async args => {
+          const loader = sourceLoader(args);
+          if (!loader) {
+            return undefined;
+          }
 
-        const source = await fs.promises.readFile(args.path, 'utf8');
-        const compiled = await transform(source, {
-          define: {
-            __dirname: JSON.stringify(path.dirname(args.path)),
-            __filename: JSON.stringify(args.path),
-            'import.meta.url': JSON.stringify(pathToFileURL(args.path).href),
-          },
-          jsx: 'automatic',
-          loader,
-          sourcefile: args.path,
-          target: NODE_TARGET,
-        });
+          const source = await fs.promises.readFile(args.path, 'utf8');
+          const canonicalSourcePath = await fs.promises.realpath(args.path);
+          const compiled = await transform(source, {
+            define: {
+              __dirname: JSON.stringify(path.dirname(canonicalSourcePath)),
+              __filename: JSON.stringify(canonicalSourcePath),
+              'import.meta.url': JSON.stringify(
+                pathToFileURL(canonicalSourcePath).href,
+              ),
+            },
+            jsx: 'automatic',
+            loader,
+            sourcefile: args.path,
+            target: NODE_TARGET,
+          });
 
-        return {
-          contents: compiled.code,
-          loader: 'js',
-          resolveDir: path.dirname(args.path),
-        };
-      });
+          return {
+            contents: compiled.code,
+            loader: 'js',
+            resolveDir: path.dirname(args.path),
+          };
+        },
+      );
     },
   };
 }

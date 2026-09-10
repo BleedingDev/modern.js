@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { runAgentsMd } from './agents-md';
 import {
   CODESMITH_OVERLAY_FLAG,
+  collectPositionalArgs,
   DRY_RUN_FLAG,
   detectApiProtocolFlag,
   detectBffRuntime,
@@ -35,6 +36,7 @@ import {
   generateUltramodernWorkspace,
   planUltramodernVertical,
 } from './ultramodern-workspace';
+import { recoverFreshWorkspaceTransactions } from './ultramodern-workspace/add-vertical/transaction';
 import { hasUltramodernBridgeCliOptions } from './ultramodern-workspace/bridge-config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -158,6 +160,8 @@ async function main() {
     return;
   }
 
+  if (collectPositionalArgs(args).length === 0)
+    recoverFreshWorkspaceTransactions(process.cwd());
   const { name: projectName, useCurrentDir } = await getProjectName();
   const targetDir = useCurrentDir
     ? process.cwd()
@@ -169,6 +173,7 @@ async function main() {
       ? path.basename(targetDir)
       : projectName;
 
+  recoverFreshWorkspaceTransactions(targetDir);
   if (fs.existsSync(targetDir)) {
     const files = fs.readdirSync(targetDir);
     if (files.length > 0) {
@@ -197,7 +202,7 @@ async function main() {
     packageSource,
     generateAgentFiles,
   });
-  initializeGeneratedGitRepository(targetDir);
+  const initializedGitRepository = initializeGeneratedGitRepository(targetDir);
 
   const dim = '\x1b[2m\x1b[3m';
   const reset = '\x1b[0m';
@@ -214,6 +219,13 @@ async function main() {
   }
   console.log(`${dim}   ${i18n.t(localeKeys.message.step2)}${reset}`);
   console.log(`${dim}   pnpm check${reset}`);
+  if (initializedGitRepository) {
+    console.log(i18n.t(localeKeys.message.initialCommit));
+    console.log(`${dim}   git add .${reset}`);
+    console.log(
+      `${dim}   git commit -m "chore: initial UltraModern scaffold"${reset}`,
+    );
+  }
   console.log(`${dim}   ${i18n.t(localeKeys.message.step3)}${reset}\n`);
 }
 

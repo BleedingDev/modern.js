@@ -50,7 +50,10 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
+      "types": {
+        "import": "./dist/types-esm/index.d.mts",
+        "default": "./dist/types/index.d.ts"
+      },
       "node": {
         "import": "./dist/esm-node/index.mjs",
         "require": "./dist/cjs/index.js"
@@ -58,11 +61,17 @@
       "default": "./dist/cjs/index.js"
     },
     "./runtime": {
-      "types": "./dist/types/runtime.d.ts",
+      "types": {
+        "import": "./dist/types-esm/runtime.d.mts",
+        "default": "./dist/types/runtime.d.ts"
+      },
       "default": "./dist/esm/runtime.mjs"
     },
     "./styled": {
-      "types": "./dist/types/styled.d.ts",
+      "types": {
+        "import": "./dist/types-esm/styled.d.mts",
+        "default": "./dist/types/styled.d.ts"
+      },
       "default": "./dist/esm/styled.mjs"
     }
   },

@@ -1378,7 +1378,7 @@ test('a recovery dispatch still qualifies the publication tooling that runs with
   assert.equal(sourceStep.if, "inputs.recovery_run_id == ''");
   assert.match(sourceStep.run, /pnpm \\\n\s+--filter/u);
   assert.match(sourceStep.run, /pnpm test:ut/u);
-  assert.match(sourceStep.run, /pnpm test:scripts/u);
+  assert.match(sourceStep.run, /pnpm run test:scripts:after-build$/mu);
   assert.ok(
     stepNames.indexOf('Install Dependencies') <
       stepNames.indexOf('Qualify the release publication tooling'),
@@ -1623,10 +1623,53 @@ test('the tooling lane qualifies the whole import closure the OIDC jobs load', (
 });
 
 test('the root script suites run every test file they claim to cover', () => {
-  // The source lane qualifies the same publish tooling under `pnpm
-  // test:scripts`, so a suite the extension patterns skip there is a suite
-  // neither lane ever runs.
+  // Standalone and nightly callers retain the complete aggregate, including
+  // both the source tooling and the additional postbuild script checks.
   assertGlobsRunEveryTestFile(parseTestGlobs('test:scripts'), 'test:scripts');
+});
+
+test('release source and built selections partition the complete script suite', () => {
+  const selectedFiles = scriptName => {
+    const files = parseTestGlobs(scriptName).flatMap(({ dir, filePattern }) =>
+      fs.globSync(`${dir}/__tests__/${filePattern}`, { cwd: repoRoot }),
+    );
+    assert.equal(
+      new Set(files).size,
+      files.length,
+      `${scriptName} repeats files`,
+    );
+    return files.sort();
+  };
+  const tooling = selectedFiles('test:publish-tooling');
+  const afterBuild = selectedFiles('test:scripts:after-build');
+  const complete = selectedFiles('test:scripts');
+  assert.deepEqual(
+    tooling.filter(file => afterBuild.includes(file)),
+    [],
+    'source tooling must not replay after the build',
+  );
+  assert.deepEqual([...tooling, ...afterBuild].sort(), complete);
+
+  // A positive file selection cannot silently lose the image proof when a
+  // test-name skip pattern changes. Keep every built suite in this lane.
+  const imageProof =
+    'scripts/ultramodern-publish/__tests__/built/cohort-image.test.js';
+  assert.ok(
+    afterBuild.includes(imageProof),
+    'missing actual image build proof',
+  );
+  const builtFiles = fs.globSync(
+    'scripts/ultramodern-publish/__tests__/built/*.test.*',
+    { cwd: repoRoot },
+  );
+  for (const file of builtFiles) {
+    assert.ok(afterBuild.includes(file), `built suite never runs: ${file}`);
+  }
+  const qualification = workflow(publishWorkflowPath).jobs['qualify-source'];
+  const toolingStep = qualification.steps.find(
+    step => step.name === 'Qualify the release publication tooling',
+  );
+  assert.doesNotMatch(toolingStep.run, /test-skip-pattern/u);
 });
 
 test('the recovered qualification attempt is independent of the recovered bundle attempt', () => {
@@ -1923,4 +1966,50 @@ test('publish change record structurally schedules only for a successful real ou
     false,
     'change record must remain bound to the publish branch',
   );
+});
+
+test('downloaded receipts use one strict acceptance runner in each release job', () => {
+  const parsed = workflow(publishWorkflowPath);
+  const names = [
+    'Verify previously accepted release bundle',
+    'Verify exact release acceptance receipt',
+  ];
+  const steps = Object.values(parsed.jobs)
+    .flatMap(job => job.steps ?? [])
+    .filter(step => names.includes(step.name));
+  assert.equal(steps.length, 4);
+  for (const step of steps) {
+    assert.equal(
+      (step.run.match(/run-release-acceptance\.mjs/gu) ?? []).length,
+      1,
+    );
+    assert.match(step.run, /--verify-receipt/u);
+    assert.match(step.run, /--run-identity/u);
+    assert.doesNotMatch(
+      step.run,
+      /published-create-proof\/acceptance-receipt\.mjs/u,
+    );
+  }
+});
+
+test('published ERP-10 and Tractor retain independent registry waits through one helper', () => {
+  const publish = workflow(publishWorkflowPath);
+  const tractor = workflow(tractorWorkflowPath);
+  const publishedWait = publish.jobs['accept-published'].steps.find(
+    step => step.name === 'Start the exact registry cohort wait',
+  );
+  const tractorWait = tractor.jobs['tractor-downstream'].steps.find(
+    step => step.name === 'Wait for the exact registry cohort',
+  );
+  for (const step of [publishedWait, tractorWait]) {
+    assert.match(
+      step.run,
+      /bash scripts\/ultramodern-publish\/wait-for-registry-cohort\.sh/u,
+    );
+    assert.doesNotMatch(step.run, /for attempt/u);
+  }
+  assert.match(publishedWait.run, /\|\| status=\$\?/u);
+  assert.match(publishedWait.run, /registry-cohort-wait\.status/u);
+  assert.match(publishedWait.run, /2>&1 &/u);
+  assert.equal(tractorWait.if, 'inputs.wait_for_registry_cohort');
 });

@@ -19,6 +19,7 @@ export type UltramodernToolingConfigApp = {
   domain?: string;
   surfaceProfile?: VerticalPreset;
   deliveryUnitKind?: WorkspaceDeliveryUnitKind;
+  deliveryUnit?: WorkspaceApp['deliveryUnit'];
   port?: number;
   portEnv?: string;
   moduleFederation?: {

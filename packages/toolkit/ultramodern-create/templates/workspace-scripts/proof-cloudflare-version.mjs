@@ -378,7 +378,7 @@ function createNodeExecutionSurface(app) {
     containerEntry: `http://localhost:${app.port}/backendRemoteEntry.cjs`,
     remoteType: 'commonjs-module',
     expose: './effect-api',
-    runtimePackage: '@modern-js/plugin-bff/effect',
+    runtimePackage: '@modern-js/plugin-bff-extensions/backend-federation-manifest/node',
   };
 }
 

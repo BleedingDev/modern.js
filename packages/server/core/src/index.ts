@@ -20,13 +20,9 @@ export * from './types/config';
 export * from './types/plugins';
 export * from './types/render';
 export * from './types/requestHandler';
-export type { SafeFailureEnvelope, SafeFailureHttpResult } from './utils';
 export {
   createErrorHtml,
-  createSafeFailureHttpResult,
-  createSafeJsonFailureResponse,
   ErrorDigest,
-  getSafeFailureStatus,
   onError,
 } from './utils';
 export {

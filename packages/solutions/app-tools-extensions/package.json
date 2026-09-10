@@ -97,6 +97,30 @@
       "modern:source": "./src/native-type-checker.ts",
       "import": "./dist/esm-node/native-type-checker.mjs",
       "require": "./dist/cjs/native-type-checker.js"
+    },
+    "./build-config/precompress/plugin": {
+      "types": "./dist/types/build-config/precompress/plugin.d.ts",
+      "modern:source": "./src/build-config/precompress/plugin.ts",
+      "import": "./dist/esm-node/build-config/precompress/plugin.mjs",
+      "require": "./dist/cjs/build-config/precompress/plugin.js"
+    },
+    "./backend-federation-build": {
+      "types": "./dist/types/backend-federation-build/index.d.ts",
+      "modern:source": "./src/backend-federation-build/index.ts",
+      "import": "./dist/esm-node/backend-federation-build/index.mjs",
+      "require": "./dist/cjs/backend-federation-build/index.js"
+    },
+    "./deploy-output/plugin": {
+      "types": "./dist/types/deploy-output/plugin.d.ts",
+      "modern:source": "./src/deploy-output/plugin.ts",
+      "import": "./dist/esm-node/deploy-output/plugin.mjs",
+      "require": "./dist/cjs/deploy-output/plugin.js"
+    },
+    "./deploy-output/target": {
+      "types": "./dist/types/deploy-output/target.d.ts",
+      "modern:source": "./src/deploy-output/target.ts",
+      "import": "./dist/esm-node/deploy-output/target.mjs",
+      "require": "./dist/cjs/deploy-output/target.js"
     }
   },
   "typesVersions": {
@@ -104,6 +128,18 @@
       "*": [
         "./dist/types/*",
         "./src/*"
+      ],
+      "build-config/precompress/plugin": [
+        "./dist/types/build-config/precompress/plugin.d.ts"
+      ],
+      "backend-federation-build": [
+        "./dist/types/backend-federation-build/index.d.ts"
+      ],
+      "deploy-output/plugin": [
+        "./dist/types/deploy-output/plugin.d.ts"
+      ],
+      "deploy-output/target": [
+        "./dist/types/deploy-output/target.d.ts"
       ]
     }
   },
@@ -111,8 +147,9 @@
     "prepublishOnly": "only-allow-pnpm",
     "pretest": "pnpm run build",
     "dev": "rslib build --watch",
-    "build": "rslib build",
-    "test": "rstest"
+    "build": "rslib build && pnpm run verify:public-surface",
+    "test": "rstest",
+    "verify:public-surface": "node ./tests/build-config/verify-public-surface.mjs"
   },
   "engines": {
     "node": ">=26.7.0"
@@ -121,26 +158,35 @@
     "@babel/parser": "^8.0.4",
     "@babel/traverse": "^8.0.4",
     "@loadable/component": "5.16.7",
+    "@modern-js/backend-federation-contracts": "workspace:*",
     "@modern-js/builder": "workspace:*",
+    "@modern-js/prod-server": "workspace:*",
     "@modern-js/server-core": "workspace:*",
+    "@modern-js/server-runtime-extensions": "workspace:*",
     "@modern-js/types": "workspace:*",
     "@modern-js/utils": "workspace:*",
     "@swc/helpers": "^0.5.23",
+    "compression-webpack-plugin": "^12.0.0",
+    "esbuild": "^0.28.2",
     "std-env": "4.2.0"
   },
   "peerDependencies": {
     "@rsbuild/core": "2.2.3"
   },
   "devDependencies": {
-    "@module-federation/runtime-tools": "2.9.0",
+    "@modern-js/plugin": "workspace:*",
+    "@modern-js/plugin-bff-extensions": "workspace:*",
     "@modern-js/rslib": "workspace:*",
-    "@rslib/core": "1.0.0",
+    "@module-federation/runtime-tools": "2.9.0",
     "@rsbuild/core": "2.2.3",
+    "@rslib/core": "1.0.0",
     "@scripts/rstest-config": "workspace:*",
     "@types/babel__traverse": "7.28.0",
     "@types/node": "^26.4.1",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "core-js": "^3.50.0"
+    "core-js": "^3.50.0",
+    "effect": "4.0.0-rc.112",
+    "ndepe": "^0.1.13"
   },
   "sideEffects": false,
   "publishConfig": {

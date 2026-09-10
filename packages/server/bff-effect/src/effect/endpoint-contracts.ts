@@ -15,7 +15,7 @@
 import {
   createOperationContractHash,
   type OperationContractSource,
-} from '@modern-js/bff-core';
+} from '@modern-js/server-runtime-extensions/bff-policy/node';
 import {
   classifyEffectBffEntryModule,
   isValidatorAwareHandlerFactory,

@@ -7,7 +7,7 @@ import {
   DELIVERY_UNIT_DEPLOY_PROFILE,
   DELIVERY_UNIT_KIND,
   DELIVERY_UNIT_SCHEMA_VERSION,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
 import * as sourceFramework from '../src/release-envelope/framework-output';
 
 const roots: string[] = [];

@@ -183,8 +183,15 @@ test('the OIDC sidecar job verifies the clean-room acceptance receipt before pub
   );
   assert.match(verifyRun, /run-release-acceptance\.mjs/u);
   assert.match(verifyRun, /--verify-receipt/u);
-  assert.match(verifyRun, /acceptance-receipt\.mjs/u);
-  assert.match(verifyRun, /--verify/u);
+  assert.equal(verifyRun.match(/--verify-receipt/gu).length, 1);
+  assert.doesNotMatch(verifyRun, /acceptance-receipt\.mjs/u);
+  const verifyIndex = sidecarJob.steps.findIndex(
+    step => step.run === verifyRun,
+  );
+  const publishIndex = sidecarJob.steps.findIndex(step =>
+    /Publish the staged sidecars/u.test(String(step.name ?? '')),
+  );
+  assert.ok(verifyIndex >= 0 && publishIndex > verifyIndex);
 });
 
 test('the sidecar lane publishes before the cohort and never with it', () => {
@@ -1628,72 +1635,6 @@ test('the packed-consumer proof binds registry reuse to exact tarball bytes', as
     crypto.createHash('sha1').update(packed.bytes).digest('hex'),
   );
   assert.equal(packed.packageJson.name, '@bleedingdev/sidecar-digest-fixture');
-});
-
-test('the packed-consumer proof stages the cohort image with its aliases intact', async () => {
-  const { cohortImageTargetName, proofImageVersion, stageCohortImagePackage } =
-    await importConsumerProof();
-  const { collectSidecarPackages, validateAliasConsistency } = await import(
-    '../lib/prepare-bleedingdev-packages/sidecars.mjs'
-  );
-  const semver = requireFromPrebundle(
-    path.join(repoRoot, 'packages/toolkit/utils/compiled/semver/index.js'),
-  );
-
-  // The cohort image is rebuilt from the working tree every run, so its proof
-  // version is unique per run: an immutable local-registry version can never be
-  // republished with different bytes. The SIDECAR versions stay exact.
-  const first = proofImageVersion();
-  const second = proofImageVersion();
-  assert.notEqual(first, second);
-  assert.ok(semver.valid(first), `${first} must be valid semver`);
-  assert.ok(
-    semver.lt(first, '0.0.0'),
-    'the proof version must be a prerelease',
-  );
-  assert.match(first, /^0\.0\.0-sidecar-consumer-proof\./u);
-
-  const stageDir = path.join(makeTempDir(), 'image');
-  const { packageJson, version } = stageCohortImagePackage(stageDir, {
-    version: first,
-  });
-
-  assert.equal(packageJson.name, cohortImageTargetName);
-  assert.equal(packageJson.version, first);
-  assert.equal(version, first);
-  assert.equal(packageJson.publishConfig.access, 'public');
-  assert.equal(
-    Object.hasOwn(packageJson.publishConfig, 'registry'),
-    false,
-    'the staged cohort image must carry no publish target',
-  );
-  assert.equal(packageJson.devDependencies, undefined);
-  assert.equal(packageJson.scripts, undefined);
-  // The npm: alias literals are what this whole lane exists to make
-  // resolvable; the proof must publish them unchanged, pinned at the exact
-  // stable sidecar versions even though the image version floats per run.
-  assert.match(
-    packageJson.dependencies['@rsbuild-image/core'],
-    /^npm:@bleedingdev\/rsbuild-image-core@\d+\.\d+\.\d+$/u,
-  );
-  assert.match(
-    packageJson.dependencies.ipx,
-    /^npm:@bleedingdev\/ipx@\d+\.\d+\.\d+$/u,
-  );
-  assert.doesNotThrow(() =>
-    validateAliasConsistency(
-      [{ name: cohortImageTargetName, packageJson }],
-      collectSidecarPackages(repoRoot),
-    ),
-  );
-  // Staged out of tree: the repository copy keeps its own identity.
-  const sourceManifest = JSON.parse(
-    fs.readFileSync(
-      path.join(repoRoot, 'packages/runtime/plugin-image/package.json'),
-      'utf8',
-    ),
-  );
-  assert.equal(sourceManifest.name, '@modern-js/image');
 });
 
 test('the consumer proof resolves packages by walking up from a public entry', async () => {

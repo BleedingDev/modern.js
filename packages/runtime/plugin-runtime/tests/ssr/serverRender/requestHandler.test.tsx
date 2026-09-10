@@ -1,6 +1,6 @@
+import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import React from 'react';
 import {
-  applyRouterRuntimeState,
   setGlobalContext,
   setGlobalInternalRuntimeContext,
 } from '../../../src/core/context';

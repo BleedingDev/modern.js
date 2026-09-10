@@ -167,7 +167,46 @@ export function writeJson(
 
 export function formatGeneratedSourceCandidates(
   sources: readonly (readonly [relativePath: string, source: string])[],
+  formattingWorkspaceRoot?: string,
 ) {
+  if (formattingWorkspaceRoot) {
+    const oxfmtBin = resolveOxfmtBin();
+    return sources.map(([relativePath, source]) => {
+      assertSafeRelativePath(relativePath);
+      if (!formattableExtensions.has(path.extname(relativePath))) return source;
+      // stdin preserves the original filename for Oxfmt's native config,
+      // nested override and module resolution without writing consumer files.
+      const result = spawnSync(
+        process.execPath,
+        [
+          oxfmtBin,
+          '--stdin-filepath',
+          path.resolve(formattingWorkspaceRoot, relativePath),
+        ],
+        {
+          cwd: formattingWorkspaceRoot,
+          input: source,
+          encoding: 'utf-8',
+          env: { ...process.env, FORCE_COLOR: '0' },
+        },
+      );
+      if (result.status !== 0) {
+        const detail = [
+          result.error?.message,
+          result.stderr?.trim(),
+          result.stdout?.trim(),
+        ]
+          .filter(Boolean)
+          .join('\n');
+        throw new Error(
+          ['Failed to format generated UltraModern workspace output.', detail]
+            .filter(Boolean)
+            .join('\n'),
+        );
+      }
+      return result.stdout;
+    });
+  }
   const temporaryRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'ultramodern-format-'),
   );
@@ -258,7 +297,9 @@ function writePreformatConfig(targetDir: string) {
         pattern => `    ${JSON.stringify(pattern)},`,
       ),
       '  ],',
+      '  printWidth: 120,',
       '  singleQuote: true,',
+      "  trailingComma: 'all',",
       '});',
       '',
     ].join('\n'),

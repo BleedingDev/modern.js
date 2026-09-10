@@ -1,1 +1,1 @@
-export * from './server/rsc/rsc.worker';
+export * from './server/rsc';

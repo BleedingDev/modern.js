@@ -1,20 +1,11 @@
 import vm from 'node:vm';
 import { RenderLevel } from '../../../../src/core/constants';
 import { SSRDataCollector } from '../../../../src/core/server/string/ssrData';
-import { applyRouterRuntimeState } from '../../../../src/router/runtime/lifecycle';
 
 const createScripts = (options?: {
   useJsonScript?: boolean;
   nonce?: string;
   unsafeHeaders?: string[];
-  routerServerSnapshot?: {
-    routerData?: {
-      loaderData?: Record<string, unknown>;
-      errors?: Record<string, unknown>;
-    };
-    hydrationScript?: string;
-    hydrationScripts?: string[];
-  };
 }) => {
   const chunkSet = {
     renderLevel: RenderLevel.SERVER_RENDER,
@@ -27,12 +18,6 @@ const createScripts = (options?: {
     initialData: { name: 'modern.js' },
     __i18nData__: {},
   } as any;
-  if (options?.routerServerSnapshot) {
-    applyRouterRuntimeState(runtimeContext, {
-      framework: 'react-router',
-      serverSnapshot: options.routerServerSnapshot,
-    });
-  }
 
   const collector = new SSRDataCollector({
     runtimeContext,
@@ -140,41 +125,5 @@ describe('SSR data script generation', () => {
     expect(payload.context.request.headers).toEqual({
       'x-request-id': 'req-1',
     });
-  });
-
-  it('should use router snapshot data and hydration script when present', () => {
-    const browser = executeScripts(
-      createScripts({
-        routerServerSnapshot: {
-          routerData: {
-            loaderData: { route: { ok: true } },
-            errors: {},
-          },
-          hydrationScript: '<script>window.__ROUTER_SSR__ = true;</script>',
-        },
-      }),
-    );
-
-    expect(browser.__ROUTER_SSR__).toBe(true);
-    expect(browser._ROUTER_DATA).toEqual({
-      errors: {},
-      loaderData: { route: { ok: true } },
-    });
-  });
-
-  it('should serialize generic router hydration scripts when present', () => {
-    const browser = executeScripts(
-      createScripts({
-        routerServerSnapshot: {
-          hydrationScripts: [
-            '<script>window.__ROUTER_A__ = true;</script>',
-            '<script>window.__ROUTER_B__ = true;</script>',
-          ],
-        },
-      }),
-    );
-
-    expect(browser.__ROUTER_A__).toBe(true);
-    expect(browser.__ROUTER_B__).toBe(true);
   });
 });

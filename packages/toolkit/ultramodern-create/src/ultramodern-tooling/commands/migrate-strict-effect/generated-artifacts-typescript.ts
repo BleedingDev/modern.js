@@ -1,22 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { parse } from '@babel/parser';
 import { ULTRAMODERN_CREATE_PACKAGE } from '../../../ultramodern-package-source';
 import {
   createAppEnvDts,
   createAppRuntimeConfig,
 } from '../../../ultramodern-workspace/app-files';
 import {
+  createFederatedComponentsRegistry,
   createRemoteExposeFragmentPage,
+  createShellRemoteComponents,
+  createShellWorkerRemoteComponents,
   regenerateGeneratedNavigationSurface,
   regenerateGeneratedProductRouteAdapter,
   remoteComponentOutputPath,
 } from '../../../ultramodern-workspace/demo-components';
 import {
+  appEmitsBrowserUi,
   appI18nNamespace,
   distributedSsrExposes,
   distributedSsrFragmentSlug,
   resolveRemoteRefs,
 } from '../../../ultramodern-workspace/descriptors';
+import { formatGeneratedSourceCandidates } from '../../../ultramodern-workspace/fs-io';
 import {
   createAppMfTypesTsConfig,
   createAppTsConfig,
@@ -27,7 +33,7 @@ import {
   allWorkspaceAppsFromToolingConfig,
   type UltramodernToolingConfig,
 } from '../../config';
-import { writeGeneratedUiSourceIfChanged } from './generated-ui-source';
+import { generatedUiSourceRequiresRewrite } from './generated-ui-source';
 import { type MigrationIo, writeJsonFile } from './io';
 
 type JsonObject = Record<string, unknown>;
@@ -38,12 +44,6 @@ function jsonObject(value: unknown): JsonObject | undefined {
     : undefined;
 }
 
-function hasStringName(
-  value: JsonObject | undefined,
-): value is JsonObject & { name: string } {
-  return typeof value?.name === 'string';
-}
-
 function readJsonObject(filePath: string) {
   if (!fs.existsSync(filePath)) {
     return undefined;
@@ -51,98 +51,127 @@ function readJsonObject(filePath: string) {
   return jsonObject(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
 }
 
-function mergeUniqueJsonValues(generated: unknown, existing: unknown) {
-  const generatedValues = Array.isArray(generated) ? generated : [];
-  const existingValues = Array.isArray(existing) ? existing : [];
-  const seen = new Set(generatedValues.map(value => JSON.stringify(value)));
-  return [
-    ...generatedValues,
-    ...existingValues.filter(value => {
-      const key = JSON.stringify(value);
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    }),
-  ];
-}
+/** Reconstruct only the .4 generator's complete flattened-locale runtime. */
+function historicalFlattenedLocaleRuntime(generatedSource: string) {
+  const helper = `type LocaleResource = string | { readonly [key: string]: LocaleResource };
 
-function mergeTypeScriptPlugins(generated: unknown, existing: unknown) {
-  const generatedPlugins = Array.isArray(generated) ? generated : [];
-  const existingPlugins = Array.isArray(existing) ? existing : [];
-  const existingByName = new Map(
-    existingPlugins
-      .map(jsonObject)
-      .filter(hasStringName)
-      .map(plugin => [plugin.name, plugin] as const),
+const flattenLocaleResource = (
+  resource: LocaleResource,
+  prefix = ''
+): Record<string, string> => {
+  if (typeof resource === 'string') {
+    return prefix.length > 0 ? { [prefix]: resource } : {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(resource).flatMap(([key, value]) => {
+      const nextKey = prefix.length > 0 ? \`\${prefix}.\${key}\` : key;
+      return typeof value === 'string'
+        ? [[nextKey, value]]
+        : Object.entries(flattenLocaleResource(value, nextKey));
+    })
   );
-  const merged = generatedPlugins.map(generatedPlugin => {
-    const generatedObject = jsonObject(generatedPlugin);
-    const existingObject =
-      typeof generatedObject?.name === 'string'
-        ? existingByName.get(generatedObject.name)
-        : undefined;
-    if (!generatedObject || !existingObject) {
-      return generatedPlugin;
-    }
-    existingByName.delete(generatedObject.name as string);
-    return {
-      ...generatedObject,
-      ...existingObject,
-      diagnosticSeverity: {
-        ...jsonObject(generatedObject.diagnosticSeverity),
-        ...jsonObject(existingObject.diagnosticSeverity),
-      },
-    };
-  });
-  return [...merged, ...existingByName.values()];
+};`;
+  return generatedSource
+    .replace(
+      'const i18nInstance = createInstance();',
+      `${helper}\n\nconst i18nInstance = createInstance();`,
+    )
+    .replace(': csResource }', ': flattenLocaleResource(csResource) }')
+    .replace(': enResource }', ': flattenLocaleResource(enResource) }');
 }
 
-function mergeTypeScriptConfig(generated: unknown, existing: unknown) {
-  const generatedConfig = jsonObject(generated) ?? {};
-  const existingConfig = jsonObject(existing) ?? {};
-  const generatedCompilerOptions =
-    jsonObject(generatedConfig.compilerOptions) ?? {};
-  const existingCompilerOptions = {
-    ...(jsonObject(existingConfig.compilerOptions) ?? {}),
+/**
+ * Move named imports only when the generated target identifies one provider.
+ * Authored programs retain every byte outside the migrated module literals;
+ * complete generated programs may also use the generated-source formatter.
+ */
+function migrateGeneratedProviderImports(
+  io: MigrationIo,
+  filePath: string,
+  generatedSource: string,
+  historicalGeneratedSources: readonly string[] = [],
+) {
+  if (!fs.existsSync(filePath)) return false;
+  const source = fs.readFileSync(filePath, 'utf8');
+  const legacyProviders: Record<string, readonly string[]> = {
+    '@modern-js/federation-runtime': ['@modern-js/runtime/module-federation'],
+    '@modern-js/federation-runtime/distributed-ssr': [
+      '@modern-js/runtime/module-federation',
+      '@modern-js/runtime/module-federation/distributed-ssr',
+    ],
+    '@modern-js/boundary-debugger': [
+      '@modern-js/runtime-extensions/boundary-debugger',
+      '@modern-js/runtime/boundary-debugger',
+    ],
   };
-  delete existingCompilerOptions.skipLibCheck;
-  const compilerOptions = {
-    ...existingCompilerOptions,
-    ...generatedCompilerOptions,
-  };
-  if (Array.isArray(generatedCompilerOptions.types)) {
-    compilerOptions.types = mergeUniqueJsonValues(
-      generatedCompilerOptions.types,
-      existingCompilerOptions.types,
+  let updated = source;
+  let preserveAuthoredSource = false;
+  try {
+    const options = {
+      sourceType: 'module' as const,
+      plugins: ['typescript' as const, 'jsx' as const],
+    };
+    const current = parse(source, options);
+    const generated = parse(generatedSource, options);
+    const targets = generated.program.body.filter(
+      statement => statement.type === 'ImportDeclaration',
     );
-  }
-  if (
-    Array.isArray(generatedCompilerOptions.plugins) ||
-    Array.isArray(existingCompilerOptions.plugins)
-  ) {
-    compilerOptions.plugins = mergeTypeScriptPlugins(
-      generatedCompilerOptions.plugins,
-      existingCompilerOptions.plugins,
-    );
-  }
-  const merged: JsonObject = { ...existingConfig, ...generatedConfig };
-  if (Object.keys(compilerOptions).length > 0) {
-    merged.compilerOptions = compilerOptions;
-  }
-  for (const key of ['include', 'exclude', 'references'] as const) {
-    if (
-      Array.isArray(generatedConfig[key]) ||
-      Array.isArray(existingConfig[key])
-    ) {
-      merged[key] = mergeUniqueJsonValues(
-        generatedConfig[key],
-        existingConfig[key],
+    const edits: Array<{ start: number; end: number; content: string }> = [];
+    for (const statement of current.program.body) {
+      if (statement.type !== 'ImportDeclaration') continue;
+      const matches = targets.filter(
+        target =>
+          target.type === 'ImportDeclaration' &&
+          legacyProviders[target.source.value]?.includes(
+            statement.source.value,
+          ) &&
+          statement.specifiers.length > 0 &&
+          statement.specifiers.every(
+            specifier =>
+              specifier.type === 'ImportSpecifier' &&
+              target.specifiers.some(
+                expected =>
+                  expected.type === 'ImportSpecifier' &&
+                  (expected.imported.type === 'Identifier'
+                    ? expected.imported.name
+                    : expected.imported.value) ===
+                    (specifier.imported.type === 'Identifier'
+                      ? specifier.imported.name
+                      : specifier.imported.value),
+              ),
+          ),
       );
+      if (matches.length !== 1) continue;
+      edits.push({
+        start: statement.source.start! + 1,
+        end: statement.source.end! - 1,
+        content: matches[0].source.value,
+      });
     }
+    if (edits.length === 0) return false;
+    for (const edit of edits.toSorted(
+      (left, right) => right.start - left.start,
+    ))
+      updated =
+        updated.slice(0, edit.start) + edit.content + updated.slice(edit.end);
+    preserveAuthoredSource = [
+      generatedSource,
+      ...historicalGeneratedSources,
+    ].every(candidate => generatedUiSourceRequiresRewrite(updated, candidate));
+  } catch {
+    io.log(
+      `${path.relative(io.workspaceRoot, filePath)} preserved authored source: native provider imports could not be proven.`,
+    );
+    return false;
   }
-  return merged;
+  if (preserveAuthoredSource) {
+    io.log(
+      `${path.relative(io.workspaceRoot, filePath)} migrated native provider imports while preserving authored source.`,
+    );
+    return io.write(filePath, updated);
+  }
+  return io.writeGenerated(filePath, updated);
 }
 
 function writeMergedTypeScriptConfig(
@@ -150,14 +179,16 @@ function writeMergedTypeScriptConfig(
   filePath: string,
   generated: unknown,
 ) {
-  const existing = readJsonObject(filePath);
-  const merged = mergeTypeScriptConfig(generated, existing);
-  if (existing && JSON.stringify(merged) !== JSON.stringify(generated)) {
+  if (fs.existsSync(filePath)) {
+    // A generated-looking JSON shape does not prove ownership of compiler
+    // options, references, or formatting. Historical source upgrades require
+    // an explicit recognized transition, never a merge with template defaults.
     io.log(
-      `${path.relative(io.workspaceRoot, filePath)} preserved consumer-owned TypeScript configuration.`,
+      `${path.relative(io.workspaceRoot, filePath)} preserved consumer-owned TypeScript configuration byte-for-byte.`,
     );
+    return false;
   }
-  return writeJsonFile(io, filePath, merged);
+  return writeJsonFile(io, filePath, generated);
 }
 
 function generatedManifest(io: MigrationIo, config: UltramodernToolingConfig) {
@@ -197,6 +228,71 @@ function appSurfaceIsOwned(
     typeof manifestApp.package === 'string' &&
     packageJson?.name === manifestApp.package
   );
+}
+
+/** Add one missing input only for the complete immediate generated predecessor. */
+function writeAppTypeScriptConfig(
+  io: MigrationIo,
+  config: UltramodernToolingConfig,
+  app: ReturnType<typeof allWorkspaceAppsFromToolingConfig>[number],
+  remotes: ReturnType<typeof allWorkspaceAppsFromToolingConfig>,
+) {
+  const filePath = path.join(io.workspaceRoot, app.directory, 'tsconfig.json');
+  const generated = createAppTsConfig(app, remotes);
+  const stat = fs.lstatSync(filePath, { throwIfNoEntry: false });
+  if (stat === undefined) return writeJsonFile(io, filePath, generated);
+  const preserve = () => {
+    io.log(
+      `${app.directory}/tsconfig.json preserved consumer-owned TypeScript configuration byte-for-byte. ` +
+        'If its generated build module imports shared/ultramodern-build.json, include that JSON input in the composite project.',
+    );
+    return false;
+  };
+  if (!stat.isFile()) return preserve();
+  const source = fs.readFileSync(filePath, 'utf8');
+  let existing: JsonObject | undefined;
+  try {
+    existing = jsonObject(JSON.parse(source));
+  } catch {
+    return preserve();
+  }
+  const input = 'shared/ultramodern-build.json';
+  if (
+    (Array.isArray(existing?.include) && existing.include.includes(input)) ||
+    (Array.isArray(existing?.files) && existing.files.includes(input))
+  )
+    return false;
+  const manifest = generatedManifest(io, config);
+  const manifestApp =
+    manifest && manifestApps(manifest).find(entry => entry.id === app.id);
+  if (!manifestApp || !appSurfaceIsOwned(io, app, manifestApp))
+    return preserve();
+
+  const current = jsonObject(generated)!;
+  const predecessor = {
+    ...current,
+    include: (current.include as string[]).filter(value => value !== input),
+  };
+  // Parsing is only a cheap rejection filter. Duplicate keys, comments and
+  // unrecognized formatting never count as complete predecessor evidence.
+  if (JSON.stringify(existing) !== JSON.stringify(predecessor))
+    return preserve();
+  const previousBytes = `${JSON.stringify(predecessor, null, 2)}\n`;
+  const currentBytes = `${JSON.stringify(current, null, 2)}\n`;
+  let target = currentBytes;
+  if (source !== previousBytes) {
+    const [formattedPrevious, formattedCurrent] =
+      formatGeneratedSourceCandidates([
+        ['previous/tsconfig.json', previousBytes],
+        ['current/tsconfig.json', currentBytes],
+      ]);
+    if (source !== formattedPrevious) return preserve();
+    target = formattedCurrent;
+  }
+  io.log(
+    `${app.directory}/tsconfig.json migrated its recognized generated JSON build input.`,
+  );
+  return io.write(filePath, target);
 }
 
 function shellSurfaceIsOwned(
@@ -522,11 +618,7 @@ export function updateGeneratedTypeScriptSurfaces(
   }
 
   for (const app of apps) {
-    writeMergedTypeScriptConfig(
-      io,
-      path.join(io.workspaceRoot, app.directory, 'tsconfig.json'),
-      createAppTsConfig(app, remotes),
-    );
+    writeAppTypeScriptConfig(io, config, app, remotes);
     writeMergedTypeScriptConfig(
       io,
       path.join(io.workspaceRoot, app.directory, 'tsconfig.mf-types.json'),
@@ -537,32 +629,63 @@ export function updateGeneratedTypeScriptSurfaces(
       createAppEnvDts(app, remotes, config.workspace.packageScope),
     );
 
-    if (app.kind !== 'shell') {
-      for (const expose of distributedSsrExposes(app)) {
-        const fragmentPagePath = path.join(
-          io.workspaceRoot,
-          app.directory,
-          'src/routes/[lang]/_mf/fragment',
-          distributedSsrFragmentSlug(expose),
-          'page.tsx',
-        );
-        if (!fs.existsSync(fragmentPagePath)) {
-          continue;
-        }
-        const fragmentPageSource = fs.readFileSync(fragmentPagePath, 'utf-8');
-        if (
-          !fragmentPageSource.includes(
-            "from '@modern-js/runtime/module-federation';",
-          ) ||
-          !fragmentPageSource.includes(
-            'data-modern-distributed-ssr-marker="start"',
-          )
-        ) {
-          continue;
-        }
-        writeGeneratedUiSourceIfChanged(
+    const runtimeSource = createAppRuntimeConfig(
+      app,
+      config.workspace.packageScope,
+      remotes,
+    );
+    migrateGeneratedProviderImports(
+      io,
+      path.join(io.workspaceRoot, app.directory, 'src/modern.runtime.ts'),
+      runtimeSource,
+      [historicalFlattenedLocaleRuntime(runtimeSource)],
+    );
+    if ((app.verticalRefs?.length ?? 0) > 0) {
+      for (const worker of [false, true]) {
+        migrateGeneratedProviderImports(
           io,
-          fragmentPagePath,
+          path.join(
+            io.workspaceRoot,
+            app.directory,
+            `src/federated-components${worker ? '.worker' : ''}.tsx`,
+          ),
+          createFederatedComponentsRegistry(
+            config.workspace.packageScope,
+            app,
+            remotes,
+            worker,
+          ),
+        );
+      }
+    }
+    if (app.kind === 'shell') {
+      const uiRemotes = resolveRemoteRefs(app, remotes).filter(
+        appEmitsBrowserUi,
+      );
+      for (const worker of [false, true]) {
+        migrateGeneratedProviderImports(
+          io,
+          path.join(
+            io.workspaceRoot,
+            app.directory,
+            `src/routes/vertical-components${worker ? '.worker' : ''}.tsx`,
+          ),
+          worker
+            ? createShellWorkerRemoteComponents(app, uiRemotes)
+            : createShellRemoteComponents(app, uiRemotes),
+        );
+      }
+    } else {
+      for (const expose of distributedSsrExposes(app)) {
+        migrateGeneratedProviderImports(
+          io,
+          path.join(
+            io.workspaceRoot,
+            app.directory,
+            'src/routes/[lang]/_mf/fragment',
+            distributedSsrFragmentSlug(expose),
+            'page.tsx',
+          ),
           createRemoteExposeFragmentPage(app, expose),
         );
       }

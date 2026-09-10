@@ -75,6 +75,58 @@ function addSyntheticTopologyVertical(
   writeJson(workspaceDir, overlayPath, overlay);
 }
 
+test('workspace snapshots ignore Git maintenance state and retain generated files', () => {
+  const { tempRoot, workspaceDir } = createWorkspace('snapshot-workspace', {
+    tempPrefix: 'um-generated-snapshot-',
+  });
+
+  try {
+    const before = snapshotWorkspace(workspaceDir);
+    assert.ok(before['.gitignore']);
+    assert.ok(before['.modernjs/ultramodern.json']);
+
+    const gitDir = path.join(workspaceDir, '.git');
+    fs.mkdirSync(path.join(gitDir, 'logs'), { recursive: true });
+    fs.writeFileSync(path.join(gitDir, 'logs/HEAD'), 'maintenance state\n');
+    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
+    fs.writeFileSync(path.join(gitDir, 'logs/HEAD'), 'updated state\n');
+    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
+    fs.rmSync(gitDir, { recursive: true });
+    fs.writeFileSync(gitDir, 'gitdir: /external/worktree/metadata\n');
+    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
+
+    for (const [relativePath, content] of Object.entries(before)) {
+      fs.writeFileSync(
+        path.join(workspaceDir, relativePath),
+        `${content}\nmutation probe\n`,
+      );
+    }
+    const edited = snapshotWorkspace(workspaceDir);
+    assert.deepEqual(Object.keys(edited), Object.keys(before));
+    for (const [relativePath, content] of Object.entries(before)) {
+      assert.equal(
+        edited[relativePath],
+        `${content}\nmutation probe\n`,
+        `snapshot must detect edits to ${relativePath}`,
+      );
+      fs.writeFileSync(path.join(workspaceDir, relativePath), content);
+    }
+
+    const manifestPath = path.join(workspaceDir, 'package.json');
+    fs.rmSync(manifestPath);
+    assert.notDeepEqual(snapshotWorkspace(workspaceDir), before);
+    fs.writeFileSync(manifestPath, before['package.json']);
+    const addedPath = path.join(workspaceDir, '.github/snapshot-probe.yml');
+    fs.mkdirSync(path.dirname(addedPath), { recursive: true });
+    fs.writeFileSync(addedPath, 'name: snapshot probe\n');
+    assert.notDeepEqual(snapshotWorkspace(workspaceDir), before);
+    fs.rmSync(addedPath);
+    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('public dry-run plan leaves workspace unchanged and matches normal run summary', () => {
   const { tempRoot, workspaceDir } = createWorkspace('dry-run-workspace', {
     tempPrefix: 'um-vertical-dry-',
@@ -236,12 +288,12 @@ test('dry-run reports validation failures without modifying the workspace', () =
 });
 
 test('CLI --dry-run prints a MicroVertical plan without writing files', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'um-cli-dry-run-'));
+  const { tempRoot: tmpDir, workspaceDir } = createWorkspace(
+    'cli-dry-run-workspace',
+    { tempPrefix: 'um-cli-dry-run-' },
+  );
 
   try {
-    const createResult = runCli(tmpDir, ['cli-dry-run-workspace']);
-    assert.equal(createResult.status, 0, createResult.stderr);
-    const workspaceDir = path.join(tmpDir, 'cli-dry-run-workspace');
     const before = snapshotWorkspace(workspaceDir);
 
     const dryRunResult = runCli(workspaceDir, [

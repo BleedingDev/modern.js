@@ -1,41 +1,40 @@
-import {
-  createUltramodernBuildArtifact,
-  type DeliveryUnitRecord,
-} from '@modern-js/utils/universal';
+import { createUltramodernBuildArtifact } from '@modern-js/backend-federation-contracts';
 import { createDeliveryUnitRecord } from '../delivery-unit';
 import { appEmitsBrowserUi, appHasApi } from '../descriptors';
 import type { WorkspaceApp } from '../types';
-
-function deliveryUnitRecordFor(scope: string, app: WorkspaceApp) {
-  return app.deliveryUnit
-    ? (app.deliveryUnit as unknown as DeliveryUnitRecord)
-    : createDeliveryUnitRecord(scope, app);
-}
 
 export function createUltramodernBuildArtifactJson(
   scope: string,
   app: WorkspaceApp,
 ): string {
-  const record = deliveryUnitRecordFor(scope, app);
-  return `${JSON.stringify(createUltramodernBuildArtifact(record), null, 2)}\n`;
+  const record = createDeliveryUnitRecord(scope, app);
+  const artifact = createUltramodernBuildArtifact(record);
+  return `${JSON.stringify(
+    {
+      ...artifact,
+      deliveryUnit: { ...record, ...artifact.deliveryUnit },
+      surfaces: {
+        api: { ...record, ...artifact.surfaces.api },
+        ui: { ...record, ...artifact.surfaces.ui },
+      },
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 export function createUltramodernBuildModule(
-  scope: string,
+  _scope: string,
   app: WorkspaceApp,
   includeUiMarker = appEmitsBrowserUi(app),
 ): string {
-  const record = deliveryUnitRecordFor(scope, app);
-  return `import { resolveUltramodernBuildArtifact } from '@modern-js/runtime-extensions/build-identity';
+  return `import buildArtifact = require('./ultramodern-build.json');
+import { resolveUltramodernBuildArtifact } from '@modern-js/runtime-extensions/build-identity';
 
 declare const ULTRAMODERN_BUILD_MARKER: string;
 declare const ULTRAMODERN_SOURCE_REVISION: string;
 
-const ultramodernBuildArtifact = resolveUltramodernBuildArtifact(${JSON.stringify(
-    createUltramodernBuildArtifact(record),
-    null,
-    2,
-  )} as const, {
+const ultramodernBuildArtifact = resolveUltramodernBuildArtifact(buildArtifact, {
   buildMarker: () => ULTRAMODERN_BUILD_MARKER,
   sourceRevision: () => ULTRAMODERN_SOURCE_REVISION,
 });

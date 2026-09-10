@@ -1,10 +1,10 @@
-import { resolveLocalisedUrlsConfig } from '@modern-js/i18n-runtime-extensions';
 import * as honoPkg from '@modern-js/server-core/hono';
 
 const { languageDetector } = honoPkg;
 
 import type { Context, Next, ServerPlugin } from '@modern-js/server-runtime';
 import type { LocaleDetectionOptions } from '../shared/type';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
 import { getLocaleDetectionOptions } from '../shared/utils.js';
 import { collectApiPrefixes, matchesApiPrefix } from './apiPrefix.js';
 import { convertToHonoLanguageDetectorOptions } from './detectorOptions.js';
@@ -21,6 +21,7 @@ export { collectApiPrefixes, matchesApiPrefix } from './apiPrefix.js';
 export interface I18nPluginOptions {
   localeDetection: LocaleDetectionOptions;
   staticRoutePrefixes: string[];
+  resolveUrlStrategy?: (entryName: string) => I18nUrlStrategy | undefined;
 }
 
 export const i18nServerPlugin = (options: I18nPluginOptions): ServerPlugin => ({
@@ -53,6 +54,10 @@ export const i18nServerPlugin = (options: I18nPluginOptions): ServerPlugin => ({
         if (!options.localeDetection) {
           return;
         }
+        const entryLocaleDetection = getLocaleDetectionOptions(
+          entryName,
+          options.localeDetection,
+        );
         const {
           localePathRedirect,
           i18nextDetector = true,
@@ -60,8 +65,22 @@ export const i18nServerPlugin = (options: I18nPluginOptions): ServerPlugin => ({
           fallbackLanguage = 'en',
           detection,
           ignoreRedirectRoutes,
-          localisedUrls,
-        } = getLocaleDetectionOptions(entryName, options.localeDetection);
+        } = entryLocaleDetection;
+        const legacyLocalisedUrls = Reflect.get(
+          entryLocaleDetection,
+          'localisedUrls',
+        );
+        const urlStrategy = options.resolveUrlStrategy?.(entryName);
+        if (
+          legacyLocalisedUrls &&
+          typeof legacyLocalisedUrls === 'object' &&
+          Object.keys(legacyLocalisedUrls).length > 0 &&
+          !urlStrategy
+        ) {
+          throw new Error(
+            'Mapped locale URLs require a URL strategy. Use the i18n integration server plugin or supply resolveUrlStrategy.',
+          );
+        }
         const staticRoutePrefixes = options.staticRoutePrefixes;
         const originUrlPath = route.urlPath;
         const urlPath = originUrlPath.endsWith('/')
@@ -84,6 +103,18 @@ export const i18nServerPlugin = (options: I18nPluginOptions): ServerPlugin => ({
                 const pathname = url.pathname;
 
                 if (matchesApiPrefix(pathname, apiPrefixes)) {
+                  return await next();
+                }
+
+                if (
+                  shouldIgnoreRedirect(
+                    pathname,
+                    urlPath,
+                    ignoreRedirectRoutes,
+                    urlStrategy,
+                    languages,
+                  )
+                ) {
                   return await next();
                 }
 
@@ -138,7 +169,13 @@ export const i18nServerPlugin = (options: I18nPluginOptions): ServerPlugin => ({
 
               // Check if this route should ignore automatic redirect
               if (
-                shouldIgnoreRedirect(pathname, urlPath, ignoreRedirectRoutes)
+                shouldIgnoreRedirect(
+                  pathname,
+                  urlPath,
+                  ignoreRedirectRoutes,
+                  urlStrategy,
+                  languages,
+                )
               ) {
                 return await next();
               }
@@ -168,19 +205,17 @@ export const i18nServerPlugin = (options: I18nPluginOptions): ServerPlugin => ({
                   originUrlPath,
                   targetLanguage,
                   languages,
-                  localisedUrls,
+                  urlStrategy,
                 );
                 return createLocaleRedirectResponse(localizedUrl);
               }
-              const localisedUrlsConfig =
-                resolveLocalisedUrlsConfig(localisedUrls);
-              if (localisedUrlsConfig.enabled) {
+              if (urlStrategy) {
                 const expectedUrl = buildLocalizedUrl(
                   c.req,
                   originUrlPath,
                   language,
                   languages,
-                  localisedUrls,
+                  urlStrategy,
                 );
                 if (expectedUrl !== `${pathname}${url.search}${url.hash}`) {
                   return createLocaleRedirectResponse(expectedUrl);

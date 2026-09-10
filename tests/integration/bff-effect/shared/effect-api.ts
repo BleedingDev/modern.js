@@ -3,7 +3,7 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   Schema,
-} from '@modern-js/plugin-bff/effect-client';
+} from '@modern-js/bff-effect/effect-client';
 
 export const bffEffectApi = HttpApi.make('BffEffectApi').add(
   HttpApiGroup.make('greetings')

@@ -1,6 +1,6 @@
 import dns from 'node:dns';
 import path from 'node:path';
-import { Effect } from '@modern-js/plugin-bff/effect-server';
+import * as Effect from 'effect/Effect';
 import { buildFixtureOnce } from '../../../utils/fixtureBuild';
 import {
   getPort,

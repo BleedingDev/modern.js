@@ -1,12 +1,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
+import type { ServerPluginAPI } from '@modern-js/server-core';
 import {
   buildOperationContractMap,
   resolveCrossProjectPolicy,
-} from '@modern-js/bff-core';
-import type { ServerPluginAPI } from '@modern-js/server-core';
+} from '@modern-js/server-runtime-extensions/bff-policy/node';
 import { resolveAdapterCrossProjectPolicy } from '../src/cross-project-policy';
 import {
   checkCrossProjectPolicyForRequest,

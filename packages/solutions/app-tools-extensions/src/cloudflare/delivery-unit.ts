@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { fs as fse } from '@modern-js/utils';
 import {
   type DeliveryUnitIdentity,
   isUltramodernBuildArtifact,
@@ -7,7 +6,8 @@ import {
   toDeliveryUnitIdentity,
   ULTRAMODERN_BUILD_ARTIFACT_PATH,
   ULTRAMODERN_BUILD_MODULE_PATH,
-} from '@modern-js/utils/universal';
+} from '@modern-js/backend-federation-contracts';
+import { fs as fse } from '@modern-js/utils';
 import { resolveUltramodernReleaseIdentity } from '../release-identity';
 import { isRecord } from './utils';
 

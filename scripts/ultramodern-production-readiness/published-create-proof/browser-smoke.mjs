@@ -164,6 +164,7 @@ function runBrowserSmoke(
   projectDir,
   {
     artifactMode,
+    artifactRoot = '.modern/production-readiness/browser-smoke',
     mode,
     packageManagerEnv,
     platform,
@@ -183,8 +184,8 @@ function runBrowserSmoke(
     shellRuntime ??
     (executionMode === 'local' ? 'workerd' : 'public');
   const artifactKey = `${releaseAcceptanceMode}-${runtimePlatform}`;
-  const artifactDir = `.modern/production-readiness/browser-smoke/${artifactKey}`;
-  const out = `.modern/production-readiness/browser-smoke/${artifactKey}-summary.json`;
+  const artifactDir = path.join(artifactRoot, artifactKey);
+  const out = path.join(artifactRoot, `${artifactKey}-summary.json`);
   const runtimeDir = ensureBrowserSmokeRuntimeImpl();
   const args = [
     'node',

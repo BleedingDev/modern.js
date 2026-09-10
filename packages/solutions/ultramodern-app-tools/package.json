@@ -1,0 +1,116 @@
+{
+  "name": "@modern-js/ultramodern-app-tools",
+  "description": "Native UltraModern.js build, preset and release plugin composition.",
+  "homepage": "https://bleedingdev.github.io/ultramodern.js/",
+  "bugs": "https://github.com/BleedingDev/ultramodern.js/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BleedingDev/ultramodern.js",
+    "directory": "packages/solutions/ultramodern-app-tools"
+  },
+  "license": "MIT",
+  "version": "3.8.3",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "types": "./dist/types/native-composition/index.d.ts",
+  "main": "./dist/cjs/native-composition/index.js",
+  "exports": {
+    ".": {
+      "modern:source": "./src/native-composition/index.ts",
+      "import": {
+        "types": "./dist/types-esm/native-composition/index.d.mts",
+        "default": "./dist/esm-node/native-composition/index.mjs"
+      },
+      "require": {
+        "types": "./dist/types/native-composition/index.d.ts",
+        "default": "./dist/cjs/native-composition/index.js"
+      },
+      "types": "./dist/types/native-composition/index.d.ts"
+    },
+    "./server-plugin": {
+      "node": {
+        "modern:source": "./src/native-composition/server-plugin.ts",
+        "import": {
+          "types": "./dist/types-esm/native-composition/server-plugin.d.mts",
+          "default": "./dist/esm-node/native-composition/server-plugin.mjs"
+        },
+        "require": {
+          "types": "./dist/types/native-composition/server-plugin.d.ts",
+          "default": "./dist/cjs/native-composition/server-plugin.js"
+        }
+      },
+      "types": "./dist/types/native-composition/server-plugin.d.ts"
+    },
+    "./router-runtime": {
+      "modern:source": "./src/native-composition/router-runtime.ts",
+      "node": {
+        "import": {
+          "types": "./dist/types-esm/native-composition/router-runtime.d.mts",
+          "default": "./dist/esm-node/native-composition/router-runtime.mjs"
+        },
+        "require": {
+          "types": "./dist/types/native-composition/router-runtime.d.ts",
+          "default": "./dist/cjs/native-composition/router-runtime.js"
+        }
+      },
+      "default": "./dist/esm/native-composition/router-runtime.mjs",
+      "types": "./dist/types-esm/native-composition/router-runtime.d.mts"
+    }
+  },
+  "scripts": {
+    "prepublishOnly": "only-allow-pnpm",
+    "build": "rslib build && pnpm run verify:deploy-output",
+    "test": "rstest",
+    "verify:deploy-output": "node ./tests/deploy-output/verify-public-surface.mjs"
+  },
+  "engines": {
+    "node": ">=26.7.0"
+  },
+  "dependencies": {
+    "@modern-js/app-tools": "workspace:*",
+    "@modern-js/app-tools-extensions": "workspace:*",
+    "@modern-js/plugin": "workspace:*",
+    "@modern-js/server-core": "workspace:*",
+    "@rsbuild/core": "2.2.3",
+    "@modern-js/runtime-renderer-extensions": "workspace:*",
+    "@modern-js/i18n-integration": "workspace:*",
+    "@modern-js/server-runtime-extensions": "workspace:*",
+    "@modern-js/runtime": "workspace:*",
+    "@modern-js/runtime-extensions": "workspace:*"
+  },
+  "devDependencies": {
+    "@modern-js/backend-federation-contracts": "workspace:*",
+    "@modern-js/builder": "workspace:*",
+    "@modern-js/plugin-bff": "workspace:*",
+    "@modern-js/rslib": "workspace:*",
+    "@modern-js/tsconfig": "workspace:*",
+    "@modern-js/utils": "workspace:*",
+    "@rslib/core": "1.0.0",
+    "@scripts/rstest-config": "workspace:*",
+    "@types/node": "^26.4.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@modern-js/prod-server": "workspace:*",
+    "@modern-js/server": "workspace:*",
+    "@modern-js/plugin-tanstack": "workspace:*"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "types": "./dist/types/native-composition/index.d.ts"
+  },
+  "typesVersions": {
+    "*": {
+      "server-plugin": [
+        "./dist/types/native-composition/server-plugin.d.ts",
+        "./src/native-composition/server-plugin.ts"
+      ],
+      "router-runtime": [
+        "./dist/types/native-composition/router-runtime.d.ts",
+        "./src/native-composition/router-runtime.ts"
+      ]
+    }
+  }
+}

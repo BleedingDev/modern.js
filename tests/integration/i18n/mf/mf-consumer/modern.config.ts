@@ -1,5 +1,6 @@
-import { appTools, defineConfig } from '@modern-js/app-tools';
+import { defineConfig } from '@modern-js/app-tools';
 import { i18nPlugin } from '@modern-js/plugin-i18n';
+import { ultramodernAppTools } from '@modern-js/ultramodern-app-tools';
 import { moduleFederationPlugin } from '@module-federation/modern-js-v3';
 
 const enableAppLevelMFSSR = process.env.MODERN_MF_APP_SSR === 'true';
@@ -36,7 +37,7 @@ export default defineConfig({
     },
   },
   plugins: [
-    appTools(),
+    ultramodernAppTools(),
     i18nPlugin({
       localeDetection: {
         localePathRedirect: true,

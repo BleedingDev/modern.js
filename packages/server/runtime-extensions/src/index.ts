@@ -56,6 +56,10 @@ export {
   registerServerRuntimeDisposer,
   type ServerRuntimeHandle,
 } from './runtimeLifecycle';
+export type {
+  UltramodernBffUserConfig,
+  UltramodernServerUserConfig,
+} from './serverConfig';
 export {
   createOtlpTelemetryExporter,
   createRuntimeFallbackSignalRuntimeState,

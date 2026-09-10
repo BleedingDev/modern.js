@@ -1,10 +1,8 @@
 // @effect-diagnostics anyUnknownInErrorContext:off asyncFunction:off strictBooleanExpressions:off
-import {
-  defineEffectBff,
-  Effect,
-  HttpApiBuilder,
-  Layer,
-} from '@modern-js/plugin-bff/effect-server';
+import { defineEffectBff } from '@modern-js/bff-effect/effect';
+import * as Effect from 'effect/Effect';
+import * as Layer from 'effect/Layer';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
 import { portfolioApi } from '../../shared/portfolio-api';
 import {
   createInitialPortfolioState,

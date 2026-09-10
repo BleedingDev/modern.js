@@ -11,6 +11,80 @@ describe('typescript', () => {
     return import(`${pathToFileURL(entry).href}?t=${Date.now()}`);
   };
 
+  it('excludes requested roots while still checking explicitly imported dependencies', async () => {
+    const appDirectory = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), 'server-utils-root-exclusion-')),
+    );
+    const sourceDir = path.join(appDirectory, 'api');
+    const declaration = path.join(appDirectory, 'src/client.d.ts');
+    const options = {
+      sourceDirs: [sourceDir],
+      distDir: path.join(appDirectory, 'dist'),
+      tsconfigPath: path.join(appDirectory, 'tsconfig.json'),
+      throwErrorInsteadOfExit: true,
+    };
+    try {
+      await fs.outputJSON(options.tsconfigPath, {
+        compilerOptions: {
+          module: 'commonjs',
+          target: 'ES2022',
+          types: [],
+          skipLibCheck: false,
+          noEmitOnError: true,
+        },
+        include: ['api', 'src'],
+      });
+      await fs.outputFile(
+        path.join(sourceDir, 'index.ts'),
+        'export const value = 1;\n',
+      );
+      await fs.outputFile(
+        declaration,
+        "export { Missing } from 'unavailable-client-types';\n",
+      );
+
+      await expect(compile(appDirectory, {}, options)).rejects.toThrow(
+        /TS-Go compilation failed/,
+      );
+      await compile(
+        appDirectory,
+        {},
+        { ...options, excludeFiles: [declaration] },
+      );
+      expect(
+        await fs.pathExists(path.join(options.distDir, 'api/index.js')),
+      ).toBe(true);
+
+      await fs.outputFile(
+        path.join(sourceDir, 'index.ts'),
+        "import type { Missing } from '../src/client';\nexport const value: Missing = {};\n",
+      );
+      await expect(
+        compile(appDirectory, {}, { ...options, excludeFiles: [declaration] }),
+      ).rejects.toThrow(/unavailable-client-types/);
+    } finally {
+      await fs.remove(appDirectory);
+    }
+  });
+
+  it('rejects relative excluded file paths', async () => {
+    const appDirectory = path.resolve(
+      os.tmpdir(),
+      'server-utils-relative-exclusion',
+    );
+    await expect(
+      compile(
+        appDirectory,
+        {},
+        {
+          sourceDirs: [path.join(appDirectory, 'api')],
+          distDir: path.join(appDirectory, 'dist'),
+          excludeFiles: ['src/client.d.ts'],
+        },
+      ),
+    ).rejects.toThrow('excluded file src/client.d.ts is not an absolute path.');
+  });
+
   it('compile typescript', async () => {
     const { example, tempRoot } = await createIsolatedTsExample();
     const tsconfigPath = path.join(example, './tsconfig.json');

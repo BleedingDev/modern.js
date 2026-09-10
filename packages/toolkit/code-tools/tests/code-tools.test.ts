@@ -340,13 +340,16 @@ export function App() {
     expect(combinedOutput(result)).toContain('data-mf-* boundary attributes');
   });
 
-  test('workspace runner rejects raw API handler drift through Oxlint', () => {
+  test.each([
+    'server',
+    'hono-server',
+  ])('workspace runner rejects raw API handler drift through Oxlint from %s', endpoint => {
     const root = trackTempRoot();
     writeFile(
       root,
       'verticals/catalog/api/index.ts',
       `
-import { createHandler } from '@modern-js/plugin-bff/hono-server';
+import { createHandler } from '@modern-js/plugin-bff/${endpoint}';
 
 export const handler = async (request: Request) => {
   const body = await request.json();
@@ -373,10 +376,48 @@ const strictEffectApproach = false;
 
     expect(result.exitCode).toBe(1);
     expect(output).toContain('must not import Hono server helpers');
+    expect(output).toContain(
+      'use @modern-js/bff-effect/effect-edge and HttpApi',
+    );
     expect(output).toContain('must not hand-build Response objects');
     expect(output).toContain('must not manually parse request bodies');
     expect(output).toContain('must not export raw request handlers');
     expect(output).toContain('must keep strictEffectApproach enabled');
+  });
+
+  test('Hono diagnostics cover template imports without treating server-plugin as the Hono endpoint', () => {
+    const root = trackTempRoot();
+    writeFile(
+      root,
+      'apps/shell/src/runtime.ts',
+      "import serverPlugin from '@modern-js/plugin-bff/server-plugin'; export const plugin = serverPlugin;\n",
+    );
+    const valid = captureConsole(() =>
+      runWorkspaceSourceCheck({
+        cwd: root,
+        sourceRoots: ['apps'],
+        locales: [],
+      }),
+    );
+    expect(combinedOutput(valid)).not.toContain(
+      'must not import Hono server helpers',
+    );
+    writeFile(
+      root,
+      'apps/shell/src/runtime.ts',
+      'export const load = () => import(`@modern-js/plugin-bff/server`);\n',
+    );
+    const invalid = captureConsole(() =>
+      runWorkspaceSourceCheck({
+        cwd: root,
+        sourceRoots: ['apps'],
+        locales: [],
+      }),
+    );
+    expect(invalid.exitCode).toBe(1);
+    expect(combinedOutput(invalid)).toContain(
+      'must not import Hono server helpers',
+    );
   });
 
   test('workspace runner includes mts sources in strict API boundary checks', () => {
@@ -435,7 +476,7 @@ export const runtime = {};
       root,
       'apps/shell-super-app/shared/api.ts',
       `
-import { Schema } from '@modern-js/plugin-bff/effect-edge';
+import { Schema } from '@modern-js/bff-effect/effect-edge';
 
 export const Payload = Schema.UnknownFromJsonString;
 `,

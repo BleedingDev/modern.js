@@ -213,7 +213,7 @@ transport surfaces when needed. They do not make raw request handlers valid
 inside generated HTTP API modules.
 
 Strict API tests should exercise the `HttpApi` contract. Use
-`createEffectBffTestHandler` from `@modern-js/plugin-bff/effect-edge` for
+`createEffectBffTestHandler` from `@modern-js/bff-effect/effect-edge` for
 edge-compatible proof tests; if you manually compose a web handler, provide
 `HttpServer.layerServices` beside your API group layer before calling
 `HttpRouter.toWebHandler`.

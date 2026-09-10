@@ -21,6 +21,25 @@ import { CONTENT_TYPE_DEFERRED, LOADER_ID_PARAM } from '../common/constants';
 import { errorResponseToJson, serializeError } from './errors';
 import { createDeferredReadableStream } from './response';
 
+export type LoaderRouteIdResolver = (
+  requestedRouteId: string,
+  options: {
+    routes: ServerLoaderBundle['routes'];
+    matchedRouteIds: (string | undefined)[];
+  },
+) => string;
+
+const LOADER_ROUTE_ID_RESOLVER =
+  '@modern-js/plugin-data-loader:route-id-resolver';
+
+/** Register route identity resolution for this request's loader context. */
+export function setLoaderRouteIdResolver(
+  loaderContext: Map<string, unknown>,
+  resolver: LoaderRouteIdResolver,
+): void {
+  loaderContext.set(LOADER_ROUTE_ID_RESOLVER, resolver);
+}
+
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 export function isRedirectResponse(status: number): boolean {
   return redirectStatusCodes.has(status);
@@ -102,13 +121,18 @@ export const handleRequest: ServerLoaderBundle['handleRequest'] = async ({
     },
     async () => {
       const routes = transformNestedRoutes(routesConfig);
-      const routeId = resolveLocalisedLoaderRouteId(
-        routesConfig,
-        requestedRouteId,
-        matchRoutes(routes, url.pathname, basename)?.map(
-          match => match.route.id,
-        ),
-      );
+      const resolveRouteId = loaderContext?.get(LOADER_ROUTE_ID_RESOLVER) as
+        | LoaderRouteIdResolver
+        | undefined;
+      const routeId = resolveRouteId
+        ? resolveRouteId(requestedRouteId, {
+            routes: routesConfig,
+            matchedRouteIds:
+              matchRoutes(routes, url.pathname, basename)?.map(
+                match => match.route.id,
+              ) ?? [],
+          })
+        : requestedRouteId;
       const { queryRoute } = createStaticHandler(routes, {
         basename,
       });
@@ -206,5 +230,3 @@ export const handleRequest: ServerLoaderBundle['handleRequest'] = async ({
     },
   );
 };
-
-import { resolveLocalisedLoaderRouteId } from '@modern-js/runtime-extensions/localised-loader-identity';

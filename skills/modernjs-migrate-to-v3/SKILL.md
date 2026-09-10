@@ -7,6 +7,21 @@ description: 将一个 Modern.js 2.0 应用迁移到 3.0，优先做可安全自
 
 本 skill 用于单个 Modern.js 应用的 v2→v3 迁移。目标：完成可安全改写的部分，剩余风险收敛成明确人工清单。规则与示例以仓库 `guides/upgrade/*` 的真实文档为准。
 
+## UltraModern 发布更新先分流
+
+已有 `.modernjs/ultramodern.json` 的 UltraModern 工作区使用现有命令：
+`pnpm dlx @bleedingdev/modern-js-ultramodern-create@<V> ultramodern migrate-strict-effect --version <V>`。
+CLI 与目标版本必须来自同一真实发布 cohort。可加 `--dry-run` 预览；
+正常命令在临时目录安装并校验目标，再写入 lockfile 等变更；之后运行
+`pnpm install --frozen-lockfile`、`pnpm check`、`pnpm build`。
+不要为更新包而添加 vertical、同步 delivery identity，或运行下面的 v2→v3 脚本。
+
+同合同更新只应改变依赖版本、lockfile 和发布数据。改变旧 schema、生成源码
+或配置属于迁移；不能因 compact schema 相同就声称无需迁移。此路径的发布验证
+状态、冲突和回滚边界见
+[`docs/ultramodern-native-workflows.md`](../../docs/ultramodern-native-workflows.md)。
+以下流程仅用于普通 Modern.js v2→v3 迁移。
+
 ## 使用原则
 
 - 调用方先确定 `projectDir`，所有修改仅限 `projectDir`

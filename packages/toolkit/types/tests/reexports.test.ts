@@ -1,9 +1,15 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const PKG_ROOT = path.resolve(__dirname, '..');
-const TSC_BIN = path.resolve(PKG_ROOT, '../../../node_modules/.bin/tsc');
+const require = createRequire(import.meta.url);
+const compilerManifestPath = require.resolve('typescript/package.json');
+const TSC_BIN = path.resolve(
+  path.dirname(compilerManifestPath),
+  require(compilerManifestPath).bin.tsc,
+);
 
 const collectDtsFiles = (dir: string, files: string[] = []): string[] => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -23,8 +29,9 @@ const collectDtsFiles = (dir: string, files: string[] = []): string[] => {
 describe('shipped .d.ts files', () => {
   it('resolves every relative import and re-export through TypeScript', () => {
     const result = spawnSync(
-      TSC_BIN,
+      process.execPath,
       [
+        TSC_BIN,
         '--ignoreConfig',
         '--noEmit',
         '--module',
@@ -43,6 +50,8 @@ describe('shipped .d.ts files', () => {
       },
     );
 
+    expect(result.error).toBeUndefined();
+    expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
     const diagnostics = `${result.stdout}${result.stderr}`
       .split(/\r?\n/u)
       .filter(Boolean);

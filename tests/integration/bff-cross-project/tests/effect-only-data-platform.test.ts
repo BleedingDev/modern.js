@@ -59,7 +59,7 @@ const createConfig = (port = 3399) => ({
 describe('effect-only cross-project BFF contracts', () => {
   test('effect-client runtime builds operation manifest and request contracts', () => {
     const runtime = requireFromApiApp(
-      '@modern-js/plugin-bff/effect-client-runtime',
+      '@modern-js/bff-effect/effect-client-runtime',
     );
     const createRequestCalls: Array<Record<string, any>> = [];
     const requestRuntime = {
@@ -99,10 +99,10 @@ describe('effect-only cross-project BFF contracts', () => {
 
   test('effect-client runtime preserves strict envelope fallback semantics', async () => {
     const runtime = requireFromApiApp(
-      '@modern-js/plugin-bff/effect-client-runtime',
+      '@modern-js/bff-effect/effect-client-runtime',
     );
     const dataPlatform = requireFromApiApp(
-      '@modern-js/plugin-bff/data-platform',
+      '@modern-js/bff-effect/data-platform',
     );
     const sentPayloads: Array<Record<string, any>> = [];
     const createRequestCalls: Array<Record<string, any>> = [];
@@ -169,10 +169,10 @@ describe('effect-only cross-project BFF contracts', () => {
 
   test('generated effect client requestContext propagates locale and traceparent into request payload', async () => {
     const runtime = requireFromApiApp(
-      '@modern-js/plugin-bff/effect-client-runtime',
+      '@modern-js/bff-effect/effect-client-runtime',
     );
     const dataPlatform = requireFromApiApp(
-      '@modern-js/plugin-bff/data-platform',
+      '@modern-js/bff-effect/data-platform',
     );
     const sentPayloads: Array<Record<string, any>> = [];
     const requestRuntime = {

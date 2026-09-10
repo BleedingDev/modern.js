@@ -1,3 +1,4 @@
+import { createRouterPrefetchPolicy } from '@modern-js/runtime-extensions/router-prefetch-policy';
 import {
   createMemoryRouter,
   type RouteObject,
@@ -71,6 +72,7 @@ const createRealm = (
   chunkId: string,
 ): TInternalRuntimeContext => ({
   isBrowser: true,
+  linkPrefetchPolicy: createRouterPrefetchPolicy(),
   routes,
   routeManifest: {
     routeAssets: {

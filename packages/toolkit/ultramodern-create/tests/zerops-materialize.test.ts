@@ -224,9 +224,11 @@ fs.writeFileSync(
       },
     ).toString();
 
-    assert.match(
+    assert.ok(
+      output.includes(
+        `materialized catalog runtime at ${path.join('.zerops', 'runtime', 'catalog')}`,
+      ),
       output,
-      /materialized catalog runtime at \.zerops\/runtime\/catalog/u,
     );
     assert.equal(
       fs.readFileSync(path.join(workspaceRoot, 'README.md'), 'utf-8'),

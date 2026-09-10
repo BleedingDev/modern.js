@@ -46,13 +46,13 @@ export function createApiServiceEntry(
   Effect,
   HttpApiBuilder,
   Layer,
-} from '@modern-js/plugin-bff/effect-edge';
+} from '@modern-js/bff-effect/effect-edge';
 ${
   options
     ? ''
     : `import type {
   EffectRuntimeLayer,
-} from '@modern-js/plugin-bff/effect-edge';`
+} from '@modern-js/bff-effect/effect-edge';`
 }
 import { ultramodernApiMarker } from '../shared/ultramodern-build.ts';
 import {

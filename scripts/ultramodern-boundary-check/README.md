@@ -13,9 +13,44 @@ either fails. Use `--mode imports` or `--mode divergence` to run one gate.
 
 ## 1. Import boundary (`checker.js`)
 
-This gate freezes the set of upstream-owned source files that import
-UltraModern-only code relative to merge-base `8a744c1b`. Its independent
-baseline is `allowlist.json`.
+This gate rejects every current governed import of UltraModern-only code in
+upstream-owned source files. Its ownership base is the exact commit
+`8a744c1b3178d1e85d4113f29e8837ff94079fb3`. The independent `allowlist.json`
+records migration history: matching an allowance does not permit an edge or
+make verification pass. The default `--mode all` applies this same strict rule.
+
+`--head <commit>` scans source paths and bytes from that resolved commit, even
+when the worktree differs. Without `--head`, the gate scans the worktree.
+The ownership base and target must resolve, and the base must be an ancestor
+of the target. Import verification rejects `--root`, `--base-ref`, `--allowlist`,
+`--base`, `--pathspec`, and `--divergence-allowlist`; inherited Git repository
+context variables are removed before Git runs.
+
+The classifier uses the existing literal import-specifier marker scan over
+`packages/**/src` files present at the import ownership base. Literal dynamic
+imports, requires, type imports and direct re-exports are covered. This check
+does not yet prove alias resolution, transitive barrel resolution, renamed
+source identity, or imports in later upstream-added source. Strict success is
+therefore evidence about the existing governed inventory, not a substitute for
+those remaining final-gate proofs.
+
+One exact native dependency has a target-aware exception: named imports or
+re-exports of `configure`, `createRequest` and `createUploader` from the bare
+`@modern-js/create-request` package. Babel AST inspection checks source bindings
+(including aliases and type-only references), never comments or string text.
+Namespace, default, dynamic and CommonJS references do not qualify.
+
+The exception applies only when that measured target retains the native package
+identity, native node/browser export targets, reviewed native dependencies and
+the recorded eight native source identities. AST checks validate local imports,
+public value/type bindings and absence of retired policy identifiers/property
+keys. Unknown files, fork policy modules/imports, new export surfaces, malformed
+source or metadata, and source symlinks revoke eligibility. Committed targets
+read their own tree; worktree checks include untracked package source files.
+The source inventory records six audited files and the reviewed native factory
+and header extraction. It is structural classification evidence, not a semantic
+proof against arbitrarily rewritten policy. No other marker, allowance,
+ownership base or divergence budget changes when the native edge qualifies.
 
 ```bash
 node scripts/ultramodern-boundary-check/check-fork-import-boundary.js --mode imports
@@ -42,6 +77,29 @@ remains governed. Directory or filename segments such as `tests`, `fixtures`,
 executable/configuration inputs or shipped product documentation. Explicit
 fork-owned package roots are excluded only when they did not exist at the
 reviewed upstream provenance.
+
+The explicit inventory includes `packages/document/ultramodern-preset`,
+`packages/runtime/runtime-extensions`, `packages/toolkit/ultramodern-create`
+and `packages/toolkit/ultramodern-sandpack-profile`. All four roots are absent
+from both pinned upstream trees; their manifests first appear in fork commit
+`b6794e933d0bce99eb5c9324b0dc38b721ff2435`. Their inclusion corrects ownership
+accounting without changing the audited base, reviewed provenance, scope or
+stored budgets. An upstream-owned identity moved into any of these roots
+remains governed, and a listed package present in reviewed upstream is not
+exempt.
+
+The relocation inventory also includes `packages/cli/plugin-bff-build-extensions`,
+`packages/runtime/boundary-debugger`,
+`packages/runtime/federation-runtime`, `packages/runtime/i18n-integration`,
+`packages/runtime/renderer-extensions`,
+`packages/solutions/ultramodern-app-tools`,
+`packages/toolkit/backend-federation-contracts` and
+`packages/toolkit/surface-resolution`. Their entire directory trees are absent
+at both immutable upstream pins; the behavior suite verifies that evidence.
+These roots contain fork-owned subsystems moved out of upstream packages.
+Registering them does not exempt any audited identity moved into them, adjacent
+package paths, or packages introduced by reviewed upstream. The recorded scope,
+provenance and all allowance budgets remain unchanged.
 
 ### Fail-closed recorded contract
 
@@ -101,7 +159,7 @@ schema migration is the exact v1 `2f4d9c4559` snapshot to v2
 `eded841256`/`2f4d9c4559`, with byte-for-byte identical scope, entries, budgets,
 and totals.
 
-### Exact Rule 5 cap and reviewed growth
+### Rule 5 evidence and reviewed growth
 
 Rule 5 separately examines the actual PR delta from its resolved merge-base to
 its committed head. Audited-base ownership follows files across renames. An
@@ -114,9 +172,8 @@ must exactly equal the immutable audited identity, including the old path of a
 rename; owner and reason must be nonempty; and disposition must consist of the
 ledger's allowed full tokens. Whitespace/reformatting, unrelated rows, grouped
 paths, broad advisory tables, duplicates, and pre-existing historical rows do
-not count. Each file also has an exact hard maximum of **20
-added-plus-removed PR lines**. To record a legitimate capped increase after the
-source and strict ledger row exist:
+not count. To record a reviewed increase after the source and strict ledger row
+exist:
 
 ```bash
 node scripts/ultramodern-boundary-check/check-fork-import-boundary.js \
@@ -125,11 +182,18 @@ node scripts/ultramodern-boundary-check/check-fork-import-boundary.js \
 ```
 
 The reviewed writer rejects missing/unresolvable refs, absent ledger evidence,
-over-cap changes, noncanonical targets, and budgets that do not exactly match
+noncanonical targets, and budgets that do not exactly match
 the committed-head measurement. CI then independently reads both committed
 allowlists with `git show`, re-measures the head, reconstructs rename ownership,
-and re-derives the same cap and ledger evidence. Editing the baseline alone
+and re-derives the same PR delta and ledger evidence. Editing the baseline alone
 cannot sanction growth.
+
+Reviewed growth can reconcile inherited source that is unchanged in the PR.
+Each raised or new budget still needs its own new or semantically changed
+strict ledger row and must exactly match the committed measurement. A source
+edit is not required merely to record that review. Unchanged historical rows
+and review of another file do not authorize the increase. Fork subsystem
+ownership requirements still apply.
 
 ### Scope migration
 
@@ -184,6 +248,6 @@ node --test scripts/ultramodern-boundary-check/__tests__/*.test.js
 
 The behavior suite uses temporary Git repositories to exercise scope attacks,
 strict schema validation, committed-ref governance, strict semantic ledger-row
-correlation, lexical test/fixture/docs escape attempts, capped growth, semantic
+correlation, lexical test/fixture/docs escape attempts, reviewed growth, semantic
 replacement, renames, genuine shrink, and reviewed migrations through the
 public API and CLI.

@@ -19,7 +19,10 @@ import {
 } from '../src/ultramodern-workspace';
 import { createWorkspaceRootPackageScripts } from '../src/ultramodern-workspace/workspace-script-plan';
 import { linkBuiltCodeTools } from './helpers/built-code-tools';
-import { snapshotWorkspace } from './helpers/workspace-kit';
+import {
+  linkWorkspaceFormatterDependencies,
+  snapshotWorkspace,
+} from './helpers/workspace-kit';
 
 const packageRoot = path.resolve(__dirname, '..');
 const builtCliPath = path.join(packageRoot, 'dist/esm-node/index.js');
@@ -33,6 +36,22 @@ const hermeticEnv = {
 
 const generatedConfigRuntimePackages = {
   'app-tools': path.resolve(packageRoot, '../../solutions/app-tools'),
+  'app-tools-extensions': path.resolve(
+    packageRoot,
+    '../../solutions/app-tools-extensions',
+  ),
+  'plugin-bff-build-extensions': path.resolve(
+    packageRoot,
+    '../../cli/plugin-bff-build-extensions',
+  ),
+  'ultramodern-app-tools': path.resolve(
+    packageRoot,
+    '../../solutions/ultramodern-app-tools',
+  ),
+  'i18n-integration': path.resolve(
+    packageRoot,
+    '../../runtime/i18n-integration',
+  ),
   'plugin-i18n': path.resolve(packageRoot, '../../runtime/plugin-i18n'),
   'plugin-tanstack': path.resolve(packageRoot, '../../runtime/plugin-tanstack'),
 };
@@ -207,9 +226,13 @@ function runGeneratedApiCheck(workspaceDir: string) {
     fs.mkdirSync(path.dirname(sharedLink), { recursive: true });
     fs.symlinkSync(sharedContracts, sharedLink, 'dir');
   }
-  const modules = path.join(workspaceDir, 'scripts/node_modules');
+  const modules = path.join(workspaceDir, 'node_modules');
   linkBuiltCodeTools(modules);
   for (const [name, target] of Object.entries({
+    '@modern-js/bff-effect': path.resolve(
+      __dirname,
+      '../../../server/bff-effect',
+    ),
     '@typescript/native': path.dirname(
       createRequire(import.meta.url).resolve('typescript/package.json'),
     ),
@@ -220,7 +243,7 @@ function runGeneratedApiCheck(workspaceDir: string) {
   }
   return spawnSync(
     process.execPath,
-    ['scripts/check-ultramodern-api-boundaries.mts'],
+    [path.resolve(__dirname, '../../code-tools/bin/modern-api-check.mjs')],
     {
       cwd: workspaceDir,
       encoding: 'utf8',
@@ -259,7 +282,7 @@ function evaluateRuntimeFramework(source: string): string {
       if (specifier === '@modern-js/runtime') {
         return { defineRuntimeConfig: (config: unknown) => config };
       }
-      if (specifier === '@modern-js/runtime/boundary-debugger') {
+      if (specifier === '@modern-js/boundary-debugger') {
         return { ultramodernBoundaryDebuggerPlugin: () => ({}) };
       }
       if (specifier === 'i18next') {
@@ -456,7 +479,7 @@ function assertGeneratedWorkspaceScriptBehavior(
         pnpm('typecheck'),
         pnpm('skills:check'),
         pnpm('i18n:boundaries'),
-        pnpm('api:check'),
+        pnpm('api:check:files'),
         pnpm('contract:check'),
         pnpm('performance:readiness'),
       ],
@@ -526,7 +549,7 @@ function assertGeneratedWorkspaceScriptBehavior(
         pnpm('typecheck'),
         pnpm('skills:check'),
         pnpm('i18n:boundaries'),
-        pnpm('api:check'),
+        pnpm('api:check:files'),
         pnpm('contract:check'),
       ],
     },
@@ -813,6 +836,24 @@ function assertIntegratedVertical(
     verticalPackage.dependencies['@modern-js/plugin-bff'],
     'workspace:*',
   );
+  assert.equal(
+    verticalPackage.devDependencies['@modern-js/plugin-bff-build-extensions'],
+    'workspace:*',
+  );
+  assert.match(
+    read(workspaceDir, `verticals/${id}/modern.config.ts`),
+    /import \{ bffPlugin \} from ['"]@modern-js\/plugin-bff-build-extensions['"]/u,
+  );
+  for (const manifest of [shellPackage, verticalPackage]) {
+    assert.equal(
+      manifest.dependencies['@modern-js/i18n-integration'],
+      'workspace:*',
+    );
+    assert.equal(
+      manifest.dependencies['@modern-js/plugin-i18n'],
+      'workspace:*',
+    );
+  }
   assert.equal(shellPackage.dependencies['react-router'], undefined);
   assert.equal(verticalPackage.dependencies['react-router'], undefined);
   assert.equal(shellPackage.dependencies['react-router-dom'], undefined);
@@ -841,8 +882,6 @@ function assertIntegratedVertical(
 test('generated typecheck wrapper emits only when explicitly requested', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-typecheck-'));
   const workspaceDir = path.join(tempRoot, 'integration-workspace');
-  const compilerLog = path.join(tempRoot, 'compiler-args.json');
-  const fakeCompiler = path.join(tempRoot, 'effect-tsgo');
 
   try {
     generateUltramodernWorkspace({
@@ -852,16 +891,36 @@ test('generated typecheck wrapper emits only when explicitly requested', () => {
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    const source = 'export const value: string = "checked";\n';
+    const config = {
+      compilerOptions: {
+        declaration: true,
+        emitDeclarationOnly: true,
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        outDir: './declarations',
+        strict: true,
+        types: [],
+      },
+      files: ['consumer.ts'],
+    };
+    for (const directory of [
+      workspaceDir,
+      path.join(workspaceDir, 'verticals/catalog'),
+    ]) {
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(path.join(directory, 'consumer.ts'), source);
+      writeJson(directory, 'tsconfig.json', config);
+    }
+    // The passthrough --skipLibCheck flag must suppress this declaration-only error.
     fs.writeFileSync(
-      fakeCompiler,
-      `#!/usr/bin/env node
-require('node:fs').writeFileSync(
-  process.env.ULTRAMODERN_TEST_TSGO_LOG,
-  JSON.stringify(process.argv.slice(2)),
-);
-`,
-      { mode: 0o755 },
+      path.join(workspaceDir, 'verticals/catalog/external.d.ts'),
+      'declare const externalValue: MissingExternalType;\n',
     );
+    writeJson(workspaceDir, 'verticals/catalog/tsconfig.json', {
+      ...config,
+      files: ['consumer.ts', 'external.d.ts'],
+    });
 
     const runTypecheck = (args: string[]) =>
       spawnSync(
@@ -872,18 +931,17 @@ require('node:fs').writeFileSync(
           encoding: 'utf8',
           env: {
             ...hermeticEnv,
-            EFFECT_TSGO_BIN: fakeCompiler,
-            ULTRAMODERN_TEST_TSGO_LOG: compilerLog,
+            EFFECT_TSGO_BIN: resolveInstalledTsgoExecutable(),
           },
         },
       );
 
     const strictCheck = runTypecheck(['--project', 'tsconfig.json']);
     assert.equal(strictCheck.status, 0, commandOutput(strictCheck));
-    assert.ok(
-      (readJson(tempRoot, 'compiler-args.json') as string[]).includes(
-        '--noEmit',
-      ),
+    assert.equal(
+      fs.existsSync(path.join(workspaceDir, 'declarations')),
+      false,
+      'the default check must suppress the configured declaration emit',
     );
 
     const declarationBuild = runTypecheck([
@@ -893,16 +951,15 @@ require('node:fs').writeFileSync(
       '--skipLibCheck',
     ]);
     assert.equal(declarationBuild.status, 0, commandOutput(declarationBuild));
-    const declarationArgs = readJson(
-      tempRoot,
-      'compiler-args.json',
-    ) as string[];
-    assert.deepEqual(declarationArgs.slice(0, 2), [
-      '--project',
-      'verticals/catalog/tsconfig.json',
-    ]);
-    assert.equal(declarationArgs.includes('--noEmit'), false);
-    assert.ok(declarationArgs.includes('--skipLibCheck'));
+    assert.match(
+      read(workspaceDir, 'verticals/catalog/declarations/consumer.d.ts'),
+      /export declare const value: string;/u,
+    );
+    assert.equal(
+      fs.existsSync(path.join(workspaceDir, 'declarations')),
+      false,
+      '--project must emit only for the requested vertical',
+    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -1545,7 +1602,7 @@ test('generated Cloudflare proof records backend server execution metadata offli
     );
     assert.equal(
       catalogTarget.backendFederation.executionSurfaces.node.runtimePackage,
-      '@modern-js/plugin-bff/effect',
+      '@modern-js/plugin-bff-extensions/backend-federation-manifest/node',
     );
     assert.equal(catalogTarget.backendFederation.manifestUrl, undefined);
     assert.equal(catalogTarget.backendFederation.containerEntry, undefined);
@@ -1729,7 +1786,7 @@ test('generated MicroVertical self-check names corrupted contracts and fix areas
         );
       },
       expectedContract:
-        /MicroVertical contract self-check failed: \.modernjs\/ultramodern\.json topology\.apps\.catalog\.deliveryUnit\./,
+        /MicroVertical contract self-check failed: \.modernjs\/ultramodern\.json topology\.apps\.catalog\.backendFederation\.deliveryUnit\./,
       expectedFixArea:
         /Fix area: regenerate vertical identity from delivery-unit record; do not hand-edit surface markers\./,
     },
@@ -1812,7 +1869,7 @@ test('generated API boundary check structurally rejects raw handler drift', () =
     fs.writeFileSync(
       path.join(workspaceDir, 'verticals/catalog/api/index.ts'),
       `
-import { createHandler } from '@modern-js/plugin-bff/hono-server';
+import { createHandler } from '@modern-js/plugin-bff/server';
 
 export const handler = async (request: Request) => {
   const body = await request.json();
@@ -1845,17 +1902,17 @@ export const handler = async (request: Request) => Response.json(await request.j
     const failingResult = runGeneratedApiCheck(workspaceDir);
     const output = commandOutput(failingResult);
     assert.notEqual(failingResult.status, 0, output);
-    assert.match(output, /must not import Hono server helpers/);
+    assert.match(output, /use Effect HttpApi instead of Hono helpers/);
     assert.match(output, /must not hand-build Response objects/);
-    assert.match(output, /must not manually parse request bodies/);
+    assert.match(
+      output,
+      /must use endpoint payload\/query\/params schemas instead of parsing request bodies/,
+    );
     assert.match(output, /must not export raw request handlers/);
     assert.match(output, /must keep strictEffectApproach enabled/);
     assert.match(output, /must describe the MicroVertical server role/);
     assert.match(output, /must preserve strict Effect backend execution/);
-    assert.match(
-      output,
-      /must preserve the MicroVertical server contract version/,
-    );
+    assert.match(output, /must preserve the server contract version/);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -1873,6 +1930,7 @@ test('migrate converges a legacy shell-only workspace to a validator-clean state
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceDir);
 
     // Fresh shell-only workspace already satisfies the (backend-surface-gated)
     // contract self-check.
@@ -2377,7 +2435,7 @@ test('generated validator accepts a ui-only workspace and rejects planted API ar
     const failing = runGeneratedApiCheck(workspaceDir);
     const output = commandOutput(failing);
     assert.notEqual(failing.status, 0, output);
-    assert.match(output, /Unexpected .*shared\/api\.ts for a ui-only unit/);
+    assert.match(output, /shared\/api\.ts: unit has no API surface/);
     fs.rmSync(path.join(workspaceDir, 'verticals/surface/shared/api.ts'));
 
     // Planting an RPC contract into a ui-only unit must be rejected too: a
@@ -2390,7 +2448,7 @@ test('generated validator accepts a ui-only workspace and rejects planted API ar
     const failingRpc = runGeneratedApiCheck(workspaceDir);
     const rpcOutput = commandOutput(failingRpc);
     assert.notEqual(failingRpc.status, 0, rpcOutput);
-    assert.match(rpcOutput, /Unexpected .*shared\/rpc\.ts for a ui-only unit/);
+    assert.match(rpcOutput, /shared\/rpc\.ts: unit has no API surface/);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -2472,7 +2530,7 @@ test('generated validator accepts an rpc-protocol workspace and rejects a missin
     const structurallyInvalid = runGeneratedApiCheck(workspaceDir);
     const structurallyInvalidOutput = commandOutput(structurallyInvalid);
     assert.notEqual(structurallyInvalid.status, 0, structurallyInvalidOutput);
-    assert.match(structurallyInvalidOutput, /through RpcGroup\.make/);
+    assert.match(structurallyInvalidOutput, /must call RpcGroup\.make/);
     fs.writeFileSync(rpcContractPath, rpcContract, 'utf-8');
 
     // Planting the REST API client into an RPC unit must be rejected: an RPC
@@ -2505,7 +2563,7 @@ test('generated validator accepts an rpc-protocol workspace and rejects a missin
     assert.notEqual(failing.status, 0, output);
     assert.match(
       output,
-      /Missing verticals\/catalog\/src\/api\/catalog-rpc-client\.ts/,
+      /verticals\/catalog\/src\/api\/catalog-rpc-client\.ts: required API surface is missing/,
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -2539,10 +2597,7 @@ test('generated validator still accepts a rest full-stack workspace', () => {
     const missingApiMetadata = runGeneratedApiCheck(workspaceDir);
     const missingApiOutput = commandOutput(missingApiMetadata);
     assert.notEqual(missingApiMetadata.status, 0, missingApiOutput);
-    assert.match(
-      missingApiOutput,
-      /full-stack vertical must declare its Effect API/,
-    );
+    assert.match(missingApiOutput, /vertical must declare its Effect API/);
     catalogApp.api = catalogApi;
     writeJson(workspaceDir, '.modernjs/ultramodern.json', ultramodernConfig);
 
@@ -2556,7 +2611,7 @@ test('generated validator still accepts a rest full-stack workspace', () => {
     assert.notEqual(mixedProtocol.status, 0, mixedProtocolOutput);
     assert.match(
       mixedProtocolOutput,
-      /REST unit must not emit .*shared\/rpc\.ts/,
+      /shared\/rpc\.ts: must not emit a RPC contract/,
     );
     fs.rmSync(mixedRpcContract);
 

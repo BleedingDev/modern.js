@@ -1,117 +1,68 @@
 import fs from 'node:fs';
-import { isDeepStrictEqual } from 'node:util';
+import { parse } from '@babel/parser';
+import { formatGeneratedSourceCandidates } from '../../../ultramodern-workspace/fs-io';
 import type { MigrationIo } from './io';
-import {} from './io';
 
-const multiCharacterTokens = [
-  '===',
-  '!==',
-  '**=',
-  '&&=',
-  '||=',
-  '??=',
-  '...',
-  '=>',
-  '==',
-  '!=',
-  '<=',
-  '>=',
-  '++',
-  '--',
-  '&&',
-  '||',
-  '??',
-  '?.',
-  '**',
-  '+=',
-  '-=',
-  '*=',
-  '/=',
-  '%=',
-  '&=',
-  '|=',
-  '^=',
-  '</',
-  '/>',
-] as const;
-
-function isIdentifierPart(character: string) {
-  return /[$_\p{ID_Continue}\u200C\u200D]/u.test(character);
-}
-
-function generatedUiSourceTokens(source: string) {
-  // This lexer is deliberately limited to generator-owned federation
-  // registries and empty fragment markers. It preserves literal contents and
-  // operator boundaries while ignoring formatting trivia. Never use it for
-  // arbitrary application UI, where JSX text whitespace can be meaningful.
-  const tokens: string[] = [];
-  let index = 0;
-  while (index < source.length) {
-    const character = source[index] ?? '';
-    if (/\s/u.test(character)) {
-      index += 1;
-      continue;
-    }
-    if (source.startsWith('//', index)) {
-      const lineEnd = source.indexOf('\n', index + 2);
-      index = lineEnd < 0 ? source.length : lineEnd + 1;
-      continue;
-    }
-    if (source.startsWith('/*', index)) {
-      const commentEnd = source.indexOf('*/', index + 2);
-      index = commentEnd < 0 ? source.length : commentEnd + 2;
-      continue;
-    }
-    if (character === "'" || character === '"' || character === '`') {
-      const quote = character;
-      const start = index;
-      index += 1;
-      let escaped = false;
-      while (index < source.length) {
-        const current = source[index] ?? '';
-        index += 1;
-        if (escaped) {
-          escaped = false;
-        } else if (current === '\\') {
-          escaped = true;
-        } else if (current === quote) {
-          break;
-        }
-      }
-      tokens.push(`literal:${source.slice(start, index)}`);
-      continue;
-    }
-    if (isIdentifierPart(character)) {
-      const start = index;
-      index += 1;
-      while (isIdentifierPart(source[index] ?? '')) {
-        index += 1;
-      }
-      tokens.push(`word:${source.slice(start, index)}`);
-      continue;
-    }
-    const multiCharacterToken = multiCharacterTokens.find(token =>
-      source.startsWith(token, index),
-    );
-    if (multiCharacterToken) {
-      tokens.push(`punctuator:${multiCharacterToken}`);
-      index += multiCharacterToken.length;
-      continue;
-    }
-    tokens.push(`punctuator:${character}`);
-    index += 1;
-  }
-  return tokens;
-}
-
+/** Compare syntax rather than formatter output; JSX text remains significant. */
 export function generatedUiSourceRequiresRewrite(
   existingSource: string,
   nextSource: string,
 ) {
-  return !isDeepStrictEqual(
-    generatedUiSourceTokens(existingSource),
-    generatedUiSourceTokens(nextSource),
-  );
+  const ignored = new Set([
+    'start',
+    'end',
+    'loc',
+    'extra',
+    'leadingComments',
+    'trailingComments',
+    'innerComments',
+    'comments',
+    'tokens',
+  ]);
+  const identity = (source: string) => {
+    const program = parse(source, {
+      sourceType: 'unambiguous',
+      plugins: ['typescript', 'jsx'],
+    }).program;
+    const jsxText: string[] = [];
+    const syntax = JSON.stringify(program, (key, value) => {
+      if (ignored.has(key)) return undefined;
+      if (value?.type === 'JSXText') {
+        // JSX trims indentation around line breaks, but in-line spaces are
+        // rendered content and must not be erased by formatter comparison.
+        const lines: string[] = value.value.split(/\r\n|\n|\r/u);
+        const text = lines
+          .map((line, index) => {
+            let normalized = line.replace(/\t/gu, ' ');
+            if (index > 0) normalized = normalized.replace(/^ +/u, '');
+            if (index < lines.length - 1)
+              normalized = normalized.replace(/ +$/u, '');
+            return normalized;
+          })
+          .filter(line => line.length > 0)
+          .join(' ');
+        if (text) jsxText.push(text);
+      }
+      return value;
+    });
+    return { syntax, jsxText: JSON.stringify(jsxText) };
+  };
+  try {
+    const before = identity(existingSource);
+    const after = identity(nextSource);
+    if (before.syntax === after.syntax) return false;
+    if (before.jsxText !== after.jsxText) return true;
+    // Compare the actual approved formatter's output when its import sorting
+    // changed declaration order. Never invent a sort for side-effect imports.
+    const [existing, next] = formatGeneratedSourceCandidates([
+      ['existing.tsx', existingSource],
+      ['generated.tsx', nextSource],
+    ]);
+    return identity(existing).syntax !== identity(next).syntax;
+  } catch {
+    // Unparseable authored source has no proven generated identity.
+    return true;
+  }
 }
 
 export function writeGeneratedUiSourceIfChanged(
@@ -122,8 +73,12 @@ export function writeGeneratedUiSourceIfChanged(
   if (fs.existsSync(filePath)) {
     const existingSource = fs.readFileSync(filePath, 'utf-8');
     if (!generatedUiSourceRequiresRewrite(existingSource, nextSource)) {
-      return io.writeGenerated(filePath, existingSource);
+      return false;
     }
+    io.log(
+      `${filePath} preserved consumer source: no exact historical generated transition was identified.`,
+    );
+    return false;
   }
   return io.writeGenerated(filePath, nextSource);
 }

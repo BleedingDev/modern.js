@@ -2,11 +2,11 @@ import type { ModernRoute } from '@modern-js/runtime/context';
 import type { RouteObject } from '@modern-js/runtime-utils/router';
 import type React from 'react';
 
+export type { ModernRoute } from '@modern-js/runtime/context';
 export type {
   InternalRouterServerSnapshot,
-  ModernRoute,
   RouterFramework,
-} from '@modern-js/runtime/context';
+} from '@modern-js/runtime-extensions/router-state';
 
 /** TanStack-specific router config. */
 export type RouterConfig = {

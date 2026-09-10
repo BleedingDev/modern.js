@@ -1,0 +1,126 @@
+{
+  "name": "@modern-js/federation-runtime",
+  "version": "3.8.3",
+  "description": "Federated surface consumption, distributed SSR, and bounded manifest recovery.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BleedingDev/ultramodern.js",
+    "directory": "packages/runtime/federation-runtime"
+  },
+  "engines": {
+    "node": ">=26.7.0"
+  },
+  "types": "./dist/types/module-federation/index.d.ts",
+  "main": "./dist/cjs/module-federation/index.js",
+  "module": "./dist/esm/module-federation/index.mjs",
+  "exports": {
+    ".": {
+      "types": "./dist/types/module-federation/index.d.ts",
+      "modern:source": "./src/module-federation/index.ts",
+      "node": {
+        "import": "./dist/esm-node/module-federation/index.mjs",
+        "require": "./dist/cjs/module-federation/index.js"
+      },
+      "default": "./dist/esm/module-federation/index.mjs"
+    },
+    "./distributed-ssr": {
+      "types": "./dist/types/module-federation/distributed-ssr.d.ts",
+      "modern:source": "./src/module-federation/distributed-ssr.tsx",
+      "node": {
+        "import": "./dist/esm-node/module-federation/distributed-ssr.mjs",
+        "require": "./dist/cjs/module-federation/distributed-ssr.js"
+      },
+      "default": "./dist/esm/module-federation/distributed-ssr.mjs"
+    },
+    "./manifest-recovery-runtime-plugin": {
+      "types": "./dist/types/module-federation/manifest-recovery-runtime-plugin.d.ts",
+      "modern:source": "./src/module-federation/manifest-recovery-runtime-plugin.ts",
+      "node": {
+        "import": "./dist/esm-node/module-federation/manifest-recovery-runtime-plugin.mjs",
+        "require": "./dist/cjs/module-federation/manifest-recovery-runtime-plugin.js"
+      },
+      "default": "./dist/esm/module-federation/manifest-recovery-runtime-plugin.mjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/types/module-federation/index.d.ts",
+        "./src/module-federation/index.ts"
+      ],
+      "distributed-ssr": [
+        "./dist/types/module-federation/distributed-ssr.d.ts",
+        "./src/module-federation/distributed-ssr.tsx"
+      ],
+      "manifest-recovery-runtime-plugin": [
+        "./dist/types/module-federation/manifest-recovery-runtime-plugin.d.ts",
+        "./src/module-federation/manifest-recovery-runtime-plugin.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "prepublishOnly": "only-allow-pnpm",
+    "dev": "rslib build --watch",
+    "build": "rslib build",
+    "test": "rstest run"
+  },
+  "dependencies": {
+    "@modern-js/surface-resolution": "workspace:*"
+  },
+  "peerDependencies": {
+    "@modern-js/runtime": "workspace:^3.9.0",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@modern-js/runtime": "workspace:*",
+    "@modern-js/rslib": "workspace:*",
+    "@modern-js/tsconfig": "workspace:*",
+    "@rslib/core": "1.0.0",
+    "@scripts/rstest-config": "workspace:*",
+    "@rsbuild/core": "2.2.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "esbuild": "^0.28.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/types/module-federation/index.d.ts",
+        "node": {
+          "import": "./dist/esm-node/module-federation/index.mjs",
+          "require": "./dist/cjs/module-federation/index.js"
+        },
+        "default": "./dist/esm/module-federation/index.mjs"
+      },
+      "./distributed-ssr": {
+        "types": "./dist/types/module-federation/distributed-ssr.d.ts",
+        "node": {
+          "import": "./dist/esm-node/module-federation/distributed-ssr.mjs",
+          "require": "./dist/cjs/module-federation/distributed-ssr.js"
+        },
+        "default": "./dist/esm/module-federation/distributed-ssr.mjs"
+      },
+      "./manifest-recovery-runtime-plugin": {
+        "types": "./dist/types/module-federation/manifest-recovery-runtime-plugin.d.ts",
+        "node": {
+          "import": "./dist/esm-node/module-federation/manifest-recovery-runtime-plugin.mjs",
+          "require": "./dist/cjs/module-federation/manifest-recovery-runtime-plugin.js"
+        },
+        "default": "./dist/esm/module-federation/manifest-recovery-runtime-plugin.mjs"
+      }
+    }
+  }
+}

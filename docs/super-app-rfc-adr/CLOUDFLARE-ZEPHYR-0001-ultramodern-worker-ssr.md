@@ -13,7 +13,7 @@ Full-stack UltraModern verticals use normal Modern.js build primitives:
 - `deploy.target: 'cloudflare'`
 - `deploy.worker.ssr: true`
 - stream SSR with `moduleFederationAppSSR: true`
-- `@modern-js/plugin-bff/effect-edge` for package-owned Effect BFF handlers
+- `@modern-js/bff-effect/effect-edge` for package-owned Effect BFF handlers
 - mandatory `@modern-js/plugin-i18n` runtime config with `en` and `cs` resources
 - Module Federation exposes for browser-safe UI modules only
 

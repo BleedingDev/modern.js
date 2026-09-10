@@ -4,7 +4,6 @@ const path = require('node:path');
 const { parseArgs } = require('node:util');
 
 const {
-  DEFAULT_ALLOWLIST_PATH,
   DEFAULT_BASE_REF,
   checkForkImportBoundary,
   formatBoundaryReport,
@@ -12,7 +11,6 @@ const {
 } = require('./checker');
 
 const {
-  CAPPED_PATCH_LINES,
   DEFAULT_DIVERGENCE_BASE_REF,
   DEFAULT_UPSTREAM_PROVENANCE_REF,
   checkForkDivergence,
@@ -39,8 +37,8 @@ const parseCliArgs = argv =>
     args: argv,
     strict: true,
     options: {
-      'base-ref': { type: 'string', default: DEFAULT_BASE_REF },
-      allowlist: { type: 'string', default: DEFAULT_ALLOWLIST_PATH },
+      'base-ref': { type: 'string' },
+      allowlist: { type: 'string' },
       root: { type: 'string' },
       'write-allowlist': { type: 'boolean', default: false },
       json: { type: 'boolean', default: false },
@@ -78,6 +76,8 @@ const printSelfTest = () => {
 const assertNoVerificationOverrides = args => {
   const rejected = [
     ['root', '--root'],
+    ['base-ref', '--base-ref'],
+    ['allowlist', '--allowlist'],
     ['base', '--base'],
     ['pathspec', '--pathspec'],
     ['divergence-allowlist', '--divergence-allowlist'],
@@ -162,7 +162,9 @@ const main = () => {
   }
   const verificationMode =
     !writingDivergence &&
+    !args['write-allowlist'] &&
     (args.mode === 'all' ||
+      args.mode === 'imports' ||
       args.mode === 'divergence' ||
       args.mode === 'allowlist-governance');
   if (verificationMode) {
@@ -225,7 +227,10 @@ const main = () => {
     );
   }
 
-  const allowlistPath = path.resolve(args.allowlist);
+  const allowlistPath = path.resolve(
+    args.allowlist ??
+      path.join(rootDir, 'scripts/ultramodern-boundary-check/allowlist.json'),
+  );
   const divergenceAllowlistPath = args['divergence-allowlist']
     ? path.resolve(args['divergence-allowlist'])
     : canonicalDivergenceAllowlistPath;
@@ -233,7 +238,7 @@ const main = () => {
   if (args['write-allowlist']) {
     const report = writeAllowlist({
       rootDir,
-      baseRef: args['base-ref'],
+      baseRef: args['base-ref'] ?? DEFAULT_BASE_REF,
       allowlistPath,
     });
     console.log(
@@ -261,11 +266,9 @@ const main = () => {
     });
     if (report.growth.length > 0) {
       console.warn(
-        `[ultramodern-divergence] reviewed capped growth is raising ${String(
+        `[ultramodern-divergence] reviewed growth is raising ${String(
           report.growth.length,
-        )} budget(s), each independently checked against the exact ${String(
-          CAPPED_PATCH_LINES,
-        )}-line Rule 5 cap:`,
+        )} budget(s), each independently checked against its PR delta and ledger evidence:`,
       );
       report.growth.forEach(entry => {
         console.warn(
@@ -288,8 +291,9 @@ const main = () => {
   const importReport = runImports
     ? checkForkImportBoundary({
         rootDir,
-        baseRef: args['base-ref'],
+        baseRef: args['base-ref'] ?? DEFAULT_BASE_REF,
         allowlistPath,
+        headRef: args.head,
       })
     : null;
   const divergenceReport = runDivergence

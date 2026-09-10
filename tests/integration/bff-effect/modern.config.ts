@@ -1,4 +1,4 @@
-import { bffPlugin } from '@modern-js/plugin-bff';
+import { bffPlugin } from '@modern-js/plugin-bff-build-extensions';
 import { applyBaseConfig } from '../../utils/applyBaseConfig';
 
 export default applyBaseConfig({

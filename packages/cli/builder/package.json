@@ -64,8 +64,7 @@
     "postcss-page-break": "3.0.4",
     "rspack-manifest-plugin": "5.2.2",
     "sass-embedded": "1.100.0",
-    "ts-deepmerge": "8.0.0",
-    "@modern-js/runtime-extensions": "workspace:*"
+    "ts-deepmerge": "8.0.0"
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",

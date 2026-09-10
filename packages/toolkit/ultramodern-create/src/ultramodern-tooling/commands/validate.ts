@@ -1,29 +1,58 @@
+import path from 'node:path';
 import { readWorkspaceReleaseCohort } from '../../ultramodern-release-cohort';
-import { createWorkspaceValidationScript } from '../../ultramodern-workspace/workspace-scripts';
+import { createUltramodernConfig } from '../../ultramodern-workspace/contracts';
+import { createShellHost } from '../../ultramodern-workspace/descriptors';
+import { createPackagedWorkspaceValidationScript } from '../../ultramodern-workspace/workspace-scripts';
 import {
-  additionalShellsFromToolingConfig,
-  readUltramodernConfig,
+  readJsonObject,
+  readUltramodernWorkspaceInputs,
   workspaceAppsFromToolingConfig,
 } from '../config';
 import { type CommandContext, runRenderedModule } from './context';
 
 export function runValidate(context: CommandContext) {
-  const config = readUltramodernConfig(context.workspaceRoot);
-  const apps = workspaceAppsFromToolingConfig(config);
-  const remotes = apps.filter(app => app.kind !== 'shell');
-  const primaryShell = apps.find(app => app.kind === 'shell');
-  const additionalShells = additionalShellsFromToolingConfig(config);
+  const workspace = readUltramodernWorkspaceInputs(context.workspaceRoot, {
+    overlay: readJsonObject(
+      path.join(
+        context.workspaceRoot,
+        'topology/local-overlays/development.json',
+      ),
+    ),
+  });
+  const {
+    config,
+    verticals: remotes,
+    primaryShell,
+    additionalShells,
+  } = workspace;
+  const compactApps = workspaceAppsFromToolingConfig(config);
+  const compactPrimaryShell =
+    compactApps.find(app => app.kind === 'shell') ?? createShellHost(remotes);
+  // Overlay ports govern local endpoints; compact metadata retains its own
+  // canonical ports and policy rather than adopting the observed projections.
+  const compactConfig = createUltramodernConfig(
+    config.workspace.packageScope,
+    'workspace-validation-contract',
+    { strategy: 'workspace', modernPackageVersion: 'workspace:*' },
+    compactApps,
+    config.features.tailwind,
+    undefined,
+    additionalShells,
+    compactPrimaryShell,
+    remotes,
+  ) as Record<string, unknown>;
   const releaseCohort =
     config.packageSource?.strategy === 'install'
       ? readWorkspaceReleaseCohort(context.workspaceRoot)
       : undefined;
-  const source = createWorkspaceValidationScript(
+  const source = createPackagedWorkspaceValidationScript(
     config.workspace.packageScope,
     config.features.tailwind,
     remotes,
     releaseCohort,
     additionalShells,
     primaryShell,
+    compactConfig,
   );
 
   return runRenderedModule(source, context);

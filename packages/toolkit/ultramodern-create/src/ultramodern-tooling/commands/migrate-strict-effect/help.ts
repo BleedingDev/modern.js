@@ -1,28 +1,32 @@
 export const migrateStrictEffectHelp = `Usage:
   ultramodern-create ultramodern migrate-strict-effect --version <version> [--dry-run] [--skip-install]
 
-Updates generated UltraModern package-source metadata, Modern package aliases,
-framework-owned toolchain pins, direct Effect API topology metadata, strict
-Effect pnpm overrides/trust policy, framework-owned TypeScript config
-surfaces, and the pnpm lockfile. Source code still has to pass pnpm api:check
-and pnpm contract:check.
+Run from the workspace root using the target release's CLI. Select the same
+exact authenticated release cohort for the CLI package and --version.
 
-Existing Modern configs are treated as consumer-owned unless generated
-ownership can be proven. Package scripts and TypeScript configs are merged at
-their framework-owned boundaries so consumer command segments, includes,
-references, plugins, and diagnostic overrides survive. An ambiguous Module
-Federation config that requires a bridge update is refused before any file is
-written, with the config path and the manual resolution required.
+This existing entry point handles release updates and recognized historical
+migrations. A same-contract update changes dependency versions, lockfile and
+release data; source/configuration changes are a migration. A matching compact
+schema or package version alone does not prove the same-contract case.
 
-The obsolete react-router dependency is dropped from every generated app that
-does not import React Router in its own source. Each generated Module
-Federation config then declares bridge.enableBridgeRouter from what its app
-still depends on: true where the app declares react-router or react-router-dom,
-the router-free false everywhere else.
+Historical migration can update generated Effect API metadata, toolchain and
+pnpm policy, TypeScript configuration and proven generated artifacts. Consumer
+code, scripts and configuration keep their ownership. Ambiguous generated
+regions or unsupported customizations produce a conflict with the affected
+path; preserve the custom behavior when resolving it. Recognized legacy 3.2
+metadata can supply a missing compact config.
 
-When the compact config is absent but legacy UltraModern 3.2 metadata is
-present, the compact config is synthesized from it first. Shell-only
-workspaces skip the backend-federation and Zerops runtime stages. Pass
---dry-run to print the planned filesystem changes without writing anything
-(including preserved consumer overlays; implies --skip-install).
+--dry-run previews without changing live files and implies --skip-install.
+It cannot prove target lock resolution. --skip-install skips dependency
+installation and target checks, leaving validation incomplete. Normal runs
+install and check the target in a private stage before promoting the lockfile
+and other prepared changes. Staged node_modules is not promoted. After applying,
+run pnpm install --frozen-lockfile, pnpm check and pnpm build. The aggregate
+check includes API-file and contract checks; use pnpm api:check to diagnose
+an API failure.
+
+Do not add a vertical or run sync-delivery-unit merely to update packages.
+Migration rollback covers tracked writes on failure, not subsequent installs
+or edits. Inspect the error and workspace changes before retrying. Abrupt
+termination during promotion is not a promised crash-atomic rollback.
 `;

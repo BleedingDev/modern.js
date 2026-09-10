@@ -5,41 +5,50 @@ import {
   shouldIgnoreRedirect as shouldIgnoreServerRedirect,
 } from '../src/server/redirectPolicy';
 
-const languages = ['en', 'cs'];
-
-const defaultSkippedPaths = [
-  '/backend-mf-manifest.json',
-  '/backendRemoteEntry.cjs',
-  '/mf-manifest.json',
-  '/mf-stats.json',
-  '/remoteEntry.js',
-  '/static/app.js',
-  '/upload/avatar.png',
-];
-
-describe('locale redirect default skip policy', () => {
-  test('skips ADR-0002 Module Federation and static endpoints on the server', () => {
-    for (const pathname of defaultSkippedPaths) {
-      expect(isStaticResourceRequest(pathname, [], languages)).toBe(true);
-      expect(shouldIgnoreServerRedirect(pathname, '/', undefined)).toBe(true);
-    }
-  });
-
-  test('skips language-prefixed static and upload endpoints', () => {
-    expect(isStaticResourceRequest('/cs/static/app.js', [], languages)).toBe(
-      true,
-    );
+describe('native locale redirect safeguards', () => {
+  test('retains configured ignores across runtime and server entry prefixes', () => {
+    const rules = ['/private'];
     expect(
-      isStaticResourceRequest('/en/upload/avatar.png', [], languages),
+      shouldIgnoreRuntimeRedirect('/cs/private/data', ['en', 'cs'], rules),
     ).toBe(true);
+    expect(
+      shouldIgnoreRuntimeRedirect('/cs/private-data', ['en', 'cs'], rules),
+    ).toBe(false);
+    expect(
+      shouldIgnoreServerRedirect(
+        '/app/cs/private/data',
+        '/app/*',
+        rules,
+        undefined,
+        ['en', 'cs'],
+      ),
+    ).toBe(true);
+    expect(
+      shouldIgnoreServerRedirect(
+        '/app/cs/private-data',
+        '/app/*',
+        rules,
+        undefined,
+        ['en', 'cs'],
+      ),
+    ).toBe(false);
   });
-
-  test('uses the same default skip policy in runtime redirects', () => {
-    for (const pathname of defaultSkippedPaths) {
-      expect(shouldIgnoreRuntimeRedirect(pathname, languages)).toBe(true);
-      expect(shouldIgnoreRuntimeRedirect(`/cs${pathname}`, languages)).toBe(
+  test('retains configured and native static paths without fork policy', () => {
+    for (const pathname of [
+      '/static/app.js',
+      '/upload/a.png',
+      '/cs/assets/main.js',
+    ]) {
+      expect(isStaticResourceRequest(pathname, ['/assets'], ['en', 'cs'])).toBe(
         true,
       );
     }
+    expect(
+      isStaticResourceRequest(
+        '/assets-other/main.js',
+        ['/assets'],
+        ['en', 'cs'],
+      ),
+    ).toBe(false);
   });
 });

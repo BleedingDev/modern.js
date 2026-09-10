@@ -51,6 +51,9 @@ test('materializes an executable UltraModern single-app profile', async () => {
 
   for (const packageName of [
     '@modern-js/app-tools',
+    '@modern-js/ultramodern-app-tools',
+    '@modern-js/runtime-renderer-extensions',
+    '@modern-js/i18n-integration',
     '@modern-js/plugin-i18n',
     '@modern-js/plugin-tanstack',
     '@modern-js/runtime',
@@ -93,6 +96,10 @@ test('declares every UltraModern capability in executable entrypoints', async ()
     'utf8',
   );
 
+  assert.match(config, /ultramodernAppTools\(\)/u);
+  assert.doesNotMatch(config, /source:\s*\{\s*alias:/u);
+  assert.match(layout, /@modern-js\/plugin-i18n\/runtime\/consumer/u);
+  assert.match(page, /@modern-js\/plugin-i18n\/runtime\/consumer/u);
   assert.match(config, /tanstackRouterPlugin\(\)/u);
   assert.match(config, /i18nPlugin\(/u);
   assert.match(config, /pluginTailwindcss\(\)/u);

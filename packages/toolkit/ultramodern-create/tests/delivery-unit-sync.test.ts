@@ -78,6 +78,10 @@ function scaffoldWorkspace(): { tempRoot: string; workspaceDir: string } {
 function executeBuildModule(workspaceDir: string, relativePath: string) {
   return evaluateBuildModule(
     fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
+    fs.readFileSync(
+      path.join(workspaceDir, relativePath.replace(/\.ts$/u, '.json')),
+      'utf8',
+    ),
   );
 }
 

@@ -40,8 +40,20 @@ export function appDependencies(
       '@modern-js/plugin-tanstack',
       packageSource,
     ),
+    '@modern-js/i18n-integration': modernPackageSpecifier(
+      '@modern-js/i18n-integration',
+      packageSource,
+    ),
     '@modern-js/plugin-i18n': modernPackageSpecifier(
       '@modern-js/plugin-i18n',
+      packageSource,
+    ),
+    '@modern-js/federation-runtime': modernPackageSpecifier(
+      '@modern-js/federation-runtime',
+      packageSource,
+    ),
+    '@modern-js/runtime-renderer-extensions': modernPackageSpecifier(
+      '@modern-js/runtime-renderer-extensions',
       packageSource,
     ),
     '@modern-js/runtime-extensions': modernPackageSpecifier(
@@ -57,6 +69,13 @@ export function appDependencies(
     [packageName(scope, 'shared-design-tokens')]: WORKSPACE_PACKAGE_VERSION,
   };
 
+  if (appHasApi(app) || app.kind === 'shell') {
+    dependencies['@modern-js/plugin-bff-extensions'] = modernPackageSpecifier(
+      '@modern-js/plugin-bff-extensions',
+      packageSource,
+    );
+  }
+
   const appRemotes = resolveRemoteRefs(app, remotes);
 
   for (const dependency of bridge?.dependencies ?? []) {
@@ -70,6 +89,10 @@ export function appDependencies(
   }
 
   if (app.kind === 'shell') {
+    dependencies['@modern-js/boundary-debugger'] = modernPackageSpecifier(
+      '@modern-js/boundary-debugger',
+      packageSource,
+    );
     dependencies['@modern-js/plugin-bff'] = modernPackageSpecifier(
       '@modern-js/plugin-bff',
       packageSource,
@@ -91,6 +114,10 @@ export function appDependencies(
       '@modern-js/plugin-bff',
       packageSource,
     );
+    dependencies['@modern-js/bff-effect'] = modernPackageSpecifier(
+      '@modern-js/bff-effect',
+      packageSource,
+    );
     Object.assign(dependencies, ULTRAMODERN_PACKAGE_PINS.bffEffectDependencies);
   }
 
@@ -100,6 +127,7 @@ export function appDependencies(
 function appDevDependencies(
   packageSource: ResolvedPackageSource,
   enableTailwind: boolean,
+  app: WorkspaceApp,
 ): Record<string, string> {
   const {
     '@rsbuild/plugin-tailwindcss': tailwindPluginVersion,
@@ -108,6 +136,22 @@ function appDevDependencies(
   } = ULTRAMODERN_PACKAGE_PINS.appDevDependencies;
 
   return {
+    ...(appHasApi(app) || app.kind === 'shell'
+      ? {
+          '@modern-js/plugin-bff-build-extensions': modernPackageSpecifier(
+            '@modern-js/plugin-bff-build-extensions',
+            packageSource,
+          ),
+        }
+      : {}),
+    '@modern-js/ultramodern-app-tools': modernPackageSpecifier(
+      '@modern-js/ultramodern-app-tools',
+      packageSource,
+    ),
+    '@modern-js/app-tools-extensions': modernPackageSpecifier(
+      '@modern-js/app-tools-extensions',
+      packageSource,
+    ),
     '@modern-js/app-tools': modernPackageSpecifier(
       '@modern-js/app-tools',
       packageSource,
@@ -196,7 +240,8 @@ export function createRootPackageJson(
       'agents:refs:install': 'node ./scripts/setup-agent-reference-repos.mts',
       'agents:refs:check':
         'node ./scripts/setup-agent-reference-repos.mts --check',
-      'api:check': 'node ./scripts/check-ultramodern-api-boundaries.mts',
+      'api:check': 'modern-api-check',
+      'api:check:files': 'modern-api-check-files',
       'i18n:boundaries': 'node ./scripts/check-ultramodern-i18n-boundaries.mts',
       ...bridgeScripts,
       postinstall: GENERATED_POSTINSTALL_SCRIPT,
@@ -218,6 +263,34 @@ export function createRootPackageJson(
     },
     devDependencies: {
       ...ULTRAMODERN_PACKAGE_PINS.rootDevDependencies,
+      '@modern-js/app-tools': modernPackageSpecifier(
+        '@modern-js/app-tools',
+        packageSource,
+      ),
+      '@modern-js/plugin-bff-extensions': modernPackageSpecifier(
+        '@modern-js/plugin-bff-extensions',
+        packageSource,
+      ),
+      '@modern-js/plugin-bff-build-extensions': modernPackageSpecifier(
+        '@modern-js/plugin-bff-build-extensions',
+        packageSource,
+      ),
+      '@modern-js/runtime-renderer-extensions': modernPackageSpecifier(
+        '@modern-js/runtime-renderer-extensions',
+        packageSource,
+      ),
+      '@modern-js/ultramodern-app-tools': modernPackageSpecifier(
+        '@modern-js/ultramodern-app-tools',
+        packageSource,
+      ),
+      '@modern-js/app-tools-extensions': modernPackageSpecifier(
+        '@modern-js/app-tools-extensions',
+        packageSource,
+      ),
+      '@modern-js/bff-effect': modernPackageSpecifier(
+        '@modern-js/bff-effect',
+        packageSource,
+      ),
       '@modern-js/code-tools': modernPackageSpecifier(
         '@modern-js/code-tools',
         packageSource,
@@ -288,7 +361,7 @@ export function createAppPackage(
     },
     'zephyr:dependencies': createZephyrDependencies(scope, app, remotes),
     dependencies: appDependencies(scope, packageSource, app, remotes, bridge),
-    devDependencies: appDevDependencies(packageSource, enableTailwind),
+    devDependencies: appDevDependencies(packageSource, enableTailwind, app),
   };
 
   if (appHasApi(app)) {
@@ -343,11 +416,16 @@ export function createSharedPackage(
   if (id === 'shared-contracts') {
     packageJson.exports = {
       '.': './src/index.ts',
-      './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
       './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
     };
     packageJson.dependencies = {
       ...ULTRAMODERN_PACKAGE_PINS.bffEffectDependencies,
+      '@modern-js/bff-effect': packageSource
+        ? modernPackageSpecifier('@modern-js/bff-effect', packageSource)
+        : WORKSPACE_PACKAGE_VERSION,
+      '@modern-js/runtime-extensions': packageSource
+        ? modernPackageSpecifier('@modern-js/runtime-extensions', packageSource)
+        : WORKSPACE_PACKAGE_VERSION,
       '@modern-js/plugin-bff': packageSource
         ? modernPackageSpecifier('@modern-js/plugin-bff', packageSource)
         : WORKSPACE_PACKAGE_VERSION,

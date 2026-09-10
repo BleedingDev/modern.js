@@ -1,11 +1,15 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createMigrationIo } from '../ultramodern-tooling/commands/migrate-strict-effect/io';
+import { preserveConsumerWorkspaceArtifacts } from '../ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
+import { normalizeWorkspaceInputs } from '../ultramodern-tooling/config';
 import {
   DEVELOPMENT_OVERLAY_PATH,
   TOPOLOGY_PATH,
 } from './add-vertical/constants';
 import { createPrimaryShellDescriptor } from './add-vertical/preflight';
+import { updateRootWorkspaceScripts } from './add-vertical/shell-files';
 import { verticalsFromTopology } from './add-vertical/topology';
 import { runWorkspaceTransaction } from './add-vertical/transaction';
 import {
@@ -18,13 +22,13 @@ import {
 } from './add-vertical/workspace-state';
 import {
   appEmitsBrowserUi,
+  resolveRemoteRefs,
   shellApp,
   ULTRAMODERN_CONFIG_PATH,
 } from './descriptors';
 import {
   formatGeneratedWorkspaceFiles,
   readJsonFile,
-  writeFileReplacing,
   writeJsonFile,
 } from './fs-io';
 import {
@@ -32,8 +36,8 @@ import {
   createGenerationResult,
   diffFileSnapshots,
 } from './generation-result';
+import { createAppModernConfig } from './module-federation';
 import { assertUniqueTailwindPrefixes, toPackageScope } from './naming';
-import { createRootPackageJson } from './package-json';
 import {
   assertValidShellName,
   createAdditionalShellConfigEntry,
@@ -51,8 +55,13 @@ import type {
   WorkspaceApp,
 } from './types';
 import { isRecord } from './types';
-import { writeGeneratedWorkspaceScripts } from './workspace-scripts';
-import { rewriteAppModernConfig, writeApp } from './write-app';
+import {
+  createPackagedWorkspaceValidationScript,
+  createWorkspaceScriptArtifacts,
+  createWorkspaceValidationScript,
+  writeGeneratedWorkspaceScripts,
+} from './workspace-scripts';
+import { writeApp } from './write-app';
 import { createZeropsYaml } from './zerops';
 
 type AddUltramodernShellPreflight = {
@@ -247,6 +256,10 @@ function executeAddUltramodernShell(
   );
   const primaryShell = {
     ...configuredPrimary,
+    port:
+      typeof preflight.overlay.ports?.[configuredPrimary.id] === 'number'
+        ? preflight.overlay.ports[configuredPrimary.id]
+        : configuredPrimary.port,
     verticalRefs: primaryRefsConfigured
       ? configuredPrimary.verticalRefs
       : existingVerticals.filter(appEmitsBrowserUi).map(v => v.id),
@@ -257,13 +270,95 @@ function executeAddUltramodernShell(
     allAdditionalShells,
   ).toSorted((left, right) => left - right);
 
+  const previousApps = [
+    primaryShell,
+    ...existingVerticals,
+    ...existingAdditionalShells,
+  ];
+  const compactWorkspace = normalizeWorkspaceInputs(options.workspaceRoot, {
+    config,
+  });
+  const previousDevPorts =
+    existingAdditionalShells.length > 0
+      ? previousApps
+          .map(app => app.port)
+          .toSorted((left, right) => left - right)
+      : undefined;
+  const { io: ownedIo } = preserveConsumerWorkspaceArtifacts(
+    createMigrationIo(options.workspaceRoot, false),
+    [
+      ...createWorkspaceScriptArtifacts({
+        shellOnly: existingVerticals.length === 0,
+        hasBackendSurface: existingVerticals.some(app => Boolean(app.api)),
+        validationScript: createWorkspaceValidationScript(
+          scope,
+          enableTailwind,
+          existingVerticals,
+        ),
+      }),
+      {
+        relativePath: 'scripts/validate-ultramodern-workspace.mts',
+        legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
+        generatedDataBinding: 'workspaceValidationContract',
+        content: createPackagedWorkspaceValidationScript(
+          scope,
+          enableTailwind,
+          existingVerticals,
+          undefined,
+          existingAdditionalShells,
+          primaryShell,
+        ),
+      },
+      {
+        relativePath: 'zerops.yaml',
+        content: `${createZeropsYaml(scope, previousApps)}\n`,
+      },
+      {
+        relativePath: 'zerops.yaml',
+        content: `${createZeropsYaml(scope, compactWorkspace.apps)}\n`,
+      },
+      {
+        relativePath: 'tsconfig.json',
+        content: `${JSON.stringify(createRootTsConfig(previousApps), null, 2)}\n`,
+      },
+      ...previousApps.map(app => ({
+        relativePath: `${app.directory}/modern.config.ts`,
+        content: createAppModernConfig(
+          scope,
+          app,
+          app.kind === 'shell'
+            ? resolveRemoteRefs(app, existingVerticals)
+            : existingVerticals,
+          enableTailwind,
+          previousDevPorts,
+        ),
+      })),
+      ...compactWorkspace.apps.map(app => ({
+        relativePath: `${app.directory}/modern.config.ts`,
+        content: createAppModernConfig(
+          scope,
+          app,
+          app.kind === 'shell'
+            ? resolveRemoteRefs(app, compactWorkspace.verticals)
+            : compactWorkspace.verticals,
+          enableTailwind,
+          existingAdditionalShells.length > 0
+            ? compactWorkspace.apps
+                .map(app => app.port)
+                .toSorted((left, right) => left - right)
+            : undefined,
+        ),
+      })),
+    ],
+  );
+
   writeApp(
     options.workspaceRoot,
     scope,
     shell,
     packageSource,
     enableTailwind,
-    composedVerticals,
+    existingVerticals,
     bridge,
     configuredDevPorts,
   );
@@ -280,40 +375,34 @@ function executeAddUltramodernShell(
   config.shells = shellsCollection;
   writeJsonFile(configPath, config as JsonValue);
 
-  for (const app of [
-    primaryShell,
-    ...existingVerticals,
-    ...existingAdditionalShells,
-  ]) {
-    rewriteAppModernConfig(
-      options.workspaceRoot,
-      scope,
-      app,
-      existingVerticals,
-      enableTailwind,
-      configuredDevPorts,
+  for (const app of previousApps) {
+    ownedIo.write(
+      path.join(options.workspaceRoot, app.directory, 'modern.config.ts'),
+      createAppModernConfig(
+        scope,
+        app,
+        app.kind === 'shell'
+          ? resolveRemoteRefs(app, existingVerticals)
+          : existingVerticals,
+        enableTailwind,
+        configuredDevPorts,
+      ),
     );
   }
-
-  const rootPackagePath = path.join(options.workspaceRoot, 'package.json');
-  const rootPackage = readJsonFile(rootPackagePath);
-  const generatedRootPackage = createRootPackageJson(
+  updateRootWorkspaceScripts(
+    options.workspaceRoot,
     scope,
     packageSource,
     existingVerticals,
     bridge,
     allAdditionalShells,
-  ) as Record<string, any>;
-  rootPackage.scripts = generatedRootPackage.scripts;
-  writeJsonFile(rootPackagePath, rootPackage as JsonValue);
-
-  writeJsonFile(
+    existingVerticals,
+    primaryShell,
+    existingAdditionalShells,
+  );
+  ownedIo.write(
     path.join(options.workspaceRoot, 'tsconfig.json'),
-    createRootTsConfig([
-      primaryShell,
-      ...existingVerticals,
-      ...allAdditionalShells,
-    ]),
+    `${JSON.stringify(createRootTsConfig([primaryShell, ...existingVerticals, ...allAdditionalShells]), null, 2)}\n`,
   );
 
   writeGeneratedWorkspaceScripts(
@@ -324,11 +413,15 @@ function executeAddUltramodernShell(
     undefined,
     allAdditionalShells,
     primaryShell,
+    {
+      io: { ...ownedIo, writeGenerated: ownedIo.write },
+      compactConfig: config,
+      developmentOverlay: preflight.overlay,
+    },
   );
 
-  writeFileReplacing(
-    options.workspaceRoot,
-    'zerops.yaml',
+  ownedIo.write(
+    path.join(options.workspaceRoot, 'zerops.yaml'),
     `${createZeropsYaml(scope, [
       primaryShell,
       ...existingVerticals,

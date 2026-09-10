@@ -1,400 +1,185 @@
-import { createServerBase } from '@modern-js/server-core';
+import { createServerBase, type ServerPlugin } from '@modern-js/server-core';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { applyPlugins } from '../src/apply';
 import type { ProdServerOptions } from '../src/types';
 
-const makeTempDir = () =>
-  fs.mkdtempSync(path.join(os.tmpdir(), 'modern-prod-apply-plugins-'));
+describe('native error response extension', () => {
+  let directory: string;
+  let server: ReturnType<typeof createServerBase> | undefined;
 
-describe('applyPlugins fork plugin assembly', () => {
-  test('registers the telemetry plugin from @modern-js/server-runtime-extensions', async () => {
-    const tempDir = makeTempDir();
-    const snapshotPath = path.join(tempDir, '.modern/contract-gates.json');
-
-    try {
-      const options = {
-        pwd: tempDir,
-        serverConfigPath: path.join(tempDir, 'modern.server.js'),
-        appContext: {
-          apiDirectory: '',
-          lambdaDirectory: '',
-          appDirectory: tempDir,
-        },
-        config: {
-          html: {},
-          output: {},
-          source: {},
-          tools: {},
-          server: {
-            logger: false,
-            telemetry: {
-              enabled: true,
-              canary: {
-                enabled: true,
-                rollbackConsecutiveFailures: 1,
-                autopilot: {
-                  enabled: true,
-                  gateSnapshotPath: snapshotPath,
-                  pollIntervalMs: 60_000,
-                  runtimeFallbackSignal: {
-                    enabled: true,
-                    auth: {
-                      expectedValue: 'assembly-signal-token',
-                    },
-                  },
-                },
-              },
-            },
-          },
-          bff: {},
-          dev: {},
-          security: {},
-        },
-      } as unknown as ProdServerOptions;
-
-      const server = createServerBase(options);
-      await applyPlugins(server, options);
-      await server.init();
-
-      // Status detail requires the configured token.
-      const unauthorizedStatus = await server.request(
-        '/_modern/runtime/status',
-        {},
-        {},
-      );
-      expect(unauthorizedStatus.status).toBe(401);
-
-      const statusResponse = await server.request(
-        '/_modern/runtime/status',
-        {
-          method: 'GET',
-          headers: new Headers({
-            'x-modernjs-runtime-signal-token': 'assembly-signal-token',
-          }),
-        },
-        {},
-      );
-      expect(statusResponse.status).toBe(200);
-      const status = (await statusResponse.json()) as Record<string, any>;
-      expect(status.ok).toBe(true);
-      expect(status.canary.enabled).toBe(true);
-
-      // The signal endpoint requires the token as well.
-      const unauthorizedSignal = await server.request(
-        '/_modern/contract-gates/runtime-fallback',
-        {
-          method: 'POST',
-          headers: new Headers({ 'content-type': 'application/json' }),
-          body: JSON.stringify({
-            reason: 'remote_load_failed',
-            phase: 'load',
-            appName: 'dashboard',
-            entry: 'https://remote.example.com/remoteEntry.js',
-          }),
-        },
-        {},
-      );
-      expect(unauthorizedSignal.status).toBe(401);
-      expect(fs.existsSync(snapshotPath)).toBe(false);
-
-      const signalResponse = await server.request(
-        '/_modern/contract-gates/runtime-fallback',
-        {
-          method: 'POST',
-          headers: new Headers({
-            'content-type': 'application/json',
-            'x-modernjs-runtime-signal-token': 'assembly-signal-token',
-          }),
-          body: JSON.stringify({
-            reason: 'remote_load_failed',
-            phase: 'load',
-            appName: 'dashboard',
-            entry: 'https://remote.example.com/remoteEntry.js',
-          }),
-        },
-        {},
-      );
-      expect(signalResponse.status).toBe(202);
-      expect(fs.existsSync(snapshotPath)).toBe(true);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+  beforeEach(() => {
+    directory = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'native-error-response-'),
+    );
   });
 
-  test('registers injectModuleFederationCssPlugin after injectResourcePlugin in the real assembly', async () => {
-    const tempDir = makeTempDir();
-
-    try {
-      // Host MF manifest fixture: makes injectModuleFederationCssPlugin
-      // active for this dist directory (no remotes -> no network access).
-      fs.writeFileSync(
-        path.join(tempDir, 'mf-manifest.json'),
-        JSON.stringify({ remotes: [] }),
-      );
-
-      let observedManifest: Record<string, unknown> | undefined;
-
-      const options = {
-        pwd: tempDir,
-        serverConfigPath: path.join(tempDir, 'modern.server.js'),
-        appContext: {
-          apiDirectory: '',
-          lambdaDirectory: '',
-          appDirectory: tempDir,
-        },
-        config: {
-          html: {},
-          output: {},
-          source: {},
-          tools: {},
-          server: {
-            logger: false,
-          },
-          bff: {},
-          dev: {},
-          security: {},
-        },
-        serverConfig: {
-          middlewares: [
-            {
-              name: 'capture-server-manifest',
-              // run after every default middleware (including
-              // inject-server-manifest and inject-module-federation-css)
-              order: 'post' as const,
-              handler: async (c: any) => {
-                observedManifest = c.get('serverManifest') as Record<
-                  string,
-                  unknown
-                >;
-                return c.json({ ok: true });
-              },
-            },
-          ],
-        },
-      } as unknown as ProdServerOptions;
-
-      const server = createServerBase(options);
-      await applyPlugins(server, options);
-      await server.init();
-
-      const response = await server.request('/', {}, {});
-      expect(response.status).toBe(200);
-
-      // The real injectResourcePlugin middleware ran first and set the
-      // request-scoped manifest...
-      expect(observedManifest).toBeTruthy();
-      expect(observedManifest!.loaderBundles).toEqual({});
-      // ...and injectModuleFederationCssPlugin, registered after it in
-      // applyPlugins, enriched that manifest. If the registration order
-      // regressed, the manifest would not exist yet at enrichment time and
-      // this property would be undefined.
-      expect(observedManifest!.moduleFederationCssAssets).toEqual([]);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+  afterEach(async () => {
+    await server?.dispose();
+    server = undefined;
+    fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  test('applies the MF asset cache-header policy in the real assembly', async () => {
-    const tempDir = makeTempDir();
-
-    try {
-      // Host MF manifest declaring a remoteEntry served by the static
-      // middleware from this dist directory.
-      fs.mkdirSync(path.join(tempDir, 'static'), { recursive: true });
-      fs.writeFileSync(
-        path.join(tempDir, 'mf-manifest.json'),
-        JSON.stringify({
-          metaData: {
-            remoteEntry: {
-              path: 'static',
-              name: 'remoteEntry.js',
+  const initialize = async (
+    plugins: ServerPlugin[] = [],
+    onError?: NonNullable<ProdServerOptions['serverConfig']>['onError'],
+  ) => {
+    const options: ProdServerOptions = {
+      pwd: directory,
+      serverConfigPath: path.join(directory, 'modern.server.js'),
+      appContext: {
+        appDirectory: directory,
+        apiDirectory: '',
+        lambdaDirectory: '',
+      },
+      config: {
+        html: {},
+        output: {},
+        source: {},
+        tools: {},
+        server: { logger: false },
+        bff: { prefix: ['/api', '/rpc'] },
+        dev: {},
+        security: {},
+      },
+      plugins,
+      serverConfig: {
+        onError,
+        middlewares: [
+          {
+            name: 'throw-request-error',
+            order: 'pre',
+            handler: () => {
+              throw Object.assign(new Error('private database detail'), {
+                status: 503,
+                retryAfter: 90,
+              });
             },
           },
-          remotes: [],
-        }),
-      );
-      fs.writeFileSync(
-        path.join(tempDir, 'static', 'remoteEntry.js'),
-        'var remoteEntry = 1;',
-      );
+        ],
+      },
+    };
+    server = createServerBase(options);
+    await applyPlugins(server, options);
+    await server.init();
+    return server;
+  };
 
-      const options = {
-        pwd: tempDir,
-        serverConfigPath: path.join(tempDir, 'modern.server.js'),
-        appContext: {
-          apiDirectory: '',
-          lambdaDirectory: '',
-          appDirectory: tempDir,
-        },
-        config: {
-          html: {},
-          output: {},
-          source: {},
-          tools: {},
-          server: {
-            logger: false,
-          },
-          bff: {},
-          dev: {},
-          security: {},
-        },
-      } as unknown as ProdServerOptions;
-
-      const server = createServerBase(options);
-      await applyPlugins(server, options);
-      await server.init();
-
-      const manifestResponse = await server.request(
-        '/mf-manifest.json',
-        {},
-        {},
-      );
-      expect(manifestResponse.status).toBe(200);
-      expect(manifestResponse.headers.get('cache-control')).toBe(
-        'no-cache, no-store, must-revalidate',
-      );
-      expect(manifestResponse.headers.get('pragma')).toBe('no-cache');
-
-      const remoteEntryResponse = await server.request(
-        '/static/remoteEntry.js',
-        {},
-        {},
-      );
-      expect(remoteEntryResponse.status).toBe(200);
-      expect(remoteEntryResponse.headers.get('cache-control')).toBe(
-        'public, max-age=0, must-revalidate',
-      );
-
-      const pinnedRemoteEntryResponse = await server.request(
-        '/static/remoteEntry.js?mfv=remote-v1',
-        {},
-        {},
-      );
-      expect(pinnedRemoteEntryResponse.status).toBe(200);
-      expect(pinnedRemoteEntryResponse.headers.get('cache-control')).toBe(
-        'public, max-age=31536000, immutable',
-      );
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-  });
-
-  test('does not expose telemetry endpoints when telemetry is not configured', async () => {
-    const tempDir = makeTempDir();
-
-    try {
-      const options = {
-        pwd: tempDir,
-        serverConfigPath: path.join(tempDir, 'modern.server.js'),
-        appContext: {
-          apiDirectory: '',
-          lambdaDirectory: '',
-          appDirectory: tempDir,
-        },
-        config: {
-          html: {},
-          output: {},
-          source: {},
-          tools: {},
-          server: {
-            logger: false,
-          },
-          bff: {},
-          dev: {},
-          security: {},
-        },
-      } as unknown as ProdServerOptions;
-
-      const server = createServerBase(options);
-      await applyPlugins(server, options);
-      await server.init();
-
-      const statusResponse = await server.request(
-        '/_modern/runtime/status',
-        {},
-        {},
-      );
-      expect(statusResponse.status).toBe(404);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-  });
-
-  test('returns safe BFF failure envelopes and maintenance Retry-After from prod error fallback', async () => {
-    const tempDir = makeTempDir();
-
-    try {
-      const options = {
-        pwd: tempDir,
-        serverConfigPath: path.join(tempDir, 'modern.server.js'),
-        appContext: {
-          apiDirectory: '',
-          lambdaDirectory: '',
-          appDirectory: tempDir,
-        },
-        config: {
-          html: {},
-          output: {},
-          source: {},
-          tools: {},
-          server: {
-            logger: false,
-          },
-          bff: {
-            prefix: '/api',
-          },
-          dev: {},
-          security: {},
-        },
-        serverConfig: {
-          middlewares: [
-            {
-              name: 'throw-bff-error',
-              path: '/api/*',
-              handler: (c: any) => {
-                if (c.req.path.includes('maintenance')) {
-                  throw Object.assign(new Error('maintenance detail'), {
-                    status: 503,
-                    retryAfterSeconds: 90,
-                  });
-                }
-                throw new Error('raw secret detail');
-              },
-            },
-          ],
-        },
-      } as unknown as ProdServerOptions;
-
-      const server = createServerBase(options);
-      await applyPlugins(server, options);
-      await server.init();
-
-      const failure = await server.request('/api/failure', {}, {});
-      expect(failure.status).toBe(500);
-      await expect(failure.json()).resolves.toEqual({
-        success: false,
-        error: {
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Internal Server Error',
-          status: 500,
-        },
+  test('redacts unhandled API errors in the native JSON shape', async () => {
+    const instance = await initialize();
+    for (const url of ['/api/failure', '/rpc/failure']) {
+      const response = await instance.request(url, {}, {});
+      expect(response.status).toBe(500);
+      expect(response.headers.get('Retry-After')).toBeNull();
+      await expect(response.json()).resolves.toEqual({
+        message: '[BFF] Internal Server Error',
       });
-
-      const maintenance = await server.request('/api/maintenance', {}, {});
-      expect(maintenance.status).toBe(503);
-      expect(maintenance.headers.get('Retry-After')).toBe('90');
-      await expect(maintenance.json()).resolves.toEqual({
-        success: false,
-        error: {
-          code: 'SERVICE_UNAVAILABLE',
-          message: 'Service Unavailable',
-          status: 503,
-        },
-      });
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+
+  test('keeps native HTML for unhandled non-API errors', async () => {
+    const instance = await initialize();
+    const response = await instance.request('/page', {}, {});
+    expect(response.status).toBe(500);
+    expect(response.headers.get('content-type')).toContain('text/html');
+    const html = await response.text();
+    expect(html).toContain('Internal Server Error');
+    expect(html).not.toContain('private database detail');
+  });
+
+  test('runs the user handler before plugin response handlers', async () => {
+    const calls: string[] = [];
+    const instance = await initialize(
+      [
+        {
+          name: 'response-hook',
+          setup(api) {
+            api.handleError(async input => {
+              calls.push('plugin');
+              return { ...input, response: new Response('plugin') };
+            });
+          },
+        },
+      ],
+      () => {
+        calls.push('user');
+        return new Response('user response', { status: 418 });
+      },
+    );
+    const response = await instance.request('/api/failure', {}, {});
+    expect(response.status).toBe(418);
+    expect(await response.text()).toBe('user response');
+    expect(calls).toEqual(['user']);
+  });
+
+  test.each([
+    'declines',
+    'throws',
+  ])('runs plugins when the user handler %s', async outcome => {
+    const calls: string[] = [];
+    const instance = await initialize(
+      [
+        {
+          name: 'delegating-hook',
+          setup(api) {
+            api.handleError(async (input, next) => {
+              calls.push('delegate');
+              next?.(input);
+              return input;
+            });
+          },
+        },
+        {
+          name: 'response-hook',
+          setup(api) {
+            api.handleError(async input => {
+              calls.push('response');
+              expect(input.error.message).toBe('private database detail');
+              expect(input.context.req.path).toBe('/api/failure');
+              return {
+                ...input,
+                response: new Response('plugin response', { status: 422 }),
+              };
+            });
+          },
+        },
+        {
+          name: 'unreached-hook',
+          setup(api) {
+            api.handleError(async input => {
+              calls.push('unreached');
+              return input;
+            });
+          },
+        },
+      ],
+      () => {
+        calls.push('user');
+        if (outcome === 'throws') throw new Error('handler failure');
+      },
+    );
+    const response = await instance.request('/api/failure', {}, {});
+    expect(response.status).toBe(422);
+    expect(await response.text()).toBe('plugin response');
+    expect(calls).toEqual(['user', 'delegate', 'response']);
+  });
+
+  test('falls back safely when a response plugin throws', async () => {
+    const instance = await initialize([
+      {
+        name: 'broken-hook',
+        setup(api) {
+          api.handleError(async () => {
+            throw new Error('plugin secret');
+          });
+        },
+      },
+    ]);
+    const response = await instance.request('/api/failure', {}, {});
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      message: '[BFF] Internal Server Error',
+    });
   });
 });

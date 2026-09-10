@@ -190,7 +190,7 @@ Effect RPC、WebSockets 和其他传输方式应在需要时作为显式 transpo
 它们不能作为在生成 HTTP API 模块中重新引入原始 request handler 的理由。
 
 严格 API 测试应执行 `HttpApi` 契约。Edge 兼容 proof 测试使用
-`@modern-js/plugin-bff/effect-edge` 的 `createEffectBffTestHandler`；如果必须手动组合
+`@modern-js/bff-effect/effect-edge` 的 `createEffectBffTestHandler`；如果必须手动组合
 web handler，在调用 `HttpRouter.toWebHandler` 前要把 `HttpServer.layerServices` 和
 API group layer 一起提供。
 

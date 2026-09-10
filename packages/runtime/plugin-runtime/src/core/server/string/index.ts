@@ -1,5 +1,4 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off
-import * as rendererHead from '@modern-js/runtime-extensions';
 import type { StaticHandlerContext } from '@modern-js/runtime-utils/router';
 import { time } from '@modern-js/runtime-utils/time';
 import { SSR_HYDRATION_ID_PREFIX } from '@modern-js/utils/universal/constants';
@@ -7,17 +6,29 @@ import type React from 'react';
 import ReactDomServer from 'react-dom/server';
 import { RenderLevel } from '../../constants';
 import type { TInternalRuntimeContext } from '../../context';
-import { getGlobalInternalRuntimeContext } from '../../context';
-import { wrapRuntimeContextProvider } from '../../react/wrapper';
+import {
+  getGlobalEnableRsc,
+  getGlobalInternalRuntimeContext,
+} from '../../context';
+import {
+  wrapRuntimeComponentResolver,
+  wrapRuntimeContextProvider,
+} from '../../react/wrapper';
 import type { SSRServerContext } from '../../types';
 import {
   CHUNK_CSS_PLACEHOLDER,
+  CHUNK_JS_PLACEHOLDER,
   HTML_PLACEHOLDER,
   SSR_DATA_PLACEHOLDER,
 } from '../constants';
 import { createReplaceHelemt, getHelmetData } from '../helmet';
-import { replaceChunkJsPlaceholder } from '../scriptOrder';
-import { type BuildHtmlCb, buildHtml, type RenderString } from '../shared';
+import {
+  type BuildHtmlCb,
+  buildHtml,
+  createSSRRenderLifecycle,
+  type RenderString,
+  replaceSSRTemplateChunk,
+} from '../shared';
 import { SSRErrors, SSRTimings, type Tracer } from '../tracer';
 import { getSSRConfigByEntry, safeReplace } from '../utils';
 import { LoadableCollector } from './loadable';
@@ -35,13 +46,7 @@ export const renderString: RenderString = async (
 
   const routerContext = runtimeContext.routerContext as StaticHandlerContext;
 
-  const {
-    htmlTemplate,
-    entryName,
-    loadableStats,
-    routeManifest,
-    moduleFederationCssAssets,
-  } = resource;
+  const { htmlTemplate, entryName, loadableStats, routeManifest } = resource;
 
   const ssrConfig = getSSRConfigByEntry(
     entryName,
@@ -56,18 +61,20 @@ export const renderString: RenderString = async (
     cssChunk: '',
   };
 
-  const collectors: Collector[] = [
-    new LoadableCollector({
-      stats: loadableStats,
-      nonce: config.nonce,
-      routeManifest,
-      runtimeContext,
-      template: htmlTemplate,
-      entryName,
-      moduleFederationCssAssets,
-      chunkSet,
-      config,
-    }),
+  const collectors: Collector[] = [];
+  const lifecycle = createSSRRenderLifecycle(collectors);
+  const loadableCollector = new LoadableCollector({
+    stats: loadableStats,
+    nonce: config.nonce,
+    routeManifest,
+    template: htmlTemplate,
+    entryName,
+    chunkSet,
+    config,
+    lifecycle,
+  });
+  collectors.push(
+    loadableCollector,
     new SSRDataCollector({
       runtimeContext,
       request,
@@ -77,24 +84,37 @@ export const renderString: RenderString = async (
       routerContext,
       nonce: config.nonce,
       useJsonScript: config.useJsonScript,
+      lifecycle,
     }),
-  ];
+  );
 
   const internalRuntimeContext = getGlobalInternalRuntimeContext();
   const hooks = internalRuntimeContext.hooks;
 
   const extraCollectors = hooks.extendStringSSRCollectors.call({
     chunkSet,
+    render: {
+      runtimeContext,
+      request,
+      resource,
+      config,
+      platform: 'node',
+      mode: 'string',
+      isRsc: getGlobalEnableRsc() === true,
+    },
   });
 
   for (const c of extraCollectors) {
     if (c) collectors.unshift(c);
   }
 
-  const rootElement = wrapRuntimeContextProvider(
+  let rootElement = wrapRuntimeContextProvider(
     serverRoot,
     Object.assign(runtimeContext, { ssr: true }),
   );
+  if (getGlobalEnableRsc() === true && runtimeContext.isBrowser === false) {
+    rootElement = wrapRuntimeComponentResolver(rootElement, hooks);
+  }
 
   const html = await generateHtml(
     rootElement,
@@ -102,9 +122,10 @@ export const renderString: RenderString = async (
     chunkSet,
     collectors,
     runtimeContext.ssrContext?.htmlModifiers || [],
-    runtimeContext,
-    entryName,
     tracer,
+    request.signal,
+    lifecycle,
+    loadableCollector.stylesheetInfo,
   );
 
   return html;
@@ -116,86 +137,95 @@ async function generateHtml(
   chunkSet: ChunkSet,
   collectors: Collector[],
   htmlModifiers: BuildHtmlCb[],
-  runtimeContext: TInternalRuntimeContext,
-  entryName: string,
   { onError, onTiming }: Tracer,
+  signal: AbortSignal,
+  lifecycle: ReturnType<typeof createSSRRenderLifecycle>,
+  stylesheetInfo: LoadableCollector['stylesheetInfo'],
 ): Promise<string> {
   let html = '';
   let helmetData;
 
-  const finalApp = collectors.reduce(
-    (pre, creator) => creator.collect?.(pre) || pre,
-    App,
-  );
-  rendererHead.beginHeadRender(runtimeContext);
   try {
-    const end = time();
-    // react render to string
-    html = ReactDomServer.renderToString(finalApp, {
-      identifierPrefix: SSR_HYDRATION_ID_PREFIX,
-    });
-    html = rendererHead.completeHeadRender(runtimeContext, html);
-    chunkSet.renderLevel = RenderLevel.SERVER_RENDER;
-    helmetData = getHelmetData(runtimeContext);
+    signal.throwIfAborted();
+    try {
+      const finalApp = collectors.reduce(
+        (pre, creator) => creator.collect?.(pre) || pre,
+        App,
+      );
+      lifecycle.beforeReact();
+      const end = time();
+      html = ReactDomServer.renderToString(finalApp, {
+        identifierPrefix: SSR_HYDRATION_ID_PREFIX,
+      });
+      html = lifecycle.completedBody(html, 'complete');
+      chunkSet.renderLevel = RenderLevel.SERVER_RENDER;
+      helmetData = getHelmetData(collectors);
 
-    const cost = end();
-    onTiming(SSRTimings.RENDER_HTML, cost);
-  } catch (e) {
-    rendererHead.abortHeadRender(runtimeContext);
-    chunkSet.renderLevel = RenderLevel.CLIENT_RENDER;
-    onError(e, SSRErrors.RENDER_HTML);
+      const cost = end();
+      onTiming(SSRTimings.RENDER_HTML, cost);
+    } catch (error) {
+      lifecycle.finish({ status: 'fallback', error });
+      html = '';
+      chunkSet.renderLevel = RenderLevel.CLIENT_RENDER;
+      onError(error, SSRErrors.RENDER_HTML);
+    }
+
+    // Existing effects remain concurrent and run on the fallback path too.
+    await Promise.all(collectors.map(component => component.effect()));
+    signal.throwIfAborted();
+
+    const { ssrScripts, cssChunk, jsChunk } = chunkSet;
+
+    const finalHtml = await buildHtml(htmlTemplate, [
+      createReplaceHtml(html),
+      template =>
+        replaceSSRTemplateChunk(
+          {
+            name: 'scripts',
+            template,
+            placeholder: CHUNK_JS_PLACEHOLDER,
+            content: jsChunk,
+          },
+          lifecycle,
+        ),
+      template =>
+        replaceSSRTemplateChunk(
+          {
+            name: 'styles',
+            template,
+            placeholder: CHUNK_CSS_PLACEHOLDER,
+            content: cssChunk,
+            ...stylesheetInfo,
+          },
+          lifecycle,
+        ),
+      template =>
+        replaceSSRTemplateChunk(
+          {
+            name: 'data',
+            template,
+            placeholder: SSR_DATA_PLACEHOLDER,
+            content: ssrScripts,
+          },
+          lifecycle,
+        ),
+      createReplaceHelemt(helmetData),
+      ...htmlModifiers,
+    ]);
+
+    signal.throwIfAborted();
+    lifecycle.finish({ status: 'complete' });
+    return finalHtml;
+  } catch (error) {
+    lifecycle.finish(
+      signal.aborted
+        ? { status: 'cancelled', reason: signal.reason }
+        : { status: 'error', error },
+    );
+    throw error;
   }
-
-  // collectors do effect
-  await Promise.all(collectors.map(component => component.effect()));
-
-  const { ssrScripts, cssChunk, jsChunk } = chunkSet;
-
-  const finalHtml = await buildHtml(htmlTemplate, [
-    createReplaceHtml(html),
-    createReplaceChunkJs(jsChunk, entryName),
-    createReplaceChunkCss(cssChunk),
-    createReplaceSSRDataScript(ssrScripts, entryName),
-    createReplaceHelemt(helmetData),
-    ...htmlModifiers,
-  ]);
-
-  return finalHtml;
 }
 
 function createReplaceHtml(html: string): BuildHtmlCb {
   return (template: string) => safeReplace(template, HTML_PLACEHOLDER, html);
-}
-
-// FORK: upstream uses a plain `safeReplace` here, which leaves the SSR data +
-// router hydration block wherever the template author put the placeholder —
-// usually AFTER the entry script tag. We reuse the fork's stream-mode
-// primitive (stream/afterTemplate.ts) so `window._SSR_DATA` and the TanStack
-// `$_TSR` bootstrap are emitted BEFORE the entry script in string mode too,
-// giving string mode the same script-ordering guarantee stream mode has.
-// `replaceChunkJsPlaceholder` leaves templates that omit the target marker
-// byte-identical, preserving a custom template's explicit opt-out. When the
-// marker exists but no entry script is found, it degrades to in-place
-// replacement. Every standard Modern.js template with both the marker and an
-// entry script changes by design: the SSR data + router bootstrap block moves
-// in front of the entry tag, which in the common head-script layout relocates
-// it above the rendered `<div id="root">`. Do NOT restore upstream's
-// `safeReplace` call when resolving a sync merge — the guard is
-// tests/ssr/serverRender/renderToString/buildTemplate.test.tsx.
-function createReplaceSSRDataScript(
-  data: string,
-  entryName?: string,
-): BuildHtmlCb {
-  return (template: string) =>
-    replaceChunkJsPlaceholder(template, data, entryName, SSR_DATA_PLACEHOLDER);
-}
-
-function createReplaceChunkJs(js: string, entryName?: string): BuildHtmlCb {
-  return (template: string) =>
-    replaceChunkJsPlaceholder(template, js, entryName);
-}
-
-function createReplaceChunkCss(css: string): BuildHtmlCb {
-  return (template: string) =>
-    safeReplace(template, CHUNK_CSS_PLACEHOLDER, css);
 }

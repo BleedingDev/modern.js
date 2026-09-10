@@ -12,7 +12,7 @@ bases and counts, §3 reconciliation, and every base-transition growth entry.
 
 **Re-verified 2026-08-25** for the upstream sync through `f4bc5ee335`: §2
 bases and counts and §3 reconciliation. The re-anchor changed no cumulative
-per-file divergence budget. The later RT-23 capped patch added five governed
+per-file divergence budget. The later RT-23 inline patch added five governed
 changed lines without changing the file or hunk totals.
 
 **Re-verified 2026-08-26** after restoring the fixed `eded841256` audited
@@ -33,15 +33,241 @@ every PR.
 
 ---
 
+### 2026-09-10 native declarations and tutorial qualification
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-ssg/rslib.config.mts` | bleedingdev | Emit checked ESM declarations through the existing fork-owned Rslib declaration extension, with native .d.mts identity and valid transitive references; preserve the existing CommonJS output. | `extension-point` + `inline-patch` |
+| `packages/cli/plugin-styled-components/rslib.config.mts` | bleedingdev | Emit checked ESM declarations through the existing fork-owned Rslib declaration extension so native import consumers receive the advertised default factory and styled element types. Preserve CommonJS output and runtime behavior. | `extension-point` + `inline-patch` |
+| `packages/document/src/sandbox/csr-auth/src/routes/page-tsx.txt` | bleedingdev | Import the React JSX type explicitly for the React 19 tutorial; the exact bilingual sandbox sources pass strict TypeScript checks without suppressions. | `inline-patch` |
+
 ### 2026-09-08 public declaration closure
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production after Rslib copies prebundles; retain watcher/glob/Inquirer runtime bytes while restoring the complete strict TS7/Node26 type closure | `extension-point` + `capped-patch` |
-| `packages/toolkit/utils/package.json` | bleedingdev | Declare build-only RxJS input for self-contained Inquirer 8 declaration production, without adding a consumer runtime dependency | `capped-patch` |
-| `packages/cli/builder/rslib.config.mts` | bleedingdev | Attach fork-owned declaration production to isolate Sass/SVG/CSS options from loader, Babel, and Webpack implementation declarations | `extension-point` + `capped-patch` |
-| `packages/cli/builder/package.json` | bleedingdev | Own the public Sass and CSS source-map declaration dependencies already used transitively by the build plugins | `capped-patch` |
-| `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Publish precompression configuration aliases with Rspack path data without leaking the plugin's Webpack compiler class | `extension-point` + `capped-patch` |
+| `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Run fork-owned declaration production through the Rslib plugin point after prebundle copies, preserving watcher/glob/Inquirer runtime bytes and strict TS7/Node26 type closure. Retain upstream Rslib 1.0 externals-callback and optional-library compatibility so emitted module formats remain correct. | `extension-point` + `inline-patch` + `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/utils/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 and post-audit native utils cohort, public exports and declaration metadata. Keep RxJS build-only for self-contained Inquirer 8 declaration production. | `inline-patch` + `upstream-PR` + `keep-[M]` |
+| `packages/cli/builder/rslib.config.mts` | bleedingdev | Use the existing Rslib plugin point for fork-owned declaration production, isolating public Sass, SVG and CSS options from loader, Babel and Webpack implementation declarations. | `extension-point` + `inline-patch` |
+| `packages/cli/builder/package.json` | bleedingdev | Retain the integrated native Rsbuild/Rslib/SWC toolchain, declared Sass and source-map dependencies, optional RSC peers, and Rsdoctor1.6.3 cohort. Remove the runtime-extensions dependency after the higher solution moves disabled-RSC policy into its existing builder-plugin composition; package metadata no longer selects a fork runtime. | `inline-patch` + `keep-[M]` + `upstream-PR` |
+| `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Publish precompression types with Rspack path data without leaking the Webpack compiler class. Preserve upstream #8819 single-writer ESM loaders, CJS loader copies and deployment templates in every compiled output required by createNodePreset and other deployment readers. | `extension-point` + `inline-patch` + `upstream-PR` + `fixed-in-fork` |
+
+### 2026-09-09 simplification and builder compatibility
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/builder/src/createBuilder.ts` | bleedingdev | Restore createRequire dependency bundling in the native builder, preserve explicit overrides and the public parseConfig shape. Restore the audited disabled-RSC fallback import and registration after moving the broader five-entry disabled-runtime policy to higher solution composition. | `inline-patch` |
+| `packages/cli/builder/tests/cache.test.ts` | bleedingdev | Replace implementation snapshots with persistent-cache assertions and real cold/warm environment isolation proof through a repository test helper | `inline-patch` |
+| `packages/cli/builder/tests/default.test.ts` | bleedingdev | Verify deployed createRequire output after removing source dependencies, including the explicit false override. Restore the audited native fallback plugin name and position; higher composition tests independently execute the broader disabled-RSC contracts. | `inline-patch` |
+| `packages/cli/builder/tests/environment.test.ts` | bleedingdev | Assert effective native cache storage isolation with compiled output rather than legacy storage-directory formatting | `inline-patch` |
+
+### Native ownership reconciliation (2026-09-09)
+
+These rows record the reviewed native source, native regression, documentation,
+release metadata and exact-upstream identities retained during reconciliation.
+They do not change the fixed pins, canonical scope or divergence budgets.
+Fork implementation and mixed-file ownership work remain separate.
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/builder/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 4d698ae3300827ae26785eb55033820d6e745d29 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/cli/builder/src/shared/rsc/rscClientBrowserFallback.ts` | bleedingdev | Restore the audited native disabled-RSC fallback implementation and registration after moving the broader five-entry runtime policy to higher solution composition. The only retained difference in this file is Biome import ordering; its two changed lines occupy two hunks, so componentwise governance requires explicit evidence despite the large line-count shrink. | `inline-patch` + `keep-[M]` |
+| `packages/cli/plugin-bff/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 931f0349a577c15d949d40ccb55fe17b903757be from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/cli/plugin-bff/src/cli/compress.ts` | bleedingdev | 792894ba57 extracts existing CLI behavior. Audit pin has compression prefix filter, prefix list construction and .ts/.js watch handling; fork broadens normalization/extensions. Preserve needed correctness inline in native CLI, not an entire fork subsystem. Evidence: CLI per-file classification packet. | `inline-patch` |
+| `packages/cli/plugin-bff/src/cli/prefix.ts` | bleedingdev | 792894ba57 extracts existing CLI behavior. Audit pin has compression prefix filter, prefix list construction and .ts/.js watch handling; fork broadens normalization/extensions. Preserve needed correctness inline in native CLI, not an entire fork subsystem. Evidence: CLI per-file classification packet. | `inline-patch` |
+| `packages/cli/plugin-bff/src/cli/watch.ts` | bleedingdev | 792894ba57 extracts existing CLI behavior. Audit pin has compression prefix filter, prefix list construction and .ts/.js watch handling; fork broadens normalization/extensions. Preserve needed correctness inline in native CLI, not an entire fork subsystem. Evidence: CLI per-file classification packet. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/files.ts` | bleedingdev | Retain the native file/path derivation extracted from audited clientGenerator.ts, including normalized export identities and declaration paths. Resolve generated output paths against the app directory explicitly so callers receive canonical absolute paths across platforms. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/index.ts` | bleedingdev | Native extraction barrel for audited clientGenerator.ts helpers; retain the refactor or fold the native functions back without reclassifying them as a fork subsystem. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/package-json.ts` | bleedingdev | Audited clientGenerator.ts already owns FileDetails/path calculation/directory scanning, mergePackageJson, setPackage/writeTargetFile, and buildClientTypeFacade. Current extraction adds safe package collision handling, exact ESM client boundary and missing-declaration failure; preserve native fixes inline. type-facade introduction 2fbbb48cd2 ports #8797, but the audited pin already contains that upstream facade algorithm. Evidence: CLI per-file classification packet. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/type-facade.ts` | bleedingdev | Audited clientGenerator.ts already owns FileDetails/path calculation/directory scanning, mergePackageJson, setPackage/writeTargetFile, and buildClientTypeFacade. Current extraction adds safe package collision handling, exact ESM client boundary and missing-declaration failure; preserve native fixes inline. type-facade introduction 2fbbb48cd2 ports #8797, but the audited pin already contains that upstream facade algorithm. Evidence: CLI per-file classification packet. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/write-package.ts` | bleedingdev | Retain native generated-client ESM boundaries, declaration packaging and collision-safe export merging extracted from audited clientGenerator.ts. Validate descriptor-provided dependency names/specifiers and reject existing dependency conflicts before the one final package write, preserving unrelated manifest content. | `inline-patch` |
+| `packages/cli/plugin-data-loader/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 133f0fc4a24cbf9617c2a27ec78ad630b2a2e71e from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/cli/plugin-ssg/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 498953479187175bcb1cceb6b18ba0b5859481b1 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/document/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 1088d4132dd744ae5212664d6452df0bdcd6539e from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/document/docs/en/community/showcase.mdx` | bleedingdev | Maintain community/showcase.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/en/components/init-rspack-app.mdx` | bleedingdev | Maintain components/init-rspack-app.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/en/configure/app/bff/effect.mdx` | bleedingdev | Document canonical bff-effect public runtime helpers, direct Effect namespace imports, the higher BFF build plugin, and production adapter dependencies after native facade retirement; preserve the strict API and peer-cohort guidance. | `inline-patch` |
+| `packages/document/docs/en/configure/app/bff/runtime-framework.mdx` | bleedingdev | Maintain configure/app/bff/runtime-framework.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/en/configure/app/performance/rsdoctor.mdx` | bleedingdev | Maintain configure/app/performance/rsdoctor.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/en/guides/advanced-features/bff/data-platform.mdx` | bleedingdev | Document data-platform helpers at their canonical bff-effect public entry after removing the native plugin-bff facade. | `inline-patch` |
+| `packages/document/docs/en/guides/basic-features/deploy.mdx` | bleedingdev | Maintain guides/basic-features/deploy.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/en/guides/get-started/ultramodern.mdx` | bleedingdev | Point generated strict API test guidance at the canonical bff-effect/effect-edge helper after native facade retirement. | `inline-patch` |
+| `packages/document/docs/en/guides/troubleshooting/cli.mdx` | bleedingdev | Maintain guides/troubleshooting/cli.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/en/tutorials/examples/csr-auth.mdx` | bleedingdev | Maintain tutorials/examples/csr-auth.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/zh/community/showcase.mdx` | bleedingdev | Maintain community/showcase.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/zh/components/init-rspack-app.mdx` | bleedingdev | Maintain components/init-rspack-app.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/zh/configure/app/bff/effect.mdx` | bleedingdev | Document canonical bff-effect public runtime helpers, direct Effect namespace imports, the higher BFF build plugin, and production adapter dependencies after native facade retirement; preserve the strict API and peer-cohort guidance. | `inline-patch` |
+| `packages/document/docs/zh/configure/app/bff/runtime-framework.mdx` | bleedingdev | Maintain configure/app/bff/runtime-framework.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/zh/configure/app/performance/rsdoctor.mdx` | bleedingdev | Maintain configure/app/performance/rsdoctor.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/zh/guides/advanced-features/bff/data-platform.mdx` | bleedingdev | Document data-platform helpers at their canonical bff-effect public entry after removing the native plugin-bff facade. | `inline-patch` |
+| `packages/document/docs/zh/guides/basic-features/deploy.mdx` | bleedingdev | Maintain guides/basic-features/deploy.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/zh/guides/get-started/ultramodern.mdx` | bleedingdev | Point generated strict API test guidance at the canonical bff-effect/effect-edge helper after native facade retirement. | `inline-patch` |
+| `packages/document/docs/zh/guides/troubleshooting/cli.mdx` | bleedingdev | Maintain guides/troubleshooting/cli.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/docs/zh/tutorials/examples/csr-auth.mdx` | bleedingdev | Maintain tutorials/examples/csr-auth.mdx documentation for the accepted native toolchain or documented fork package/API; this file contains documentation, not a framework implementation. | `inline-patch` |
+| `packages/document/src/sandbox/csr-auth/src/routes/Auth-tsx.txt` | bleedingdev | Use native TanStack matched-route and navigation APIs in the authentication tutorial, preserving the original protected destination across pending navigation and awaiting public-route commit before signout. Use the React 19 JSX namespace without compiler suppressions or navigation shims. | `inline-patch` |
+| `packages/document/src/sandbox/csr-auth/src/routes/layout-tsx.txt` | bleedingdev | Use native TanStack Link, Navigate, Outlet or navigation/search state in the authentication tutorial; preserve the documented demo behavior without app-level navigation shims. | `inline-patch` |
+| `packages/document/src/sandbox/csr-auth/src/routes/login/page-tsx.txt` | bleedingdev | Use native TanStack Link, Navigate, Outlet or navigation/search state in the authentication tutorial; preserve the documented demo behavior without app-level navigation shims. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/cache.ts` | bleedingdev | Retain extracted native language cache write behavior from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/detector.ts` | bleedingdev | Retain extracted native detector configuration and execution from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/initOptions.ts` | bleedingdev | Retain extracted native detection initialization options from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/language.ts` | bleedingdev | Retain extracted native supported-language normalization and selection from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/path.ts` | bleedingdev | Retain extracted native pathname language detection from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/priority.ts` | bleedingdev | Retain extracted native language-source precedence from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/ssr.ts` | bleedingdev | Retain extracted native SSR language lookup from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/detection/types.ts` | bleedingdev | Retain native detection result/options types extracted from audited detection/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/server/apiPrefix.ts` | bleedingdev | Keep locale detection out of native BFF API routes by normalizing and matching configured prefixes. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/server/detectorOptions.ts` | bleedingdev | Native Hono language-detector option conversion extracted from audited server/index.ts. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/backendDefaults.test.ts` | bleedingdev | Verify native filesystem backend locale-directory defaults. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/i18nUtils.test.ts` | bleedingdev | Verify native fs-backend namespace interop, locale defaults and initialization completion. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/peerCohort.test.ts` | bleedingdev | Verify React runtime peer cohort without overstating i18n peer floors. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/type-fixture/i18nInstanceTypes.fixture.ts` | bleedingdev | Compile native i18next instance compatibility after removing the overly broad index signature. | `inline-patch` |
+| `packages/runtime/plugin-image/rslib.config.mts` | bleedingdev | Emit unbundled native declarations with explicit type-output ownership instead of duplicate declaration producers. | `inline-patch` |
+| `packages/runtime/plugin-runtime/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 2692d92ba5d020158005ad0defc35f966b0a6c68 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/runtime/plugin-runtime/rstest.config.mts` | bleedingdev | Keep native browser suites in their browser project and isolate workerLifecycle.test.tsx in a dedicated Node test project. Only that project aliases Flight transport; it executes the real native SSR/HTML adapters and does not replace emitted Worker acceptance. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/cli/code.ts` | bleedingdev | Observe the eager SSR handler promise before a renderer consumes it, preventing startup failures from terminating Node while preserving the original rejection for request-time reporting. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/cli/registry.ts` | bleedingdev | Type-only empty module anchors generated runtime registry alias declarations; no runtime registry implementation lives here. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/utils.ts` | bleedingdev | Keep native attribute-name validation and double-quoted value escaping in the native formatter used by native renderer template seams. Remove the reverse import of fork HTML helpers while preserving escaped ampersand, quote and angle-bracket output. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/document/cli/index.ts` | bleedingdev | Keep document template loading compatible with native ESM and expose native script-placeholder processing. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/runtime/utils.tsx` | bleedingdev | Preserve native React Router 404/status/error behavior and production error redaction. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/cli/ssr-bootstrap-rejection.test.ts` | bleedingdev | Regression companion for observable early server-entry failures without process termination. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/browser/stream-hydration.test.tsx` | bleedingdev | Verify matching SSR/client useId tree paths and label targets. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/registrySurface.test.ts` | bleedingdev | Compile main/named generated runtime alias declarations and verify no runtime fallback is introduced. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/fixtures/rsc-build-entry.ts` | bleedingdev | Build fixture for the native React Router RSC dependency boundary. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/plugin.client.test.tsx` | bleedingdev | Preserve native mounted-router/ref primitive checks and add real hash-router/hydration event delivery proving state installed before later lifecycle taps. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/routerHelper.test.ts` | bleedingdev | Verify native route-module namespace/Component/default interop and route-error recognition. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/rsc-build-boundary.test.ts` | bleedingdev | Verify the native React Router RSC build entry excludes browser-only runtime dependencies. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/rsc-router.test.tsx` | bleedingdev | Verify React Router Component routes serialize as native RSC payload elements. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/utils.test.ts` | bleedingdev | Regression companion for URL helpers, native catch-all 404s, loader status and safe error hydration. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/beforeTemplate.test.ts` | bleedingdev | Verify native stylesheet-link matching and first-duplicate attribute semantics. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tsconfig.tsgo.json` | bleedingdev | Native TypeScript-Go build configuration for existing runtime declarations. | `inline-patch` |
+| `packages/runtime/render/CHANGELOG.md` | bleedingdev | Retain exact upstream blob d3fd42faadb19ee37ef75aaa019d4dbc7058f095 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/runtime/render/src/client.ts` | bleedingdev | Native public build entry re-exports the existing client implementation. | `inline-patch` |
+| `packages/runtime/render/src/rsc.ts` | bleedingdev | Native public build entry re-exports the existing Node RSC implementation. | `inline-patch` |
+| `packages/runtime/render/src/server/rsc/csr.shared.tsx` | bleedingdev | Retain the native CSR-with-RSC HTML/CSS/payload assembly extracted behind an injected renderer. | `inline-patch` |
+| `packages/runtime/render/src/server/rsc/handle-action.ts` | bleedingdev | Retain the audited RSC action algorithm with native POST, body-size and decoding safeguards behind an injected runtime. | `inline-patch` |
+| `packages/runtime/render/src/ssr.ts` | bleedingdev | Native public build entry re-exports the existing SSR implementation. | `inline-patch` |
+| `packages/runtime/render/tests/build-artifact/ssr-externals.test.ts` | bleedingdev | Verify built native SSR entry externalizes RSC implementations correctly. | `inline-patch` |
+| `packages/runtime/render/tests/rsc/handle-action.test.ts` | bleedingdev | Regression companion for native RSC action method, payload size, malformed body and decoding behavior. | `inline-patch` |
+| `packages/runtime/render/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/bff-core/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 35078581f8be325bf7c9725bee55a859738736bf from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/bff-core/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/bff-runtime/CHANGELOG.md` | bleedingdev | Retain exact upstream blob d2dda78259be18f2d619479228efa407e03966a8 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/bff-runtime/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/core/CHANGELOG.md` | bleedingdev | Retain exact upstream blob fcb3f30351cf9dec53b677529a5a094952c6ed95 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/core/src/adapters/node/node.ts` | bleedingdev | Derive Request protocol from the socket and authority from native headers; preserve response failure handling. | `inline-patch` |
+| `packages/server/core/src/plugins/render/serverActionHandler.ts` | bleedingdev | Reject non-POST server action requests before dispatching the server bundle. | `inline-patch` |
+| `packages/server/core/tests/adapters/node.test.ts` | bleedingdev | Verify native Node request/response conversion, including secure protocol and authority. | `inline-patch` |
+| `packages/server/core/tests/adapters/utils.test.ts` | bleedingdev | Verify native adapter request/response helpers. | `inline-patch` |
+| `packages/server/core/tests/context.test.ts` | bleedingdev | Verify native server request context behavior. | `inline-patch` |
+| `packages/server/core/tests/plugins/dataHandler.test.ts` | bleedingdev | Verify native server loaders run inside the request Hono context. | `inline-patch` |
+| `packages/server/core/tests/plugins/serverActionHandler.test.ts` | bleedingdev | Verify non-POST action requests return 405 before server execution. | `inline-patch` |
+| `packages/server/core/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/create-request/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 92d3e2754b1f208b0e6ebb29e30d0ed1ffd0e272 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/create-request/src/utiles.ts` | bleedingdev | Guard FileList in environments without the constructor and read FileList.item safely. | `inline-patch` |
+| `packages/server/create-request/tests/acceptHeader.test.ts` | bleedingdev | Verify native Accept defaults normalize case-variant header keys. | `inline-patch` |
+| `packages/server/create-request/tests/browser-get-body.test.ts` | bleedingdev | Verify browser GET request bodies are omitted before transport. | `inline-patch` |
+| `packages/server/create-request/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/plugin-polyfill/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 02edaca823e68c6212b2c1469f0f09b1a68b1666 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/plugin-polyfill/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/prod-server/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 0c73ced8532db5011df8ca5d33ea045adcde1ebb from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/server-runtime/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 75c12c418c625a42517a323d632e473872999a90 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/server-runtime/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/server/CHANGELOG.md` | bleedingdev | Retain exact upstream blob f148909020dc2e9322be70865271fa8e613d59ba from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/server/src/dev-tools/reloadManager.ts` | bleedingdev | Retain optional native handle disposal for failed candidates, replaced handles and shutdown. Add immediate retirement that waits for active handler promises before one shared disposal, and guarantee previous-handle cleanup even when reload callbacks or their error reporter throw. | `inline-patch` |
+| `packages/server/server/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/server/utils/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 2cf6d0f3886f7354f079c3f15695db796ed78ea8 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/server/utils/src/compilers/typescript/importRewriter.ts` | bleedingdev | Rewrite real JS/TS output module specifiers using AST spans and detect native output collisions; preserve code-like runtime data. | `inline-patch` |
+| `packages/server/utils/src/compilers/typescript/tsconfigPathsPlugin.ts` | bleedingdev | Preserve native ESM/CJS and Windows alias resolution with .mts/.cts output extensions. | `inline-patch` |
+| `packages/server/utils/tests/fixtures/ts-example/nested/tsconfig.json` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/fixtures/ts-example/tsconfig.bundler.json` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/fixtures/ts-example/tsconfig.noemit.json` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/fixtures/tsx-example/server/helper.mjs` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/fixtures/tsx-example/server/native.cts` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/fixtures/tsx-example/server/native.mts` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/importRewriter.test.ts` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/rewriteOutput.test.ts` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/server/utils/tests/ts.test.ts` | bleedingdev | Retain native TypeScript-Go emission, executable alias, module suffix and cleanup regressions. Verify exact root exclusions still diagnose excluded files when imported and reject relative exclusion paths. | `inline-patch` |
+| `packages/server/utils/tests/tsgoCleanup.test.ts` | bleedingdev | Native compiler regression/fixture for TypeScript-Go emission, executable alias rewrites, native module suffixes, diagnostics or temporary-config cleanup. | `inline-patch` |
+| `packages/solutions/app-tools/bin/modern-bundle-docs.js` | bleedingdev | Enforce the same Node 26.7 runtime cohort for the documentation CLI. | `inline-patch` |
+| `packages/solutions/app-tools/bin/modern.js` | bleedingdev | Enforce the accepted Node 26.7 runtime cohort before native TypeScript CLI loading. | `inline-patch` |
+| `packages/solutions/app-tools/CHANGELOG.md` | bleedingdev | Retain upstream release notes and the nine historical app-tools fork release-note lines; no runtime subsystem is implemented in this metadata. | `inline-patch` |
+| `packages/solutions/app-tools/src/builder/shared/bundlerPlugins/RouterPlugin.ts` | bleedingdev | Normalize automatic publicPath in HTML, CSS and route-manifest assets so native serving does not request auto/ URLs. | `inline-patch` |
+| `packages/solutions/app-tools/src/bundleDocs.ts` | bleedingdev | Use Node Dirent.parentPath in the existing documentation copy routine. | `inline-patch` |
+| `packages/solutions/app-tools/src/plugins/analyze/getServerRoutes.ts` | bleedingdev | Recover production entrypoints from built route metadata so serve can operate without source routes. | `inline-patch` |
+| `packages/solutions/app-tools/src/plugins/analyze/isDefaultExportFunction.ts` | bleedingdev | Update existing export analysis to supported Babel 8 parser syntax. | `inline-patch` |
+| `packages/solutions/app-tools/src/run/index.ts` | bleedingdev | Replace obsolete Node 16 warning with the accepted Node 26.7 native-runtime requirement. | `inline-patch` |
+| `packages/solutions/app-tools/src/utils/register.ts` | bleedingdev | Use Node native TypeScript capability and alias hooks for existing config loading; remove classic transpiler fallback. | `inline-patch` |
+| `packages/solutions/app-tools/tests/builder/routerPlugin.test.ts` | bleedingdev | Regression companion for automatic publicPath normalization in emitted router assets. | `inline-patch` |
+| `packages/solutions/app-tools/tests/deploy/server-plugin-interop.test.ts` | bleedingdev | Execute native and CJS plugin factories in both native launcher module formats. | `inline-patch` |
+| `packages/solutions/app-tools/tests/rslib-template-output.test.ts` | bleedingdev | Build and load ESM loaders and CJS outputs to catch duplicate writers and missing deployment templates. | `inline-patch` |
+| `packages/solutions/app-tools/tests/utils/register-esm.test.ts` | bleedingdev | Ensure existing config registration prefers Node registerHooks over deprecated module.register. | `inline-patch` |
+| `packages/solutions/app-tools/tests/utils/register.test.ts` | bleedingdev | Verify Node native TypeScript capability, absence handling and config-loading behavior. | `inline-patch` |
+| `packages/toolkit/create/rslib.config.mts` | bleedingdev | Retain exact upstream blob d3fe8c92df8c6925d644242de45a5f52f7d96454 from upstream b6f784095994; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/create/rslibconfig.mts` | bleedingdev | Record the canonical audited identity of the superseded minimal native Rslib configuration; create now retains the accepted upstream rslib.config.mts replacement recorded above. Git identity tracking pairs the old four-line template with the fork-owned plugin-bff-extensions/rslib.config.mts, whose reviewed PR change excludes the Node-only Hono binder from browser output. The build customization remains in its fork package; this explicit identity row does not restore native create policy or change audited pins. | `inline-patch` |
+| `packages/toolkit/plugin/CHANGELOG.md` | bleedingdev | Retain exact upstream blob c5f32f1a7af21d30bd28b84fb0c24b16e77fef5b from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/plugin/tests/createConfigOptions.test.ts` | bleedingdev | Native public API/build-artifact regression; toolkit identity packet confirms existing native behavior and no additive subsystem. | `inline-patch` |
+| `packages/toolkit/plugin/tests/createFileWatcher.test.ts` | bleedingdev | Native public API/build-artifact regression; toolkit identity packet confirms existing native behavior and no additive subsystem. | `inline-patch` |
+| `packages/toolkit/plugin/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/toolkit/runtime-utils/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 9eb8007bb31389be81243bc2d2affee94246b156 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/runtime-utils/tests/build-artifact/async-storage-externals.test.ts` | bleedingdev | Native public API/build-artifact regression; toolkit identity packet confirms existing native behavior and no additive subsystem. | `inline-patch` |
+| `packages/toolkit/runtime-utils/tests/node/serialize.test.ts` | bleedingdev | Native public API/build-artifact regression; toolkit identity packet confirms existing native behavior and no additive subsystem. | `inline-patch` |
+| `packages/toolkit/runtime-utils/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/toolkit/sandpack-react/CHANGELOG.md` | bleedingdev | Retain exact upstream blob c3bcb5011ed6ec7b033f0c98243cf7b83600e014 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/sandpack-react/scripts/template.mts` | bleedingdev | Retain identity of the audited template.ts generator across its native ESM rename and Node-native build compatibility. | `inline-patch` |
+| `packages/toolkit/types/CHANGELOG.md` | bleedingdev | Retain exact upstream blob 7db15738a7f455c93aa00c1161cb7ffb02342e3f from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/types/tests/tsconfig.json` | bleedingdev | Type-check configuration supporting the native declaration-reexport regression; copied native test configuration is not a runtime subsystem. | `inline-patch` |
+| `packages/toolkit/utils/CHANGELOG.md` | bleedingdev | Retain exact upstream blob c1fe70e15974d4b98de5603b68a38ae901dd2c54 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/utils/compiled/js-yaml/package.json` | bleedingdev | Retain native cohort and packaging metadata; changed fields: funding, main, module, types, version. | `inline-patch` |
+| `packages/toolkit/utils/src/cli/modulePath.ts` | bleedingdev | Extend existing native module discovery to .cts/.mts and .cjs/.mjs. | `inline-patch` |
+| `packages/toolkit/utils/src/universal/wait.ts` | bleedingdev | Retain the native wait helper extracted from audited src/cli/common.ts. | `inline-patch` |
+| `packages/toolkit/utils/tests/alias.test.ts` | bleedingdev | Verify existing native path alias filtering and source entry discovery. | `inline-patch` |
+| `packages/toolkit/utils/tests/compiledYamlExports.test.ts` | bleedingdev | Native public API/build-artifact regression; toolkit identity packet confirms existing native behavior and no additive subsystem. | `inline-patch` |
+| `packages/toolkit/utils/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
+| `packages/tsconfig/CHANGELOG.md` | bleedingdev | Retain exact upstream blob ab334cf69f00974846218ef588f7a233bd346fc4 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/tsconfig/package.json` | bleedingdev | Retain exact upstream blob 0a1c306f37f06ae692983983db14548f870e6464 from v3.9.0 ae639d9c1c70; this is per-file accepted-upstream evidence and does not advance either audited pin. | `inline-patch` |
+| `packages/toolkit/create/template/src/routes/index.css` | bleedingdev | Retain native template CSS formatting; no additive runtime subsystem. | `inline-patch` |
+| `packages/toolkit/create/template/biome.json` | bleedingdev | Migrate the native generated template configuration to the accepted Biome 2 schema. | `inline-patch` |
+| `packages/runtime/plugin-runtime/scripts/gen-static.ts` | bleedingdev | Retain audited gen-static.ts identity at gen-static.mts; native ESM generator reads built CJS constants and produces the same three static assets. | `inline-patch` |
+
+### Native renderer and component contracts (2026-09-09)
+
+These entries describe the delivered native hook and adapter changes. Fork
+head collection and projection implementations live in their owning packages.
+Dedicated Flight transport fixtures support native adapter tests; they do not
+replace built RSC/Worker and downstream acceptance.
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/context/runtime.ts` | bleedingdev | Declare optional native LinkPrefetchPolicy capability on internal runtime context; field/type only, with no fork implementation/import. Context singleton and projection semantics unchanged. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/context/public.ts` | bleedingdev | Preserve the public native context import path by re-exporting the canonical declarations and instances from runtime.ts without a fork registry dependency. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/context/index.ts` | bleedingdev | Expose native canonical router hooks, component/context projection and Link prefetch capability types directly. Remove fork state/provider/context-extension reexports so higher compositions import their owning modules. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/exports/head.ts` | bleedingdev | Resolve the native AsyncHelmet default through the generic head.Helmet component slot, render it through React, reject self-resolution, and preserve existing named/default exports. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/shared.ts` | bleedingdev | Implement generic native renderer lifecycle dispatch with exactly-once terminal notification, ordered stream transforms and awaited cancellation cleanup. Add ordered asset groups preserving original subtype/object identities, prepared template callbacks with native formatting capabilities, and optional raw router-data suppliers; fork asset/bootstrap selection lives in the registered renderer extension. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/helmet.ts` | bleedingdev | Read structural head data from native collector/stream lifecycle callbacks and preserve HTML/head serialization; remove direct access to fork request Helmet storage. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/string/index.ts` | bleedingdev | Pass original request, context, resource and configuration metadata to native string collectors and propagate the lifecycle into native template/loadable preparation. Preserve beforeReact, completedBody, structural head, terminal and fallback behavior while extensions supply asset/bootstrap policy. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/string/types.ts` | bleedingdev | Carry the unchanged native request through string-render options so collector metadata, abort and terminal handling share the original request. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/createReadableStream.ts` | bleedingdev | Run native Node SSR extenders with the original request, context, resource and configuration metadata. Preserve render/body transform ordering, exactly-once terminal outcomes and awaited cancellation cleanup, and run prepared template callbacks on the full template before separator splitting. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/createReadableStream.worker.ts` | bleedingdev | Run native Web SSR extenders with the original request, context, resource and configuration metadata. Preserve retained pipe promises, HTML-only component resolution, terminal/error/cancellation ownership, and full-template callbacks before stream separator splitting. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/beforeTemplate.ts` | bleedingdev | Keep native Node shell/head assembly, async entry assets, attribute formatting and existing-stylesheet detection. Consume structural head data and generic asset/template lifecycle callbacks; matched-route and federation CSS ordering is supplied by the fork renderer extension. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/beforeTemplate.worker.ts` | bleedingdev | Keep native Web shell/head assembly and formatting while consuming structural head data and generic asset/template lifecycle callbacks. Matched-route and federation CSS ordering is supplied by the fork renderer extension. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/context-identity.test.tsx` | bleedingdev | Verify native context singleton identity across independently bundled subpaths while keeping concurrent SSR request values isolated. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/exports/head.test.tsx` | bleedingdev | Verify native AsyncHelmet fallback, named/default public exports, generic component selection and self-resolution rejection after moving fork head-collection assertions. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/rendererHooks.test.tsx` | bleedingdev | Verify native string and Node renderer callback ordering, original context, fallback/terminal error ownership and awaited cancellation/transform destruction; tests exercise the generic native lifecycle rather than fork asset policy. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/workerLifecycle.test.tsx` | bleedingdev | Verify native Web renderer UTF-8 transform ordering, delivered EOF/error, awaited cancellation/source teardown, fallback cleanup and request abort terminal behavior. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToStream/buildTemplate.before.test.ts` | bleedingdev | Retain native structural-head, async-entry and exact existing-stylesheet behavior. Move route/federation CSS, Node/Web priority and snapshot policy expectations to the renderer extension suite. | `inline-patch` |
+| `packages/runtime/render/src/server/ssr/ssr.tsx` | bleedingdev | Apply the optional wrapHtmlRoot callback at both real React HTML render calls, honor a null result, and leave the element passed into Flight unchanged. | `inline-patch` |
+| `packages/runtime/render/rstest.config.mts` | bleedingdev | Keep native tests in their existing environment and isolate htmlRoot.test.tsx in a dedicated project. Scope explicit Flight aliases, including source-resolved RSC entries, to that test while retaining the real HTML renderer. | `inline-patch` |
+| `packages/runtime/render/tests/ssr/htmlRoot.test.tsx` | bleedingdev | Verify the native HTML-root callback covers both render paths, honors null and never wraps Flight input using explicit transport fixtures. | `inline-patch` |
+| `packages/toolkit/plugin/tests/runtimeRendererHooks.test.ts` | bleedingdev | Verify native runtime hook metadata, collector/stream compatibility, lifecycle types and render/body transform phases through the public plugin API. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/fixtures/rsc-client.ts` | bleedingdev | Provide an explicit Flight client transport double only for the dedicated native HTML/lifecycle test project; keep real HTML rendering and production resolution unchanged. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/fixtures/rsc-server.ts` | bleedingdev | Provide an explicit Flight server transport double only for the dedicated native HTML/lifecycle test project; emitted RSC/Worker artifact validation remains separate. | `inline-patch` |
+| `packages/runtime/render/tests/fixtures/rsc-client.ts` | bleedingdev | Provide an explicit Flight client transport double only for the dedicated native HTML/lifecycle test project; keep real HTML rendering and production resolution unchanged. | `inline-patch` |
+| `packages/runtime/render/tests/fixtures/rsc-server.ts` | bleedingdev | Provide an explicit Flight server transport double only for the dedicated native HTML/lifecycle test project; emitted RSC/Worker artifact validation remains separate. | `inline-patch` |
+
+### Native Worker renderer packaging (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/render/rslib.config.mts` | bleedingdev | Build the Worker RSC output from the same native renderer as Node, mapping react-server-dom-rspack/server.node and client.node externals to their edge equivalents only in that output. Preserve public RSC aliases and SSR externalization while deleting the duplicate Worker source. Rebuilt public Node/edge tests and workerd HTML/Flight, CSS, action and delayed-stream acceptance pass. | `inline-patch` |
 
 ## 1. Maintenance contract
 
@@ -72,8 +298,8 @@ is in exactly one bucket:
   one of three resolutions:
   1. a PR to upstream `web-infra-dev/modern.js`,
   2. use of an existing upstream extension point, or
-  3. a **capped patch of at most 20 added-plus-removed PR lines** per
-     audited-base-owned file, with a matching row in this ledger.
+  3. a **reviewed inline patch**, with a matching row in this ledger for
+     non-shrink changes. There is no fixed per-file PR line limit.
 
 Every `packages/**` row below is a Bucket-B divergence except TK-10, which the
 row itself flags as a fork-added directory carrying no budget; §4's root/infra
@@ -96,11 +322,10 @@ node scripts/ultramodern-boundary-check/check-fork-import-boundary.js \
   --merge-base "$PR_MERGE_BASE" --head "$COMMITTED_HEAD"
 ```
 
-That operation fails unless every raised audited-base-owned file has at most 20
-added-plus-removed lines in the PR and has its strict ledger row in the same
-committed range. CI independently resolves both refs, reads the committed
+That operation fails unless every raised audited-base-owned file has its
+strict ledger row in the same committed range. CI independently resolves both refs, reads the committed
 allowlists, semantically compares ledger rows, re-measures the full recorded
-scope, and re-derives the cap and ledger evidence; a hand-edited baseline cannot
+scope, and re-derives the measurement and ledger evidence; a hand-edited baseline cannot
 authorize growth by itself. Scope changes use
 `--rebase-divergence-allowlist` with the same refs and ledger evidence. The
 audited ownership and reviewed provenance SHAs are exact pins; provenance
@@ -154,39 +379,38 @@ fork audit passed. Owner: `bleedingdev`.
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/builder/package.json` | bleedingdev | Resolve disabled RSC browser runtimes from the fork-owned runtime package rather than the Builder Node output. | capped-patch |
 
 ### Deployed server plugin interop (2026-09-09)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/solutions/app-tools/src/plugins/deploy/utils/generator.ts` | bleedingdev | Resolve native ESM namespace wrappers around transpiled CommonJS default factories so Module Federation's Node server plugin starts. | capped-patch |
+| `packages/solutions/app-tools/src/plugins/deploy/utils/generator.ts` | bleedingdev | Resolve callable native ESM, CommonJS and nested transpiler-default plugin factories in deployed launchers, including Module Federation Node server plugins. | `inline-patch` |
 
 ### Worker API implementation graph (2026-09-09)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/plugin-bff/src/loader.ts` | bleedingdev | Delegate the worker API implementation graph to the fork-owned source bundler so imported server helpers do not pass through client API generation. | capped-patch |
+| `packages/cli/plugin-bff/src/loader.ts` | bleedingdev | Retain native lambda client generation and executable diagnostic modules for invalid resources, including platform-native paths. Remove Effect and Worker graph interception; the fork build extension installs its own source loader through the existing bundler configuration seam. Forward the neutral clientCodegenPlugin module specifier and explicit requestId to native code generation without selecting producer policy; preserve existing requestId defaults when absent. | `inline-patch` |
 
 ### Localized server loader identity (2026-09-09)
 
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/plugin-data-loader/src/runtime/index.ts` | bleedingdev | Delegate canonical loader-ID resolution to the fork-owned runtime helper only after the router has matched the requested localized URL; retain cross-route rejection and deferred-data identity. | capped-patch |
-| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Declare the runtime-extensions dependency that owns localized loader identity mapping without coupling CLI builds to the React/i18n runtime. | capped-patch |
+| `packages/cli/plugin-data-loader/src/runtime/index.ts` | bleedingdev | Delegate canonical loader-ID resolution to the fork-owned runtime helper only after the router has matched the requested localized URL; retain cross-route rejection and deferred-data identity. | inline-patch |
+| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Declare the runtime-extensions dependency that owns localized loader identity mapping without coupling CLI builds to the React/i18n runtime. | inline-patch |
 
 ### Native ESM server-plugin interop (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/utils/src/cli/require.ts` | bleedingdev | Normalize Node's CJS import namespace and tagged transpiler defaults so ESM-built utils load server-plugin factories; retain genuine ESM payloads, named-only namespaces, raw interop, and development reload behavior. | capped-patch |
+| `packages/toolkit/utils/src/cli/require.ts` | bleedingdev | Read JSON directly and normalize only Node-marked CJS namespaces and tagged transpiler defaults. Preserve genuine ESM payloads, named-only namespaces, raw interop and development reload behavior when loading server-plugin factories. | `inline-patch` |
 
 ### Standalone CLI type dependencies (2026-09-08)
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/types/cli/index.d.ts` | bleedingdev | Import React types explicitly so backend consumers with Node-only ambient types can resolve exported route declarations. | capped-patch |
-| `packages/toolkit/types/package.json` | bleedingdev | Publish the React and type-fest declaration dependencies referenced by the public CLI surface instead of relying on consumer ambient types or dev-only hoisting. | capped-patch |
+| `packages/toolkit/types/cli/index.d.ts` | bleedingdev | Import React types explicitly so backend consumers with Node-only ambient types can resolve exported route declarations. | inline-patch |
+| `packages/toolkit/types/package.json` | bleedingdev | Publish the React and type-fest dependencies required by the public CLI declarations, with matching exports/typesVersions and native cohort metadata; avoid reliance on ambient consumer types or dev-only hoisting. | `inline-patch` |
 
 ### Disposition vocabulary
 
@@ -194,7 +418,7 @@ fork audit passed. Owner: `bleedingdev`.
 | --- | --- |
 | `upstream-PR` | Bucket B resolution (1). Isolatable and PR-able to web-infra-dev/modern.js as-is. |
 | `extension-point` | Bucket B resolution (2). Logic should move out of the upstream file into a fork-owned module; budget shrinks when it does. |
-| `capped-patch` | Bucket B resolution (3). Stays inline, at most 20 added-plus-removed PR lines per audited-base-owned file, kept deliberately. |
+| `inline-patch` | Bucket B resolution (3). A reviewed inline change, kept deliberately with its ownership and reason recorded. |
 | `fixed-in-fork` | Upstream defect repaired in the fork. Keep the repair; add `upstream-PR` separately when the fix is queued upstream. |
 | `keep-deleted` | Upstream artifact intentionally deleted in the fork. Re-delete it on sync and port upstream changes to its replacement when applicable. |
 | `keep-[F]` | Permanent fork divergence. Only meaningful with the ultramodern lanes (Effect BFF, TanStack, Module Federation, telemetry, tsgo). Never resolved toward upstream. |
@@ -300,44 +524,37 @@ identified as a capped fork correction within the same four-line manifest delta.
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/adapter-rstest/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/cli/builder/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/cli/plugin-bff/package.json` | bleedingdev | Retain upstream Rslib 1.0.0 settings and align the app-tools workspace peer with the integrated Modern.js 3.9.0 baseline; four added-plus-removed PR lines | `upstream-PR` + `keep-[M]` + `capped-patch` |
-| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/cli/plugin-ssg/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/cli/plugin-styled-components/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/runtime/plugin-image/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/cli/adapter-rstest/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 and post-v3.8.2 Rstest dependency cohort, which remains measurable from the fixed audit point; these are native dependency and release metadata changes. | `upstream-PR` + `keep-[M]` |
+| `packages/cli/plugin-bff/package.json` | bleedingdev | Retain native root/CLI/server-plugin/client entries, restore the audited server endpoint to Hono and expose the parameterized native cross-project plugin with matching declarations/source conditions. Retire Effect/data-platform facade exports and typesVersions, and transfer their dependency/peer ownership to canonical fork packages. Preserve native BFF/build dependencies, the optional emitted app-tools declaration peer, current Rslib cohort and Node baseline. | `inline-patch` + `keep-[M]` + `upstream-PR` + `keep-[F]` |
+| `packages/cli/plugin-data-loader/package.json` | bleedingdev | Retain the integrated native 3.9.0/Rslib, React and dependency cohort, including path-to-regexp8 and current test/compiler tooling. Remove the runtime-extensions dependency after native request-scoped route-ID resolution replaces localized policy forwarding; public loader/runtime entrypoints remain native. | `keep-[M]` + `upstream-PR` + `inline-patch` |
+| `packages/cli/plugin-ssg/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 and synced SSG dependency cohort, including removal of the unused optional react-router-dom peer. Select emitted ESM declarations for native import consumers while preserving CommonJS declarations, runtime conditions and legacy type resolution; actual default and named import consumers pass in NodeNext and Bundler modes. | `upstream-PR` + `keep-[M]` |
+| `packages/cli/plugin-styled-components/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 cohort and post-v3.8.2 styled-components dependency and peer updates, measured from the fixed audit point. Select ESM declaration identity for native import consumers, preserving CommonJS declarations and runtime exports; actual default factory and styled.div consumers pass in NodeNext and Bundler modes. | `upstream-PR` + `keep-[M]` |
+| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Retain reviewed dependency/build alignment and optional react-i18next packaging. Expose existing native configuration utilities through matching config runtime/declaration subpaths so the higher integration composes native options directly; remove the reverse i18n-runtime-extensions dependency. Existing Link types and native locale detection entrypoints remain public. | `keep-[M]` + `upstream-PR` + `keep-[F]` + `fixed-in-fork` + `inline-patch` |
+| `packages/runtime/plugin-image/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 and image-plugin dependency cohort and native module metadata. Historical v3.8.3 remeasurement split the mechanical delta into five hunks while changed lines fell from 17 to 13. | `upstream-PR` + `keep-[M]` |
 | `packages/runtime/plugin-runtime/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/runtime/render/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/bff-core/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/bff-runtime/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/core/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/create-request/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/plugin-polyfill/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/prod-server/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/server-runtime/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/server/server/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/**/package.json` (2026-09-08 dependency cohort) | bleedingdev | Exact-version bumps of shared third-party dependencies to their newest matured releases (Rsbuild 2.2.3, SWC 1.16.2, Babel 8.0.4, cssnano 9, TanStack Router 1.170.33/1.171.28/1.162.2, i18next 26.4.2, Hono 4.13.7, Zod 4.5.4, OpenTelemetry 2.11, `@types/*`); every touched upstream-owned manifest stays within the 20-line cap and carries no fork behaviour | `keep-[M]` + `capped-patch` |
-| `packages/server/utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
+| `packages/runtime/render/package.json` | bleedingdev | Retain the native React/RSC cohort, optional react-server-dom-rspack peer, Rslib/typecheck scripts and emitted SSR/RSC/client declaration/runtime paths. Expose the shared native renderer through matching Worker runtime/type entrypoints and remove the now-unused runtime-extensions dependency; actual Worker bindings are selected by the native build rather than a duplicate renderer. | `keep-[M]` + `upstream-PR` + `inline-patch` |
+| `packages/server/bff-core/package.json` | bleedingdev | Retain reviewed native BFF dependency/build configuration and optional Zod contract. Remove the policy public subpath after moving its implementation to server runtime extensions; declare that higher package only as a development dependency for native operator interop tests. | `keep-[M]` + `upstream-PR` + `inline-patch` |
+| `packages/server/bff-runtime/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 toolchain cohort, native BFF dependencies and release metadata. | `upstream-PR` + `keep-[M]` |
+| `packages/server/core/package.json` | bleedingdev | Retain reviewed native server dependency/build alignment and remove the reverse runtime-extensions dependency after configuration/error policy moves to its owning fork package. | `keep-[M]` + `upstream-PR` + `inline-patch` |
+| `packages/server/create-request/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 toolchain cohort, native request dependencies and Node/browser conditional exports and release metadata. | `upstream-PR` + `keep-[M]` |
+| `packages/server/plugin-polyfill/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 toolchain cohort, native polyfill dependencies and release metadata. | `upstream-PR` + `keep-[M]` |
+| `packages/server/prod-server/package.json` | bleedingdev | Retain reviewed production-server dependency/build alignment and remove the reverse server-runtime-extensions runtime dependency; the higher solution composes fork plugins through the native plugin list. | `keep-[M]` + `upstream-PR` + `inline-patch` |
+| `packages/server/server-runtime/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 toolchain cohort, native server-runtime dependencies and release metadata. | `upstream-PR` + `keep-[M]` |
+| `packages/server/server/package.json` | bleedingdev | Retain reviewed native server tooling/dependency alignment and remove the reverse server-runtime-extensions dependency after higher solution composition owns fork plugins. | `keep-[M]` + `upstream-PR` + `inline-patch` |
+| `packages/**/package.json` (2026-09-08 dependency cohort) | bleedingdev | Exact-version bumps of shared third-party dependencies to their newest matured releases (Rsbuild 2.2.3, SWC 1.16.2, Babel 8.0.4, cssnano 9, TanStack Router 1.170.33/1.171.28/1.162.2, i18next 26.4.2, Hono 4.13.7, Zod 4.5.4, OpenTelemetry 2.11, `@types/*`); every touched upstream-owned manifest carries no fork behaviour | `keep-[M]` + `inline-patch` |
+| `packages/server/utils/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 toolchain cohort, native server compiler dependencies and optional TypeScript-Go peer metadata and release metadata. | `upstream-PR` + `keep-[M]` |
 | `packages/solutions/app-tools/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
 | `packages/toolkit/create/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/toolkit/i18n-utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/toolkit/plugin/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/toolkit/runtime-utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/toolkit/sandpack-react/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/toolkit/sandpack-react/src/templates/index.ts` | bleedingdev | Retain the reviewed upstream static ESM template import required by the new Rslib build | `upstream-PR` + `keep-[M]` |
-| `packages/toolkit/utils/package.json` | bleedingdev | Retain the reviewed upstream Rslib 1.0.0 toolchain settings in the fork package cohort | `upstream-PR` + `keep-[M]` |
-| `packages/toolkit/utils/rslib.config.mts` | bleedingdev | Retain the reviewed upstream Rslib 1.0 externals callback and optional library configuration compatibility | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/i18n-utils/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 toolchain cohort, native localization dependencies and release metadata. | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/plugin/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 and post-audit native toolkit-plugin dependency cohort and release metadata. | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/runtime-utils/package.json` | bleedingdev | Retain reviewed native runtime utility exports/dependencies and expose the existing URL entry through Node import/require conditions alongside its default ESM and declaration targets. | `keep-[M]` + `upstream-PR` + `inline-patch` |
+| `packages/toolkit/sandpack-react/package.json` | bleedingdev | Retain the reviewed Rslib 1.0.0 and synced post-v3.8.2 Sandpack cohort, native Node generator command and corrected repository directory. | `upstream-PR` + `keep-[M]` |
+| `packages/toolkit/sandpack-react/src/templates/index.ts` | bleedingdev | Retain the reviewed static ESM template import required by Rslib. Its exact upstream blob is adb2003cc9b8f5c77146067f9f2c977d6db21613 at b6f784095994; this does not advance either audit pin. | `upstream-PR` + `keep-[M]` |
 
 ### 2026-09-02 app-tools deployment-template packaging repair
 
 | Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/solutions/app-tools/rslib.config.mts` | bleedingdev | Copy the deployment entry templates into every compiled output so `createNodePreset` and the other runtime deployment readers receive the required CJS and ESM files; retain upstream #8819's duplicate-loader fix | `capped-patch` + `fixed-in-fork` + `upstream-PR` |
-| `packages/solutions/app-tools/tests/config/verify-public-surface.mjs` | bleedingdev | Verify both compiled formats contain the complete deployment-template set so an incomplete app-tools tarball fails during its producer build rather than clean-room application acceptance | `capped-patch` + `fixed-in-fork` + `upstream-PR` |
-| `packages/solutions/app-tools/tests/deploy/cloudflare.test.ts` | bleedingdev | Regress the fork-owned Cloudflare streaming stylesheet injector against route CSS already rendered before the distributed-SSR sentinel, preventing duplicate links in workerd output without changing app-tools runtime ownership | `capped-patch` + `fixed-in-fork` |
-| `packages/runtime/plugin-runtime/src/core/context/extensions.ts` | bleedingdev | Make the internal symbol slot enumerable so SSR object spreads preserve extension state while string-key enumeration and JSON remain unchanged | `capped-patch` + `fixed-in-fork` + `upstream-PR` |
 
 ### Historical 2026-08-30 v3.8.3 transition: complete raised set
 
@@ -345,13 +562,8 @@ identified as a capped fork correction within the same four-line manifest delta.
 | --- | --- | --- | --- |
 | `packages/cli/builder/tests/__snapshots__/default.test.ts.snap` | bleedingdev | Re-anchoring after the retained upstream Rsbuild work changes the comparison side of the fork's generated builder snapshot; the snapshot remains generated evidence, not newly authored runtime behavior | `keep-[M]` |
 | `packages/cli/builder/tests/__snapshots__/environment.test.ts.snap` | bleedingdev | Same reviewed builder-snapshot base transition as `default.test.ts.snap`; the larger cumulative deletion reflects the newer upstream fixture, not a fork subsystem added inline | `keep-[M]` |
-| `packages/cli/plugin-data-loader/package.json` | bleedingdev | The v3.8.3 package identity and retained UltraModern toolchain cohort split the mechanical manifest delta into one additional hunk while reducing changed lines | `keep-[M]` |
-| `packages/cli/plugin-ssg/package.json` | bleedingdev | The v3.8.3 package identity changes hunk shape while the retained manifest divergence falls in total lines | `keep-[M]` |
-| `packages/document/package.json` | bleedingdev | The v3.8.3 release baseline changes mechanical manifest hunk shape while cumulative changed lines shrink | `keep-[M]` |
-| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Upstream 3.8.3 is adopted, including the `@modern-js/runtime` peer baseline; the fork retains its reviewed React 19 peer cohort (RT-22), producing two extra hunks but fewer changed lines | `keep-[F]` (dependency cohort) |
-| `packages/runtime/plugin-image/package.json` | bleedingdev | The v3.8.3 release baseline changes only mechanical manifest hunk shape and reduces the cumulative line delta | `keep-[M]` |
-| `packages/runtime/render/package.json` | bleedingdev | The v3.8.3 package baseline and retained fork RSC/toolchain metadata split the manifest delta while reducing cumulative lines | `keep-[M]` |
-| `packages/server/core/src/plugins/render/render.ts` | bleedingdev | #8836's monitor-native CSR fallback reporting is adopted and the obsolete plugin hook is removed; the fork retains only its existing `serverContext` propagation into `SSRRenderOptions` | `capped-patch` (existing render seam; 2 retained fork lines relative to upstream) |
+| `packages/document/package.json` | bleedingdev | Retain the fork documentation application's UltraModern description, homepage, repository/issue links and keyword, alongside the integrated Rspress/React/toolchain cohort. Declare ultramodern-sandpack-profile because the EN/ZH authorization examples pass its exported files to the existing Sandpack files prop; executable profile logic lives entirely in its fork-owned package. | `keep-[M]` + `inline-patch` |
+| `packages/server/core/src/plugins/render/render.ts` | bleedingdev | #8836's monitor-native CSR fallback reporting is adopted and the obsolete plugin hook is removed; the fork retains only its existing `serverContext` propagation into `SSRRenderOptions` | `inline-patch` (existing render seam; 2 retained fork lines relative to upstream) |
 
 No other raised/new path belongs to this transition.
 
@@ -359,30 +571,14 @@ No other raised/new path belongs to this transition.
 
 | Audited-base-owned path | Owner | Backward-base transition reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/adapter-rstest/package.json` | bleedingdev | The fully retained post-v3.8.2 upstream Rstest cohort changes are visible when the manifest is measured from the older fixed audit point; this is mechanical dependency metadata, not new PR-authored behavior | `keep-[M]` |
-| `packages/cli/builder/package.json` | bleedingdev | Retain the post-v3.8.2 upstream builder toolchain manifest and upgrade the fork's opt-in Rsdoctor diagnostics from 1.5.17 to 1.6.3 while the workspace override resolves its Socket.IO 4.8.1 chain to patched `socket.io-parser` 4.2.7 | `capped-patch` + `keep-[M]` |
 | `packages/cli/builder/tests/__snapshots__/postcssLegacy.test.ts.snap` | bleedingdev | The synced upstream snapshot regeneration occurred after the fixed audit point, so measuring backward exposes its generated snapshot delta | `keep-[M]` |
-| `packages/cli/plugin-bff/package.json` | bleedingdev | The fully retained post-v3.8.2 upstream BFF manifest edits are newly measurable from the older base; this row records mechanical cohort identity rather than fork-side feature growth | `keep-[M]` |
-| `packages/cli/plugin-data-loader/package.json` | bleedingdev | The synced upstream data-loader manifest cohort is newer than the fixed audit point and therefore raises the cumulative older-base measurement | `keep-[M]` |
-| `packages/cli/plugin-ssg/package.json` | bleedingdev | The synced upstream SSG dependency metadata remains in `HEAD`; returning to the older base makes those mechanical lines measurable again | `keep-[M]` |
-| `packages/cli/plugin-styled-components/package.json` | bleedingdev | The post-v3.8.2 upstream styled-components plugin bump remains fully incorporated and is visible relative to the fixed audit point | `keep-[M]` |
-| `packages/document/package.json` | bleedingdev | The synced documentation dependency/toolchain manifest is newer than the fixed audit point; the resulting delta is mechanical metadata | `keep-[M]` |
-| `packages/runtime/plugin-i18n/package.json` | bleedingdev | The fully retained upstream runtime dependency cohort after v3.8.2 is visible in the older-base cumulative diff | `keep-[M]` |
-| `packages/runtime/plugin-image/package.json` | bleedingdev | The fully retained upstream image-plugin dependency cohort after v3.8.2 is visible in the older-base cumulative diff | `keep-[M]` |
 | `packages/runtime/plugin-runtime/package.json` | bleedingdev | The synced plugin-runtime manifest updates postdate the fixed audit point, so their mechanical dependency delta is newly measured | `keep-[M]` |
-| `packages/runtime/render/package.json` | bleedingdev | The synced React/RSC render cohort remains in `HEAD` and becomes measurable relative to the older v3.8.2 mainline point | `keep-[M]` |
-| `packages/server/core/package.json` | bleedingdev | The fully retained upstream server-core manifest updates postdate the fixed audit point and surface as mechanical cumulative divergence | `keep-[M]` |
-| `packages/server/server/package.json` | bleedingdev | The fully retained upstream server manifest updates postdate the fixed audit point and surface as mechanical cumulative divergence | `keep-[M]` |
 | `packages/solutions/app-tools/package.json` | bleedingdev | The synced app-tools dependency/build cohort remains complete in `HEAD`; measuring from v3.8.2 exposes its mechanical manifest delta | `keep-[M]` |
 | `packages/solutions/app-tools/tests/fixtures/subcommand/package.json` | bleedingdev | The synced fixture manifest update postdates the fixed audit point, so its test-fixture dependency delta is mechanically measurable | `keep-[M]` |
-| `packages/toolkit/plugin/package.json` | bleedingdev | The fully retained upstream toolkit plugin manifest cohort postdates the fixed base and is exposed by the backward measurement | `keep-[M]` |
-| `packages/toolkit/runtime-utils/package.json` | bleedingdev | The fully retained upstream runtime-utils manifest cohort postdates the fixed base and is exposed by the backward measurement | `keep-[M]` |
-| `packages/toolkit/sandpack-react/package.json` | bleedingdev | The synced Sandpack manifest updates remain in `HEAD`; their post-v3.8.2 dependency delta is mechanical | `keep-[M]` |
-| `packages/toolkit/utils/package.json` | bleedingdev | The fully retained upstream toolkit-utils manifest cohort postdates the fixed base and is exposed by the backward measurement | `keep-[M]` |
 
 The table is the same-PR ownership evidence for the complete base-transition
 increase. It does not claim that later upstream lines are fork-authored, and it
-must not be used to waive the 20-line cap for any unrelated change in those
+does not supply ownership evidence for unrelated later changes in those
 files.
 
 The seven entries that grew across the historical forward 2026-08-24 base
@@ -393,11 +589,6 @@ defect:
 | Audited-base-owned path(s) | Owner | Base-transition reason | Disposition |
 | --- | --- | --- | --- |
 | `packages/cli/builder/tests/__snapshots__/{default,environment}.test.ts.snap` | bleedingdev | Upstream regenerated and enlarged snapshots the fork intentionally deleted after replacing them with focused assertions; the new base therefore measures larger deletions | `keep-deleted` |
-| `packages/cli/plugin-ssg/package.json` | bleedingdev | Upstream dependency edits split the retained mechanical manifest divergence into 5 hunks while changed lines fell 24 → 20 | `keep-[M]` |
-| `packages/document/package.json` | bleedingdev | Upstream dependency edits split the retained mechanical manifest divergence into 10 hunks while changed lines fell 40 → 34 | `keep-[M]` |
-| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Upstream React/dependency edits split the retained fork cohort manifest into 11 hunks while changed lines fell 42 → 38 | `keep-[M]` |
-| `packages/runtime/plugin-image/package.json` | bleedingdev | Upstream dependency edits split the retained mechanical manifest divergence into 5 hunks while changed lines fell 17 → 13 | `keep-[M]` |
-| `packages/runtime/render/package.json` | bleedingdev | Upstream React/RSC dependency edits split the retained fork cohort manifest into 10 hunks while changed lines fell 46 → 38 | `keep-[M]` |
 
 ### Current dependency-cohort non-shrinks
 
@@ -409,14 +600,13 @@ same-PR ownership and disposition evidence.
 | Audited-base-owned path(s) | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
 | `packages/cli/{adapter-rstest,builder,plugin-bff,plugin-data-loader}/package.json`, `packages/runtime/plugin-runtime/package.json`, `packages/solutions/app-tools/package.json`, `packages/toolkit/plugin/package.json` | bleedingdev | Promote the full framework build/test surface atomically from the Rsbuild 2.2 release candidate to stable 2.2.0; mixed RC/stable installs would invalidate the Rspack, Module Federation, Tailwind, React Compiler, and chunk-splitting acceptance evidence | `keep-[M]` |
-| `packages/cli/plugin-bff/package.json` | bleedingdev | Keep the optional Effect peers, mirrored development identities, and Module Federation runtime on the coherent fork cohort; a partial update can install incompatible Effect identities | `keep-[F]` |
 | `packages/toolkit/create/package.json` | bleedingdev | Keep the generator's formatter and Ultracite runtime dependencies aligned with the generated Oxc toolchain policy | `keep-[M]` |
 | `packages/toolkit/create/README.md` | bleedingdev | Keep package documentation truthful to the fork's generated Effect, TanStack, Module Federation, and pnpm cohort | `keep-[F]` |
 | `packages/document/docs/en/components/prerequisites.mdx` | bleedingdev | Keep the documented pnpm bootstrap command aligned with the fork's generated and CI toolchain | `keep-[M]` |
 | `packages/document/docs/zh/components/prerequisites.mdx` | bleedingdev | Keep the translated pnpm bootstrap command aligned with the fork's generated and CI toolchain | `keep-[M]` |
-| `packages/toolkit/types/packages/hoist-non-react-statics.d.ts` | bleedingdev | Remove a redundant `declare` modifier from an already ambient module so the published declaration compiles under TypeScript without a diagnostic suppression | `capped-patch` + `fixed-in-fork` |
-| `packages/toolkit/utils/src/compiled.ts` | bleedingdev | Preserve the public `yaml.load` and `yaml.dump` namespace in native CommonJS and ESM after js-yaml 5 removed its generated default export | `capped-patch` + `fixed-in-fork` |
-| `packages/cli/plugin-styled-components/src/runtime.ts` | bleedingdev | Import the strongly typed runtime-plugin authoring contract so tsgo preserves the collector callback context instead of inferring an implicit `any` | `capped-patch` + `fixed-in-fork` |
+| `packages/toolkit/types/packages/hoist-non-react-statics.d.ts` | bleedingdev | Remove a redundant `declare` modifier from an already ambient module so the published declaration compiles under TypeScript without a diagnostic suppression | `inline-patch` + `fixed-in-fork` |
+| `packages/toolkit/utils/src/compiled.ts` | bleedingdev | Preserve the public `yaml.load` and `yaml.dump` namespace in native CommonJS and ESM after js-yaml 5 removed its generated default export | `inline-patch` + `fixed-in-fork` |
+| `packages/cli/plugin-styled-components/src/runtime.ts` | bleedingdev | Use the strongly typed native RuntimePlugin contract so TS-Go preserves the SSR collector callback context and chunkSet without implicit any. | `inline-patch` + `fixed-in-fork` |
 
 ### 2026-09-01 runtime cone non-shrinks
 
@@ -427,12 +617,11 @@ and disposition evidence.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/router/runtime/PrefetchLink.tsx` | bleedingdev | Read the Webpack-supplied `__webpack_public_path__` magic global inside `try`/`catch` so a non-Webpack realm returns an empty public path instead of throwing a `ReferenceError` on an undeclared identifier; RT-09 prefetch behavior is unchanged and RT-07/RT-08 remain scheduled | `capped-patch` + `fix` |
-| `packages/runtime/plugin-runtime/tests/router/prefetch.test.tsx` | bleedingdev | Extend the audited-base-owned router prefetch regression to cover the non-Webpack realm so the `PrefetchLink.tsx` public-path guard cannot regress silently | `capped-patch` + `fix` |
-| `packages/server/utils/src/compilers/typescript/index.ts` | bleedingdev | Resolve the generated stable `@typescript/native` alias and its `bin.tsc` entry before retaining the legacy native-preview fallback, so BFF/server compilation uses the compiler identity emitted by the UltraModern generator | `capped-patch` + `fixed-in-fork` |
-| `packages/server/utils/tests/tsgo.test.ts` | bleedingdev | Pin stable `@typescript/native` binary resolution while preserving the existing native-preview compatibility regressions | `capped-patch` + `fixed-in-fork` |
-| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Expose consumer-only i18n runtime declarations, including the generated no-react-i18next alias shape, so federated declaration generation does not enter plugin-authoring and build-tool declarations | `capped-patch` + `fixed-in-fork` |
-| `packages/runtime/plugin-i18n/tests/linkTypes.test.ts` | bleedingdev | Compile the emitted consumer declaration graph under tsgo and reject any path back into builder, app-tools, runtime-plugin internals, or toolkit utility declarations | `capped-patch` + `fixed-in-fork` |
+| `packages/runtime/plugin-runtime/src/router/runtime/PrefetchLink.tsx` | bleedingdev | Keep native RouterLink/NavLink rendering, path/match/revalidation/data-hint/chunk-load primitives. Remove fork queue/cache/network/default/preload/viewport implementation and reverse import; expose optional per-runtime LinkPrefetchPolicy capability. Exact native prefetch type union preserved; no-policy native default and native navigation/ref behavior tested. | `fix` + `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/prefetch.test.tsx` | bleedingdev | Retain audited native test identity. Explicitly install fork policy for policy/Link interop tests; add no-policy default, exact native anchor ref, consumer-prevented intent, modified click and actual client navigation checks. | `fix` + `inline-patch` |
+| `packages/server/utils/src/compilers/typescript/index.ts` | bleedingdev | Retain native TypeScript-Go emission, source-root filtering, alias rewriting and stable @typescript/native binary resolution with native-preview fallback. Replace the hard-coded TanStack generated-file filter with caller-supplied exact absolute root exclusions, preserving diagnostics for imported dependencies. | `fixed-in-fork` + `inline-patch` |
+| `packages/server/utils/tests/tsgo.test.ts` | bleedingdev | Retain stable @typescript/native binary resolution and native-preview compatibility checks. Verify exact caller-selected root exclusions with nested tsconfigs, while unrelated generated-looking files remain in the native compiler input set. | `fixed-in-fork` + `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/linkTypes.test.ts` | bleedingdev | Compile required built consumer declarations under tsgo and reject paths into builder, app-tools, runtime-plugin internals or toolkit utilities. Inspect those artifacts without rebuilding shared output during test collection, preserving strict assertions while preventing concurrent CLI imports from observing partial dist writes. | `inline-patch` + `fixed-in-fork` |
 
 ### 2026-09-01 skill-suite anchor repair
 
@@ -442,7 +631,7 @@ disposition evidence and no writer operation is run for it.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `tests/skill/run.mjs` | bleedingdev | Re-anchor the suite's esbuild `createRequire` at the fork-owned `ultramodern-create` package after the create extraction removed the vanilla `create` esbuild dependency, so the migrate-to-v3 regression suite can execute at all | `capped-patch` + `fix` |
+| `tests/skill/run.mjs` | bleedingdev | Re-anchor the suite's esbuild `createRequire` at the fork-owned `ultramodern-create` package after the create extraction removed the vanilla `create` esbuild dependency, so the migrate-to-v3 regression suite can execute at all | `inline-patch` + `fix` |
 
 The group breakdown below is the last hand-classified snapshot, taken at
 `dfcd414a`. It is advisory attribution only — the gate reads per-file budgets,
@@ -470,8 +659,8 @@ uses only its validated, canonical full scope; callers cannot narrow it with a
 pathspec, nested root, alternate file, or inherited Git context. Every entry,
 budget, total, base OID, and base-tree path is validated before measurement. A
 raised metric or new entry is accepted only when it exactly matches the
-committed-head measurement, its audited-base-owned PR delta is at most 20
-added-plus-removed lines, and `FORK-DIVERGENCE.md` changes in the same PR. Base
+committed-head measurement and `FORK-DIVERGENCE.md` supplies strict ownership
+evidence in the same PR. Base
 or scope transitions require the explicit reviewed re-record operation plus the
 same ledger evidence. Section 4 remains outside the divergence pathspec because
 it covers root and infrastructure files outside `packages/`.
@@ -489,7 +678,7 @@ it covers root and infrastructure files outside `packages/`.
 | ROOT-05 | `patchedDependencies` for MF 2.9.0 (`manifest`, `rspack`, `bridge-react`, `modern-js-v3`, `runtime-core`), msgpackr and zod CSP hardening | bleedingdev | MF lazy-DTS/SSR/topology and CSP/Worker-safe runtime lanes; the TanStack router-core declaration patch retired at 1.171.28 | keep-[F] | — |
 | ROOT-07 | `pnpm-workspace.yaml` negative globs `!tests/integration/**/{dist,node_modules}/**` | bleedingdev | Gitignored build output emits `package.json` files that match the positive globs and add phantom importers to the lockfile | keep-[F] | — |
 | ROOT-08 | 10 fork-owned workflows added | bleedingdev | Fork gates (boundary, contract, publish, certification, nightly, readiness, security), docs publishing (`docs-pages`), bun smoke (`bun-superapp-smoke`), and Tractor downstream acceptance (`ultramodern-tractor-downstream`) | keep-[F] | — |
-| ROOT-09 | Modified upstream workflows (dependency check, diff, integration, lint, type-check, unit, builder e2e, issue labels) | bleedingdev | Fork toolchain + gate wiring | capped-patch — reconcile upstream infra fixes by hand | — |
+| ROOT-09 | Modified upstream workflows (dependency check, diff, integration, lint, type-check, unit, builder e2e, issue labels) | bleedingdev | Fork toolchain + gate wiring | inline-patch — reconcile upstream infra fixes by hand | — |
 | ROOT-10 | Release tags namespaced `ultramodern-v<version>`, never `v<version>` | bleedingdev | 277 inherited upstream `v*` tags; `gh release create` reuses a pre-existing tag and silently ignores `--target` | keep-[F] — see note N3 | — |
 | ROOT-11 | `publish-change-record` is the only `contents: write` job, asserted as a closed set | bleedingdev | Publish-workflow privilege containment | keep-[F] | — |
 | ROOT-12 | Fork-owned script families (`boundary-guards`, `ultramodern-boundary-check`, `lib`, `release-gates`, `security`, `superapp-certification`, `ultramodern-production-readiness`, `ultramodern-publish`, `prepare-root.mjs`, tsgo helpers) | bleedingdev | Fork CI surface | keep-[F] | — |
@@ -516,24 +705,24 @@ it covers root and infrastructure files outside `packages/`.
 | CLI-03 | `builder` `performance.rsdoctor` opt-in surface (`RsdoctorUserConfig`) in `createBuilder.ts`, `parseCommonConfig.ts`, `types.ts` | bleedingdev | RsDoctor config surface; defaults OFF after the ADR-0001 revert (`a210ac658d`), pinned by `tests/rsdoctor.test.ts` | extension-point (plugin split already in fork-owned `plugins/rsdoctor.ts`, `rsdoctorConfig.ts`) | P3 |
 | CLI-04 | `builder/src/shared/parseCommonConfig.ts:305` sets `reactCompiler: reactCompiler ?? true` | bleedingdev | Upstream ships React Compiler **opt-in**; the fork enables it by default for every vanilla build. Fork's own rstest adapter then hardcodes an opt-out (CLI-02), i.e. the default is not trusted internally | **revert to opt-in, or move to `presetUltramodern` only** | **P1** |
 | CLI-05 | `builder/src/plugins/postcss.ts` resolves postcss/tailwind from the app root via `createRequire` | bleedingdev | Fixes monorepo/workspace resolution; upstreamable in isolation | upstream-PR | P2 |
-| CLI-06 | `builder` RSC layer matching extended to fork render dist entries + `shared/rsc/rscDisabledRuntime.ts`, `plugins/rscConfig.ts`, `shared/devServer.ts` | bleedingdev | Disabled RSC must fail closed even when the optional runtime is resolvable; upstream `rscClientBrowserFallback.ts` deleted in favor of entrypoint-specific throwing modules | keep-[F] | — |
+| CLI-06 | Higher solution composes the complete disabled-RSC plugin; native builder restores its audited fallback | bleedingdev | Preserve five public entrypoint contracts, alias conflicts and late compiler enforcement through existing builderPlugins/addPlugins; actual compiler tests prove the higher composition | extension-point (extracted) | — |
 | CLI-07 | `builder/src/index.ts` export reshuffle | bleedingdev | Import hygiene | keep-[M] | — |
 | CLI-08 | `builder` tests (8 files incl. snapshots) | bleedingdev | Track CLI-03…CLI-06 | keep-[F] | — |
 | CLI-09 | `builder` `dev.lazyCompilation` disabled unless set (`parseCommonConfig.ts:220`), paired with APP-07 route-eager `lazyCompilation.test` | bleedingdev | Deliberate dev-perf lane, broadened beyond stream-SSR | keep-[F], documented — see APP-07 | — |
-| CLI-10 | `plugin-bff` `./server` export repointed **Hono → Effect** (`dist/.../runtime/effect/index`) | bleedingdev | Product decision: Effect BFF is a blessed path in this fork | keep-[F] (product) | — |
-| CLI-11 | `packages/cli/plugin-bff/src/server.ts:47-50` — `resolveRuntimeFramework` defaults `bff.runtimeFramework` to `'effect'` (`=== 'hono' ? 'hono' : 'effect'`), pinned by `packages/cli/plugin-bff/tests/server.test.ts:131` (`should treat unresolved runtime framework as effect`) | bleedingdev | Effect HttpApi + Effect BFF is the single blessed authored HTTP path; Hono remains internal compatibility and is feature-frozen; upstream has only Hono | keep-[F] | — |
-| CLI-12 | `src/server.ts` loads the fork-owned `EffectAdapter` via **dynamic** `await import('@modern-js/plugin-bff-extensions/effect-adapter')` inside `onPrepare` | bleedingdev | A static import pulls `effect/*` into the eager module graph and crashes hono-only consumers with `ERR_MODULE_NOT_FOUND`; the adapter implementation now lives entirely outside the upstream package | extension-point (extracted) + capped-patch (dynamic import seam) — see note N4 | — |
-| CLI-13 | `src/utils/{runtimeGenerator,pluginGenerator,crossProjectApiPlugin}.ts` retains audited generator compatibility seams while Effect client/source/runtime generation lives in `@modern-js/plugin-bff-extensions` (ADR-0005) | bleedingdev | Stable `plugin-bff` output paths and the compiled cross-project template remain compatible; the additive Effect generator subsystem no longer lives in upstream-owned package code | extension-point (extracted) + upstream-PR (generic fail-fast/merge behavior) | P3 |
-| CLI-14 | `plugin-bff/package.json` entirely fork-added optional `effect` / `@effect/opentelemetry` peer + mirrored devDep block | bleedingdev | Effect must resolve to one identity in the consumer graph; a `dependencies` entry lets pnpm install a second copy and the runtime barrels hand back services from the wrong instance | keep-[F] — see note N5 | — |
+| CLI-10 | Native plugin-bff `./server` restored to Hono; Effect public entries belong to `@modern-js/bff-effect` | bleedingdev | Preserve the native API identity while authored Effect APIs use the canonical fork runtime | extension-point (higher composition) | — |
+| CLI-11 | Native `src/server.ts` defaults to Hono; the higher BFF build plugin selects Effect for the fork | bleedingdev | Native consumers retain their default and fork consumers register their chosen runtime through the finite configuration registry | extension-point | — |
+| CLI-12 | Native server plugin accepts finite runtime adapter module descriptors and an optional Hono route-binder descriptor | bleedingdev | Resolve only selected application modules lazily and validate factory results; higher composition owns concrete Effect and Hono-policy targets | extension-point + inline-patch — see note N4 | — |
+| CLI-13 | Native runtime/plugin/cross-project generators retain native generation, serialization and lifecycle with typed hooks or configured module descriptors | bleedingdev | Effect clients, producer source/runtime policy and concrete cross-project transport live in fork owners; native generated entry and CLI tests cover the seam | extension-point + inline-patch | P3 |
+| CLI-14 | Effect peer/development dependency cohort belongs to canonical fork BFF packages | bleedingdev | Dependency ownership follows the retired native Effect facades and avoids installing a second Effect identity | keep-[F] — see note N5 | — |
 | CLI-15 | `src/runtime/safe-failure.ts:71` builds the error envelope from `SAFE_FAILURE_MESSAGES[status] ?? 'Request failed'`, discarding `err.message` | bleedingdev | Not a deliberate divergence — real error detail is dropped on every BFF failure, including in development | **fix** (preserve `err.message` at least in dev / behind a flag) | **P2** |
 | CLI-16 | `plugin-data-loader` (4 files): import reordering, storage import path swap, strictness | bleedingdev | Toolchain | keep-[M] | — |
 | CLI-17 | `plugin-ssg` (7 files): import reordering, destructuring/strictness in prerender/server paths | bleedingdev | Toolchain | keep-[M] | — |
 | CLI-18 | `plugin-styled-components` derives the styled interface from `typeof styledComponents.default` | bleedingdev | styled-components v6 no longer exports `StyledInterface`; coupled to the dependency migration | keep-[F] (coupled dep) | — |
-| CLI-19 | `plugin-bff/src/cli.ts` reduced to a 38-line plugin entry that delegates to fork-owned `src/cli/{generator,compress,prefix,watch}.ts`. Budget 216 → **218** lines at the 3.8.2 base | bleedingdev | Base-transition growth, not new fork code: upstream #8797 added `moduleType` and `apiFiles: apiRouter.getApiFiles()` to its inline `generator()` (4 lines). The fork already threads both from `src/cli/generator.ts:87,134` and `:253`, so the behavior is adopted — the upstream file simply grew underneath the extraction | extension-point (already extracted) | — |
-| CLI-20 | `plugin-bff/src/utils/clientGenerator.ts` is a re-export shim over fork-owned `src/utils/client-generator/`. Budget 291 → **338** lines at the 3.8.2 base | bleedingdev | Base-transition growth: upstream #8797 rewrote this file (+153 changed lines) to stop copying handler declarations into `dist/client`. The fork ports that behavior into `client-generator/{generate,type-facade,files,write-package}.ts`; a shim over a bigger upstream file measures as a bigger deletion | extension-point (already extracted) — see note N9 | — |
-| CLI-21 | `plugin-bff/src/loader.ts` delegates Effect client generation and worker-runtime rendering to `@modern-js/plugin-bff-extensions`, threads the configured `requestId`, and transpiles the worker runtime to ES2024 | bleedingdev | The upstream Rspack loader exposes no hook for the fork's Effect generators or request identity; this 14-line compatibility seam removes duplicate subsystem ownership while preserving the loader contract and stable public output paths | extension-point (extracted) + capped-patch (loader seam) | — |
-| CLI-22 | `plugin-bff/package.json` published-boundary wiring: edge-safe ESM conditions for Effect client/data-platform, no source export, direct dependencies on the extracted BFF owners, an optional `@modern-js/app-tools` declaration peer, and Node >=26.7 | bleedingdev | Package metadata has no extension hook: these declarations keep edge resolution out of CJS/source, make extracted runtime and generated declaration imports resolvable, and preserve the fork's modern Node baseline | extension-point (extracted owners) + capped-patch (17-line manifest seam) | — |
-| CLI-23 | `plugin-bff/package.json` root declaration mapping and dependency-ownership cleanup after the Effect/federation extraction | bleedingdev | The published root resolves to `cli.d.ts`; builder and esbuild are build-only; telemetry, federation, runtime-extension, and SWC-helper runtime dependencies no longer belong to this package after their consumers moved to fork-owned packages | extension-point (dependencies follow extracted owners) + capped-patch (19-line manifest cleanup) | — |
+| CLI-19 | Native plugin-bff CLI delegates its extracted generator/compress/prefix/watch operations through typed native lifecycle hooks | bleedingdev | These are audited native algorithm extractions; fork generator, bundler and policy callbacks are registered by the higher build plugin | inline-patch + extension-point | — |
+| CLI-20 | Native clientGenerator entry exports the native client-generator implementation helpers | bleedingdev | Preserve native declaration discovery, ESM facade output, file copying and package-boundary writing, with a typed callback for extension client generation | inline-patch + extension-point — see notes N9 and N10 | — |
+| CLI-21 | Native loader selects an optional configured client-codegen module through a structural callback contract and preserves explicit request identity | bleedingdev | Higher composition owns concrete codegen selection; native error transformation, request fields and generated module validation remain native | extension-point + inline-patch | — |
+| CLI-22 | Native plugin-bff publishes root/CLI/server-plugin/client/cross-project and restored Hono server entries; Effect/data-platform aliases are retired | bleedingdev | Matching runtime and declaration conditions describe actual native artifacts; the optional app-tools declaration peer and Node baseline remain explicit | inline-patch | — |
+| CLI-23 | Native plugin-bff declaration mapping and dependency ownership follow the restored public surface | bleedingdev | Builder and esbuild remain build-only; Effect, telemetry, federation and runtime-extension dependencies belong to canonical fork owners | inline-patch | — |
 
 ---
 
@@ -563,7 +752,7 @@ it covers root and infrastructure files outside `packages/`.
 | RT-20 | `render` (6 files) RSC adapter surface: `createFromFetch` export, `rscManifest` plumb-through, `react-server-dom-rspack.d.ts` | bleedingdev | Fork RSC lane; RSC stays disabled in the distribution | keep-[F] | — |
 | RT-21 | React Router / Remix compatibility surface (`plugin-runtime` router paths and related upstream-owned files) | bleedingdev | Maintenance-only: the compatibility surface is retained and takes regression fixes only, no new features or public surface. New routing work belongs to TanStack Router; RT-06/RT-16/RT-18 keep their own dispositions | keep-[F] (maintenance-only) | — |
 | RT-22 | `plugin-i18n/package.json` React and ReactDOM peer ranges match the required `@modern-js/runtime` React 19 cohort | bleedingdev | The plugin requires `@modern-js/runtime`, whose peers are `^19.2.8`; advertising React 18 was unsatisfiable in a supported install. i18next and react-i18next retain upstream floors because older versions are not exercised here | keep-[F] (dependency cohort) | — |
-| RT-23 | `plugin-runtime/src/cli/ssr/index.ts` disables Rsbuild 2.2 `splitChunks` only for Module Federation SSR server environments and emits `MODERN_MF_APP_SSR` with env-compatible string semantics | bleedingdev | Rsbuild 2.2's server default makes the CommonJS MF render entry resolve asynchronously without `requestHandler`; browser environments retain native chunk splitting. Serializing the config-derived marker as a string, paired with APP-09's ambient auto-injection exclusion, prevents conflicting DefinePlugin values while preserving the public `process.env` string contract | capped-patch | — |
+| RT-23 | Higher ultramodern-app-tools SSR integration sets Module Federation markers, flag policy, server single-chunk output and Cloudflare ESM behavior | bleedingdev | Existing builderPlugins and modifyEnvironmentConfig hooks apply policy after native SSR defaults; actual Rsbuild tests prove the required ordering | extension-point (extracted) | — |
 
 ---
 
@@ -587,12 +776,12 @@ it covers root and infrastructure files outside `packages/`.
 | SRV-14 | `plugin-polyfill` migrates ua-parser-js `0.7` → `2.0` (`src/index.ts:34-36`) and lru-cache `6` → `11` (`src/libs/cache.ts:39-40`, `max`/`length` → `maxSize`/`sizeCalculation`) | bleedingdev | Breaking major runtime deps with call-site rewrites | keep-[F] — `package.json` + source must move together | — |
 | SRV-15 | `prod-server` telemetry re-export surface (`src/apply.ts:23`, `src/index.ts:17`), typed `createProdServer`, netlify entry | bleedingdev | Re-exported from `@modern-js/server-runtime-extensions` | keep-[F] | — |
 | SRV-16 | `prod-server/src/apply.ts` registers `injectTelemetryPlugin()`, `injectModuleFederationCssPlugin()`, `injectMfAssetCacheHeadersPlugin()` **unconditionally** in the shared prod+dev plugin assembly | bleedingdev | Fork telemetry + MF integration stays fork-owned, but registration must be gated on config (`server.telemetry`, MF SSR) so unconfigured consumers do not pay for the plugins | keep-[F] — add config gates | **P3** |
-| SRV-17 | `server` `src/helpers/mock.ts` drops `encode: encodeURI` from the path-to-regexp `match` options (`:149-151`) and adds `method ?? 'get'` / `pathname ?? '/'` fallbacks in `parseKey` (`:73-74`) | bleedingdev | Changes dev-mock route matching for non-ASCII paths. Dev tooling only, but it hides inside otherwise mechanical churn | capped-patch — on conflict keep the fork side or consciously re-add `encode` | — |
+| SRV-17 | `server` `src/helpers/mock.ts` drops `encode: encodeURI` from the path-to-regexp `match` options (`:149-151`) and adds `method ?? 'get'` / `pathname ?? '/'` fallbacks in `parseKey` (`:73-74`) | bleedingdev | Changes dev-mock route matching for non-ASCII paths. Dev tooling only, but it hides inside otherwise mechanical churn | inline-patch — on conflict keep the fork side or consciously re-add `encode` | — |
 | SRV-18 | `server` typed `CreateDevServerResult` and undefined-guards in watcher/fileReader | bleedingdev | Strictness fixes, same family as `render.ts` | upstream-PR | P3 |
 | SRV-19 | `server-runtime` export reordering | bleedingdev | Import hygiene | keep-[M] | — |
 | SRV-20 | `utils` TypeScript compiler path rebuilt around tsgo (spawned `tsgo`, tsconfig-paths matcher, import-specifier rewriting; `src/compilers/typescript/index.ts` 454 → **482** changed lines, 15 → **17** hunks) | bleedingdev | Toolchain divergence; upstream `typescriptLoader.ts` deleted (Appendix A). The 2026-08-16 growth is a capped Bucket-B patch (20 insertions / 4 deletions) porting #8797: `declaration` is no longer forced to `false`, `OUTPUT_SOURCE_EXTENSIONS` maps `.d.ts`/`.d.mts`/`.d.cts` back to their sources, `getSourceFileForOutput` splits the double extension (`path.parse('index.d.ts').name` is `index.d`), and the output collector accepts `.d.(c\|m)?ts` so declarations reach the specifier rewriter | keep-[F]; **extension-point** for the budget | P3 |
 | SRV-21 | `utils` `src/compilers/typescript/tsconfigPathsPlugin.ts` hosts only the `before` transform. Budget 203 → **325** lines, 24 → **22** hunks at the 3.8.2 base | bleedingdev | Base-transition growth: upstream #8797 added `tsconfigPathsAfterDeclarationsHookFactory`, a `ts.TransformerFactory` run through the tsc `afterDeclarations` hook (~130 lines). The fork has no tsc `Program` — it spawns `tsgo` — so there is no `afterDeclarations` hook to register (`grep -rn afterDeclarations packages/server/utils/src/` is empty). The same alias-stripping is achieved post-emit in fork-owned `importRewriter.ts`, verified against all four specifier kinds by `packages/server/utils/tests/ts.test.ts` | keep-[F] (no upstream extension point exists under tsgo) | — |
-| SRV-22 | `utils` `tests/ts.test.ts` asserts rewritten declaration specifiers with quote-agnostic regexes (`/from ["']\.\.\/shared\/types\.js["']/`) instead of upstream's double-quoted `toContain` literals. Budget 216 → **230** lines, 16 → **20** hunks | bleedingdev | Capped Bucket-B patch (8 insertions / 6 deletions). Upstream's assertions encode `tsc`'s emitter, which normalises specifiers to double quotes; tsgo preserves the quote style of the source. The assertion is loosened on quoting only — the specifier text itself, which is what #8797 fixes, stays exact | capped-patch | — |
+| SRV-22 | `utils` `tests/ts.test.ts` asserts rewritten declaration specifiers with quote-agnostic regexes (`/from ["']\.\.\/shared\/types\.js["']/`) instead of upstream's double-quoted `toContain` literals. Budget 216 → **230** lines, 16 → **20** hunks | bleedingdev | Reviewed Bucket-B patch (8 insertions / 6 deletions). Upstream's assertions encode `tsc`'s emitter, which normalises specifiers to double quotes; tsgo preserves the quote style of the source. The assertion is loosened on quoting only — the specifier text itself, which is what #8797 fixes, stays exact | inline-patch | — |
 | SRV-23 | `utils` `tests/fixtures/ts-declaration/api/declaration.ts` carries one extra blank line versus upstream's new #8797 fixture | bleedingdev | Repo formatter output: `biome check --write` inserts a blank line between the leading comment/`import type` pair and the next comment. Take upstream's fixture on sync and re-run biome rather than hand-reverting the line | keep-[M] | — |
 
 ---
@@ -603,14 +792,14 @@ it covers root and infrastructure files outside `packages/`.
 | --- | --- | --- | --- | --- | --- |
 | APP-01 | `config/initialize`, `src/index.ts`, types wire fork-added `src/presetUltramodern.ts` (telemetry, MF SSR defaults) | bleedingdev | Fork preset entry point. **Corrected 2026-08-11:** the old ledger named `src/baseline.ts`; that file and its alias shim were deleted in `5f8230e055` | keep-[F] | — |
 | APP-02 | `package.json`, `src/index.ts`, `src/builder/shared/builderPlugins/adapterSSR.ts`, and `tests/index.test.ts` register fork-owned `@modern-js/app-tools-extensions` plugins; `src/builder/generator/getBuilderEnvironments.ts` and the former in-package CSS runtime plugin are now genuine removals | bleedingdev | Keep only capped package/plugin registration seams in upstream-owned app-tools while Cloudflare worker entries, bundler policy, provider detection, CSS runtime normalization, templates, and tests live in the fork package | extension-point | — |
-| APP-03 | `src/plugins/deploy/index.ts` and `src/types/config/deploy.ts` import public `@modern-js/app-tools-extensions` owners; the only retained Cloudflare facade backs the published `@modern-js/app-tools/cloudflare-output-verifier` compatibility contract, while the other former platform files are genuine removals | bleedingdev | Preserve the established app-tools deploy target, configuration types, and unavoidable published verifier path while keeping additive Cloudflare delivery, output verification, release-envelope, security, i18n, and worker-manifest behavior in the fork package | extension-point | — |
+| APP-03 | `src/plugins/deploy/index.ts` and `src/types/config/deploy.ts` import public `@modern-js/app-tools-extensions` owners; former platform wrappers and the old app-tools config/verifier exports are retired | bleedingdev | Preserve native deploy targets and configuration types while consumers use the fork-owned config and Cloudflare verifier directly. Native build composition, deployment aliases, and release ordering live in fork packages. The app-tools manifest retirement is 18 total PR lines; config API behavior and public declarations are verified in the owning package | extension-point | — |
 | APP-04 | `src/commands/*` dev/build/serve/deploy/info/inspect hooks | bleedingdev | Fork CLI surface. **Corrected 2026-08-11:** the old ledger claimed `modern runtime status` / `fallback-signal` registration (EPIC-7); those commands were deleted in `5f8230e055` and `src/commands/` no longer contains them | keep-[F] | — |
 | APP-05 | `src/plugins/analyze/*` entry/routes-owner integration | bleedingdev | Pairs with RT-18 | keep-[F] | — |
 | APP-06 | `src/rsbuild.ts:19,58-60` adds `disableReactCompiler?: boolean` to `ResolveModernRsbuildConfigOptions` | bleedingdev | Exists only to let callers opt out of CLI-04's default; disappears if CLI-04 reverts | **revert** with CLI-02 / CLI-04 | **P1** |
 | APP-07 | `src/plugins/initialize/index.ts:36-43` defaults `dev.lazyCompilation` to `{ imports: true, entries: false }` when unset, plus `src/builder/shared/lazyCompilation.ts` route-eager `lazyCompilation.test` | bleedingdev | Deliberate dev-perf divergence, broadened beyond stream-SSR to all route component modules. Low priority so an explicit user `dev.lazyCompilation` always wins | keep-[F], documented | — |
 | APP-08 | esm register hooks, utils, tests | bleedingdev | tsgo toolchain + track the above | keep-[M] | — |
-| APP-09 | `src/utils/env.ts` excludes `MODERN_MF_APP_SSR` from ambient `MODERN_*` auto-injection; `tests/utils/env.test.ts` pins the exclusion | bleedingdev | The variable controls config selection before normalization, while plugin-runtime publishes the resolved SSR mode. Compiling the ambient value through a second DefinePlugin conflicts with the config-derived marker and can mislabel client bundles | capped-patch | — |
-| APP-10 | `src/builder/shared/bundlerPlugins/RouterPlugin.ts`, `src/bundleDocs.ts`, and `src/plugins/analyze/{getServerRoutes,isDefaultExportFunction}.ts` carry capped Node 26 / TS7 / Rspack 2 / Babel 8 compatibility repairs | bleedingdev | Keep automatic public paths truthfully narrowed, use Node 26 `Dirent.parentPath`, restore the canonical main-entry constant import, and remove syntax plugins Babel 8 parses by default. Each upstream-owned file stays within the 20-line PR cap; no legacy Node support, casts, or diagnostic suppression are introduced | fixed-in-fork + upstream-PR | P1 |
+| APP-09 | Native env auto-injection excludes MODERN_MF_APP_SSR; its test pins the exclusion | bleedingdev | The higher SSR integration publishes the config-derived string marker; a second ambient DefinePlugin value would conflict and mislabel clients | inline-patch | — |
+| APP-10 | `src/builder/shared/bundlerPlugins/RouterPlugin.ts`, `src/bundleDocs.ts`, and `src/plugins/analyze/{getServerRoutes,isDefaultExportFunction}.ts` carry reviewed Node 26 / TS7 / Rspack 2 / Babel 8 compatibility repairs | bleedingdev | Keep automatic public paths truthfully narrowed, use Node 26 `Dirent.parentPath`, restore the canonical main-entry constant import, and remove syntax plugins Babel 8 parses by default. No legacy Node support, casts, or diagnostic suppression are introduced | fixed-in-fork + upstream-PR | P1 |
 
 ---
 
@@ -623,7 +812,7 @@ it covers root and infrastructure files outside `packages/`.
 | TK-03 | `create` public generator API subpaths (`./ultramodern-workspace`, `./ultramodern-workspace/codesmith`) | bleedingdev | Public generator seam; `exports` and `publishConfig.exports` must stay mirrored with runtime files | keep-[F] | — |
 | TK-04 | `create` MicroVertical dry-run/preflight validation + explicit CodeSmith overlay hook; tooling commands split under `src/ultramodern-tooling/commands/` | bleedingdev | Fork generator validation | keep-[F] | — |
 | TK-05 | `create` workspace content migrating from TypeScript strings to `templates/workspace/` shipped file templates; shared patches gated by `tests/patch-sync.test.ts` | bleedingdev | Replaces the deleted upstream handlebars single-app template (Appendix A) | keep-[F] | — |
-| TK-06 | `toolkit/plugin` (27 files) import/type re-export hygiene + fork duplicate-plugin detection across internal and config plugins | bleedingdev | Mostly mechanical; the duplicate detection is fork behavior | keep-[M] + capped-patch (detection) | — |
+| TK-06 | `toolkit/plugin` (27 files) import/type re-export hygiene + fork duplicate-plugin detection across internal and config plugins | bleedingdev | Mostly mechanical; the duplicate detection is fork behavior | keep-[M] + inline-patch (detection) | — |
 | TK-07 | `runtime-utils` `nestedRoutes` browser export, `url` `normalizePathname`, `loaderContext`, async storage, `fileReader`; rstest config on happy-dom | bleedingdev | Support the fork router/runtime lanes | keep-[F] / keep-[M] | — |
 | TK-08 | `toolkit/utils` `compiled/pkg-up/*` vendored compiled blob replaced by a readable reimplementation (same API) | bleedingdev | Auditability of vendored blobs | keep-[F] | — |
 | TK-09 | `toolkit/utils` `src/cli/constants.ts` fork constants (`NESTED_ROUTE_SPEC_FILE`, …) | bleedingdev | Fork routing constants | keep-[F] | — |
@@ -644,7 +833,7 @@ result**. Referenced by ID from the tables above.
 **N1 — ROOT-02 Effect cohort (lockstep, no active patch).**
 `EFFECT_VERSION`/`EFFECT_VITEST_VERSION` in
 `packages/toolkit/ultramodern-create/src/ultramodern-workspace/versions.ts`;
-`packages/cli/plugin-bff/package.json` (dep/peer/devDep, see N5); the generated
+the canonical `bff-effect` and BFF extension package manifests (see N5); the generated
 `pnpm.overrides`/`trustPolicyExclude` emitted by
 `ultramodern-workspace/policy.ts`. Effect 4.0.0-rc.112 includes the former
 `SchemaAST.Sentinel` declaration repair, so generated workspaces carry no
@@ -665,8 +854,8 @@ Under upstream's `latest` spelling, `pnpm install` downloads real Modern.js
 `node_modules/.pnpm/node_modules/@modern-js/*`. Which one wins is not
 deterministic across machines, so anything resolving a bare `@modern-js/*`
 specifier from outside the workspace tree — the plugin-bff generator fixtures do
-exactly this — binds to upstream on CI and to the fork locally, and fork-only
-subpaths (`./effect-client`, `./effect`) fail with
+exactly this — binds to upstream on CI and to the fork locally, and canonical fork runtime
+packages or subpaths fail with
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. Take upstream's example *sources* on sync; keep
 `workspace:*` on their manifests.
 
@@ -676,28 +865,23 @@ must stay in sync with the workflow — it is also the since-boundary the change
 record uses. The tagging step is idempotent (`gh release view` → `edit`, else
 `create`) because it runs **after** the unrollbackable npm publish.
 
-**N4 — CLI-12 dynamic Effect import.**
-A static top-level import pulls `effect/Effect`, `effect/Layer`, `effect/Schema`
-and `effect/unstable/http*` into the eager module graph of
-`@modern-js/plugin-bff/server-plugin`. The dynamic target is the public
-`@modern-js/plugin-bff-extensions/effect-adapter` subpath; do not restore a
-local adapter implementation. Guard:
-`packages/cli/plugin-bff/tests/regression.test.ts`
-(`server entry does not eagerly load Effect`).
+**N4 — CLI-12 lazy registered runtime modules.**
+Native plugin-bff accepts finite registry-keyed runtime module descriptors and
+an optional Hono route-binder descriptor. It resolves only the selected module
+from the application and validates its factory and returned adapters. Concrete
+Effect and Hono policy modules are registered by the higher BFF build plugin;
+do not restore a hard-coded native Effect import or a local implementation.
+Guards: native `tests/server.test.ts` and `tests/regression.test.ts`, plus higher
+`tests/server-integration.test.ts` and `tests/hono-runtime-composition.test.ts`.
 
-**N5 — CLI-14 plugin-bff dependency block is purely additive.**
-Upstream's plugin-bff has no `effect` dependency and **no `peerDependencies`
-block at all**, so a sync merge will not conflict on it and a resolver taking
-"theirs" wholesale drops it **silently**. `@effect/opentelemetry` MUST move with
-`effect`: it declares a REQUIRED (non-optional) `effect` peer of its own, so
-leaving it in `dependencies` re-imposes that peer on every hono-only consumer
-transitively and makes the optional `effect` peer a fiction. Guards:
-`tests/regression.test.ts` asserts, for BOTH packages, that
-`dependencies[name] === undefined`,
-`peerDependencies[name] === devDependencies[name]`, and
-`peerDependenciesMeta[name].optional === true`; plus
-`packages/toolkit/ultramodern-create/tests/version-pins.test.ts`
-(`plugin-bff declares the same Effect cohort generated workspaces pin`).
+**N5 — CLI-14 Effect dependencies follow canonical fork owners.**
+The native plugin-bff package has retired its Effect/data-platform runtime
+facades. Preserve the exact Effect cohort in the canonical fork package peers
+and development dependencies, and in generated application dependencies.
+`@effect/opentelemetry` must follow `effect` because it requires the same Effect
+identity. Do not restore an additive native peer block as a compatibility shim.
+Generated applications need the configured adapter package in production
+resolution after development dependencies are removed.
 
 **N6 — RT-02 `I18nInstance`.**
 Do **not** take upstream's interface body wholesale on sync — it silently
@@ -725,12 +909,13 @@ and the byte-offset assertion in
 `tests/integration/routes-tanstack/tests/index.test.ts`.
 
 **N8 — SRV-02 optional zod peer.**
-`@modern-js/plugin-bff`'s root, `./cli`, `./server-plugin` and `./hono-server`
-entries all reach `operationContracts.ts` transitively and threw
-`ERR_MODULE_NOT_FOUND: zod` for consumers without zod. Do not "simplify" the
-assembled specifier back to a literal on sync. Guard:
-`packages/server/bff-core/tests/optionalZodPeer.test.ts` (asserts the source
-shape and that no built format carries an eager zod dependency).
+The fork operation-contract implementation lives in
+`packages/server/runtime-extensions/src/bff-policy/operationContracts.ts`.
+Its optional zod loader must remain lazy: a literal eager external import would
+require the peer before a consumer selects schema policy. Canonical fork tests
+in `tests/bff-policy/optionalZodPeer.test.ts` guard that graph. Native bff-core
+has separate `tests/optionalZodPeer.test.ts` coverage for its own public schema
+entries. Native plugin-bff no longer statically imports the fork policy graph.
 
 **N9 — CLI-20 the client type facade is always ESM.**
 Upstream #8797 threads the app-level `moduleType` from `cli.ts` into
@@ -792,7 +977,6 @@ and port any upstream change into the listed fork replacement instead.
 
 | Original upstream path | Fork replacement / reason |
 | --- | --- |
-| `packages/cli/builder/src/shared/rsc/rscClientBrowserFallback.ts` | Fork-owned `rscDisabledRuntime.ts` + entrypoint-specific throwing modules. Disabled RSC must override resolvable optional peers and fail closed (CLI-06). |
 | `packages/cli/builder/tests/__snapshots__/{default,environment}.test.ts.snap`, `packages/runtime/plugin-runtime/tests/router/__snapshots__/templates.test.ts.snap`, `packages/server/bff-core/tests/client/__snapshots__/generateClient.test.ts.snap`, `packages/server/core/tests/utils/__snapshots__/error.test.ts.snap` | Five exact-output snapshots replaced by structured/compiler/runtime behavior checks. Do not restore generated-output oracles. |
 | `packages/runtime/render/modern.config.js` | Fork-added `rslib.config.mts`. Port upstream build-config changes there. |
 | `packages/server/utils/src/compilers/typescript/typescriptLoader.ts` | tsgo compiler path under `src/compilers/typescript/` (SRV-20). |
@@ -890,21 +1074,219 @@ current evidence — do not cite it.
    reviewed. Never substitute a release tag, PR merge-base, push before-SHA, or
    `HEAD`, and never re-record a fresh snapshot to erase existing debt.
 
-### Runtime React context identity (2026-09-09)
-
-| File | Owner | Reason | Disposition |
-| --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/core/context/public.ts` (split from audited `runtime.ts`) | bleedingdev | Delegate public React context identity to the fork-owned runtime helper so independently bundled federation runtime paths read the current SSR provider instead of stale context. | capped-patch |
-| `packages/runtime/plugin-runtime/src/core/context/runtime.ts` | bleedingdev | Delegate the separate internal React context identity to the same fork-owned helper; React providers continue to own per-request values. | capped-patch |
-
 ### Streaming hydration identity (2026-09-09)
 
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Preserve the streaming server's end-marker sibling slot during hydration so React-generated input IDs and accessibility references use the same tree positions. | capped-patch |
+| `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Preserve the streaming server's end-marker sibling slot during hydration so React-generated input IDs and accessibility references use the same tree positions. | inline-patch |
 
 ### Eager SSR bootstrap rejection (2026-09-09)
 
 | File | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-runtime/src/cli/code.ts` | bleedingdev | Observe the eager SSR handler promise before a renderer consumes it, preventing remote startup failures from terminating Node while preserving the original rejection for request error handling. | capped-patch |
+
+### Explicit native response and stream conditions (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/server/requestResponse.ts` | bleedingdev | Make missing and empty redirect-header checks explicit in the existing helper extracted from audited source packages/runtime/plugin-runtime/src/core/server/requestHandler.tsx. Git records the helper as an added path with its original source retained, so the checker governs this helper identity separately. Complete PR delta: six lines; body disposal, cleanup and rejection behavior remain unchanged. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/deferredScript.ts` | bleedingdev | Redact production errors in native deferred SSR scripts. Make thenable, error-object and nonce conditions explicit while preserving falsy values and empty nonces; the reviewed ten-line PR delta also removes the prior diagnostic pragma. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/runtime/redirect.ts` | bleedingdev | Make null and empty Location-header checks explicit in the existing redirect helper extracted from audited source packages/runtime/plugin-runtime/src/router/runtime/rsc-router.tsx. Git records the helper as an added path with its original source retained, so the checker governs this helper identity separately. Complete PR delta: three lines; basename and redirect behavior remain unchanged. | `inline-patch` |
+
+### Native context, streaming and static extension contracts (2026-09-09)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/render/src/rsc-html-stream/server.ts` | bleedingdev | Repair native HTML and Flight stream injection for split UTF-8 and tags, empty streams, byte-preserving binary payloads, errors and cancellation. Remove the fork delegate while retaining both closing-tag modes; Node 26.7 and workerd artifact checks cover the native implementation. | `inline-patch` |
+| `packages/runtime/render/tests/rsc-html-stream/server.test.ts` | bleedingdev | Exercise native HTML and Flight injection through existing public signatures, including chunk boundaries, binary and BOM payloads, cancellation, errors, closing-tag modes and streaming before EOF. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/react/wrapper.tsx` | bleedingdev | Pipeline public/internal projection with the unchanged original context, then install the named component resolver once. Keep resolver callbacks out of the RSC Flight tree; head storage, extension slots and request-whitelist policy live in the fork plugin. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/react/wrapper.test.tsx` | bleedingdev | Verify native dual-context projection, unchanged original context, named component resolution and RSC HTML/Flight separation; fork head collection tests move to the owning renderer package. | `inline-patch` |
+| `packages/toolkit/plugin/src/runtime/api.ts` | bleedingdev | Expose generic context projection and named component resolution through the existing runtime plugin API; preserve the SSR collector and stream extension registration contracts. | `inline-patch` |
+| `packages/toolkit/plugin/src/runtime/hooks.ts` | bleedingdev | Create context projection and named component resolution with the existing synchronous hooks, and retain collector/stream hooks for typed native renderer lifecycle callbacks. | `inline-patch` |
+| `packages/toolkit/plugin/src/runtime/index.tsx` | bleedingdev | Retain public generic context projection, component resolution and renderer lifecycle exports, and expose neutral asset-group, template-chunk, native-formatting and raw-router-data types for renderer extensions. | `inline-patch` |
+| `packages/toolkit/plugin/src/types/runtime/api.ts` | bleedingdev | Type the existing runtime API for dual-context projection, named component resolution and SSR collector/stream metadata while preserving prior callback compatibility. | `inline-patch` |
+| `packages/toolkit/plugin/src/types/runtime/hooks.ts` | bleedingdev | Retain native context projection, component resolution and render/body lifecycle contracts. Add original opaque resource/config metadata, asset groups preserving generic identity, prepared template callbacks with native formatting capabilities, and optional raw router data without embedding fork selection or serialization policy. | `inline-patch` |
+| `packages/server/core/src/adapters/node/plugins/static.ts` | bleedingdev | Keep audited route selection, file reads, MIME, headers and containment native. Offer selected-asset and public-fallback callbacks through the existing server context, replacing the mixed staticServing extraction without moving native serving code. | `inline-patch` |
+| `packages/server/core/src/adapters/node/index.ts` | bleedingdev | Export the native static asset responder and its callback types for server plugins. | `inline-patch` |
+| `packages/server/core/src/types/plugins/plugin.ts` | bleedingdev | Retain optional static asset responders on the existing server-plugin context update API and type the generic onDispose registration/unregistration API for resources owned by a native server instance. | `inline-patch` |
+| `packages/server/core/tests/plugins/staticAssetResponder.test.ts` | bleedingdev | Verify the native responder contract, default serving, precedence, fallback order and containment. | `inline-patch` |
+| `packages/server/prod-server/src/apply.ts` | bleedingdev | Keep native production/development server plugin assembly and explicit user plugins. Remove automatic fork telemetry, federation cache/CSS and static-serving registration; the fork solution composes those plugins through the existing server plugin list. | `inline-patch` |
+| `packages/toolkit/types/tests/reexports.test.ts` | bleedingdev | Resolve the installed TypeScript manifest and launch its declared compiler through Node on every platform. Check successful completion before asserting the emitted native public declaration graph. | `inline-patch` |
+
+### Native compatibility after fork extraction (2026-09-09)
+
+These rows review the native compatibility changes in commit
+`9d2d786bcff2f12648c83076d2ba4204bea04ad2`. They preserve the fixed ownership
+pins, complete scope and stored budgets; import-boundary review remains separate.
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-runtime/src/core/server/routerCleanup.ts` | bleedingdev | Preserve native request cleanup and error propagation while consuming the extracted router-state accessor from its fork-owned public subpath. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/afterTemplate.ts` | bleedingdev | Keep native streamed SSR data serialization, header filtering, nonce formatting and placeholder replacement. Pass prepared data/script chunks through the generic renderer lifecycle before final assembly; router hydration/bootstrap policy is supplied by the renderer extension instead of imported directly. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/string/ssrData.ts` | bleedingdev | Keep native JSON/error serialization, header filtering and script formatting. Read optional raw router data through the lifecycle, preserving an explicit empty result and the native fallback when absent; remove direct router-state and hydration-script policy imports. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/runtime/hooks.ts` | bleedingdev | Own canonical native create/hydrate notifications and six-hook registry without fork state types. Lifecycle payload keeps native routes/context/raw router and extensible string provider identity; fork-specific snapshot/storage metadata is outside native ownership. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/runtime/plugin.node.tsx` | bleedingdev | Remove fork server snapshot mapper/state producer; native query/error/redirect/clientRender behavior and raw StaticHandlerContext notification remain. Fork subscriber projects successful native event through existing hooks. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/server/loadable.test.ts` | bleedingdev | Retain native loadable entry-manifest exclusion coverage. Move matched-route CSS, hydration ordering and omitted-manifest policy assertions to the renderer extension tests that instantiate the real registered plugin. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/lifecycle.test.tsx` | bleedingdev | Replace removed compatibility-barrel equality assertions with native hook/public-boundary checks and real plugin-manager native SSR events proving state ordering, native loader snapshot projection, redirect exclusion and failed-loader exclusion. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToStream/buildTemplate.after.test.ts` | bleedingdev | Retain native streamed SSR header filtering and nonce/script serialization assertions. Move bootstrap ordering and custom-template policy expectations to the renderer extension suite using native template APIs. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToString/entry.test.ts` | bleedingdev | Retain native SSR JSON/error serialization, script execution and header filtering assertions. Move router snapshot/hydration policy cases to the renderer extension suite with the original execution expectations. | `inline-patch` |
+| `packages/runtime/render/src/rsc.worker.ts` | bleedingdev | Keep the public Worker RSC entry while forwarding it to the shared native RSC renderer. Worker-specific Flight imports are selected by the reviewed build mapping, allowing deletion of the duplicate renderer implementation. | `inline-patch` |
+| `packages/server/core/src/types/config/bff.ts` | bleedingdev | Retain native BFF prefix/request-creator options and expose a neutral clientCodegenPlugin module specifier. Use the extensible native BFF runtime registry selector; Effect and producer policy configuration fields are augmented by their fork owners. | `inline-patch` |
+| `packages/server/core/src/types/config/server.ts` | bleedingdev | Keep native server configuration and remove telemetry field/type forwarding after canonical fork augmentation owns that public configuration. | `inline-patch` |
+| `packages/solutions/app-tools/tests/types.test.ts` | bleedingdev | Launch the installed native TypeScript compiler through Node for portable generated-environment declaration checks, and assert removal of the fork config export from native app-tools after its implementation moved to the fork-owned solution package. Retain strict global, asset and public module assertions. | `inline-patch` |
+
+### Reviewed native seams, public contracts and retained artifacts (2026-09-10)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-bff/src/cli.ts` | bleedingdev | Register four typed asynchronous BFF compile, artifact and generated-entry hooks per native plugin instance. Keep native lambda loading and the Hono default in this plugin; fork Effect selection, instrumentation and producer policy are composed by the BFF build extension. Forward the neutral clientCodegenPlugin module specifier and explicit requestId to native code generation without selecting producer policy; preserve existing requestId defaults when absent. | `inline-patch` |
+| `packages/cli/plugin-bff/src/cli/generator.ts` | bleedingdev | Keep native API discovery, compilation and SDK publication here. Invoke the typed before/after compile and artifact/entry hooks with the original per-generation context, forward exact server compiler exclusions, and preserve fail-fast hook and compiler errors; global-variable transforms, Effect bundling and producer contracts now live in the fork build extension. Forward the neutral clientCodegenPlugin module specifier and explicit requestId to native code generation without selecting producer policy; preserve existing requestId defaults when absent. | `inline-patch` |
+| `packages/cli/plugin-bff/src/runtime/create-request/index.ts` | bleedingdev | Forward the existing native configure, createRequest and createUploader exports through the native create-request package entry so its declared environment conditions select the implementation. Remove the fork request-policy forwarding surface from this native entry. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/generate.ts` | bleedingdev | Retain native API filtering, lambda generation, exact ESM declaration facades and missing-declaration failure. Accept neutral additional artifact descriptors with unchanged generation identity, validate canonical source/export/output identities before writing, and invoke entry generation before the single final native manifest publication. Effect artifact generation now belongs to the fork build extension. Forward the neutral clientCodegenPlugin module specifier and explicit requestId to native code generation without selecting producer policy; preserve existing requestId defaults when absent. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/crossProjectApiPlugin.ts` | bleedingdev | Parameterize the existing native cross-project plugin with package, prefix and SDK directory descriptors. Preserve prefix conflict validation and native context/config initialization, then expose a callback receiving validated paths; Effect selection and producer security defaults now live in the fork build extension. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/pluginGenerator.ts` | bleedingdev | Render and write the native cross-project plugin as a code/declaration descriptor that calls the public parameterized native plugin. Preserve package/module identity, normalized SDK paths and generation errors; let registered extensions transform the descriptor before the native writer publishes it. | `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/runtimeGenerator.ts` | bleedingdev | Render and write the native configured request-runtime entry as a code/declaration descriptor with requestId and caller options. Honor ESM versus CommonJS package identity, encode absolute ESM imports as file URLs, and let the fork build extension supply producer defaults through the generated-entry hook. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/clientGenerator.test.ts` | bleedingdev | Retain native lambda/client declaration coverage and verify neutral extension artifact publication, canonical identity collisions, dependency conflict rejection, unchanged generation context and one final manifest write after generated entries. Verify explicit requestId preservation and a rejected client transform prevents publication. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/cross-project-api-plugin.test.ts` | bleedingdev | Verify native cross-project prefix conflicts, exact prefix-array acceptance, SDK directory/context initialization and the generic config callback receiving validated paths. Fork runtime and producer policy expectations move to the BFF build extension suite. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/bffBuildHooks.test.ts` | bleedingdev | Verify separate native hook instances, original compilation-context identity and before/compile/after ordering, failed hook/compiler behavior, and forwarding of current exact compiler exclusions after before hooks. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/loader.test.ts` | bleedingdev | Verify native lambda client generation independently of the fork source loader, explicit error modules for non-lambda resources, and executable diagnostic quoting for platform-native paths. Verify explicit requestId and neutral clientCodegenPlugin forwarding, with transform failures reported without generated success output. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/shared.tsx` | bleedingdev | Keep native Node stream composition and pass the existing renderer lifecycle to native shell preparation, replacing direct policy selection with the generic template/asset seam. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/string/loadable.ts` | bleedingdev | Keep native loadable collection, inline asset behavior, attribute formatting and manifest exclusion. Offer generic ordered asset groups and prepared chunks to renderer lifecycle callbacks, with fork route/federation ordering and deduplication in the registered renderer extension. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/renderToString/buildTemplate.test.tsx` | bleedingdev | Retain native string marker/placeholder assembly assertions after moving fork head/asset policy cases to the registered renderer extension integration suite. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/rendererAssets.test.tsx` | bleedingdev | Verify the neutral native asset/template/router-data seam: subtype and original-group identity, original resource/config identity, effects before formatting, callbacks before separator splitting, raw error serialization, empty-object precedence and absent-supplier fallback. | `inline-patch` |
+| `packages/server/core/src/serverBase.ts` | bleedingdev | Own native server instance disposal through the existing plugin API. Register resources before initialization can fail, unregister before retirement, retire synchronously, share one disposal promise, attempt every disposer in reverse order, and preserve the original initialization failure if cleanup also fails. | `inline-patch` |
+| `packages/server/core/tests/serverBase.test.ts` | bleedingdev | Verify native disposal registration before synchronous setup, config and asynchronous prepare failures; reverse-order cleanup despite failures; synchronous retirement with one shared promise; and unregistering resources before retirement. | `inline-patch` |
+| `packages/server/create-request/src/browser.ts` | bleedingdev | Keep native browser URL/body construction, response handling and default configure/request/upload exports. Expose a fresh native client factory so optional instance-local hooks do not share configuration or import fork request policy. | `inline-patch` |
+| `packages/server/create-request/src/node.ts` | bleedingdev | Keep native server URL/body construction, request-context headers, response handling and default configure/request/upload exports. Expose a fresh native client factory while fork policy configures its own canonical client separately. | `inline-patch` |
+| `packages/server/create-request/src/requestFactory.ts` | bleedingdev | Retain native environment-specific request/upload construction, path/query/body/header handling and configuration maps extracted from the native Node/browser clients. Offer instance-local start/header/dispatch hooks while preserving callback ordering and failed-configuration atomicity; identity binding, tracing, envelopes and retries move to fork request policy. | `inline-patch` |
+| `packages/server/create-request/src/types.ts` | bleedingdev | Preserve native request, upload, sender and configuration signatures while typing fresh clients and neutral start/header/dispatch contexts. Move fork identity, envelope, operation-contract, retry and transport policy types to the fork-owned request client. | `inline-patch` |
+| `packages/server/create-request/src/headers.ts` | bleedingdev | Retain native case-insensitive header lookup and replacement as shared helpers for native request construction, avoiding duplicate header casing while leaving request-policy decisions in the fork client. | `inline-patch` |
+| `packages/server/create-request/tests/browser.test.ts` | bleedingdev | Retain native browser configure, interceptor, default request and domain behavior. Move envelope, operation identity and transport policy assertions to the fork request-client suite. | `inline-patch` |
+| `packages/server/create-request/tests/node.test.ts` | bleedingdev | Retain native server configure, interceptor, domain and forwarded-header behavior. Move identity binding, tracing, envelope and transport policy assertions to the fork request-client suite. | `inline-patch` |
+| `packages/server/create-request/tests/requestHooks.test.ts` | bleedingdev | Verify fresh native client configuration isolation, path extraction, neutral request/upload hooks and normalized dispatch, synchronous server versus asynchronous browser errors, and interceptor-before-domain ordering with failed-configuration atomicity. | `inline-patch` |
+| `packages/server/prod-server/src/index.ts` | bleedingdev | Use native ServerBase disposal for production close and startup failure with one shared retirement promise, preserving the original startup error. Remove fork telemetry lifecycle imports and public telemetry reexports from the native production server entry. | `inline-patch` |
+| `packages/server/prod-server/tests/applyPlugins.test.ts` | bleedingdev | Retain native SSR/server error fallback coverage after fork telemetry and backend-federation composition cases move to their owning extension/solution suites. | `inline-patch` |
+| `packages/server/prod-server/tests/runtimeLifecycle.test.ts` | bleedingdev | Verify production server close and failed initialization release native instance resources once and preserve the original startup failure even when cleanup fails and close follows. | `inline-patch` |
+| `packages/server/server/src/createDevServer.ts` | bleedingdev | Initialize each native development runtime with native instance cleanup on failure and a draining reload handle. Preserve the active runtime when replacements fail, and close initial process resources without replacing the original startup error. | `inline-patch` |
+| `packages/server/server/tests/reloadManager.test.ts` | bleedingdev | Verify native failed-candidate isolation, serving-handle retention, cleanup despite throwing reload/error callbacks, immediate retirement and shared disposal after active handler promises drain. | `inline-patch` |
+| `packages/server/server/tests/createDevServer.lifecycle.test.ts` | bleedingdev | Exercise actual native development server assembly for fresh per-runtime options, retained process resources, failed reload isolation and initial-runtime/process cleanup that preserves the original startup failure. | `inline-patch` |
+| `packages/server/utils/src/common/index.ts` | bleedingdev | Expose optional exact absolute file exclusions on the existing native compiler options and validate their paths. Exclusions select compiler roots only; imported dependencies remain subject to normal diagnostics. | `inline-patch` |
+| `packages/solutions/app-tools/src/plugins/serverBuild.ts` | bleedingdev | Forward the current exact generated-file exclusions from native app context into existing server compilation; the owning router/build extension decides which paths to exclude. | `inline-patch` |
+| `packages/solutions/app-tools/src/types/index.ts` | bleedingdev | Expose the typed native BFF compilation, generation, artifact and generated-module hook contracts through the existing public app-tools types entry. | `inline-patch` |
+| `packages/solutions/app-tools/src/types/plugin.ts` | bleedingdev | Define typed per-instance BFF before/after compile, client-artifact and generated-entry hooks, preserving original generation context and native publication ownership. Add optional exact server compiler exclusions to native app context; fork instrumentation and producer policy register through these seams. Use the native extensible BFF runtime registry key for app context instead of hard-coding a fork selector. | `inline-patch` |
+| `packages/solutions/app-tools/tests/serverBuild.test.ts` | bleedingdev | Verify the native server build forwards the current exact exclusion list to compilation without selecting router-specific paths itself. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/runtime/internal.ts` | bleedingdev | Restore direct native React Router factory export. Remove fork selection/realm/global-registry subsystem and provider reexports; expose native canonical hooks/type injection seam to higher compositions. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/runtime/plugin.tsx` | bleedingdev | Remove direct fork state producer; retain native BrowserRouter/HashRouter construction and lifecycle notifications. Import canonical hooks from their native owner rather than fork-created provider module. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/runtime/types.ts` | bleedingdev | Remove fork snapshot/state/framework reexport dependency. Native provider identifier remains string-extensible with same assignability as prior the prior built-in union plus arbitrary strings. Router APIs and route types stay native. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/provider.test.ts` | bleedingdev | Keep real native canonical hook identity interop in native companion suite; provider operations import fork owner and receive canonical hooks explicitly. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/internalProvider.test.ts` | bleedingdev | Prove native export is the real React Router provider; higher injected fork composition selects local factories and rejects compatibility providers absent from app realm. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/provider-realm-isolation.test.ts` | bleedingdev | Migrate provider module imports to fork owner while preserving old/new module graph realm isolation and compatibility behavior tests. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/prefetch-realm-isolation.test.tsx` | bleedingdev | Native companion suite supplies per-context fork capability and retains actual native Link tests across contexts, public paths, federation loaders, chunk generations and stale queued work. | `inline-patch` |
+| `packages/cli/plugin-bff/src/server.ts` | bleedingdev | Retain native Hono defaults, API preparation, route prefixes, middleware/reset behavior and native Hono construction. Accept finite registry-keyed runtime adapter module descriptors and an optional Hono route-binder module, resolve only configured modules lazily from the application, and validate their structural factories/results. Extension runtimes and producer policy are registered by the higher build plugin without hard-coded native Effect selection or imports. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/hono-adapter-parity.test.ts` | bleedingdev | Retain actual native Hono route registration and middleware order, positional parameters, status/header/redirect operators and schema response envelopes. Move producer, authorization and federation scenarios to the higher CLI-to-native-runtime composition suite without maintaining policy fixtures in native Hono tests. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/honoAdapter.test.ts` | bleedingdev | Verify actual native HonoAdapter registration and ServerBase API dispatch in development and production, custom prefixes, render fallthrough and Hono defaults. Exercise the neutral optional binder factory with fresh native API metadata, retaining unbound handler behavior; fork producer/security policy scenarios move to higher composition tests. | `inline-patch` |
+| `packages/cli/plugin-data-loader/src/runtime/index.ts` | bleedingdev | Expose a loader-context registration function for a request-scoped route-ID resolver. Pass original source routes and matched IDs to the resolver, preserve requested IDs without a registration and retain native route authorization and dispatch; localized mapping is supplied by the fork server plugin. | `inline-patch` |
+| `packages/cli/plugin-data-loader/tests/routeIdResolver.test.ts` | bleedingdev | Verify unchanged requested IDs without registration, original route/match inputs, native authorization after remapping, concurrent request-context isolation and propagation of resolver failures without alternate dispatch. | `inline-patch` |
+| `packages/runtime/plugin-i18n/rstest.config.mts` | bleedingdev | Register the native federation component resolver contract suite and remove the two federation implementation suites after their unchanged move to the i18n integration package. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/cli/index.ts` | bleedingdev | Retain native backend discovery, detection configuration and generated runtime/server plugin setup. Remove localized route-map transformation from native CLI; the higher integration installs that policy through the existing file-system route hook. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/Link.tsx` | bleedingdev | Retain native Link interpolation, search/hash handling, active state and actual router primitive rendering. Use provider-scoped URL strategy and createLinkProps callbacks instead of embedded localized-map or TanStack-specific navigation translation. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/context.tsx` | bleedingdev | Retain canonical native i18n contexts, provider identity and language hook behavior; project an optional per-plugin URL strategy. Export existing context/provider capabilities and keep FederatedI18nBoundary as a generic runtime component resolver shell with missing-integration and self-recursion errors; resource cloning/isolation implementation lives in the integration package. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/contextHelpers.ts` | bleedingdev | Retain native language mutation, resource loading, browser fallback and actual router navigation. Pass the optional per-plugin URL strategy into path localization and additive redirect exclusions while preserving entry prefix, search and hash. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/core.tsx` | bleedingdev | Expose typed native URL-strategy, navigation-provider and language-synchronization component seams and forward them through native provider assembly. Keep native defaults and remove direct localized-map configuration policy. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/hooks.ts` | bleedingdev | Retain native context creation, locale redirect and language synchronization hooks while forwarding the optional URL strategy. Provider-specific route mapping and navigation synchronization are composed by the higher integration. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/localizedPaths.ts` | bleedingdev | Retain native language-prefix localization/canonicalization and suffix-preserving location helpers. Delegate only pathname mapping to an optional per-plugin strategy, with native prefix behavior when absent. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/providerComposition.tsx` | bleedingdev | Keep native i18n provider ordering, instance stability, SDK resource loading and language state. Accept stable optional navigation-provider and synchronization component types with native fallbacks; hook-bearing integration components remain mounted across unrelated parent renders. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/routerAdapter.tsx` | bleedingdev | Keep native React Router and browser navigation fallbacks and expose provider-scoped navigation context plus structured Link target callbacks. Remove TanStack state translation and selection from the native adapter. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/utils.ts` | bleedingdev | Retain native basename/language handling, prefix-only URL construction and configured redirect ignores. Use the shared suffix splitter and optional pathname strategy with additive skip behavior, removing direct localized-map policy imports. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/server/index.ts` | bleedingdev | Keep native server locale detection, configured static/API exclusions and redirect middleware. Resolve an optional per-entry URL strategy; reject mapped legacy options without integration instead of silently ignoring them, and preserve native exclusions before any strategy-selected canonical redirect. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/server/redirectPolicy.ts` | bleedingdev | Retain native locale-prefix detection and redirects, configured/static exclusions, entry-prefix boundaries and uncached localized redirect responses. Accept optional pathname mapping and additive exclusions through the URL strategy; Module Federation skip rules and mapped-slug algorithms remain fork-owned. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/shared/type.ts` | bleedingdev | Keep native language detection configuration and remove the fork localized-map option type; mapped configuration is typed by the higher integration. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/shared/urlStrategy.ts` | bleedingdev | Define the neutral per-plugin pathname localize/canonicalize contract and optional additive redirect exclusion callback. Native callers continue to own search/hash handling and configured exclusions. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/link.test.tsx` | bleedingdev | Retain native URL suffix handling, route-parameter interpolation, language detection priority and prefix-only localization assertions; mapped-path policy assertions move to the integration owner. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/localisedUrlRewriteMatrix.fork.test.ts` | bleedingdev | Retain native Link target normalization, splat separator/percent encoding and search normalization cases after localized route-map policy cases move to the integration suite. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/localisedUrls.test.ts` | bleedingdev | Retain native disabled-react integration entry, unchanged routes without mapping and API-prefix collection/middleware skip behavior. Mapped-route and custom slug assertions move to the higher integration. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/redirectPolicy.test.ts` | bleedingdev | Verify native configured ignores across runtime/server prefixes and configured/static/upload exclusions without fork policy. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/routerAdapter.test.tsx` | bleedingdev | Verify native root and child preservation, provider order/identity, optional react-i18next loading and stable supplied navigation/synchronization components rendering actual router primitives. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/federatedI18nBoundaryResolver.test.tsx` | bleedingdev | Verify the native component resolver shell reports missing/unhandled integration, rejects resolution to itself and renders a hook-bearing replacement with unchanged props. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/server/requestResponse.test.ts` | bleedingdev | Verify native redirect status/header handling, malformed redirect preservation and discarded-body ownership failure without premature router cleanup; use generic cleanup callbacks after fork state moves out. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/server/routerCleanup.test.ts` | bleedingdev | Verify native cleanup callback runs at most once after consumed/cancelled bodies, reports errors, handles bodyless responses and does not run before a failed cancellation relinquishes body ownership. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/server/ssrHelpers.matrix.test.ts` | bleedingdev | Retain five native response/helper assertions covering redirects, body lifetime and native stream behavior after fork CSS/bootstrap cases move unchanged to renderer-extension suites. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/serverRender/requestHandler.test.tsx` | bleedingdev | Retain actual native request-handler integration coverage for extension-provided snapshot status/errors and deferred cleanup. Configure the canonical fork extension explicitly while exercising native response and stream lifetime behavior. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/utils.test.ts` | bleedingdev | Verify native attribute-name rejection and exact double-quoted attribute escaping, including malformed names and values containing ampersands, quotes and angle brackets. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/cli/ssr/loadable-bundler-plugin.test.ts` | bleedingdev | Retain the native loadable bundler regression at its actual owner: explicit chunk-loading-global options override compiler configuration and compiled hydration uses the configured per-app identity. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/core/browser/hydrate.test.tsx` | bleedingdev | Retain native hydration regression ownership: fallback chunk global, delegation to the actual React hydration root with preserved promise contract and browser execution without process. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/exports/loadable.test.ts` | bleedingdev | Retain native loadable public-export coverage for nested CommonJS default interop resolving to the callable function. | `inline-patch` |
+| `packages/server/bff-core/src/client/generateClient.ts` | bleedingdev | Retain native handler discovery, route/parameter/domain/request creator and upload code generation. Expose a structured ClientModuleDraft and one asynchronous clientCodegenPlugin transform loaded through Node module resolution, preserve original transform errors and custom request creators, and keep operation stamping/bootstrap policy in the fork build extension. | `inline-patch` |
+| `packages/server/bff-core/src/index.ts` | bleedingdev | Keep native API, operator, request generation and middleware exports; remove adapter-kit and operation/cross-project policy barrels now owned by fork extensions. | `inline-patch` |
+| `packages/server/bff-core/tests/client/generateClient.test.ts` | bleedingdev | Execute generated native dynamic/default/method/custom handlers, upload contracts, domain/request creator/fetcher forwarding, plus neutral structured transform ordering, module identity, explicit creator retention and original errors. Cover absolute ESM plugin paths with spaces and non-callable plugin rejection. | `inline-patch` |
+| `packages/server/bff-core/tests/client/fixtures/neutral-codegen.cjs` | bleedingdev | Provide the minimal neutral generated-client transform used by native code-generation tests to assert original handler metadata and structured module edits without fork policy. | `inline-patch` |
+| `packages/server/bff-core/tests/operationContractInterop.test.ts` | bleedingdev | Retain explicit cross-package interop tests whose subjects are real native schema operators and reflected handler identities. Verify canonical fork policy can read every native schema slot and produce independent hashes without a second native policy implementation. | `inline-patch` |
+| `packages/server/bff-core/tests/optionalZodPeer.test.ts` | bleedingdev | Retain native optional-Zod peer and importability coverage after policy-specific optional-peer assertions move to the canonical policy owner. | `inline-patch` |
+| `packages/server/core/src/index.ts` | bleedingdev | Retain native server entry exports and remove fork safe-failure exports after error policy moves to the canonical server extension. | `inline-patch` |
+| `packages/server/core/src/plugins/compat/index.ts` | bleedingdev | Register a typed generic handleError asynchronous pipeline on the existing server compatibility hook registry so the owning error plugin can supply responses without a native fork import. | `inline-patch` |
+| `packages/server/core/src/utils/error.ts` | bleedingdev | Keep native error rendering and header behavior; remove safe-failure implementation/type forwarding to the fork owner. | `inline-patch` |
+| `packages/server/core/tests/utils/error.test.ts` | bleedingdev | Retain native error page/response assertions after canonical safe-failure policy tests move to the server extension owner. | `inline-patch` |
+| `packages/solutions/app-tools/src/utils/initAppContext.ts` | bleedingdev | Use the native extensible BffRuntimeFramework registry key type for initialized app directory metadata, preserving Hono defaults while fork runtimes add their own selector through module augmentation. | `inline-patch` |
+| `packages/toolkit/plugin/src/server/index.ts` | bleedingdev | Expose BffRuntimeRegistry and its key type from the existing native server entry so runtime packages can augment their own supported selector. | `inline-patch` |
+| `packages/toolkit/plugin/src/server/run/types.ts` | bleedingdev | Declare an extensible native BFF runtime registry with Hono as the native entry and derive BffRuntimeFramework from its keys. Use it in server creation metadata; fork Effect registration belongs to its own package augmentation. | `inline-patch` |
+| `packages/toolkit/plugin/src/types/server/context.ts` | bleedingdev | Expose optional BFF runtime selection on native server plugin context through the canonical extensible native registry type, enabling plugin selection without importing a fork runtime. | `inline-patch` |
+| `packages/toolkit/runtime-utils/src/url.ts` | bleedingdev | Share the native relative URL target splitter that separates pathname/search/hash without decoding or normalizing suffix bytes, eliminating duplicated implementations in i18n and its integration. | `inline-patch` |
+| `packages/toolkit/runtime-utils/tests/url.test.ts` | bleedingdev | Verify shared native URL splitting for pathname/search/hash, query-only targets and a question mark inside the hash without reinterpreting suffix bytes. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/canonicalRoutes.ts` | bleedingdev | Retain the public canonical route declaration-merging contract used by native Link types. Validate literal routes and required/optional/absent parameters while permitting external/hash and computed-string targets; generated router integrations augment the interface rather than maintaining duplicate native Link declarations. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/linkHelpers.ts` | bleedingdev | Retain native Link parameter interpolation for named/optional/splat patterns, development-only missing-parameter diagnostics and normalized query/search values. These helpers construct native Link targets before an optional URL strategy receives the pathname. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/i18n/react-i18next.ts` | bleedingdev | Retain the extracted optional react-i18next import adapter. Resolve the real provider/init plugin when available and return null capabilities when the optional package cannot load, without pulling it into the no-react-i18next runtime entry. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/no-react-i18next.tsx` | bleedingdev | Retain the native i18n runtime entry constructed from the shared core without loading the optional react-i18next integration; preserve the named/default plugin and public core identities. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/pluginSetup.ts` | bleedingdev | Retain native before-render i18n detection, request/context selection, per-request instance setup, SDK loading and language initialization extracted from the runtime entry. Provider-specific navigation and localized URL policy remain outside this setup helper. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/reactI18next.ts` | bleedingdev | Type the optional native provider/init capabilities and resolve them through an injected asynchronous loader only when enabled, allowing the native core to support both public runtime entries without a hard optional-peer import. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/reactI18nextRuntimeBoundary.test.ts` | bleedingdev | Bundle both actual native i18n runtime entries to verify the no-react entry remains usable when react-i18next is absent and the standard entry includes its intended adapter; retain synchronous plugin registration and correct optional provider initialization. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/type-fixture/fixture-globals.d.ts` | bleedingdev | Supply the minimal SSR i18n Window data shape for the isolated native public-Link type fixture, whose compilation intentionally does not include the runtime internal global declarations. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/type-fixture/linkTypes.fixture.tsx` | bleedingdev | Compile the actual native public Link with canonical route declaration merging; preserve accepted required-parameter, suffix, external/hash and dynamic targets and expected errors for unknown routes or missing/forbidden parameters. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/type-fixture/tsconfig.json` | bleedingdev | Define the isolated strict no-emit native Link declaration fixture with DOM/React support and the actual public runtime source mapping so expected type failures are checked without unrelated application declarations. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/router/cli/nestedRoutesSpec.ts` | bleedingdev | Retain generic native route-spec publication for multiple route producers. Snapshot submitted route objects, serialize updates per resolved output path, merge existing entries and atomically rename a same-directory temporary file, cleaning queued state and failed temporary writes. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/router/cliExtension.test.ts` | bleedingdev | Exercise native router CLI extension points using a non-TanStack fake route plugin: custom directories/ownership, scoped regeneration, preservation of other route entries, atomic concurrent spec publication and snapshot isolation before queued writes. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/rsc/server.worker.ts` | bleedingdev | Retain the public native runtime Worker RSC entry as a direct export of the shared native render/rsc-worker entry. The consolidated renderer uses build-time edge bindings; no duplicate Worker renderer implementation remains. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/helmet.test.ts` | bleedingdev | Verify native head-template replacement of title and structural priority data, with prioritized tags emitted once before ordinary tags. The tests supply native SSRHeadData directly and do not implement or select a fork head collector. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/browser/hydrate.tsx` | bleedingdev | Retain native React hydration delegation and loadable readiness. Use the configured chunk-loading-global with a native fallback, preserve context route getters and hydration completion, mirror the native stream end-marker tree slot for React useId, and avoid requiring process in browser execution. | `inline-patch` |
+| `packages/server/bff-core/tests/fixtures/upload/lambda/index.ts` | bleedingdev | Retain the real native Api/Upload schema fixture used by request-code-generation and multipart tests, returning uploaded form keys and a plain request handler without fork policy dependencies. | `inline-patch` |
+| `packages/server/bff-core/tests/operators/http.matrix.test.ts` | bleedingdev | Verify native HTTP operator inputs, schema validation failures and validator execution order before the handler across supported request slots; retain the real native operator pipeline as the subject. | `inline-patch` |
+| `packages/solutions/app-tools/tests/initAppContext.test.ts` | bleedingdev | Verify native app-context Hono defaults, preservation of an explicitly registered runtime selector, app-local generated internals when node_modules is symlinked and explicit temporary-directory precedence. | `inline-patch` |
+| `packages/toolkit/utils/compiled/js-yaml/index.js` | bleedingdev | Retain the generated CommonJS js-yaml5.4.1 bundle. Independently reproduced byte-for-byte with the declared ncc0.44.1 prebundle producer and current externals/minify/assetBuilds settings; SHA256 e7302a1de13024f89596b071c01f0b91a18aa583b9b6b185646da5eda47ad0a4. No generated runtime patch is retained. | `inline-patch` |
+| `packages/toolkit/utils/compiled/js-yaml/index.mjs` | bleedingdev | Retain the generated ESM js-yaml5.4.1 bundle. Independently reproduced byte-for-byte with the declared ncc0.44.1 prebundle producer and current externals/minify/assetBuilds settings; SHA256 0105aeb6d65cd6536352612b17b75f9056d50b75b0025b2036a7af2863d4d1be. No generated runtime patch is retained. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/cli/ssr/index.ts` | bleedingdev | Retain native SSR CLI and Rsbuild registration, output module defaults, generic Node target recognition, mode/RSC/hydration/target definitions, loadable configuration and runtime utility alias identity. Remove Module Federation marker detection, explicit-flag enforcement, MF defines/single-chunk output and Cloudflare exceptions; the higher solution supplies that policy through existing builderPlugins and modifyEnvironmentConfig hooks. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/ssr/moduleFederation.test.ts` | bleedingdev | Retain native RSC compile-definition assertions and add plain ESM/CJS/client/worker output controls. Move Module Federation detection, flag, warning and output-policy cases to the higher solution suite, where actual createRsbuild composition proves ordering against the native SSR plugin. | `inline-patch` |
+| `packages/cli/plugin-bff/src/runtime/hono/adapter.ts` | bleedingdev | Retain actual native Hono API route registration, prefix matching, middleware dispatch and request handler metadata. Accept an optional route-binder capability through a structural native contract; the higher composition supplies cross-project policy while the native adapter owns route execution and default behavior. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/server.test.ts` | bleedingdev | Verify native Hono defaults and lifecycle/prefix behavior, finite registered adapter module dispatch, missing/malformed adapter errors and isolation from unselected extension modules. Effect default/composition assertions live in the higher extension integration suite. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/package-surface.test.ts` | bleedingdev | Verify native package runtime conditions resolve built artifacts, root and CLI declarations agree, native server maps to Hono, retired Effect/data-platform aliases remain absent, build tooling stays development-only and the emitted app-tools declaration peer remains optional. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/regression.test.ts` | bleedingdev | Retain native CLI default/named export identity, client generation without lambda scanning, generated runtime initialization and export-collision failures. Assert restored native Hono/public packaging after Effect facade retirement; pure backend federation/runtime assertions move unchanged to their canonical fork-owned suites. | `inline-patch` |
+| `packages/document/docs/en/components/hono.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+| `packages/document/docs/en/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Distinguish native Hono defaults from the higher extension Effect defaults and show canonical runtime registration, application dependencies and framework helper imports. | `inline-patch` |
+| `packages/document/docs/en/guides/advanced-features/bff/function.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+| `packages/document/docs/en/guides/advanced-features/bff/operators.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+| `packages/document/docs/zh/components/bff-operator-code.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+| `packages/document/docs/zh/components/hono.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+| `packages/document/docs/zh/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Distinguish native Hono defaults from the higher extension Effect defaults and show canonical runtime registration, application dependencies and framework helper imports. | `inline-patch` |
+| `packages/document/docs/zh/guides/advanced-features/bff/function.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+| `packages/document/docs/zh/guides/advanced-features/bff/operators.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
+
+### Native template configuration delivery (2026-09-10)
+
+| Upstream-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/toolkit/create/template/biome.json.handlebars` | bleedingdev | Preserve the exact native Biome 1.9.4 configuration from audited identity `packages/toolkit/create/template/biome.json` as a template rendered by the existing create and Sandpack template mechanisms. Its template filename prevents repository tooling from interpreting consumer configuration as repository configuration. | `inline-patch` |
+| `packages/toolkit/create/src/index.ts` | bleedingdev | Match the existing subproject exclusion to the configuration's template filename, preserving the native rule that subprojects inherit root tooling. | `inline-patch` |
+
+### Disabled-RSC ownership reconciliation (2026-09-10)
+
+The earlier native-retention review traced `rscDisabledRuntime.ts` to the
+audited fallback responsibility and required preservation of its five-entry
+correctness and conflict handling. The final relocation preserves those
+contracts in `ultramodern-app-tools/src/native-composition/rsc-disabled-plugin.ts`
+through existing builder plugin composition. Native
+`rscClientBrowserFallback.ts` restores the audited implementation from
+`eded841256`, with import ordering adjusted by the formatter, and
+its native registration is restored. The native fallback alone is narrower;
+the higher composition supplies the complete corrected behavior. All six real
+compiler cases move with that policy, with four additional activation cases.
+The obsolete strict rows for the removed replacement and its old test are
+retired; this records the provenance without granting a remaining native fork
+policy budget.

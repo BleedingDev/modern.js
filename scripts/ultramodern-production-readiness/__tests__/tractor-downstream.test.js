@@ -707,6 +707,7 @@ test('runner has no bypass for Node or workerd release gates', async () => {
   } = await runnerPromise;
   assert.deepEqual(requiredCommands, [
     ['pnpm', ['install', '--frozen-lockfile']],
+    ['pnpm', ['format']],
     ['pnpm', ['check']],
     ['pnpm', ['build']],
     ['pnpm', ['node:proof']],
@@ -726,6 +727,7 @@ test('runner has no bypass for Node or workerd release gates', async () => {
         ],
         report: false,
       },
+      { command: ['pnpm', ['format']], report: true },
       { command: ['pnpm', ['check']], report: true },
       { command: ['pnpm', ['build']], report: true },
       { command: ['pnpm', ['node:proof']], report: true },
@@ -737,6 +739,7 @@ test('runner has no bypass for Node or workerd release gates', async () => {
     'exact-create-migration',
     'exact-cohort',
     'install---frozen-lockfile',
+    'format',
     'check',
     'promotable-application-source',
     'build',
@@ -1407,7 +1410,7 @@ test('Tractor delegates its whole runtime context to the shared acceptance owner
   );
 });
 
-test('Tractor evidence ids and order are unchanged by runtime-context ownership', async () => {
+test('Tractor requires formatting evidence before checks and preserves runtime gate order', async () => {
   const { requiredTractorCheckIds } = await contractPromise;
   const { executionCommands, requiredCommands } = await runnerPromise;
 
@@ -1417,6 +1420,7 @@ test('Tractor evidence ids and order are unchanged by runtime-context ownership'
       'exact-create-migration',
       'exact-cohort',
       'install---frozen-lockfile',
+      'format',
       'check',
       'promotable-application-source',
       'build',
@@ -1436,6 +1440,7 @@ test('Tractor evidence ids and order are unchanged by runtime-context ownership'
       .map(entry => entry.command[1].join('-')),
     [
       'install---frozen-lockfile',
+      'format',
       'check',
       'build',
       'node:proof',
@@ -1446,6 +1451,75 @@ test('Tractor evidence ids and order are unchanged by runtime-context ownership'
   assert.deepEqual(
     executionCommands.filter(entry => entry.report).map(entry => entry.command),
     [...requiredCommands],
+  );
+});
+
+test('Tractor formats after install and records success before the unchanged check', async () => {
+  const { executeTractorCommands } = await runnerPromise;
+  const report = { checks: [] };
+  const calls = [];
+  const env = { TRACTOR_TEST_CONTEXT: 'format-lifecycle' };
+  const iterator = executeTractorCommands({
+    workspace: '/tractor-format-fixture',
+    env,
+    report,
+    runImpl(command, args, options) {
+      calls.push([command, ...args]);
+      assert.equal(options.cwd, '/tractor-format-fixture');
+      assert.equal(options.env, env);
+      if (args[0] === 'check') {
+        assert.equal(report.checks.at(-1).id, 'format');
+        assert.equal(report.checks.at(-1).status, 'passed');
+      }
+    },
+  });
+  // Stop at check: build/runtime resources are outside this lifecycle test.
+  for (const args of iterator) {
+    if (args[0] === 'check') break;
+  }
+  assert.deepEqual(calls, [
+    ['pnpm', 'install', '--frozen-lockfile'],
+    ['pnpm', 'exec', 'playwright', 'install', '--with-deps', 'chromium'],
+    ['pnpm', 'format'],
+    ['pnpm', 'check'],
+  ]);
+  assert.deepEqual(report.checks, [
+    {
+      id: 'install---frozen-lockfile',
+      status: 'passed',
+      detail: { command: 'pnpm install --frozen-lockfile' },
+    },
+    { id: 'format', status: 'passed', detail: { command: 'pnpm format' } },
+    { id: 'check', status: 'passed', detail: { command: 'pnpm check' } },
+  ]);
+});
+
+test('Tractor stops on formatter failure without reporting format or running checks/builds', async () => {
+  const { executeTractorCommands } = await runnerPromise;
+  const report = { checks: [] };
+  const calls = [];
+  const failure = new Error('consumer formatter rejected a source file');
+  const iterator = executeTractorCommands({
+    workspace: '/tractor-format-failure-fixture',
+    env: {},
+    report,
+    runImpl(command, args) {
+      calls.push([command, ...args]);
+      if (args[0] === 'format') throw failure;
+    },
+  });
+  assert.throws(
+    () => Array.from(iterator),
+    error => error === failure,
+  );
+  assert.deepEqual(calls, [
+    ['pnpm', 'install', '--frozen-lockfile'],
+    ['pnpm', 'exec', 'playwright', 'install', '--with-deps', 'chromium'],
+    ['pnpm', 'format'],
+  ]);
+  assert.deepEqual(
+    report.checks.map(check => check.id),
+    ['install---frozen-lockfile'],
   );
 });
 

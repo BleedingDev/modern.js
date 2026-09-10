@@ -24,30 +24,60 @@ export const createConservingWebShellStream = (
     markerCarry = markerFound ? '' : candidate.slice(-(marker.length - 1));
   };
 
-  return source.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        const decoded = decoder.decode(chunk, { stream: true });
-        observeMarker(decoded);
-        const output = headProcessor.push(decoded);
-        if (output) {
-          controller.enqueue(encoder.encode(output));
+  const transform = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      const decoded = decoder.decode(chunk, { stream: true });
+      observeMarker(decoded);
+      const output = headProcessor.push(decoded);
+      if (output) {
+        controller.enqueue(encoder.encode(output));
+      }
+    },
+    flush(controller) {
+      const decoded = decoder.decode();
+      observeMarker(decoded);
+      if (!markerFound) {
+        abortHeadRender(context);
+        const error = new Error(MISSING_SHELL_MARKER_ERROR);
+        onMissingMarker?.(error);
+        throw error;
+      }
+      const output = headProcessor.finish(decoded);
+      if (output) {
+        controller.enqueue(encoder.encode(output));
+      }
+    },
+  });
+  const piping = source.pipeTo(transform.writable);
+  piping.catch(() => {});
+  const reader = transform.readable.getReader();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const result = await reader.read();
+        if (result.done) {
+          await piping;
+          controller.close();
+          reader.releaseLock();
+        } else controller.enqueue(result.value);
+      } catch (error) {
+        await piping.catch(() => {});
+        controller.error(error);
+        reader.releaseLock();
+      }
+    },
+    async cancel(reason) {
+      try {
+        await reader.cancel(reason);
+      } finally {
+        try {
+          await piping.catch(error => {
+            if (error !== reason) throw error;
+          });
+        } finally {
+          reader.releaseLock();
         }
-      },
-      flush(controller) {
-        const decoded = decoder.decode();
-        observeMarker(decoded);
-        if (!markerFound) {
-          abortHeadRender(context);
-          const error = new Error(MISSING_SHELL_MARKER_ERROR);
-          onMissingMarker?.(error);
-          throw error;
-        }
-        const output = headProcessor.finish(decoded);
-        if (output) {
-          controller.enqueue(encoder.encode(output));
-        }
-      },
-    }),
-  );
+      }
+    },
+  });
 };

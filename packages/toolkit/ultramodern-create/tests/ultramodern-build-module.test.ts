@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { createDeliveryUnitRecord } from '../src/ultramodern-workspace/delivery-unit';
 import { createNeutralOwnership } from '../src/ultramodern-workspace/descriptors';
-import { createUltramodernBuildModule } from '../src/ultramodern-workspace/module-federation/reexport-module';
+import {
+  createUltramodernBuildArtifactJson,
+  createUltramodernBuildModule,
+} from '../src/ultramodern-workspace/module-federation/reexport-module';
 import type { WorkspaceApp } from '../src/ultramodern-workspace/types';
 import { evaluateBuildModule } from './helpers/build-module';
 
@@ -28,9 +31,10 @@ const app: WorkspaceApp = {
 
 test('generated build module applies one compiled identity to UI, API, and delivery-unit records', () => {
   const source = createUltramodernBuildModule('acme', app);
+  const artifactJson = createUltramodernBuildArtifactJson('acme', app);
   const generationRecord = createDeliveryUnitRecord('acme', app);
   const execute = (globals: Record<string, string>) => {
-    const exports = evaluateBuildModule(source, globals);
+    const exports = evaluateBuildModule(source, artifactJson, globals);
     assert.deepEqual(Object.keys(exports).sort(), [
       'ultramodernApiMarker',
       'ultramodernDeliveryUnit',
@@ -45,6 +49,9 @@ test('generated build module applies one compiled identity to UI, API, and deliv
     };
   };
   const fallback = execute({});
+  const generatedArtifact = JSON.parse(artifactJson);
+  assert.deepEqual(fallback.deliveryUnit, generatedArtifact.deliveryUnit);
+  assert.deepEqual(fallback.surfaces, generatedArtifact.surfaces);
   assert.equal(fallback.deliveryUnit.buildMarker, generationRecord.buildMarker);
   assert.equal(fallback.deliveryUnit.sourceRevision, 'workspace');
 
@@ -57,6 +64,7 @@ test('generated build module applies one compiled identity to UI, API, and deliv
     compiledIdentity.surfaces.api,
     compiledIdentity.surfaces.ui,
   ]) {
+    assert.equal(identity.unitId, generationRecord.unitId);
     assert.equal(identity.build, 'compiled-marker');
     assert.equal(identity.buildMarker, 'compiled-marker');
     assert.equal(identity.sourceRevision, 'compiled-revision');
@@ -64,10 +72,25 @@ test('generated build module applies one compiled identity to UI, API, and deliv
 });
 
 test('shell build modules expose the delivery and UI identity consumed by their pages', () => {
-  const source = createUltramodernBuildModule('acme', {
+  const shell: WorkspaceApp = {
     ...app,
     kind: 'shell',
-  });
+  };
+  const source = createUltramodernBuildModule('acme', shell);
+  const artifactJson = createUltramodernBuildArtifactJson('acme', shell);
+  const exports = evaluateBuildModule(source, artifactJson);
+  assert.deepEqual(Object.keys(exports).sort(), [
+    'ultramodernDeliveryUnit',
+    'ultramodernUiMarker',
+  ]);
+  assert.deepEqual(
+    exports.ultramodernDeliveryUnit,
+    JSON.parse(artifactJson).deliveryUnit,
+  );
+  assert.deepEqual(
+    exports.ultramodernUiMarker,
+    JSON.parse(artifactJson).surfaces.ui,
+  );
   assert.match(source, /export const ultramodernDeliveryUnit/u);
   assert.match(source, /export const ultramodernUiMarker/u);
   assert.doesNotMatch(source, /export const ultramodernApiMarker/u);

@@ -61,6 +61,10 @@ const sourceLoaders = {
     target: './src/index.ts',
     load: () => import('../src/index'),
   },
+  './assembly': {
+    target: './src/assembly.ts',
+    load: () => import('../src/assembly'),
+  },
   './effect': {
     target: './src/effect/index.ts',
     load: () => import('../src/effect'),
@@ -72,6 +76,10 @@ const sourceLoaders = {
   './effect-client': {
     target: './src/effect-client/index.ts',
     load: () => import('../src/effect-client'),
+  },
+  './microvertical-api': {
+    target: './src/microvertical-api.ts',
+    load: () => import('../src/microvertical-api'),
   },
   './effect-client-runtime': {
     target: './src/effect-client/runtime.ts',
@@ -227,6 +235,46 @@ describe('@modern-js/bff-effect package surface', () => {
     expect(esmEntryShape.isValidatorAwareHandlerFactory(factory)).toBe(true);
   });
 
+  test('replaces the runtime macro and keeps browser factory registration local', async () => {
+    for (const format of ['cjs', 'esm-node', 'esm']) {
+      const extension = format === 'cjs' ? 'js' : 'mjs';
+      const source = readFileSync(
+        path.join(
+          packageRoot,
+          `dist/${format}/effect/entry-shape.${extension}`,
+        ),
+        'utf8',
+      );
+      expect(source).not.toContain('MODERN_EFFECT_NODE_RUNTIME');
+      if (format === 'esm') {
+        expect(source).not.toContain('process');
+        expect(source).not.toContain('node:module');
+        expect(source).not.toContain('#effect-entry-shape-registry');
+      }
+    }
+
+    const browserEntryShape = await import(
+      pathToFileURL(path.join(packageRoot, 'dist/esm/effect/entry-shape.mjs'))
+        .href
+    );
+    const cjsEntryShape = requireCjs(
+      path.join(packageRoot, 'dist/cjs/effect/entry-shape.js'),
+    );
+    const nodeFactory = () => undefined;
+    cjsEntryShape.registerValidatorAwareHandlerFactory(nodeFactory);
+    expect(browserEntryShape.isValidatorAwareHandlerFactory(nodeFactory)).toBe(
+      false,
+    );
+    const browserFactory = () => undefined;
+    browserEntryShape.registerValidatorAwareHandlerFactory(browserFactory);
+    expect(
+      browserEntryShape.isValidatorAwareHandlerFactory(browserFactory),
+    ).toBe(true);
+    expect(cjsEntryShape.isValidatorAwareHandlerFactory(browserFactory)).toBe(
+      false,
+    );
+  });
+
   test('resolves every declared types export with TypeScript 7', () => {
     const fixtureRoot = mkdtempSync(
       path.join(tmpdir(), 'bff-effect-types-surface-'),
@@ -298,13 +346,14 @@ describe('@modern-js/bff-effect package surface', () => {
         compilerManifest.bin.tsgo,
       );
       const result = spawnSync(
-        compilerPath,
-        ['--project', path.join(fixtureRoot, 'tsconfig.json')],
+        process.execPath,
+        [compilerPath, '--project', path.join(fixtureRoot, 'tsconfig.json')],
         {
           encoding: 'utf8',
         },
       );
 
+      expect(result.error).toBeUndefined();
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true });

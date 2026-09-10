@@ -104,11 +104,11 @@ export const Link = <TTo extends string = string>(
   } = props as LinkBaseProps & { to: string; params?: LinkParams };
 
   const adapter = useI18nRouterAdapter();
-  const { language, supportedLanguages, localisedUrls } = useModernI18n();
+  const { language, supportedLanguages, urlStrategy } = useModernI18n();
 
   const config: LocalizedPathsConfig = {
     languages: supportedLanguages,
-    localisedUrls,
+    urlStrategy,
   };
 
   const isExternal = EXTERNAL_TARGET_RE.test(to);
@@ -139,7 +139,7 @@ export const Link = <TTo extends string = string>(
       interpolated,
       language,
       supportedLanguages,
-      localisedUrls,
+      urlStrategy,
     );
     const hash = hashProp ?? (hashFromTo ? hashFromTo.slice(1) : '');
     const { searchString, searchObject } = normalizeSearch(
@@ -164,7 +164,7 @@ export const Link = <TTo extends string = string>(
     isBareHash,
     language,
     supportedLanguages,
-    localisedUrls,
+    urlStrategy,
   ]);
 
   const isActive = useMemo(() => {
@@ -190,7 +190,7 @@ export const Link = <TTo extends string = string>(
     adapter.location,
     activeOptions?.exact,
     supportedLanguages,
-    localisedUrls,
+    urlStrategy,
   ]);
 
   const resolvedActiveProps = splitActiveProps(isActive, activeProps);
@@ -214,7 +214,7 @@ export const Link = <TTo extends string = string>(
     );
   }
 
-  const { Link: RouterLink, hasRouter, framework } = adapter;
+  const { Link: RouterLink, hasRouter } = adapter;
 
   if (!hasRouter || !RouterLink) {
     const { replace: _replace, ...anchorProps } = rest;
@@ -252,43 +252,23 @@ export const Link = <TTo extends string = string>(
     ...(activeStyle as React.CSSProperties | undefined),
   };
 
-  if (framework === 'tanstack') {
-    // TanStack's prop is `preload`; map our react-router-flavored `prefetch`
-    // onto it (`'none'` -> `false`). An explicit native `preload` wins.
-    const tanstackPreload =
-      preload !== undefined
-        ? preload
-        : prefetch === undefined
-          ? undefined
-          : prefetch === 'none'
-            ? false
-            : prefetch;
-
-    // Pass hash/search natively: string-concatenated targets silently break
-    // TanStack navigation.
-    return (
-      <RouterLink
-        to={target.localizedPathname}
-        {...(target.searchObject ? { search: target.searchObject } : {})}
-        {...(target.hash ? { hash: target.hash } : {})}
-        {...(hashScrollIntoView === undefined ? {} : { hashScrollIntoView })}
-        {...(tanstackPreload === undefined ? {} : { preload: tanstackPreload })}
-        {...rest}
-        {...activeRest}
-        {...activeAttributes}
-        className={mergedClassName}
-        style={mergedStyle}
-      >
-        {children}
-      </RouterLink>
-    );
-  }
+  const routerProps = adapter.createLinkProps?.({
+    pathname: target.localizedPathname,
+    href: target.href,
+    search: target.searchObject,
+    hash: target.hash,
+    hashScrollIntoView,
+    prefetch,
+    preload,
+  }) ?? {
+    to: target.href,
+    ...(prefetch === undefined ? {} : { prefetch }),
+    ...(preload === undefined ? {} : { preload }),
+  };
 
   return (
     <RouterLink
-      to={target.href}
-      {...(prefetch === undefined ? {} : { prefetch })}
-      {...(preload === undefined ? {} : { preload })}
+      {...routerProps}
       {...rest}
       {...activeRest}
       {...activeAttributes}

@@ -1,22 +1,6 @@
-/* @modern-js/create-request will auto select server or client implementation */
-import {
-  configure,
-  createRequest,
-  createRequestContextHeaders,
-  createRequestContextSnapshot,
-  createUploader,
-} from '@modern-js/create-request';
-
-export type {
-  OperationContext,
-  OperationContextSource,
-  RequestContextInput,
-  RequestContextSnapshot,
-} from '@modern-js/create-request';
+/* @modern-js/create-request selects the native server or client implementation. */
 export {
   configure,
   createRequest,
-  createRequestContextHeaders,
-  createRequestContextSnapshot,
   createUploader,
-};
+} from '@modern-js/create-request';

@@ -1,5 +1,5 @@
 import type { OnError } from '@modern-js/app-tools';
-import { getRouterServerSnapshot } from '../../router/runtime/lifecycle';
+import { getRouterServerSnapshot } from '@modern-js/runtime-extensions/router-state';
 import { handleRSCRedirect } from '../../router/runtime/redirect';
 import type { TInternalRuntimeContext } from '../context';
 import type { RouterCleanup } from './routerCleanup';
@@ -28,7 +28,9 @@ const isNullBodyStatus = (status: number): boolean =>
 
 const getRedirectLocation = (headers: Headers): string | undefined => {
   const location = headers.get('Location');
-  return location && URL.canParse(location, 'http://localhost')
+  return location !== null &&
+    location !== '' &&
+    URL.canParse(location, 'http://localhost')
     ? location
     : undefined;
 };
@@ -90,7 +92,7 @@ export const createLoaderRedirectResponse = (
   }
 
   const redirectUrl = getRedirectLocation(beforeRenderResult.headers);
-  if (!redirectUrl) {
+  if (redirectUrl === undefined) {
     return;
   }
   return processRedirect(

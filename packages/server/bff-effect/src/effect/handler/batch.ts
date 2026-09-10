@@ -1,5 +1,6 @@
 // @effect-diagnostics anyUnknownInErrorContext:off asyncFunction:off globalDate:off globalTimers:off newPromise:off strictBooleanExpressions:off
 
+import * as Data from 'effect/Data';
 import {
   type DataBatchRequestPayload,
   type DataBatchResponseItem,
@@ -117,7 +118,14 @@ export function toBatchItemError(
   };
 }
 
-export class BatchItemTimeoutError extends Error {}
+export class BatchItemTimeoutError extends Data.TaggedError(
+  'BatchItemTimeoutError',
+)<{ readonly message: string }> {
+  constructor(message: string) {
+    super({ message });
+    this.name = 'Error';
+  }
+}
 
 export function promiseWithTimeout<T>(
   effect: Promise<T>,

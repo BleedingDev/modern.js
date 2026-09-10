@@ -1,0 +1,49 @@
+{
+  "name": "@modern-js/backend-federation-contracts",
+  "description": "Fork-owned universal backend federation and delivery-unit contracts.",
+  "homepage": "https://github.com/BleedingDev/ultramodern.js#readme",
+  "bugs": "https://github.com/BleedingDev/ultramodern.js/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BleedingDev/ultramodern.js",
+    "directory": "packages/toolkit/backend-federation-contracts"
+  },
+  "license": "MIT",
+  "version": "3.8.3",
+  "files": ["dist", "src"],
+  "types": "./src/backend-federation-contract/index.ts",
+  "main": "./dist/cjs/backend-federation-contract/index.js",
+  "module": "./dist/esm/backend-federation-contract/index.mjs",
+  "exports": {
+    ".": {
+      "types": "./dist/types/backend-federation-contract/index.d.ts",
+      "modern:source": "./src/backend-federation-contract/index.ts",
+      "node": {
+        "import": "./dist/esm-node/backend-federation-contract/index.mjs",
+        "require": "./dist/cjs/backend-federation-contract/index.js"
+      },
+      "import": "./dist/esm/backend-federation-contract/index.mjs",
+      "default": "./dist/esm/backend-federation-contract/index.mjs"
+    }
+  },
+  "scripts": {
+    "prepublishOnly": "only-allow-pnpm",
+    "dev": "rslib build --watch",
+    "build": "rslib build",
+    "test": "rstest"
+  },
+  "devDependencies": {
+    "@modern-js/rslib": "workspace:*",
+    "@modern-js/tsconfig": "workspace:*",
+    "@rslib/core": "1.0.0",
+    "@rstest/core": "0.11.12",
+    "@scripts/rstest-config": "workspace:*",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "types": "./dist/types/backend-federation-contract/index.d.ts"
+  }
+}

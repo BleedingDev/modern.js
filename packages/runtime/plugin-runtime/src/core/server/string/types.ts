@@ -1,10 +1,6 @@
-import type { ReactElement } from 'react';
 import type { RenderLevel } from '../../constants';
 
-export interface Collector {
-  collect?: (comopnent: ReactElement) => ReactElement;
-  effect: () => void | Promise<void>;
-}
+export type { Collector } from '@modern-js/plugin/runtime';
 
 export type ChunkSet = {
   renderLevel: RenderLevel;

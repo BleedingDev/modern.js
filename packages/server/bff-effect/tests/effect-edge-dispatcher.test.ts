@@ -1,4 +1,4 @@
-import type { NormalizedCrossProjectPolicy } from '@modern-js/bff-core/security/cross-project-policy';
+import type { NormalizedCrossProjectPolicy } from '@modern-js/server-runtime-extensions/bff-policy';
 import { createEffectBffEdgeDispatcher } from '../src/effect/edge-dispatcher';
 import { registerValidatorAwareHandlerFactory } from '../src/effect/entry-shape';
 import type { EffectBffHandlerFactory } from '../src/effect/module';

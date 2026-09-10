@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -20,6 +21,89 @@ const reservePort = async () => {
   );
   return port;
 };
+
+test('Node backend proof composes public runtime owners and runs a native Effect handler', () => {
+  const workspaceRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'node-backend-proof-runtime-'),
+  );
+  try {
+    fs.writeFileSync(
+      path.join(workspaceRoot, 'package.json'),
+      '{"type":"module"}',
+    );
+    const scope = path.join(workspaceRoot, 'node_modules/@modern-js');
+    fs.mkdirSync(scope, { recursive: true });
+    for (const [name, relativePath] of [
+      ['plugin-bff-extensions', '../../../cli/plugin-bff-extensions'],
+      ['bff-effect', '../../../server/bff-effect'],
+    ]) {
+      fs.symlinkSync(
+        path.resolve(__dirname, relativePath),
+        path.join(scope, name),
+        'dir',
+      );
+    }
+
+    const proofUrl = pathToFileURL(
+      path.resolve(
+        __dirname,
+        '../templates/workspace-scripts/proof-node-backend-federation.mjs',
+      ),
+    ).href;
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+const require = createRequire(process.cwd() + '/package.json');
+const proof = await import(${JSON.stringify(proofUrl)});
+const runtime = await proof.importBackendFederationRuntime();
+const federation = await import(pathToFileURL(require.resolve('@modern-js/plugin-bff-extensions/backend-federation-manifest/node')).href);
+const effect = await import(pathToFileURL(require.resolve('@modern-js/bff-effect/effect')).href);
+assert.equal(federation.createEffectBffTestHandler, undefined);
+assert.equal(runtime.loadBackendFederatedEffectApiFromManifest, federation.loadBackendFederatedEffectApiFromManifest);
+assert.equal(runtime.createEffectBffTestHandler, effect.createEffectBffTestHandler);
+const { Effect, HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, Layer, Schema } = await import(
+  '@modern-js/bff-effect/effect-edge'
+);
+const api = HttpApi.make('ProofApi').add(
+  HttpApiGroup.make('proof').add(
+    HttpApiEndpoint.get('ready', '/ready', { success: Schema.Struct({ status: Schema.String }) }),
+  ),
+);
+const handlers = HttpApiBuilder.group(api, 'proof', group =>
+  group.handle('ready', () => Effect.succeed({ status: 'ready' })),
+);
+const layer = HttpApiBuilder.layer(api).pipe(Layer.provide(handlers));
+const handler = await runtime.createEffectBffTestHandler({ module: { api, layer }, prefix: '/proof-api' });
+try {
+  const response = await handler.handler(new Request('http://localhost/proof-api/ready'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: 'ready' });
+} finally {
+  await handler.dispose();
+}
+`,
+      ],
+      {
+        cwd: workspaceRoot,
+        env: {
+          ...process.env,
+          NODE_OPTIONS: '',
+          NODE_PATH: '',
+          ULTRAMODERN_WORKSPACE_ROOT: workspaceRoot,
+        },
+        stdio: 'pipe',
+      },
+    );
+  } finally {
+    fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  }
+});
 
 test('Node backend proof owns the runtime lifecycle for built MicroVerticals', async () => {
   const workspaceRoot = fs.mkdtempSync(

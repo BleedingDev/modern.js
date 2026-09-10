@@ -29,16 +29,11 @@ export type SingleRouteConfig = RouteProps & {
   component?: React.ComponentType;
 };
 
-export type BuiltInRouterFramework = 'react-router' | 'tanstack';
-export type RouterFramework = BuiltInRouterFramework | (string & {});
-
 export type RouterConfig = {
   /**
-   * Select the router implementation used by Modern.js conventional routing.
-   * - `react-router` (default): React Router based integration
-   * - `tanstack`: TanStack Router integration
+   * Router implementation identifier for integrations that provide selection.
    */
-  framework?: RouterFramework;
+  framework?: string;
   routesConfig: {
     globalApp?: React.ComponentType<any>;
     routes?: ModernRoute[];
@@ -62,49 +57,8 @@ export type RouterConfig = {
 
 export type Routes = RouterConfig['routesConfig']['routes'];
 
-export interface RouterRouteMatchSnapshot {
-  routeId: string;
-  assetRouteId?: string;
-  pathname?: string;
-  params?: Record<string, string>;
-}
-
 export interface RouteManifest {
   routeAssets: RouteAssets;
-}
-
-export interface InternalRouterServerSnapshot {
-  framework?: RouterFramework;
-  basename?: string;
-  statusCode?: number;
-  errors?: Record<string, unknown>;
-  routerData?: {
-    loaderData?: Record<string, unknown>;
-    errors?: Record<string, unknown>;
-  };
-  hydrationScript?: string;
-  hydrationScripts?: string[];
-  matchedRouteIds?: string[];
-  matches?: RouterRouteMatchSnapshot[];
-}
-
-export interface InternalRouterRuntimeState {
-  framework: RouterFramework;
-  basename?: string;
-  instance?: unknown;
-  hydrationScript?: string;
-  hydrationScripts?: string[];
-  matchedRouteIds?: string[];
-  matches?: RouterRouteMatchSnapshot[];
-  serverSnapshot?: InternalRouterServerSnapshot;
-  cleanup?: () => void | Promise<void>;
-}
-
-export interface RouterServerPrepareResult {
-  state: InternalRouterRuntimeState;
-  snapshot?: InternalRouterServerSnapshot;
-  redirect?: Response;
-  cleanup?: () => void | Promise<void>;
 }
 
 export interface RouteAssets {

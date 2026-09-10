@@ -1,4 +1,5 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off unnecessaryArrowBlock:off
+
 import { merge } from '@modern-js/runtime-utils/merge';
 import {
   createRequestContext,
@@ -9,7 +10,6 @@ import {
   createStaticHandler,
   createStaticRouter,
   type RouteObject,
-  type StaticHandlerContext,
   StaticRouterProvider,
   useInRouterContext,
   useLocation,
@@ -31,21 +31,16 @@ import {
 import type { TInternalRuntimeContext } from '../../core/context/runtime';
 import { setServerPayload } from '../../core/context/serverPayload/index.server';
 import DeferredDataScripts from './DeferredDataScripts.node';
-import type { RouterExtendsHooks } from './hooks';
-import {
-  applyRouterRuntimeState,
-  createRouterServerSnapshot,
-  type RouterLifecycleContext,
-} from './lifecycle';
+import type { RouterExtendsHooks, RouterLifecycleContext } from './hooks';
+import { routerProviderRegistryHooks } from './hooks';
 import { Link as PrefetchLink } from './PrefetchLink';
-import { routerProviderRegistryHooks } from './provider';
 import {
   createServerPayload,
   handleRSCRedirect,
   prepareRSCRoutes,
   RSCStaticRouter,
 } from './rsc-router';
-import type { InternalRouterServerSnapshot, RouterConfig } from './types';
+import type { RouterConfig } from './types';
 import { createRouteObjectsFromConfig, renderRoutes, urlJoin } from './utils';
 
 function createRemixRequest(request: Request) {
@@ -57,30 +52,6 @@ function createRemixRequest(request: Request) {
     method,
     headers,
     signal: controller.signal,
-  });
-}
-
-function createReactRouterServerSnapshot(
-  routerContext: StaticHandlerContext,
-  basename?: string,
-): InternalRouterServerSnapshot {
-  return createRouterServerSnapshot({
-    framework: 'react-router',
-    basename,
-    statusCode: routerContext.statusCode,
-    errors: routerContext.errors as Record<string, unknown> | undefined,
-    routerData: {
-      loaderData: routerContext.loaderData,
-      errors: routerContext.errors as Record<string, unknown> | undefined,
-    },
-    matches: routerContext.matches
-      .map(match => {
-        const routeId = match.route.id;
-        return typeof routeId === 'string' ? { routeId } : undefined;
-      })
-      .filter(
-        (match): match is { routeId: string } => typeof match !== 'undefined',
-      ),
   });
 }
 
@@ -229,22 +200,9 @@ export const routerPlugin = (
             throw errors[0];
           }
           context.routerContext = routerContext;
-          const routerServerSnapshot = createReactRouterServerSnapshot(
-            routerContext,
-            _basename,
-          );
-
-          applyRouterRuntimeState(context, {
-            framework: 'react-router',
-            basename: _basename,
-            instance: routerContext,
-            matchedRouteIds: routerServerSnapshot.matchedRouteIds,
-            serverSnapshot: routerServerSnapshot,
-          });
           hooks.onAfterCreateRouter.call({
             ...routerLifecycleContext,
             router: routerContext,
-            serverSnapshot: routerServerSnapshot,
             runtimeContext: context,
           });
 

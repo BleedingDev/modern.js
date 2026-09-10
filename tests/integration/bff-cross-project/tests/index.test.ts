@@ -170,10 +170,10 @@ describe.sequential('cross project bff', () => {
   describe('producer effect runtime contracts', () => {
     test('effect-client runtime preserves strict envelope fallback semantics', async () => {
       const runtime = requireFromApiApp(
-        '@modern-js/plugin-bff/effect-client-runtime',
+        '@modern-js/bff-effect/effect-client-runtime',
       );
       const dataPlatform = requireFromApiApp(
-        '@modern-js/plugin-bff/data-platform',
+        '@modern-js/bff-effect/data-platform',
       );
       const manifest = {
         endpoints: [

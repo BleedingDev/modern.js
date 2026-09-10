@@ -10,7 +10,9 @@ import type {
   Hooks,
   OnBeforeRenderFn,
   PickContextFn,
+  ResolveComponentFn,
   StringSSRCollectorsInfo,
+  TransformRuntimeContextFn,
   WrapRootFn,
 } from '../types/runtime/hooks';
 
@@ -22,12 +24,15 @@ export function initHooks<RuntimeConfig, RuntimeContext>(): Hooks<
     onBeforeRender:
       createAsyncInterruptHook<OnBeforeRenderFn<RuntimeContext>>(),
     wrapRoot: createSyncHook<WrapRootFn>(),
+    resolveComponent: createSyncHook<ResolveComponentFn>(),
     pickContext: createSyncHook<PickContextFn<RuntimeContext>>(),
+    transformRuntimeContext:
+      createSyncHook<TransformRuntimeContextFn<RuntimeContext>>(),
     config: createCollectSyncHook<ConfigFn<RuntimeConfig>>(),
     extendStringSSRCollectors:
       createCollectSyncHook<
-        ExtendStringSSRCollectorsFn<StringSSRCollectorsInfo>
+        ExtendStringSSRCollectorsFn<StringSSRCollectorsInfo<RuntimeContext>>
       >(),
-    extendStreamSSR: createCollectSyncHook<ExtendStreamSSRFn>(),
+    extendStreamSSR: createCollectSyncHook<ExtendStreamSSRFn<RuntimeContext>>(),
   };
 }

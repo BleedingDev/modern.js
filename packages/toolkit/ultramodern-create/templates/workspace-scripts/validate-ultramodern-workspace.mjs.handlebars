@@ -987,7 +987,52 @@ const assertCompilerArchitecture = () => {
     });
     const moduleFederationAppPath =
       moduleFederationConfigAppPaths.get(absolutePath);
+    const tailwindFactories = new Set();
+    const presetFactories = new Set();
+    for (const statement of sourceFile.statements) {
+      if (!typescript.isImportDeclaration(statement) ||
+          !typescript.isStringLiteralLikeNode(statement.moduleSpecifier) ||
+          statement.importClause?.isTypeOnly) continue;
+      const bindings = statement.importClause?.namedBindings;
+      if (bindings === undefined || !typescript.isNamedImports(bindings)) continue;
+      for (const binding of bindings.elements) {
+        if (binding.isTypeOnly) continue;
+        const imported = (binding.propertyName ?? binding.name).text;
+        if (statement.moduleSpecifier.text === '@rsbuild/plugin-tailwindcss' &&
+            imported === 'pluginTailwindcss') tailwindFactories.add(binding.name.text);
+        if (statement.moduleSpecifier.text === '@modern-js/ultramodern-app-tools' &&
+            imported === 'presetUltramodern') presetFactories.add(binding.name.text);
+      }
+    }
+    const modernConfigApp = workspaceValidationContract.topology.compactConfig.apps.find(
+      app => absolutePath === path.join(root, app.path, 'modern.config.ts'),
+    );
+    let insideDefaultExport = false;
     const visit = node => {
+      const previousDefaultExport = insideDefaultExport;
+      if (typescript.isExportAssignment(node) && !node.isExportEquals) {
+        insideDefaultExport = true;
+      }
+      if (insideDefaultExport && modernConfigApp !== undefined &&
+          isCallNamed(node, presetFactories) &&
+          node.arguments[0] !== undefined &&
+          typescript.isObjectLiteralExpression(node.arguments[0])) {
+        const builderPlugins = objectLiteralProperty(node.arguments[0], 'builderPlugins');
+        const usesTailwind = builderPlugins !== undefined &&
+          typescript.isArrayLiteralExpression(builderPlugins.initializer) &&
+          builderPlugins.initializer.elements.some(plugin => isCallNamed(plugin, tailwindFactories));
+        const emitsUi = modernConfigApp.kind === 'shell' ||
+          fullStackVerticals.some(vertical => vertical.id === modernConfigApp.id && vertical.emitsUi);
+        if (usesTailwind !== (tailwindEnabled && emitsUi)) {
+          compilerFailure(
+            sourceFile,
+            builderPlugins ?? node,
+            `${compactConfigPath} policy.features.tailwind`,
+            `Tailwind feature flag is ${tailwindEnabled}, but ${modernConfigApp.id} exported config ${usesTailwind ? 'enables' : 'does not enable'} the Tailwind builder plugin.`,
+            'keep the Tailwind feature flag and active app builder configuration consistent',
+          );
+        }
+      }
       if (
         typescript.isImportDeclaration(node) &&
         typescript.isStringLiteralLikeNode(node.moduleSpecifier) &&
@@ -1088,6 +1133,7 @@ const assertCompilerArchitecture = () => {
         }
       }
       node.forEachChild(visit);
+      insideDefaultExport = previousDefaultExport;
     };
     visit(sourceFile);
     if (moduleFederationAppPath !== undefined) {
@@ -1730,8 +1776,7 @@ const createEffectOperationContract = app => ({
 const createAppConfigContract = app => ({
   preset: 'presetUltramodern',
   plugins: [
-    'appTools',
-    'ultramodernReleaseEnvelopePlugin',
+    'ultramodernAppTools',
     'tanstackRouterPlugin',
     'i18nPlugin',
     ...(app.api ? ['bffPlugin'] : []),
@@ -1902,7 +1947,7 @@ const createAppContract = (app, apps) => ({
           (app.api.protocol ?? 'rest') === 'rpc'
             ? {
                 runtime: 'effect',
-                import: '@modern-js/plugin-bff/effect-edge',
+                import: '@modern-js/bff-effect/effect-edge',
                 prefix: app.api.prefix,
                 protocol: 'rpc',
                 strictEffectApproach: true,
@@ -1915,7 +1960,7 @@ const createAppContract = (app, apps) => ({
               }
             : {
                 runtime: 'effect',
-                import: '@modern-js/plugin-bff/effect-edge',
+                import: '@modern-js/bff-effect/effect-edge',
                 prefix: app.api.prefix,
                 openapi: '/openapi.json',
                 strictEffectApproach: true,
@@ -2046,8 +2091,18 @@ const synthesizeGeneratedContractFromCompact = config => {
     apps: apps.map(app => createAppContract(app, apps)),
   };
 };
-const readGeneratedContractView = config => {
-  return synthesizeGeneratedContractFromCompact(config);
+const readGeneratedContractView = (config, overlay) => {
+  const ports = overlay.ports ?? {};
+  return synthesizeGeneratedContractFromCompact({
+    ...config,
+    topology: {
+      ...config.topology,
+      apps: config.topology.apps.map(app => ({
+        ...app,
+        port: typeof ports[app.id] === 'number' ? ports[app.id] : app.port,
+      })),
+    },
+  });
 };
 const expectedManifestUrl = vertical =>
   `http://localhost:${vertical.port}/mf-manifest.json`;
@@ -2739,7 +2794,7 @@ const assertTsConfigReferenceGraph = () => {
   assert(baseTsConfig.compilerOptions?.skipLibCheck !== true, 'tsconfig.base.json must not use skipLibCheck');
   assertSameJson(
     shellTsConfig.include ?? [],
-    ['src', 'locales/**/*.json', 'package.json', 'shared', 'server'],
+    ['src', 'locales/**/*.json', 'package.json', 'shared', 'shared/ultramodern-build.json', 'server'],
     'apps/shell-super-app/tsconfig.json include',
     'restore the generated shell typecheck boundary',
   );
@@ -2793,6 +2848,7 @@ const assertTsConfigReferenceGraph = () => {
         'locales/**/*.json',
         'package.json',
         'shared',
+        'shared/ultramodern-build.json',
         'server',
         ...(vertical.emitsApi ? ['api'] : []),
       ],
@@ -2846,7 +2902,7 @@ const assertTsConfigReferenceGraph = () => {
     );
     assertSameJson(
       shellTsConfig.include ?? [],
-      ['src', 'locales/**/*.json', 'package.json', 'shared', 'server'],
+      ['src', 'locales/**/*.json', 'package.json', 'shared', 'shared/ultramodern-build.json', 'server'],
       `${shell.path}/tsconfig.json include`,
       'restore the generated additional-shell typecheck boundary',
     );
@@ -3089,7 +3145,6 @@ const requiredPaths = [
   'topology/local-overlays/development.json',
   'scripts/assert-mf-types.mts',
   'scripts/bootstrap-agent-skills.mts',
-  'scripts/check-ultramodern-api-boundaries.mts',
   'scripts/check-ultramodern-i18n-boundaries.mts',
   ...(hasBackendSurfaces ? ['scripts/generate-node-backend-federation.mts'] : []),
   'scripts/generate-public-surface-assets.mts',
@@ -3285,7 +3340,7 @@ assertStructuredWorkspaceMetadata({
 const bridgeConfig =
   ultramodernConfig?.bridge?.enabled === true ? ultramodernConfig.bridge : undefined;
 const packageSource = createPackageSourceView(ultramodernConfig);
-const generatedContract = readGeneratedContractView(ultramodernConfig);
+const generatedContract = readGeneratedContractView(ultramodernConfig, overlay);
 const shellPackage = readJson('apps/shell-super-app/package.json');
 
 assertMicroVerticalContractGraph({
@@ -3617,7 +3672,7 @@ if (bridgeConfig) {
   assert(rootPackage.scripts?.typecheck === 'node ./scripts/ultramodern-typecheck.mts --build tsconfig.json', 'Root typecheck must run TS-Go across the root project reference graph');
 }
 assert(rootPackage.scripts?.['contract:check'] === 'node ./scripts/validate-ultramodern-workspace.mts', 'Root must expose contract:check');
-assert(rootPackage.scripts?.['api:check'] === 'node ./scripts/check-ultramodern-api-boundaries.mts', 'Root must expose api:check');
+assert(rootPackage.scripts?.['api:check'] === 'modern-api-check', 'Root must expose api:check');
 assert(rootPackage.scripts?.['i18n:boundaries'] === 'node ./scripts/check-ultramodern-i18n-boundaries.mts', 'Root must expose i18n:boundaries');
 assert(rootPackage.scripts?.['performance:readiness'] === 'node ./scripts/ultramodern-performance-readiness.mts', 'Root must expose default-on performance readiness diagnostics');
 if (hasBackendSurfaces) {
@@ -3687,7 +3742,17 @@ assert(rootPackage.scripts?.['cloudflare:proof'] === 'node ./scripts/proof-cloud
 assert(rootPackage.scripts?.['migrate:strict-effect'] === 'node ./scripts/migrate-strict-effect.mts', 'Root must expose migrate:strict-effect');
 assert(rootPackage.scripts?.['skills:install'] === 'node ./scripts/bootstrap-agent-skills.mts', 'Root must expose skills:install');
 assert(rootPackage.scripts?.['skills:check'] === 'node ./scripts/bootstrap-agent-skills.mts --check', 'Root must expose skills:check');
-assert(rootPackage.scripts?.postinstall === 'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .', 'Root postinstall must run the default-on Codex skills bootstrap, format installed skills through the cross-platform ignore configuration, and leave reference repository installs explicit');
+const postinstall = rootPackage.scripts?.postinstall;
+const postinstallSegments = typeof postinstall === 'string'
+  ? postinstall.match(new RegExp({{workspaceScriptSegmentPattern}}, 'gu'))
+  : undefined;
+assert(
+  Array.isArray(postinstallSegments) &&
+    postinstallSegments.join('&&') === postinstall &&
+    postinstallSegments.every(command => command.trim().length > 0) &&
+    postinstallSegments.some(command => command.trim() === 'node ./scripts/bootstrap-agent-skills.mts --postinstall'),
+  'Root postinstall must run the default-on Codex skills bootstrap; formatting and reference repository installs remain explicit commands',
+);
 assert(rootPackage.scripts?.['agents:refs:install'] === 'node ./scripts/setup-agent-reference-repos.mts', 'Root must expose agents:refs:install as the explicit reference repo installer');
 
 const expectedAppIds = ['shell-super-app', ...fullStackVerticals.map(vertical => vertical.id)];

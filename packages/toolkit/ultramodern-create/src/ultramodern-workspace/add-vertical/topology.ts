@@ -140,6 +140,7 @@ export function verticalsFromTopology(
       port: typeof ports[vertical.id] === 'number' ? ports[vertical.id] : 0,
       mfName:
         vertical.moduleFederation?.name ?? `vertical${toPascalCase(domain)}`,
+      ...(vertical.deliveryUnit ? { deliveryUnit: vertical.deliveryUnit } : {}),
       ...(surfaceProfile === undefined ? {} : { surfaceProfile }),
       ...(deliveryUnitKind === undefined ? {} : { deliveryUnitKind }),
       ...(Array.isArray(vertical.moduleFederation?.exposes)
@@ -147,11 +148,12 @@ export function verticalsFromTopology(
             exposes: Object.fromEntries(
               vertical.moduleFederation.exposes.map((expose: string) => [
                 expose,
-                expose === './Route'
-                  ? './src/federation-entry.tsx'
-                  : expose === './Widget'
-                    ? `./src/components/${domain}-widget.tsx`
-                    : '',
+                vertical.moduleFederation?.exposePaths?.[expose] ??
+                  (expose === './Route'
+                    ? './src/federation-entry.tsx'
+                    : expose === './Widget'
+                      ? `./src/components/${domain}-widget.tsx`
+                      : ''),
               ]),
             ),
           }
@@ -169,4 +171,50 @@ export function verticalsFromTopology(
       ownership: vertical.ownership ?? createNeutralOwnership(vertical.id),
     };
   }) as WorkspaceApp[];
+}
+
+export function createPrimaryShellDescriptor(
+  topology: Record<string, any>,
+  config: Record<string, any>,
+): WorkspaceApp {
+  const compactShell = config.topology?.apps?.find(
+    (app: { id?: unknown }) => app?.id === shellApp.id,
+  );
+  const verticalRefs = Array.isArray(topology.shell?.verticalRefs)
+    ? topology.shell.verticalRefs.filter(
+        (id: unknown): id is string => typeof id === 'string',
+      )
+    : Array.isArray(compactShell?.moduleFederation?.verticalRefs)
+      ? compactShell.moduleFederation.verticalRefs.filter(
+          (id: unknown): id is string => typeof id === 'string',
+        )
+      : [];
+  return {
+    ...shellApp,
+    ...(compactShell?.deliveryUnit || topology.shell?.deliveryUnit
+      ? {
+          deliveryUnit:
+            compactShell?.deliveryUnit ?? topology.shell.deliveryUnit,
+        }
+      : {}),
+    verticalRefs,
+    ...(typeof compactShell?.packageSuffix === 'string'
+      ? { packageSuffix: compactShell.packageSuffix }
+      : {}),
+    ...(typeof compactShell?.displayName === 'string'
+      ? { displayName: compactShell.displayName }
+      : {}),
+    ...(typeof compactShell?.path === 'string'
+      ? { directory: compactShell.path }
+      : {}),
+    ...(typeof compactShell?.port === 'number'
+      ? { port: compactShell.port }
+      : {}),
+    ...(typeof compactShell?.portEnv === 'string'
+      ? { portEnv: compactShell.portEnv }
+      : {}),
+    ...(typeof compactShell?.moduleFederation?.name === 'string'
+      ? { mfName: compactShell.moduleFederation.name }
+      : {}),
+  };
 }

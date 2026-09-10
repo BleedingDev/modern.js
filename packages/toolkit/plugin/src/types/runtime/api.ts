@@ -8,7 +8,9 @@ import type {
   Hooks,
   OnBeforeRenderFn,
   PickContextFn,
+  ResolveComponentFn,
   StringSSRCollectorsInfo,
+  TransformRuntimeContextFn,
   WrapRootFn,
 } from './hooks';
 import type { RuntimePluginExtends } from './plugin';
@@ -23,12 +25,20 @@ export type RuntimePluginAPI<Extends extends RuntimePluginExtends> = Readonly<
     getRuntimeConfig: () => Readonly<Extends['config']>;
     onBeforeRender: PluginHookTap<OnBeforeRenderFn<Extends['extendContext']>>;
     wrapRoot: PluginHookTap<WrapRootFn>;
+    resolveComponent: PluginHookTap<ResolveComponentFn>;
     pickContext: PluginHookTap<PickContextFn<RuntimeContext>>;
+    transformRuntimeContext: PluginHookTap<
+      TransformRuntimeContextFn<RuntimeContext & Extends['extendContext']>
+    >;
     config: PluginHookTap<ConfigFn<Extends['config']>>;
     extendStringSSRCollectors: PluginHookTap<
-      ExtendStringSSRCollectorsFn<StringSSRCollectorsInfo>
+      ExtendStringSSRCollectorsFn<
+        StringSSRCollectorsInfo<RuntimeContext & Extends['extendContext']>
+      >
     >;
-    extendStreamSSR: PluginHookTap<ExtendStreamSSRFn>;
+    extendStreamSSR: PluginHookTap<
+      ExtendStreamSSRFn<RuntimeContext & Extends['extendContext']>
+    >;
   } & RuntimePluginExtendsAPI<Extends>
 >;
 

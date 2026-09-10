@@ -1,12 +1,7 @@
 // @effect-diagnostics asyncFunction:off processEnv:off strictBooleanExpressions:off unnecessaryArrowBlock:off
 import { type Chunk, ChunkExtractor } from '@loadable/server';
 import type { ReactElement } from 'react';
-import type { TInternalRuntimeContext } from '../../context';
-import { createFederatedCssLinks } from '../federatedCss';
-import {
-  getMatchedRouteChunks,
-  orderHydrationScriptChunks,
-} from '../scriptOrder';
+import type { createSSRRenderLifecycle } from '../shared';
 import { attributesToString, checkIsNode, hasStylesheetLink } from '../utils';
 import type { ChunkSet, Collector } from './types';
 
@@ -30,7 +25,7 @@ const generateChunks = (chunks: Chunk[], ext: string) =>
     .filter(chunk => Boolean(chunk.url))
     .filter(chunk => extname(chunk.url).slice(1) === ext);
 
-const routeAssetToChunk = (asset: string): Chunk => ({
+const assetToChunk = (asset: string): Chunk => ({
   chunk: asset,
   filename: asset.replace(/^\//, ''),
   linkType: 'preload',
@@ -72,10 +67,9 @@ export interface LoadableCollectorOptions {
   nonce?: string;
   stats?: Record<string, any>;
   routeManifest?: Record<string, any>;
-  runtimeContext: TInternalRuntimeContext;
   template: string;
   entryName: string;
-  moduleFederationCssAssets?: string[];
+  lifecycle?: ReturnType<typeof createSSRRenderLifecycle>;
   chunkSet: ChunkSet;
   config: LoadableCollectorConfig;
 }
@@ -92,6 +86,11 @@ export class LoadableCollector implements Collector {
   private options: LoadableCollectorOptions;
 
   private extractor?: ChunkExtractor;
+
+  readonly stylesheetInfo: {
+    emittedAssets: string[];
+    attributes: Record<string, unknown>;
+  } = { emittedAssets: [], attributes: {} };
 
   constructor(options: LoadableCollectorOptions) {
     this.options = options;
@@ -132,23 +131,20 @@ export class LoadableCollector implements Collector {
     const collectedChunks = extractor
       ? extractor.getChunkAssets(extractor.chunks)
       : [];
-    const matchedRouteChunks = getMatchedRouteChunks(
-      options.runtimeContext,
-      options.routeManifest,
-      routeAssetToChunk,
-    );
-    const orderedScriptChunks = orderHydrationScriptChunks({
-      asyncEntryChunks: asyncChunks,
-      collectedChunks,
-      matchedRouteChunks,
-      entryName,
-    });
-    const chunks = ([] as Chunk[])
-      .concat(asyncChunks)
-      .concat(collectedChunks)
-      .concat(matchedRouteChunks);
-    const scriptChunks = generateChunks(orderedScriptChunks, 'js');
-    const styleChunks = generateChunks(chunks, 'css');
+    const groups = [
+      { name: 'async-entry', assets: asyncChunks },
+      { name: 'loadable', assets: collectedChunks },
+    ];
+    const nativeChunks = [...asyncChunks, ...collectedChunks];
+    const prepare = (kind: 'script' | 'style') =>
+      options.lifecycle?.transformAssets(groups, {
+        kind,
+        source: 'loadable',
+        template: options.template,
+        createAsset: assetToChunk,
+      }) ?? nativeChunks;
+    const scriptChunks = generateChunks([...prepare('script')], 'js');
+    const styleChunks = generateChunks([...prepare('style')], 'css');
 
     if (extractor) {
       this.emitLoadableScripts(extractor);
@@ -236,8 +232,7 @@ export class LoadableCollector implements Collector {
   }
 
   private async emitStyleAssets(chunks: Chunk[]) {
-    const { template, chunkSet, config, moduleFederationCssAssets } =
-      this.options;
+    const { template, chunkSet, config } = this.options;
 
     const { inlineStyles } = config;
 
@@ -273,11 +268,8 @@ export class LoadableCollector implements Collector {
 
     // filter empty string;
     chunkSet.cssChunk += css.filter(css => Boolean(css)).join('');
-    chunkSet.cssChunk += createFederatedCssLinks(moduleFederationCssAssets, {
-      template,
-      attributes: this.generateAttributes(),
-      existingAssets: emittedChunks.map(chunk => chunk.url),
-    });
+    this.stylesheetInfo.emittedAssets = emittedChunks.map(chunk => chunk.url);
+    this.stylesheetInfo.attributes = this.generateAttributes();
   }
 
   private generateAttributes(

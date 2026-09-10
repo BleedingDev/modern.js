@@ -1,9 +1,12 @@
+import { createDefaultPlugins, createServerBase } from '@modern-js/server-core';
 import {
   createDisposableServerRuntimeHandle,
   disposeServerRuntime,
   initializeDisposableServerRuntime,
   registerServerRuntimeDisposer,
 } from '../src/runtimeLifecycle';
+import { ultramodernServerPlugin } from '../src/serverPlugin';
+import { getDefaultAppContext, getDefaultConfig } from './helpers';
 
 const deferred = () => {
   let resolve!: () => void;
@@ -103,5 +106,71 @@ describe('server runtime lifecycle', () => {
     expect(candidateDispose).toHaveBeenCalledTimes(1);
     expect(activeDispose).not.toHaveBeenCalled();
     await disposeServerRuntime(activeOwner);
+  });
+});
+
+describe('native lifecycle bridge', () => {
+  test('disposes the same owner registered by a fork runtime', async () => {
+    const server = createServerBase({
+      config: getDefaultConfig(),
+      pwd: '',
+      appContext: getDefaultAppContext(),
+    });
+    const dispose = rstest.fn(async () => {});
+    let observedOwner: object | undefined;
+    server.addPlugins([
+      ...createDefaultPlugins({ logger: false }),
+      ultramodernServerPlugin(),
+      {
+        name: 'fork-runtime-owner',
+        setup(api) {
+          api.onPrepare(() => {
+            observedOwner = api.getServerContext().serverBase;
+            registerServerRuntimeDisposer(observedOwner!, dispose);
+          });
+        },
+      },
+    ]);
+    await server.init();
+    expect(observedOwner).toBe(server);
+    await Promise.all([server.dispose(), server.dispose()]);
+    expect(dispose).toHaveBeenCalledTimes(1);
+    await disposeServerRuntime(server);
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  test('cleans fork resources after a later native prepare failure', async () => {
+    const server = createServerBase({
+      config: getDefaultConfig(),
+      pwd: '',
+      appContext: getDefaultAppContext(),
+    });
+    const dispose = rstest.fn(async () => {});
+    const prepareError = new Error('later prepare failed');
+    server.addPlugins([
+      ...createDefaultPlugins({ logger: false }),
+      ultramodernServerPlugin(),
+      {
+        name: 'fork-runtime-owner',
+        setup(api) {
+          api.onPrepare(() => {
+            registerServerRuntimeDisposer(
+              api.getServerContext().serverBase,
+              dispose,
+            );
+          });
+        },
+      },
+      {
+        name: 'later-failure',
+        setup: api => {
+          api.onPrepare(async () => {
+            throw prepareError;
+          });
+        },
+      },
+    ]);
+    await expect(server.init()).rejects.toBe(prepareError);
+    expect(dispose).toHaveBeenCalledTimes(1);
   });
 });

@@ -22,6 +22,8 @@ export const ZH_LOCALE = {
     step1: 'cd {projectName}',
     step2: 'pnpm install',
     step3: 'pnpm dev',
+    initialCommit:
+      '启动开发或 CI 构建前，请提交已检查的项目。Git 将使用你配置的身份和钩子。',
   },
   agentsCmd: {
     created: '✔ 已创建 {file}',

@@ -8,12 +8,25 @@ import type {
   ServerPluginAPI,
 } from '@modern-js/server-core';
 import type { ServerNodeMiddleware } from '@modern-js/server-core/node';
-import { API_DIR, isFunction, isWebOnly } from '@modern-js/utils';
+import {
+  API_DIR,
+  compatibleRequire,
+  isFunction,
+  isWebOnly,
+  tryResolve,
+} from '@modern-js/utils';
 import path from 'path';
 import { HonoAdapter } from './runtime/hono/adapter';
 
 type ApiMiddlewareRegistration = unknown;
 type RuntimeFramework = NonNullable<BffUserConfig['runtimeFramework']>;
+
+export type BffServerPluginOptions = {
+  honoRouteBinder?: string;
+  runtimeAdapters?: {
+    [Runtime in RuntimeFramework]?: Runtime extends 'hono' ? never : string;
+  };
+};
 
 type RuntimeAdapterOptions = {
   prefix: string | readonly string[];
@@ -24,23 +37,40 @@ type RuntimeAdapter = {
   registerMiddleware: (options: RuntimeAdapterOptions) => Promise<void>;
 };
 
-type RuntimeAdapterLoader = (api: ServerPluginAPI) => Promise<RuntimeAdapter[]>;
-
-// FORK: the Effect adapter is loaded through a DYNAMIC import so that `effect`
-// and `@effect/opentelemetry` remain optional peers. Do not
-// collapse this back to a static import on a sync merge.
-// Guard: tests/regression.test.ts ("server entry does not eagerly load Effect").
-
-const RUNTIME_ADAPTER_LOADERS: Record<RuntimeFramework, RuntimeAdapterLoader> =
-  {
-    hono: async api => [new HonoAdapter(api)],
-    effect: async api => {
-      const { EffectAdapter } = await import(
-        '@modern-js/plugin-bff-extensions/effect-adapter'
-      );
-      return [new EffectAdapter(api)];
-    },
-  };
+async function loadRuntimeAdapters(
+  specifier: unknown,
+  api: ServerPluginAPI,
+): Promise<RuntimeAdapter[]> {
+  if (typeof specifier !== 'string' || specifier.trim() === '') {
+    throw new Error('The BFF runtime adapter must be a module specifier.');
+  }
+  const context = api.getServerContext();
+  const module = await compatibleRequire(
+    tryResolve(
+      specifier,
+      context.appDirectory || context.distDirectory || process.cwd(),
+    ),
+    false,
+  );
+  if (!module || typeof module.createRuntimeAdapters !== 'function') {
+    throw new Error(
+      `BFF runtime adapter module "${specifier}" must export createRuntimeAdapters.`,
+    );
+  }
+  const adapters: unknown = await module.createRuntimeAdapters(api);
+  if (
+    !Array.isArray(adapters) ||
+    adapters.length === 0 ||
+    adapters.some(
+      adapter => !adapter || typeof adapter.registerMiddleware !== 'function',
+    )
+  ) {
+    throw new Error(
+      `BFF runtime adapter module "${specifier}" returned invalid adapters.`,
+    );
+  }
+  return adapters;
+}
 
 const normalizePrefixList = (prefix: string | string[] | undefined) => {
   if (Array.isArray(prefix)) {
@@ -51,12 +81,6 @@ const normalizePrefixList = (prefix: string | string[] | undefined) => {
 
 const getPrimaryPrefix = (prefix: string | string[] | undefined) =>
   normalizePrefixList(prefix)[0] || '/api';
-
-function resolveRuntimeFramework(
-  runtimeFramework: BffUserConfig['runtimeFramework'],
-): RuntimeFramework {
-  return runtimeFramework === 'hono' ? 'hono' : 'effect';
-}
 
 type PrepareApiServerNext = (
   input: APIServerStartInput,
@@ -70,16 +94,32 @@ class Storage {
   public middlewares: ApiMiddlewareRegistration[] = [];
 }
 
-export default (): ServerPlugin => ({
+export default (options: BffServerPluginOptions = {}): ServerPlugin => ({
   name: '@modern-js/plugin-bff',
   setup: api => {
     const storage = new Storage();
     let apiRouter: ApiRouter | null = null;
 
     const appContext = api.getServerContext();
-    const runtimeFramework = resolveRuntimeFramework(
-      appContext.bffRuntimeFramework,
-    );
+    const runtimeFramework = appContext.bffRuntimeFramework ?? 'hono';
+    if (
+      options.runtimeAdapters &&
+      Object.hasOwn(options.runtimeAdapters, 'hono')
+    ) {
+      throw new Error('The native Hono BFF adapter cannot be overridden.');
+    }
+    const adapterModule: unknown = options.runtimeAdapters?.[runtimeFramework];
+    if (
+      runtimeFramework !== 'hono' &&
+      (!options.runtimeAdapters ||
+        !Object.hasOwn(options.runtimeAdapters, runtimeFramework) ||
+        typeof adapterModule !== 'string' ||
+        adapterModule.trim() === '')
+    ) {
+      throw new Error(
+        `No BFF runtime adapter is registered for "${runtimeFramework}".`,
+      );
+    }
 
     api.onPrepare(async () => {
       const appContext = api.getServerContext();
@@ -144,12 +184,42 @@ export default (): ServerPlugin => ({
         }
       }
 
+      let createHonoRouteBinder: ConstructorParameters<typeof HonoAdapter>[1];
+      if (
+        runtimeFramework === 'hono' &&
+        options.honoRouteBinder !== undefined
+      ) {
+        if (
+          typeof options.honoRouteBinder !== 'string' ||
+          options.honoRouteBinder.trim() === ''
+        ) {
+          throw new Error(
+            'The Hono BFF route binder must be a module specifier.',
+          );
+        }
+        const context = api.getServerContext();
+        const module = await compatibleRequire(
+          tryResolve(
+            options.honoRouteBinder,
+            context.appDirectory || context.distDirectory || process.cwd(),
+          ),
+          false,
+        );
+        if (!module || typeof module.createHonoRouteBinder !== 'function') {
+          throw new Error(
+            `BFF route binder module "${options.honoRouteBinder}" must export createHonoRouteBinder.`,
+          );
+        }
+        createHonoRouteBinder = module.createHonoRouteBinder;
+      }
       const runtimeAdapters =
-        await RUNTIME_ADAPTER_LOADERS[runtimeFramework](api);
+        runtimeFramework === 'hono'
+          ? [new HonoAdapter(api, createHonoRouteBinder)]
+          : await loadRuntimeAdapters(adapterModule, api);
       await Promise.all(
         runtimeAdapters.map(adapter =>
           adapter.registerMiddleware({
-            prefix: runtimeFramework === 'effect' ? prefixList : prefix,
+            prefix: runtimeFramework === 'hono' ? prefix : prefixList,
             enableHandleWeb,
           }),
         ),

@@ -20,42 +20,145 @@
   "main": "./dist/cjs/index.js",
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
       "modern:source": "./src/index.ts",
       "node": {
-        "import": "./dist/esm-node/index.mjs",
-        "require": "./dist/cjs/index.js"
+        "import": {
+          "types": "./dist/types-esm/index.d.mts",
+          "default": "./dist/esm-node/index.mjs"
+        },
+        "require": {
+          "types": "./dist/types/index.d.ts",
+          "default": "./dist/cjs/index.js"
+        }
       },
-      "default": "./dist/cjs/index.js"
+      "default": "./dist/cjs/index.js",
+      "types": "./dist/types/index.d.ts"
     },
     "./backend-federation-security": {
-      "types": "./dist/types/backend-federation-security/index.d.ts",
       "modern:source": "./src/backend-federation-security/index.ts",
       "node": {
-        "import": "./dist/esm-node/backend-federation-security/index.mjs",
-        "require": "./dist/cjs/backend-federation-security/index.js"
+        "import": {
+          "types": "./dist/types-esm/backend-federation-security/index.d.mts",
+          "default": "./dist/esm-node/backend-federation-security/index.mjs"
+        },
+        "require": {
+          "types": "./dist/types/backend-federation-security/index.d.ts",
+          "default": "./dist/cjs/backend-federation-security/index.js"
+        }
       },
-      "import": "./dist/esm/backend-federation-security/index.mjs",
-      "default": "./dist/esm/backend-federation-security/index.mjs"
+      "import": {
+        "types": "./dist/types-esm/backend-federation-security/index.d.mts",
+        "default": "./dist/esm/backend-federation-security/index.mjs"
+      },
+      "default": "./dist/esm/backend-federation-security/index.mjs",
+      "types": "./dist/types-esm/backend-federation-security/index.d.mts"
     },
     "./backend-federation-security/node": {
-      "types": "./dist/types/backend-federation-security/node.d.ts",
       "modern:source": "./src/backend-federation-security/node.ts",
       "node": {
-        "import": "./dist/esm-node/backend-federation-security/node.mjs",
-        "require": "./dist/cjs/backend-federation-security/node.js"
+        "import": {
+          "types": "./dist/types-esm/backend-federation-security/node.d.mts",
+          "default": "./dist/esm-node/backend-federation-security/node.mjs"
+        },
+        "require": {
+          "types": "./dist/types/backend-federation-security/node.d.ts",
+          "default": "./dist/cjs/backend-federation-security/node.js"
+        }
       },
-      "default": "./dist/esm-node/backend-federation-security/node.mjs"
+      "default": "./dist/esm-node/backend-federation-security/node.mjs",
+      "types": "./dist/types/backend-federation-security/node.d.ts"
     },
     "./runtime-lifecycle": {
-      "types": "./dist/types/runtimeLifecycle.d.ts",
       "modern:source": "./src/runtimeLifecycle.ts",
       "node": {
-        "import": "./dist/esm-node/runtimeLifecycle.mjs",
-        "require": "./dist/cjs/runtimeLifecycle.js"
+        "import": {
+          "types": "./dist/types-esm/runtimeLifecycle.d.mts",
+          "default": "./dist/esm-node/runtimeLifecycle.mjs"
+        },
+        "require": {
+          "types": "./dist/types/runtimeLifecycle.d.ts",
+          "default": "./dist/cjs/runtimeLifecycle.js"
+        }
       },
-      "import": "./dist/esm/runtimeLifecycle.mjs",
-      "default": "./dist/esm/runtimeLifecycle.mjs"
+      "import": {
+        "types": "./dist/types-esm/runtimeLifecycle.d.mts",
+        "default": "./dist/esm/runtimeLifecycle.mjs"
+      },
+      "default": "./dist/esm/runtimeLifecycle.mjs",
+      "types": "./dist/types-esm/runtimeLifecycle.d.mts"
+    },
+    "./static-serving/node": {
+      "node": {
+        "modern:source": "./src/static-serving/plugin.ts",
+        "import": {
+          "types": "./dist/types-esm/static-serving/plugin.d.mts",
+          "default": "./dist/esm-node/static-serving/plugin.mjs"
+        },
+        "require": {
+          "types": "./dist/types/static-serving/plugin.d.ts",
+          "default": "./dist/cjs/static-serving/plugin.js"
+        }
+      },
+      "types": "./dist/types/static-serving/plugin.d.ts"
+    },
+    "./server-plugin": {
+      "node": {
+        "modern:source": "./src/serverPlugin.ts",
+        "import": {
+          "types": "./dist/types-esm/serverPlugin.d.mts",
+          "default": "./dist/esm-node/serverPlugin.mjs"
+        },
+        "require": {
+          "types": "./dist/types/serverPlugin.d.ts",
+          "default": "./dist/cjs/serverPlugin.js"
+        }
+      },
+      "types": "./dist/types/serverPlugin.d.ts"
+    },
+    "./bff-policy": {
+      "modern:source": "./src/bff-policy/index.ts",
+      "node": {
+        "modern:source": "./src/bff-policy/index.ts",
+        "import": {
+          "types": "./dist/types-esm/bff-policy/index.d.mts",
+          "default": "./dist/esm-node/bff-policy/index.mjs"
+        },
+        "require": {
+          "types": "./dist/types/bff-policy/index.d.ts",
+          "default": "./dist/cjs/bff-policy/index.js"
+        }
+      },
+      "default": "./dist/esm/bff-policy/index.mjs",
+      "types": "./dist/types-esm/bff-policy/index.d.mts"
+    },
+    "./bff-policy/node": {
+      "node": {
+        "modern:source": "./src/bff-policy/node.ts",
+        "import": {
+          "types": "./dist/types-esm/bff-policy/node.d.mts",
+          "default": "./dist/esm-node/bff-policy/node.mjs"
+        },
+        "require": {
+          "types": "./dist/types/bff-policy/node.d.ts",
+          "default": "./dist/cjs/bff-policy/node.js"
+        }
+      },
+      "types": "./dist/types/bff-policy/node.d.ts"
+    },
+    "./server-config": {
+      "modern:source": "./src/serverConfig.ts",
+      "node": {
+        "import": {
+          "types": "./dist/types-esm/serverConfig.d.mts",
+          "default": "./dist/esm-node/serverConfig.mjs"
+        },
+        "require": {
+          "types": "./dist/types/serverConfig.d.ts",
+          "default": "./dist/cjs/serverConfig.js"
+        }
+      },
+      "default": "./dist/esm/serverConfig.mjs",
+      "types": "./dist/types-esm/serverConfig.d.mts"
     }
   },
   "typesVersions": {
@@ -75,6 +178,26 @@
       "runtime-lifecycle": [
         "./dist/types/runtimeLifecycle.d.ts",
         "./src/runtimeLifecycle.ts"
+      ],
+      "static-serving/node": [
+        "./dist/types/static-serving/plugin.d.ts",
+        "./src/static-serving/plugin.ts"
+      ],
+      "server-plugin": [
+        "./dist/types/serverPlugin.d.ts",
+        "./src/serverPlugin.ts"
+      ],
+      "bff-policy": [
+        "./dist/types/bff-policy/index.d.ts",
+        "./src/bff-policy/index.ts"
+      ],
+      "bff-policy/node": [
+        "./dist/types/bff-policy/node.d.ts",
+        "./src/bff-policy/node.ts"
+      ],
+      "server-config": [
+        "./dist/types/serverConfig.d.ts",
+        "./src/serverConfig.ts"
       ]
     }
   },
@@ -92,7 +215,11 @@
     "@modern-js/runtime-utils": "workspace:*",
     "@modern-js/server-core": "workspace:*",
     "@modern-js/utils": "workspace:*",
-    "@swc/helpers": "^0.5.23"
+    "@swc/helpers": "^0.5.23",
+    "@modern-js/runtime-extensions": "workspace:*",
+    "reflect-metadata": "^0.2.2",
+    "@modern-js/plugin-data-loader": "workspace:*",
+    "@modern-js/plugin": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",
@@ -100,12 +227,23 @@
     "@rslib/core": "1.0.0",
     "@scripts/rstest-config": "workspace:*",
     "@types/node": "^26.4.1",
-    "@typescript/native-preview": "7.0.0-dev.20260707.2"
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@modern-js/prod-server": "workspace:*",
+    "zod": "^4.5.4",
+    "esbuild": "^0.28.2"
   },
   "sideEffects": false,
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public",
     "types": "./dist/types/index.d.ts"
+  },
+  "peerDependencies": {
+    "zod": "^4.5.4"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
   }
 }

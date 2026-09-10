@@ -6,6 +6,27 @@ export type {
   RuntimePluginAPI,
   RuntimePluginExtends,
 } from '../types/runtime';
+export type {
+  Collector,
+  ExtendStreamSSRFn,
+  ResolveComponentFn,
+  RuntimeContextProjection,
+  SSRAssetGroup,
+  SSRAssetTransformInfo,
+  SSRHeadData,
+  SSRHeadPart,
+  SSRHtmlFormatting,
+  SSRRenderAsset,
+  SSRRenderInfo,
+  SSRRenderLifecycle,
+  SSRRenderTerminal,
+  SSRRouterData,
+  SSRTemplateChunk,
+  StreamSSRExtender,
+  StreamSSRInfo,
+  StringSSRCollectorsInfo,
+  TransformRuntimeContextFn,
+} from '../types/runtime/hooks';
 export { initPluginAPI } from './api';
 export { createRuntimeContext, initRuntimeContext } from './context';
 export { initHooks } from './hooks';

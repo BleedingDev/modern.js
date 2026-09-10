@@ -1,6 +1,13 @@
 import type { ServerRoute } from '@modern-js/types';
 import type { Plugin } from '../../types/plugin';
 
+/** Registered BFF runtimes. Runtime packages extend this interface. */
+export interface BffRuntimeRegistry {
+  hono: true;
+}
+
+export type BffRuntimeFramework = keyof BffRuntimeRegistry;
+
 export type ServerCreateOptions = {
   /** server working directory, and then also dist directory */
   pwd: string;
@@ -12,7 +19,7 @@ export type ServerCreateOptions = {
     sharedDirectory?: string;
     apiDirectory?: string;
     lambdaDirectory?: string;
-    bffRuntimeFramework?: 'hono' | 'effect';
+    bffRuntimeFramework?: BffRuntimeFramework;
   };
 };
 

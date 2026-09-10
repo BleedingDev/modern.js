@@ -1,6 +1,7 @@
 import { createApiClient } from '../src/ultramodern-workspace/api/client';
 import { createApiServiceEntry } from '../src/ultramodern-workspace/api/service';
 import { createSharedApi } from '../src/ultramodern-workspace/api/shared';
+import { readFileTemplate } from '../src/ultramodern-workspace/fs-io';
 import {
   createSharedContractsIndex,
   createSharedPackage,
@@ -45,9 +46,7 @@ describe('scope-aware native API scaffolding', () => {
   });
   test('shared API baseline retains owner metadata and custom prefixes', () => {
     const source = createSharedApi(service, { scope: 'warehouse' });
-    expect(source).toContain(
-      "from '@warehouse/shared-contracts/microvertical-api-baseline'",
-    );
+    expect(source).toContain("from '@modern-js/bff-effect/microvertical-api'");
     expect(source).toContain('= MicroVerticalReadinessSchema');
     expect(source).toContain('= MicroVerticalBuildMarkerSchema');
     expect(source).toContain('.addHttpApi(warehouseItemsFoundationApi)');
@@ -66,11 +65,12 @@ describe('scope-aware native API scaffolding', () => {
     );
     expect(manifest).toMatchObject({
       exports: {
-        './microvertical-api-baseline': './src/microvertical-api-baseline.ts',
         './server/effect-bff-runtime': './src/effect-bff-runtime.ts',
       },
       dependencies: {
+        '@modern-js/bff-effect': '3.9.0',
         '@modern-js/plugin-bff': '3.9.0',
+        '@modern-js/runtime-extensions': '3.9.0',
         effect: '4.0.0-rc.112',
       },
     });
@@ -78,8 +78,19 @@ describe('scope-aware native API scaffolding', () => {
       'MicroVerticalReadinessSchema',
     );
     expect(createSharedContractsIndex()).not.toContain("from 'effect'");
-    expect(createSharedContractsIndex()).not.toContain('export *');
+    expect(createSharedContractsIndex()).toContain(
+      "export * from '@modern-js/runtime-extensions/workspace-events';",
+    );
+    expect(createSharedContractsIndex()).not.toContain('@modern-js/bff-effect');
     expect(createSharedContractsIndex()).not.toContain('defineEffectBff');
+    // Git checkout EOL does not change this native two-declaration contract.
+    expect(
+      readFileTemplate('packages/effect-bff-runtime.ts').split(/\r?\n/u),
+    ).toEqual([
+      "export { assembleEffectBffRuntime } from '@modern-js/bff-effect/assembly';",
+      "export type { EffectBffRuntimeAssembly } from '@modern-js/bff-effect/assembly';",
+      '',
+    ]);
   });
   test('migration emits the owning AST helper rather than a consumer customization', () => {
     const artifacts = migratedWorkspaceScriptArtifacts({
@@ -92,12 +103,11 @@ describe('scope-aware native API scaffolding', () => {
           file.relativePath ===
           'scripts/microvertical-api-baseline-boundary.mts',
       ),
-    ).toBe(true);
+    ).toBe(false);
     const checker = artifacts.find(
       file =>
         file.relativePath === 'scripts/check-ultramodern-api-boundaries.mts',
     );
-    expect(checker?.content).toContain('strictEffectRuntimeTopologyViolation');
-    expect(checker?.content).toContain('microVerticalApiBaselineViolation');
+    expect(checker).toBeUndefined();
   });
 });

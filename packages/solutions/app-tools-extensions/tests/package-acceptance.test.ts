@@ -78,6 +78,7 @@ function expectSuccessfulProcess(
   result: ReturnType<typeof spawnSync>,
   label: string,
 ) {
+  expect(result.error, label).toBeUndefined();
   expect(
     result.status,
     `${label}\nstdout:\n${result.stdout ?? ''}\nstderr:\n${result.stderr ?? ''}`,
@@ -155,7 +156,7 @@ describe('@modern-js/app-tools-extensions package acceptance', () => {
             const specifiers = ${specifiers};
             const rootSpecifier = ${JSON.stringify(packageManifest.name)};
             for (const specifier of specifiers) {
-              const resolved = require.resolve(specifier);
+              const resolved = require.resolve(specifier).split(require('node:path').sep).join('/');
               if (!resolved.includes('/dist/cjs/') || resolved.includes('/src/')) {
                 throw new Error(\`CJS resolved outside built output: \${specifier} -> \${resolved}\`);
               }
@@ -268,8 +269,9 @@ describe('@modern-js/app-tools-extensions package acceptance', () => {
         compilerManifest.bin.tsgo,
       );
       const result = spawnSync(
-        compilerPath,
+        process.execPath,
         [
+          compilerPath,
           '--project',
           path.join(fixtureRoot, 'tsconfig.json'),
           '--listFilesOnly',

@@ -1,10 +1,15 @@
 import { execFile } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { Rspack, RspackChain } from '@rsbuild/core';
 
 const execute = promisify(execFile);
 const name = 'UltramodernNativeTypeChecker';
+
+// Windows file events expand 8.3 aliases; register the same native path spelling.
+const watchDependencyPath = (file: string): string =>
+  process.platform === 'win32' ? realpathSync.native(file) : file;
 
 export class UltramodernNativeTypeChecker {
   constructor(
@@ -32,8 +37,9 @@ export class UltramodernNativeTypeChecker {
       return result.stdout;
     } catch (cause) {
       const output = cause as { stdout?: string; stderr?: string };
+      const diagnostics = `${output.stdout ?? ''}${output.stderr ?? ''}`;
       throw new Error(
-        `${name} failed:\n${output.stdout ?? ''}${output.stderr ?? ''}`,
+        `${name} failed:\n${diagnostics || (cause instanceof Error ? cause.message : String(cause))}`,
         { cause },
       );
     }
@@ -70,11 +76,13 @@ export class UltramodernNativeTypeChecker {
 
   apply(compiler: Rspack.Compiler): void {
     compiler.hooks.thisCompilation.tap(name, compilation => {
-      compilation.fileDependencies.add(this.options.configFile);
       compilation.hooks.processAssets.tapPromise(name, async () => {
         try {
+          compilation.fileDependencies.add(
+            watchDependencyPath(this.options.configFile),
+          );
           for (const file of await this.watchInputs())
-            compilation.fileDependencies.add(file);
+            compilation.fileDependencies.add(watchDependencyPath(file));
           await this.check();
         } catch (cause) {
           compilation.errors.push(

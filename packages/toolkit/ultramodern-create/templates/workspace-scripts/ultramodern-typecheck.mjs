@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs';
 import os from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { resolveEffectTsgoCompiler } from '@modern-js/app-tools/config';
+import { resolveEffectTsgoCompiler } from '@modern-js/app-tools-extensions/config';
 
 const args = process.argv.slice(2);
 const workspaceRoot = process.env.ULTRAMODERN_WORKSPACE_ROOT

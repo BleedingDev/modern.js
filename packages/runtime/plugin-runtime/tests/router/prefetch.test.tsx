@@ -1,3 +1,4 @@
+import { createRouterPrefetchPolicy } from '@modern-js/runtime-extensions/router-prefetch-policy';
 import {
   createMemoryRouter,
   type LoaderFunctionArgs,
@@ -22,6 +23,9 @@ let mockRouteManifest = {
   routeAssets: {} as Record<string, { chunkIds: string[]; assets: string[] }>,
 };
 const mockRuntimeContext = {
+  linkPrefetchPolicy: undefined as
+    | ReturnType<typeof createRouterPrefetchPolicy>
+    | undefined,
   get routes() {
     return mockRoutes;
   },
@@ -138,6 +142,7 @@ const setConnection = (connection: unknown) => {
 describe('prefetch', () => {
   const intentEvents = ['focus', 'mouseEnter', 'touchStart'] as const;
   beforeEach(() => {
+    mockRuntimeContext.linkPrefetchPolicy = createRouterPrefetchPolicy();
     rstest.useFakeTimers();
     rstest.resetModules();
     rstest.clearAllMocks();
@@ -578,5 +583,83 @@ describe('prefetch', () => {
       expect(global.__webpack_chunk_load_test__).toBeCalledTimes(1);
     });
     unmount();
+  });
+  test('keeps the native no-policy default and supports explicit native render prefetch', async () => {
+    mockRuntimeContext.linkPrefetchPolicy = undefined;
+    const id = 'native-default';
+    const initial = renderRouter([
+      { id: 'root-native', path: '/', element: <Link to={id}>Native</Link> },
+      createTargetRoute(id),
+    ]);
+    act(() => rstest.runAllTimers());
+    expect(global.__webpack_chunk_load_test__).not.toHaveBeenCalled();
+    expect(document.querySelector('link[rel="prefetch"]')).toBeNull();
+    initial.unmount();
+    const explicit = renderRouter([
+      {
+        id: 'root-native',
+        path: '/',
+        element: (
+          <Link to={id} prefetch="render">
+            Native
+          </Link>
+        ),
+      },
+      createTargetRoute(id),
+    ]);
+    expect(global.__webpack_chunk_load_test__).toHaveBeenCalledWith(id);
+    explicit.unmount();
+  });
+
+  test('honors consumer-prevented intent and forwards the real native anchor ref', () => {
+    const ref = React.createRef<HTMLAnchorElement>();
+    const id = 'prevented-intent';
+    const view = renderRouter([
+      {
+        id: 'root-prevented',
+        path: '/',
+        element: (
+          <Link
+            ref={ref}
+            to={id}
+            prefetch="intent"
+            onMouseEnter={event => event.preventDefault()}
+          >
+            Native
+          </Link>
+        ),
+      },
+      createTargetRoute(id),
+    ]);
+    expect(ref.current).toBe(view.container.querySelector('a'));
+    fireEvent.mouseEnter(ref.current!);
+    act(() => rstest.runAllTimers());
+    expect(global.__webpack_chunk_load_test__).not.toHaveBeenCalled();
+    view.unmount();
+    expect(ref.current).toBeNull();
+  });
+
+  test('preserves native modified clicks and ordinary client navigation', async () => {
+    const id = 'native-navigation';
+    const view = renderRouter([
+      {
+        id: 'root-navigation',
+        path: '/',
+        element: (
+          <Link to={id} prefetch="none">
+            Navigate
+          </Link>
+        ),
+      },
+      createTargetRoute(id),
+    ]);
+    const anchor = view.container.querySelector('a')!;
+    fireEvent.click(anchor, { ctrlKey: true });
+    expect(view.container.textContent).toBe('Navigate');
+    await act(async () => {
+      fireEvent.click(anchor);
+    });
+    expect(view.container.querySelector('h1')?.textContent).toBe(id);
+    view.unmount();
   });
 });

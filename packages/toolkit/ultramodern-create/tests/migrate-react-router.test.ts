@@ -16,7 +16,11 @@ import {
   removeRetiredReactRouterDependency,
 } from '../src/ultramodern-tooling/commands/migrate-strict-effect/react-router-retirement';
 import { addUltramodernVertical } from '../src/ultramodern-workspace';
-import { createWorkspace, snapshotWorkspace } from './helpers/workspace-kit';
+import {
+  createWorkspace,
+  linkWorkspaceFormatterDependencies,
+  snapshotWorkspace,
+} from './helpers/workspace-kit';
 
 // The pin a workspace generated before the bridge router opt-out carries.
 const legacyReactRouterSpecifier = '7.9.6';
@@ -96,6 +100,7 @@ test('migrate retires the obsolete react-router pin and derives the MF bridge ro
   const { tempRoot, workspaceDir } = createWorkspace('migration-react-router', {
     tempPrefix: 'um-migration-react-router-',
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
 
   try {
     addUltramodernVertical({
@@ -217,6 +222,7 @@ test('migration dry-run projects React Router retirement before regenerating Mod
     'migration-react-router-dry-run',
     { tempPrefix: 'um-migration-react-router-' },
   );
+  linkWorkspaceFormatterDependencies(workspaceDir);
 
   try {
     addUltramodernVertical({
@@ -500,5 +506,32 @@ export default createModuleFederationConfig({
   },
 });
 `,
+  );
+});
+
+test('bridge migration edits only the exported factory object and preserves surrounding source', () => {
+  const prefix = `import { createModuleFederationConfig as defineConfig } from '@module-federation/modern-js-v3';
+// createModuleFederationConfig({ name: 'comment decoy' });
+const example = "createModuleFederationConfig({ name: 'string decoy' })";
+const unused = defineConfig({ name: 'unused' });
+const config: unknown = defineConfig(/* retained */ (`;
+  const object = `{ /* name */ name: 'shell' }`;
+  const suffix = ` satisfies Record<string, unknown>));
+export /* retained */ default config;
+`;
+  const result = insertBridgeRouterOptOut(prefix + object + suffix);
+  assert.equal(
+    result,
+    prefix +
+      `{\n  bridge: {\n    enableBridgeRouter: false,\n  }, /* name */ name: 'shell' }` +
+      suffix,
+  );
+  assert.ok(result);
+  assert.equal(insertBridgeRouterOptOut(result), result);
+  assert.equal(
+    insertBridgeRouterOptOut(
+      prefix + object + suffix.replace('default config', 'default dynamic()'),
+    ),
+    undefined,
   );
 });

@@ -67,7 +67,11 @@ export const createUltramodernReleaseEnvelopePlugin = <
 }): ReleaseEnvelopePlugin<Config> => {
   return {
     name: '@modern-js/ultramodern-release-envelope',
-    pre: ['@modern-js/backend-federation-build', '@modern-js/plugin-bff'],
+    pre: [
+      '@modern-js/backend-federation-build',
+      '@modern-js/plugin-bff',
+      '@modern-js/deploy-output-aliases',
+    ],
     post: ['@modern-js/plugin-deploy'],
     setup(api) {
       const emitBuildEnvelope = async (target: 'node' | 'cloudflare') => {

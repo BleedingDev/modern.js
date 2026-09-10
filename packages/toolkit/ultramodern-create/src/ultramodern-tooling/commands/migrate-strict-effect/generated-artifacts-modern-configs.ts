@@ -26,16 +26,13 @@ import {
   allWorkspaceAppsFromToolingConfig,
   type UltramodernToolingConfig,
 } from '../../config';
-import { writeGeneratedUiSourceIfChanged } from './generated-ui-source';
+import { migrateBffBuildPluginImports } from './bff-build-plugin-migration';
+import {
+  generatedUiSourceRequiresRewrite,
+  writeGeneratedUiSourceIfChanged,
+} from './generated-ui-source';
 import { type MigrationIo, readJsonFile } from './io';
 import { appDeclaresReactRouter } from './react-router-retirement';
-
-function isGeneratedShellComposition(source: string) {
-  return (
-    source.includes('const createRemoteComponent =') &&
-    source.includes('export const VerticalShowcase =')
-  );
-}
 
 function writeOwnedTypeScriptConfig(
   io: MigrationIo,
@@ -47,10 +44,14 @@ function writeOwnedTypeScriptConfig(
     return io.writeGenerated(filePath, generatedSource);
   }
   const existingSource = fs.readFileSync(filePath, 'utf-8');
-  if (existingSource === generatedSource) {
-    return io.writeGenerated(filePath, existingSource);
+  if (!generatedUiSourceRequiresRewrite(existingSource, generatedSource)) {
+    return false;
   }
-  if (recognizedGeneratedSources.includes(existingSource)) {
+  if (
+    recognizedGeneratedSources.some(
+      candidate => !generatedUiSourceRequiresRewrite(existingSource, candidate),
+    )
+  ) {
     return io.writeGenerated(filePath, generatedSource);
   }
   io.log(
@@ -68,7 +69,15 @@ function removeOwnedTypeScriptConfig(
   if (!fs.existsSync(filePath)) {
     return false;
   }
-  if (recognizedGeneratedSources.includes(fs.readFileSync(filePath, 'utf-8'))) {
+  if (
+    recognizedGeneratedSources.some(
+      candidate =>
+        !generatedUiSourceRequiresRewrite(
+          fs.readFileSync(filePath, 'utf-8'),
+          candidate,
+        ),
+    )
+  ) {
     return io.remove(filePath);
   }
   io.log(
@@ -117,7 +126,9 @@ function isGeneratedModernConfig(
   source: string,
   generatedSources: readonly string[],
 ) {
-  return generatedSources.includes(source);
+  return generatedSources.some(
+    candidate => !generatedUiSourceRequiresRewrite(source, candidate),
+  );
 }
 
 function addPreviousTailwindOptimizationOverride(source: string) {
@@ -141,8 +152,36 @@ function removeTsCheckerBuildOverride(source: string) {
 
 function removeReleaseEnvelopePlugin(source: string) {
   return source
-    .replace('  ultramodernReleaseEnvelopePlugin,\n', '')
-    .replace('        ultramodernReleaseEnvelopePlugin(),\n', '');
+    .replace(/\bultramodernReleaseEnvelopePlugin,\s*/gu, '')
+    .replace(/,\s*ultramodernReleaseEnvelopePlugin(?=\s*\})/gu, '')
+    .replace(/^\s*ultramodernReleaseEnvelopePlugin\(\),?\r?\n/gmu, '');
+}
+
+// Reconstruct only the predecessor template, never consumer text. The caller
+// still requires a whole-program AST match before accepting this transition.
+function previousNativeCompositionConfig(source: string) {
+  return source
+    .replace(
+      `import { defineConfig } from '@modern-js/app-tools';
+import {
+  presetUltramodern,
+  ultramodernAppTools,
+} from '@modern-js/ultramodern-app-tools';`,
+      `import {
+  appTools,
+  defineConfig,
+  presetUltramodern,
+  ultramodernReleaseEnvelopePlugin,
+} from '@modern-js/app-tools';`,
+    )
+    .replace(
+      '        ultramodernAppTools(),\n',
+      '        appTools(),\n        ultramodernReleaseEnvelopePlugin(),\n',
+    )
+    .replaceAll(
+      '@modern-js/app-tools-extensions/config',
+      '@modern-js/app-tools/config',
+    );
 }
 
 export function updateGeneratedModernConfigs(
@@ -178,13 +217,14 @@ export function updateGeneratedModernConfigs(
       app.directory,
       'modern.config.ts',
     );
+    // Predecessor transforms use LF anchors; template checkout endings vary.
     const rawGeneratedModernConfig = createAppModernConfig(
       config.workspace.packageScope,
       app,
       remotes,
       config.features.tailwind,
       configuredDevPorts,
-    );
+    ).replace(/\r\n/gu, '\n');
     const previousTailwindModernConfig =
       addPreviousTailwindOptimizationOverride(rawGeneratedModernConfig);
     const currentGeneratedModernConfigs = [
@@ -195,22 +235,40 @@ export function updateGeneratedModernConfigs(
     ];
     const [generatedModernConfig, ...recognizedGeneratedModernConfigs] =
       formatGeneratedModernConfigCandidates(
-        currentGeneratedModernConfigs.flatMap(source => {
-          const withoutReleaseEnvelope = removeReleaseEnvelopePlugin(source);
-          return [
+        currentGeneratedModernConfigs
+          .flatMap(source => [source, previousNativeCompositionConfig(source)])
+          .flatMap(source => [
             source,
-            removeTsCheckerBuildOverride(source),
-            withoutReleaseEnvelope,
-            removeTsCheckerBuildOverride(withoutReleaseEnvelope),
-          ];
-        }),
+            source.replaceAll(
+              '@modern-js/plugin-bff-build-extensions',
+              '@modern-js/plugin-bff',
+            ),
+          ])
+          .flatMap(source => {
+            const withoutReleaseEnvelope = removeReleaseEnvelopePlugin(source);
+            return [
+              source,
+              removeTsCheckerBuildOverride(source),
+              withoutReleaseEnvelope,
+              removeTsCheckerBuildOverride(withoutReleaseEnvelope),
+            ];
+          }),
       );
     if (!fs.existsSync(modernConfigPath)) {
       io.writeGenerated(modernConfigPath, generatedModernConfig);
     } else {
       const existingModernConfig = fs.readFileSync(modernConfigPath, 'utf-8');
-      if (existingModernConfig === generatedModernConfig) {
-        io.writeGenerated(modernConfigPath, existingModernConfig);
+      const migratedImports =
+        migrateBffBuildPluginImports(existingModernConfig);
+      if (
+        !generatedUiSourceRequiresRewrite(
+          migratedImports,
+          generatedModernConfig,
+        )
+      ) {
+        // An import-only transition preserves existing formatting and comments.
+        if (migratedImports !== existingModernConfig)
+          io.write(modernConfigPath, migratedImports);
       } else if (
         isGeneratedModernConfig(existingModernConfig, [
           generatedModernConfig,
@@ -219,9 +277,13 @@ export function updateGeneratedModernConfigs(
       ) {
         io.writeGenerated(modernConfigPath, generatedModernConfig);
       } else {
+        if (migratedImports !== existingModernConfig)
+          io.write(modernConfigPath, migratedImports);
         io.log(
-          `${path.relative(io.workspaceRoot, modernConfigPath)} was preserved: ` +
-            'an existing Modern config is consumer-owned unless its generated ownership can be proven.',
+          `${path.relative(io.workspaceRoot, modernConfigPath)} ` +
+            (migratedImports !== existingModernConfig
+              ? 'migrated its BFF build imports; all other source was preserved because the Modern config is consumer-owned.'
+              : 'was preserved: an existing Modern config is consumer-owned unless its generated ownership can be proven.'),
         );
       }
     }
@@ -257,11 +319,21 @@ export function updateGeneratedModernConfigs(
     const recognizedModuleFederationConfigs = [
       generatedModuleFederationConfig,
       createGeneratedModuleFederationConfig(!enableBridgeRouter),
-    ];
+    ].flatMap(source => [
+      source,
+      source.replaceAll(
+        '@modern-js/app-tools-extensions/config',
+        '@modern-js/app-tools/config',
+      ),
+    ]);
     const ownsUiComposition =
       !fs.existsSync(moduleFederationConfigPath) ||
-      recognizedModuleFederationConfigs.includes(
-        fs.readFileSync(moduleFederationConfigPath, 'utf8'),
+      recognizedModuleFederationConfigs.some(
+        candidate =>
+          !generatedUiSourceRequiresRewrite(
+            fs.readFileSync(moduleFederationConfigPath, 'utf8'),
+            candidate,
+          ),
       );
     if (appEmitsBrowserUi(app)) {
       // Existing configs are never regenerated wholesale without byte-exact
@@ -324,25 +396,37 @@ export function updateGeneratedModernConfigs(
         app.directory,
         'src/routes/vertical-components.worker.tsx',
       );
+      const components = createShellRemoteComponents(app, shellUiRemotes);
+      const workerComponents = createShellWorkerRemoteComponents(
+        app,
+        shellUiRemotes,
+      );
+      const recognizedComponents = [components];
+      const recognizedWorkerComponents = [workerComponents];
       const existingComponents = fs.existsSync(componentsPath)
         ? fs.readFileSync(componentsPath, 'utf-8')
         : undefined;
       if (
         existingComponents === undefined ||
-        isGeneratedShellComposition(existingComponents)
+        recognizedComponents.some(
+          candidate =>
+            !generatedUiSourceRequiresRewrite(existingComponents, candidate),
+        )
       ) {
-        io.writeGenerated(
-          componentsPath,
-          createShellRemoteComponents(app, shellUiRemotes),
-        );
-        io.writeGenerated(
+        writeGeneratedUiSourceIfChanged(io, componentsPath, components);
+        writeGeneratedUiSourceIfChanged(
+          io,
           workerComponentsPath,
-          createShellWorkerRemoteComponents(app, shellUiRemotes),
+          workerComponents,
         );
       } else if (
         fs.existsSync(workerComponentsPath) &&
-        isGeneratedShellComposition(
-          fs.readFileSync(workerComponentsPath, 'utf-8'),
+        recognizedWorkerComponents.some(
+          candidate =>
+            !generatedUiSourceRequiresRewrite(
+              fs.readFileSync(workerComponentsPath, 'utf-8'),
+              candidate,
+            ),
         )
       ) {
         // A custom host composition is environment-neutral and obtains its

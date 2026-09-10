@@ -31,7 +31,7 @@
  * exposes.
  */
 import assert from 'node:assert/strict';
-import type { DeliveryUnitRecord } from '@modern-js/utils/universal';
+import type { DeliveryUnitRecord } from '@modern-js/backend-federation-contracts';
 import { createDeliveryUnitRecord } from '../src/ultramodern-workspace/delivery-unit';
 import type {
   BaselineCohort,

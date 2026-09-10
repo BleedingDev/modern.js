@@ -1,6 +1,7 @@
 // @effect-diagnostics anyUnknownInErrorContext:off asyncFunction:off nodeBuiltinImport:off strictBooleanExpressions:off
 
 import path from 'node:path';
+import '@modern-js/server-runtime-extensions/server-config';
 import {
   dispatchEffectBffRequest,
   type EffectApiModule,
@@ -244,3 +245,7 @@ export class EffectAdapter {
     this.handler = candidate;
   }
 }
+
+export const createRuntimeAdapters = (api: ServerPluginAPI) => [
+  new EffectAdapter(api),
+];

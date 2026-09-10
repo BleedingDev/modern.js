@@ -7,6 +7,14 @@ interface Target {
   language: string;
 }
 
+beforeEach(() => {
+  rstest.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+});
+
+afterEach(() => {
+  rstest.unstubAllGlobals();
+});
+
 test('an abandoned suspended render cannot publish an uncommitted target', async () => {
   let resolveFirst!: () => void;
   const firstChange = new Promise<void>(resolve => {
@@ -14,6 +22,7 @@ test('an abandoned suspended render cannot publish an uncommitted target', async
   });
   const changes: string[] = [];
   const commits: string[] = [];
+  let suspended = false;
   const neverSettles = new Promise<never>(() => undefined);
   const first = { id: 'first', language: 'en' };
   const speculative = { id: 'speculative', language: 'en' };
@@ -41,6 +50,7 @@ test('an abandoned suspended render cannot publish an uncommitted target', async
       },
     });
     if (suspend) {
+      suspended = true;
       throw neverSettles;
     }
     return <main>{target.id}</main>;
@@ -67,6 +77,11 @@ test('an abandoned suspended render cannot publish an uncommitted target', async
     });
     await Promise.resolve();
   });
+
+  expect(suspended).toBe(true);
+  expect(container.textContent).toBe('first');
+  expect(changes).toEqual(['first']);
+  expect(commits).toEqual([]);
 
   await act(async () => {
     resolveFirst();

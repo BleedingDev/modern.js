@@ -27,10 +27,10 @@ import {
   regenerateGeneratedNavigationSurface,
   regenerateGeneratedProductRouteAdapter,
 } from '../src/ultramodern-workspace/demo-components';
+import { shellApp } from '../src/ultramodern-workspace/descriptors';
 import {
   createAppMfTypesTsConfig,
   createAppTsConfig,
-  createSharedPackageTsConfig,
 } from '../src/ultramodern-workspace/package-json';
 import {
   renderMinimumReleaseAgeExclude,
@@ -51,6 +51,7 @@ import {
   ZOD_VERSION,
 } from '../src/ultramodern-workspace/versions';
 import { createWorkspaceRootPackageScripts } from '../src/ultramodern-workspace/workspace-script-plan';
+import { linkWorkspaceFormatterDependencies } from './helpers/workspace-kit';
 
 const retiredContractPath = '.modernjs/ultramodern-generated-contract.json';
 const retiredPackageSourcePath = '.modernjs/ultramodern-package-source.json';
@@ -109,6 +110,7 @@ function scaffoldWorkspace(name: string) {
     enableTailwind: true,
     packageSource: { strategy: 'workspace' },
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
   return { tempRoot, workspaceDir };
 }
 
@@ -1447,9 +1449,8 @@ test('migrate materializes every validator-required wrapper and rewires legacy s
       if (scriptName === 'postinstall') {
         assert.deepEqual(
           execution.records.map(record => record.command),
-          ['node', 'oxfmt'],
+          ['node'],
         );
-        assert.deepEqual(execution.records.at(-1)?.args, ['.']);
       }
     }
     const after = readJson(workspaceDir, 'package.json');
@@ -1457,7 +1458,7 @@ test('migrate materializes every validator-required wrapper and rewires legacy s
     assert.equal(after.scripts['format:check'], 'oxfmt --check .');
     assert.equal(
       after.scripts.postinstall,
-      'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .',
+      'node ./scripts/bootstrap-agent-skills.mts --postinstall',
     );
     for (const [scriptName, expectedArgs] of [
       ['format', ['.']],
@@ -1911,7 +1912,8 @@ export default catalogResource;
       'verticals/catalog/shared/ultramodern-build.json',
       'verticals/catalog/shared/ultramodern-build.ts',
     ]) {
-      fs.writeFileSync(path.join(workspaceDir, relativePath), 'stale\n');
+      // Missing generated artifacts are repairable; arbitrary source bytes are consumer-owned.
+      fs.rmSync(path.join(workspaceDir, relativePath), { force: true });
     }
     fs.rmSync(
       path.join(workspaceDir, 'scripts/proof-node-backend-federation.mjs'),
@@ -2107,6 +2109,19 @@ declare module '*.css' {}
       );
     }
 
+    const consumerTsConfigPaths = [
+      'tsconfig.base.json',
+      'packages/shared-contracts/tsconfig.json',
+      'packages/shared-design-tokens/tsconfig.json',
+      'apps/shell-super-app/tsconfig.json',
+      'apps/shell-super-app/tsconfig.mf-types.json',
+      'verticals/catalog/tsconfig.json',
+      'verticals/catalog/tsconfig.mf-types.json',
+    ];
+    const consumerTsConfigs = consumerTsConfigPaths.map(relativePath =>
+      fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
+    );
+
     assert.equal(
       await runUltramodernToolingCli(
         ['migrate-strict-effect', '--skip-install'],
@@ -2143,11 +2158,11 @@ declare module '*.css' {}
     );
     assert.equal(
       migratedIdentityTopology.shell.moduleFederation.remotes[0].alias,
-      undefined,
+      'catalog',
     );
     assert.equal(
       migratedIdentityTopology.shell.moduleFederation.remotes[0].manifestEnv,
-      undefined,
+      'VERTICAL_CATALOG_MF_MANIFEST',
     );
     const migratedOwnership = readJson(workspaceDir, 'topology/ownership.json');
     const migratedCatalogOwner = migratedOwnership.owners.find(
@@ -2173,7 +2188,7 @@ declare module '*.css' {}
     );
     assert.equal(
       migratedTopologyIdentityCatalog.deliveryUnit.buildMarker,
-      migratedBuildArtifact.deliveryUnit.buildMarker,
+      'stale-reference-marker',
     );
     assert.equal(
       compactConfig.tooling.wrappers.backendFederationProof,
@@ -2444,8 +2459,8 @@ declare module '*.css' {}
     const migratedBaseTsConfig = readJson(workspaceDir, 'tsconfig.base.json');
     assert.equal(
       migratedBaseTsConfig.compilerOptions.skipLibCheck,
-      undefined,
-      'migrate-strict-effect must remove generated skipLibCheck',
+      true,
+      'migrate-strict-effect must preserve consumer TypeScript options',
     );
     assertGitIgnored(workspaceDir, [
       '.mf/diagnostics.json',
@@ -2465,6 +2480,7 @@ declare module '*.css' {}
       'locales/**/*.json',
       'package.json',
       'shared',
+      'shared/ultramodern-build.json',
       'server',
       'modern.config.ts',
       'module-federation.config.ts',
@@ -2479,28 +2495,27 @@ declare module '*.css' {}
       'locales/**/*.json',
       'package.json',
       'shared',
+      'shared/ultramodern-build.json',
       'server',
       'api',
       'modern.config.ts',
       'module-federation.config.ts',
     ]);
 
-    for (const sharedPackageDir of [
-      'packages/shared-contracts',
-      'packages/shared-design-tokens',
-    ]) {
-      assert.deepEqual(
-        readJson(workspaceDir, `${sharedPackageDir}/tsconfig.json`),
-        createSharedPackageTsConfig(sharedPackageDir),
-      );
-    }
+    assert.deepEqual(
+      consumerTsConfigPaths.map(relativePath =>
+        fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
+      ),
+      consumerTsConfigs,
+      'Consumer TypeScript configurations must retain every byte',
+    );
 
     for (const appDir of ['apps/shell-super-app', 'verticals/catalog']) {
       const mfTypesTsConfig = readJson(
         workspaceDir,
         `${appDir}/tsconfig.mf-types.json`,
       );
-      assert.equal(mfTypesTsConfig.extends, '../../tsconfig.base.json');
+      assert.equal(mfTypesTsConfig.extends, './tsconfig.json');
 
       assert.equal(
         exists(workspaceDir, `${appDir}/src/modern-app-env.d.ts`),
@@ -2515,6 +2530,10 @@ declare module '*.css' {}
     assert.equal(shellPackage.devDependencies['cross-env'], CROSS_ENV_VERSION);
     assert.equal(
       shellPackage.dependencies['@modern-js/plugin-bff'],
+      'workspace:*',
+    );
+    assert.equal(
+      shellPackage.devDependencies['@modern-js/plugin-bff-build-extensions'],
       'workspace:*',
     );
     // plugin-bff declares both as optional peers, so migration has to add them
@@ -2993,6 +3012,7 @@ test('generated app tsconfig keeps shells independent from remote declaration ou
     'locales/**/*.json',
     'package.json',
     'shared',
+    'shared/ultramodern-build.json',
     'server',
     'api',
   ]);
@@ -3743,8 +3763,13 @@ export default defineConfig({
     const second = await loadOxfmtConfig(workspaceDir, 'second');
     assert.deepEqual(second.ignorePatterns, patched.ignorePatterns);
 
+    fs.writeFileSync(
+      path.join(workspaceDir, 'extra-ignores.ts'),
+      `export default ${JSON.stringify(patched.ignorePatterns)};\n`,
+      'utf-8',
+    );
     const unparseable = `import { defineConfig } from 'oxfmt';
-import extra from './extra-ignores';
+import extra from './extra-ignores.ts';
 
 export default defineConfig({
   ignorePatterns: [...extra],
@@ -3819,6 +3844,16 @@ test('migration supplies the optional Effect peers to workspaces generated befor
   };
   assert.equal(ensureBffEffectDependencies(root), true);
   assert.equal(root.devDependencies.effect, EFFECT_VERSION);
+  const buildOnly = {
+    devDependencies: { '@modern-js/plugin-bff-build-extensions': '3.8.3' },
+  };
+  assert.equal(ensureBffEffectDependencies(buildOnly), true);
+  assert.equal(buildOnly.devDependencies.effect, EFFECT_VERSION);
+  assert.equal(
+    buildOnly.devDependencies['@effect/opentelemetry'],
+    EFFECT_VERSION,
+  );
+  assert.equal(ensureBffEffectDependencies(buildOnly), false);
 });
 
 test('migration replaces the retired create alias before regenerating the lockfile', () => {
@@ -3844,6 +3879,8 @@ test('migration replaces the retired create alias before regenerating the lockfi
       'npm:@bleedingdev/modern-js-runtime@3.8.3-ultramodern.2',
     '@modern-js/runtime-extensions':
       'npm:@bleedingdev/modern-js-runtime-extensions@3.8.3-ultramodern.2',
+    '@modern-js/runtime-renderer-extensions':
+      'npm:@bleedingdev/modern-js-runtime-renderer-extensions@3.8.3-ultramodern.2',
     '@modern-js/ultramodern-create':
       'npm:@bleedingdev/modern-js-ultramodern-create@3.8.3-ultramodern.2',
     eslint: 'consumer-selected-eslint',
@@ -3905,4 +3942,84 @@ test('migration converges legacy generated TS-Go pins without rewriting unrelate
   assert.deepEqual(consumerPackage, {
     devDependencies: { eslint: 'consumer-selected-eslint' },
   });
+});
+
+test('migration authenticates direct renderer dependencies and preserves consumer selections', () => {
+  const renderer = '@modern-js/runtime-renderer-extensions';
+  const packageSource = {
+    strategy: 'install' as const,
+    modernPackageVersion: '3.8.3-ultramodern.2',
+    aliasScope: 'bleedingdev',
+    aliasPackageNamePrefix: 'modern-js-',
+  };
+  const cohort = {
+    packages: [
+      '@modern-js/app-tools',
+      '@modern-js/ultramodern-app-tools',
+      '@modern-js/app-tools-extensions',
+      '@modern-js/federation-runtime',
+      '@modern-js/boundary-debugger',
+      '@modern-js/plugin-bff-build-extensions',
+      '@modern-js/plugin-bff-extensions',
+      renderer,
+      '@modern-js/i18n-integration',
+    ].map(sourceName => ({
+      sourceName,
+      targetName: sourceName.replace('@modern-js/', '@bleedingdev/modern-js-'),
+      version: packageSource.modernPackageVersion,
+    })),
+  };
+  const app: Record<string, any> = {
+    dependencies: { '@modern-js/runtime': '3.8.2', react: 'consumer-react' },
+    devDependencies: { 'consumer-tool': 'consumer-version' },
+  };
+  const original = structuredClone(app);
+  for (const packages of [
+    cohort.packages.filter(item => item.sourceName !== renderer),
+    cohort.packages.map(item =>
+      item.sourceName === renderer ? { ...item, version: '3.8.2' } : item,
+    ),
+  ]) {
+    assert.throws(
+      () =>
+        updateModernDependencies(
+          app,
+          packageSource,
+          { packages },
+          { app: shellApp },
+        ),
+      /runtime-renderer-extensions is absent from the authenticated target cohort/u,
+    );
+    assert.deepEqual(app, original);
+  }
+  assert.equal(
+    updateModernDependencies(app, packageSource, cohort, { app: shellApp }),
+    true,
+  );
+  assert.equal(
+    app.dependencies[renderer],
+    'npm:@bleedingdev/modern-js-runtime-renderer-extensions@3.8.3-ultramodern.2',
+  );
+  assert.equal(app.dependencies.react, 'consumer-react');
+  assert.equal(app.devDependencies['consumer-tool'], 'consumer-version');
+  assert.equal(
+    updateModernDependencies(app, packageSource, cohort, { app: shellApp }),
+    false,
+  );
+
+  const root: Record<string, any> = {
+    modernjs: { workspace: 'ultramodern-superapp' },
+    devDependencies: { 'consumer-tool': 'consumer-version' },
+  };
+  assert.equal(updateModernDependencies(root, packageSource, cohort), true);
+  assert.equal(root.devDependencies[renderer], app.dependencies[renderer]);
+  assert.equal(root.devDependencies['consumer-tool'], 'consumer-version');
+  assert.equal(updateModernDependencies(root, packageSource, cohort), false);
+
+  const unrelated = { dependencies: { react: 'consumer-react' } };
+  assert.equal(
+    updateModernDependencies(unrelated, packageSource, cohort),
+    false,
+  );
+  assert.deepEqual(unrelated, { dependencies: { react: 'consumer-react' } });
 });

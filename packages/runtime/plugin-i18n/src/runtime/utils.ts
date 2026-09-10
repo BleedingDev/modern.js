@@ -1,10 +1,9 @@
-import {
-  type LocalisedUrlsOption,
-  localiseTargetPathname,
-  shouldSkipLocaleRedirect,
-} from '@modern-js/i18n-runtime-extensions';
 import { isBrowser } from '@modern-js/runtime';
 import { getGlobalBasename } from '@modern-js/runtime/context';
+import { splitUrlTarget } from '@modern-js/runtime-utils/url';
+import type { I18nUrlStrategy } from '../shared/urlStrategy';
+
+export { splitUrlTarget } from '@modern-js/runtime-utils/url';
 
 // Structural parameter: hooks.ts passes a public-TRuntimeContext-based
 // context while core.tsx passes the internal one; both carry the request
@@ -48,24 +47,6 @@ export const getLanguageFromPath = (
 };
 
 /**
- * Split a link target into its pathname, search and hash parts without
- * relying on `new URL` (SSR-hot path; targets are relative).
- */
-export const splitUrlTarget = (
-  target: string,
-): { pathname: string; search: string; hash: string } => {
-  const hashIndex = target.indexOf('#');
-  const hash = hashIndex >= 0 ? target.slice(hashIndex) : '';
-  const beforeHash = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
-  const searchIndex = beforeHash.indexOf('?');
-  const search = searchIndex >= 0 ? beforeHash.slice(searchIndex) : '';
-  const pathname =
-    searchIndex >= 0 ? beforeHash.slice(0, searchIndex) : beforeHash;
-
-  return { pathname, search, hash };
-};
-
-/**
  * Helper function to build localized URL
  * @param target - The language-agnostic target; may include `?search` and `#hash`
  * @param language - The target language
@@ -76,15 +57,22 @@ export const buildLocalizedUrl = (
   target: string,
   language: string,
   languages: string[],
-  localisedUrls?: LocalisedUrlsOption,
+  urlStrategy?: I18nUrlStrategy,
 ): string => {
   const { pathname, search, hash } = splitUrlTarget(target);
-  const localizedPathname = localiseTargetPathname(
-    pathname,
-    language,
-    languages,
-    localisedUrls,
-  );
+  if (urlStrategy) {
+    return `${urlStrategy.localizePathname(pathname, language, languages)}${search}${hash}`;
+  }
+  const segments = pathname.split('/').filter(Boolean);
+  if (
+    segments[0] &&
+    languages.some(item => item.toLowerCase() === segments[0].toLowerCase())
+  ) {
+    segments[0] = language;
+  } else {
+    segments.unshift(language);
+  }
+  const localizedPathname = `/${segments.join('/')}`;
 
   return `${localizedPathname}${search}${hash}`;
 };
@@ -131,6 +119,27 @@ export const shouldIgnoreRedirect = (
   pathname: string,
   languages: string[],
   ignoreRedirectRoutes?: string[] | ((pathname: string) => boolean),
+  urlStrategy?: I18nUrlStrategy,
 ): boolean => {
-  return shouldSkipLocaleRedirect(pathname, languages, ignoreRedirectRoutes);
+  if (urlStrategy?.shouldSkipRedirect?.(pathname, languages)) {
+    return true;
+  }
+  if (!ignoreRedirectRoutes) {
+    return false;
+  }
+  const segments = pathname.split('/').filter(Boolean);
+  if (
+    segments[0] &&
+    languages.some(item => item.toLowerCase() === segments[0].toLowerCase())
+  ) {
+    segments.shift();
+  }
+  const normalizedPath = `/${segments.join('/')}`;
+  return typeof ignoreRedirectRoutes === 'function'
+    ? ignoreRedirectRoutes(normalizedPath)
+    : ignoreRedirectRoutes.some(
+        pattern =>
+          normalizedPath === pattern ||
+          normalizedPath.startsWith(`${pattern}/`),
+      );
 };

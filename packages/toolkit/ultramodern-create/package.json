@@ -96,7 +96,10 @@
     "@modern-js/utils": "workspace:*",
     "esbuild": "^0.28.2",
     "oxfmt": "0.66.0",
-    "ultracite": "7.11.0"
+    "ultracite": "7.11.0",
+    "miniflare": "4.20260730.0",
+    "@modern-js/backend-federation-contracts": "workspace:*",
+    "@modern-js/app-tools-extensions": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/rslib": "workspace:*",
@@ -106,7 +109,10 @@
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "drizzle-orm": "1.0.0-rc.4",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "@modern-js/plugin-bff-build-extensions": "workspace:*",
+    "@modern-js/i18n-integration": "workspace:*",
+    "@modern-js/i18n-runtime-extensions": "workspace:*"
   },
   "publishConfig": {
     "main": "./dist/esm-node/index.js",

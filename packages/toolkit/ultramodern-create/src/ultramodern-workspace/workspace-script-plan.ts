@@ -8,7 +8,13 @@ import {
 import type { WorkspaceApp } from './types';
 
 export const GENERATED_POSTINSTALL_SCRIPT =
-  'node ./scripts/bootstrap-agent-skills.mts --postinstall && oxfmt .';
+  'node ./scripts/bootstrap-agent-skills.mts --postinstall';
+
+// Recognize only flat && chains with quoted or escaped arguments. A caller
+// must reconstruct the entire command before treating these matches as owned.
+// Substitutions, comments, pipelines and redirections remain opaque shell code.
+export const WORKSPACE_SCRIPT_SEGMENT_PATTERN =
+  /(?:'[^']*'|"(?:\\[^\r\n]|[^"\\`$]|\$(?![(']))*"|\\[^\r\n]|[^"'\\`&|;()<>\r\n^#$]|\$(?![('"]))+/gu;
 
 const toolingWrapperPath = (key: GeneratedToolingCommandKey) =>
   GENERATED_TOOLING_COMMANDS[key].wrapperPath;
@@ -59,14 +65,14 @@ const workspaceRootPackageScriptNames = {
   cloudflareBuild: 'cloudflare:build',
   cloudflareDeploy: 'cloudflare:deploy',
   cloudflareProof: rootToolingScriptName('cloudflareProof'),
-  cloudflareSsrProof: 'cloudflare:ssr-proof',
+  cloudflareSsrProof: rootToolingScriptName('cloudflareSsrProof'),
   cloudflareOutputVerify: rootToolingScriptName('cloudflareOutputVerify'),
   backendFederationGenerate: rootToolingScriptName('backendFederationGenerate'),
   nodeProof: rootToolingScriptName('backendFederationProof'),
   mfTypes: rootToolingScriptName('mfTypes'),
   performanceReadiness: rootToolingScriptName('performanceReadiness'),
   migrateStrictEffect: rootToolingScriptName('migrateStrictEffect'),
-  zeropsMaterialize: 'zerops:materialize',
+  zeropsMaterialize: rootToolingScriptName('zeropsMaterialize'),
   contractCheck: rootToolingScriptName('validate'),
   typecheck: 'typecheck',
   check: 'check',
@@ -281,7 +287,7 @@ export function createWorkspaceRootScriptPlan(
     cloudflareProof: `${rootToolingWrapperCommand(
       'cloudflareProof',
     )} --out .codex/reports/cloudflare-version-proof/public-url-proof.json`,
-    cloudflareSsrProof: 'node ./scripts/proof-workerd-ssr.mts',
+    cloudflareSsrProof: rootToolingWrapperCommand('cloudflareSsrProof'),
     cloudflareOutputVerify: rootToolingWrapperCommand('cloudflareOutputVerify'),
     backendFederationGenerate: rootToolingWrapperCommand(
       'backendFederationGenerate',
@@ -290,14 +296,14 @@ export function createWorkspaceRootScriptPlan(
     mfTypes: rootToolingWrapperCommand('mfTypes'),
     performanceReadiness: rootToolingWrapperCommand('performanceReadiness'),
     migrateStrictEffect: rootToolingWrapperCommand('migrateStrictEffect'),
-    zeropsMaterialize: 'node ./scripts/materialize-zerops-runtime.mjs',
+    zeropsMaterialize: rootToolingWrapperCommand('zeropsMaterialize'),
     contractCheck: rootToolingWrapperCommand('validate'),
     typecheck:
       options.typecheck ??
       `${rootToolingWrapperCommand('typecheck')} --build tsconfig.json`,
     // `check` is a static source/build gate. Runtime acceptance invokes the
     // read-only Node proof only after built servers are running.
-    check: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm skills:check && pnpm i18n:boundaries && pnpm api:check && pnpm contract:check && pnpm performance:readiness${bridgeCheck}`,
+    check: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm skills:check && pnpm i18n:boundaries && pnpm api:check:files && pnpm contract:check && pnpm performance:readiness${bridgeCheck}`,
   };
 }
 

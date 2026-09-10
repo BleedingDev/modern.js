@@ -355,11 +355,35 @@ test('shared source and published profiles commit only inventory, execute its C1
     '../published-create-proof/acceptance-profile.mjs'
   );
 
-  for (const mode of ['source', 'published']) {
-    await t.test(mode, async () => {
-      const root = fs.mkdtempSync(
+  for (const [mode, rejectingHook] of [
+    ['source', null],
+    ['published', null],
+    ['source', 'pre-commit'],
+    ['source', 'commit-msg'],
+  ]) {
+    await t.test(`${mode}: ${rejectingHook ?? 'passing hooks'}`, async () => {
+      const fixture = fs.mkdtempSync(
         path.join(os.tmpdir(), `operational-profile-${mode}-`),
       );
+      const root = path.join(fixture, 'workspace');
+      const hooks = path.join(fixture, 'hooks');
+      fs.mkdirSync(root);
+      fs.mkdirSync(hooks);
+      const config = path.join(fixture, 'gitconfig');
+      fs.writeFileSync(
+        config,
+        `[core]\nhooksPath = ${JSON.stringify(hooks)}\n`,
+      );
+      const fixtureRun = (command, args, options = {}) =>
+        runCommand(command, args, {
+          ...options,
+          env: {
+            ...options.env,
+            GIT_CONFIG_GLOBAL: config,
+            GIT_CONFIG_NOSYSTEM: '1',
+          },
+          stdio: 'pipe',
+        });
       try {
         const localePath = path.join(
           root,
@@ -392,47 +416,47 @@ export function listInventory() {
 }
 `,
         );
-        runCommand('git', ['init', '--quiet'], { cwd: root });
-        runCommand('git', ['config', 'user.name', 'Acceptance Test'], {
+        fixtureRun('git', ['init', '--quiet'], { cwd: root });
+        fixtureRun('git', ['config', 'user.name', 'Acceptance Test'], {
           cwd: root,
         });
-        runCommand('git', ['config', 'user.email', 'acceptance@example.test'], {
+        fixtureRun('git', ['config', 'user.email', 'acceptance@example.test'], {
           cwd: root,
         });
-        runCommand('git', ['add', '-A'], { cwd: root });
-        runCommand(
+        fixtureRun('git', ['add', '-A'], { cwd: root });
+        fixtureRun(
           'git',
-          [
-            '-c',
-            'commit.gpgsign=false',
-            '-c',
-            'core.hooksPath=/dev/null',
-            'commit',
-            '--quiet',
-            '--no-verify',
-            '-m',
-            'baseline',
-          ],
+          ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'baseline'],
           { cwd: root },
         );
-        const baseline = runCommand('git', ['rev-parse', 'HEAD'], {
+        const baseline = fixtureRun('git', ['rev-parse', 'HEAD'], {
           cwd: root,
         });
+        for (const hook of ['pre-commit', 'commit-msg']) {
+          fs.writeFileSync(
+            path.join(hooks, hook),
+            `#!/bin/sh
+printf '%s\\n' '${hook}' >> .git/hook-events
+${rejectingHook === hook ? `echo 'fixture ${hook} rejected C1' >&2\nexit 1` : 'exit 0'}
+`,
+            { mode: 0o755 },
+          );
+        }
         const calls = [];
         const runImpl = (command, args, options = {}) => {
           calls.push([command, [...args]]);
-          return runCommand(command, args, options);
+          return fixtureRun(command, args, options);
         };
         let invocation;
         const runOperationalIndependenceImpl = async options => {
           invocation = options;
           assert.equal(
-            runCommand('git', ['rev-parse', 'HEAD'], { cwd: root }),
+            fixtureRun('git', ['rev-parse', 'HEAD'], { cwd: root }),
             options.changedRef,
             'the runner must be invoked only after C1 is committed',
           );
           assert.equal(
-            runCommand(
+            fixtureRun(
               'git',
               ['status', '--porcelain=v1', '--untracked-files=all'],
               { cwd: root },
@@ -452,7 +476,7 @@ export function listInventory() {
           return evidence;
         };
         const outPath = path.join(root, '..', `${mode}-receipt.json`);
-        const details = await runOperationalIndependenceAcceptance({
+        const acceptanceOptions = {
           applicationSourceRevision: baseline,
           ephemeralWorkDir: root,
           mode,
@@ -464,7 +488,41 @@ export function listInventory() {
           projectDir: root,
           runImpl,
           runOperationalIndependenceImpl,
-        });
+        };
+        if (rejectingHook) {
+          await assert.rejects(
+            runOperationalIndependenceAcceptance(acceptanceOptions),
+            /fixture (?:pre-commit|commit-msg) rejected C1/u,
+          );
+          assert.equal(
+            invocation,
+            undefined,
+            'no operational build or proof may run after hook rejection',
+          );
+          assert.equal(
+            fixtureRun('git', ['rev-parse', 'HEAD'], { cwd: root }),
+            baseline,
+          );
+          assert.deepEqual(
+            fs
+              .readFileSync(path.join(root, '.git/hook-events'), 'utf8')
+              .trim()
+              .split('\n'),
+            rejectingHook === 'pre-commit'
+              ? ['pre-commit']
+              : ['pre-commit', 'commit-msg'],
+          );
+          return;
+        }
+        const details =
+          await runOperationalIndependenceAcceptance(acceptanceOptions);
+        assert.deepEqual(
+          fs
+            .readFileSync(path.join(root, '.git/hook-events'), 'utf8')
+            .trim()
+            .split('\n'),
+          ['pre-commit', 'commit-msg'],
+        );
 
         assert.deepEqual(invocation, {
           baselineRef: baseline,
@@ -495,7 +553,7 @@ export function listInventory() {
           details.mutations.uiLocalization.value,
         );
         assert.equal(
-          runCommand('git', ['rev-parse', 'HEAD^'], { cwd: root }),
+          fixtureRun('git', ['rev-parse', 'HEAD^'], { cwd: root }),
           baseline,
         );
         const commitCall = calls.find(
@@ -504,18 +562,14 @@ export function listInventory() {
             args.join(' ').includes('rotate inventory operational identity'),
         );
         assert.ok(commitCall);
-        assert.equal(commitCall[1].includes('core.hooksPath=/dev/null'), true);
+        assert.equal(
+          commitCall[1].some(arg => arg.startsWith('core.hooksPath=')),
+          false,
+        );
+        assert.equal(commitCall[1].includes('--no-verify'), false);
         assert.equal(commitCall[1].includes('commit.gpgsign=false'), true);
       } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-        fs.rmSync(
-          path.join(
-            root,
-            '..',
-            `${mode}-receipt.operational-independence.json`,
-          ),
-          { force: true },
-        );
+        fs.rmSync(fixture, { recursive: true, force: true });
       }
     });
   }

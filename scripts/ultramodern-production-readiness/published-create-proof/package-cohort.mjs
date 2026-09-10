@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { canonicalJson } from '../../ultramodern-publish/lib/prepare-bleedingdev-packages/release-artifacts.mjs';
 import { readJsonFile } from './constants.mjs';
 
 const compactMetadataPath = '.modernjs/ultramodern.json';
@@ -36,24 +37,6 @@ function isPlainObject(value) {
   return prototype === Object.prototype || prototype === null;
 }
 
-function canonicalValue(value) {
-  if (Array.isArray(value)) {
-    return value.map(canonicalValue);
-  }
-  if (isPlainObject(value)) {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map(key => [key, canonicalValue(value[key])]),
-    );
-  }
-  return value;
-}
-
-function canonicalJson(value) {
-  return JSON.stringify(canonicalValue(value), null, 2);
-}
-
 function assertGeneratedReleaseCohort(projectDir, release) {
   assertCondition(
     isPlainObject(release?.cohortProjection) &&
@@ -69,7 +52,7 @@ function assertGeneratedReleaseCohort(projectDir, release) {
   );
   const bytes = fs.readFileSync(filePath);
   const expectedBytes = Buffer.from(
-    `${canonicalJson(release.cohortProjection.value)}\n`,
+    `${canonicalJson(release.cohortProjection.value, 2)}\n`,
     'utf8',
   );
   assertCondition(
@@ -320,8 +303,8 @@ function resolveBootstrapReleaseAgePolicy(release, cohort, createPackage) {
     minimumReleaseAge: minimumReleaseAgeMinutes,
     minimumReleaseAgeExclude: Object.freeze(
       [...reachableTargets]
-        .sort((left, right) => left.localeCompare(right))
-        .map(targetName => `${targetName}@${release.release.version}`),
+        .map(targetName => `${targetName}@${release.release.version}`)
+        .sort((left, right) => left.localeCompare(right)),
     ),
     minimumReleaseAgeIgnoreMissingTime: false,
     minimumReleaseAgeStrict: true,
