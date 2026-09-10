@@ -1129,15 +1129,6 @@ function migrateStrictEffect(
     });
   }
 
-  if (dryRun) {
-    for (const line of io.plan) {
-      process.stdout.write(`${line}\n`);
-    }
-    process.stdout.write(
-      `[dry-run] migrate-strict-effect would migrate UltraModern strict Effect metadata to ${packageSource.modernPackageVersion}.\n`,
-    );
-  }
-
   return result(0);
 }
 
@@ -1155,6 +1146,7 @@ export function runMigrateStrictEffect(
   const installedSource = readInstalledSourceCohort(context.workspaceRoot);
   let updatePlan: SameContractPlan | undefined;
   let netChanges: string[] = [];
+  let dryRunPlan: readonly string[] = [];
   const runMigration = (io: MigrationIo, migrationContext: CommandContext) =>
     io.transaction(
       () =>
@@ -1172,6 +1164,7 @@ export function runMigrateStrictEffect(
       { commitWhen: migrationResult => migrationResult.status === 0 },
     );
   const withContext = (io: MigrationIo) => {
+    if (dryRun) dryRunPlan = io.plan;
     const invocationRelativePath = path.relative(
       context.workspaceRoot,
       context.invocationCwd,
@@ -1191,7 +1184,8 @@ export function runMigrateStrictEffect(
     ? withStagedDryRunMigrationIo(context.workspaceRoot, withContext)
     : runWorkspaceTransaction(
         context.workspaceRoot,
-        stage => withContext(createMigrationIo(stage, false)),
+        stage =>
+          withContext(createMigrationIo(stage, false, context.workspaceRoot)),
         {
           commitWhen: migrationResult => migrationResult.status === 0,
           inspectChanges: changes => {
@@ -1203,6 +1197,17 @@ export function runMigrateStrictEffect(
       );
 
   const report = (migrationResult: Awaited<typeof migration>) => {
+    if (dryRun && migrationResult.status === 0) {
+      for (const line of dryRunPlan) process.stdout.write(`${line}\n`);
+      if (
+        migrationResult.classification === 'historical-migration' &&
+        migrationResult.version
+      ) {
+        process.stdout.write(
+          `[dry-run] migrate-strict-effect would migrate UltraModern strict Effect metadata to ${migrationResult.version}.\n`,
+        );
+      }
+    }
     if (!dryRun) {
       migrationResult.changed = netChanges.map(relativePath => ({
         path: relativePath,

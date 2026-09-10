@@ -3,9 +3,10 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { rstest } from '@rstest/core';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
-import { formatGeneratedWorkspaceFiles } from '../src/ultramodern-workspace/fs-io';
+import { readFileTemplate } from '../src/ultramodern-workspace/fs-io';
 import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
@@ -26,28 +27,19 @@ function readFiles(workspaceRoot: string, relativePaths: readonly string[]) {
 function assertGeneratedFilesAreFormatted(
   workspaceRoot: string,
   relativePaths: readonly string[],
+  mode: '--check' | '--write' = '--check',
 ) {
-  const formatRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-migrate-format-check-'),
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.resolve(__dirname, '../node_modules/oxfmt/bin/oxfmt'),
+      mode,
+      '--no-error-on-unmatched-pattern',
+      ...relativePaths,
+    ],
+    { cwd: workspaceRoot, encoding: 'utf-8' },
   );
-  try {
-    for (const relativePath of relativePaths) {
-      const sourcePath = path.join(workspaceRoot, relativePath);
-      const candidatePath = path.join(formatRoot, relativePath);
-      fs.mkdirSync(path.dirname(candidatePath), { recursive: true });
-      fs.copyFileSync(sourcePath, candidatePath);
-    }
-    formatGeneratedWorkspaceFiles(formatRoot, relativePaths);
-    for (const relativePath of relativePaths) {
-      assert.equal(
-        fs.readFileSync(path.join(formatRoot, relativePath), 'utf-8'),
-        fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf-8'),
-        `${relativePath} must already contain canonical Oxfmt bytes`,
-      );
-    }
-  } finally {
-    fs.rmSync(formatRoot, { force: true, recursive: true });
-  }
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
 }
 
 test.each([
@@ -106,6 +98,17 @@ test.each([
       `export default ${JSON.stringify(formatterSettings)};\n`,
     );
     fs.writeFileSync(consumerConfigPath, consumerConfig);
+    // Establish the consumer's chosen style before testing which generated
+    // transitions migration owns; unchanged authored configs stay untouched.
+    assertGeneratedFilesAreFormatted(
+      workspaceRoot,
+      ['apps', 'verticals', 'packages', 'scripts'],
+      '--write',
+    );
+    fs.writeFileSync(
+      path.join(workspaceRoot, consumerProbePath),
+      consumerProbe,
+    );
 
     const shellUiMarker = 'apps/shell-super-app/src/ultramodern-build.ts';
     fs.writeFileSync(
@@ -202,7 +205,16 @@ test.each([
   }
 });
 
-test('generated formatting failure rolls back the transaction', () => {
+test.each([
+  { source: 'export const = ;\n', config: undefined },
+  {
+    source: 'export const changed = true;\n',
+    config: 'throw new Error("consumer formatter failed");\n',
+  },
+])('generated formatting failure rolls back the transaction %j', ({
+  source,
+  config,
+}) => {
   const workspaceRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-migrate-format-rollback-'),
   );
@@ -210,16 +222,153 @@ test('generated formatting failure rolls back the transaction', () => {
   const original = Buffer.from('export const original = true;\n');
   try {
     fs.writeFileSync(generatedPath, original);
+    if (config)
+      fs.writeFileSync(path.join(workspaceRoot, 'oxfmt.config.ts'), config);
     const io = createMigrationIo(workspaceRoot, false);
     assert.throws(
       () =>
         io.transaction(() => {
-          io.writeGenerated(generatedPath, 'export const = ;\n');
+          io.writeGenerated(generatedPath, source);
         }),
       /Failed to format generated UltraModern workspace output/u,
     );
     assert.deepEqual(fs.readFileSync(generatedPath), original);
+    if (config)
+      assert.equal(
+        fs.readFileSync(path.join(workspaceRoot, 'oxfmt.config.ts'), 'utf8'),
+        config,
+      );
   } finally {
+    fs.rmSync(workspaceRoot, { force: true, recursive: true });
+  }
+});
+
+test('dry-run reports finalized formatting with native consumer imports and nested settings', async () => {
+  const workspaceRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-native-format-preview-'),
+  );
+  const output = rstest.spyOn(process.stdout, 'write').mockReturnValue(true);
+  try {
+    generateUltramodernWorkspace({
+      targetDir: workspaceRoot,
+      packageName: 'native-format-preview',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource,
+    });
+    const moduleDirectory = path.join(
+      workspaceRoot,
+      'node_modules/consumer-format-settings',
+    );
+    fs.mkdirSync(moduleDirectory, { recursive: true });
+    fs.writeFileSync(
+      path.join(moduleDirectory, 'package.json'),
+      JSON.stringify({
+        name: 'consumer-format-settings',
+        type: 'module',
+        exports: './index.js',
+      }),
+    );
+    fs.writeFileSync(
+      path.join(moduleDirectory, 'index.js'),
+      'export default { printWidth: 80, singleQuote: false, trailingComma: "none" };\n',
+    );
+    fs.writeFileSync(
+      path.join(workspaceRoot, 'oxfmt.config.ts'),
+      'import settings from "consumer-format-settings";\nexport default settings;\n',
+    );
+    fs.writeFileSync(
+      path.join(workspaceRoot, 'scripts/.oxfmtrc.json'),
+      JSON.stringify({
+        printWidth: 160,
+        singleQuote: true,
+        trailingComma: 'none',
+      }),
+    );
+    assertGeneratedFilesAreFormatted(
+      workspaceRoot,
+      ['apps', 'verticals', 'packages', 'scripts'],
+      '--write',
+    );
+    const relativePath = 'scripts/ultramodern-performance-readiness.config.mjs';
+    fs.writeFileSync(
+      path.join(workspaceRoot, relativePath),
+      readFileTemplate(
+        'workspace-scripts/ultramodern-performance-readiness.config.mjs',
+      ),
+    );
+    const authoredPath = 'packages/authored-format.ts';
+    fs.writeFileSync(
+      path.join(workspaceRoot, authoredPath),
+      'export const authored =  { preserve: "spacing" };\n',
+    );
+    const allFiles = () =>
+      readFiles(
+        workspaceRoot,
+        fs
+          .readdirSync(workspaceRoot, { recursive: true })
+          .filter(relative =>
+            fs.lstatSync(path.join(workspaceRoot, relative)).isFile(),
+          )
+          .sort(),
+      );
+    const before = allFiles();
+    assert.equal(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--dry-run'],
+        workspaceRoot,
+      ),
+      0,
+    );
+    const preview = output.mock.calls.map(([chunk]) => String(chunk)).join('');
+    assert.deepEqual(allFiles(), before);
+    assert.ok(
+      preview.includes(`[dry-run] would write ${relativePath}\n`),
+      'Formatting-only writes must be reported after transaction finalization',
+    );
+    assert.equal(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--skip-install'],
+        workspaceRoot,
+      ),
+      0,
+    );
+    assert.notDeepEqual(
+      fs.readFileSync(path.join(workspaceRoot, relativePath)),
+      before.get(relativePath),
+    );
+    assertGeneratedFilesAreFormatted(workspaceRoot, [
+      relativePath,
+      'apps/shell-super-app/modern.config.ts',
+    ]);
+    for (const preserved of [
+      'oxfmt.config.ts',
+      'scripts/.oxfmtrc.json',
+      authoredPath,
+      'node_modules/consumer-format-settings/index.js',
+    ]) {
+      assert.deepEqual(
+        fs.readFileSync(path.join(workspaceRoot, preserved)),
+        before.get(preserved),
+      );
+    }
+    const after = allFiles();
+    const changed = [...new Set([...before.keys(), ...after.keys()])].filter(
+      relative =>
+        !before.get(relative)?.equals(after.get(relative) ?? Buffer.alloc(0)),
+    );
+    const planned = new Set(
+      preview.split('\n').flatMap(line => {
+        const match = /^\[dry-run\] would (?:write|delete) (.+)$/u.exec(line);
+        return match ? [match[1]] : [];
+      }),
+    );
+    assert.deepEqual(
+      changed.filter(relative => !planned.has(relative)),
+      [],
+    );
+  } finally {
+    output.mockRestore();
     fs.rmSync(workspaceRoot, { force: true, recursive: true });
   }
 });

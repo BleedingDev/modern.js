@@ -292,7 +292,7 @@ function copyTemplate(
 
   const excludeInSubproject = [
     '.gitignore.handlebars',
-    'biome.json',
+    'biome.json.handlebars',
     '.npmrc',
     '.nvmrc',
     // agent files are managed at the monorepo root in subproject setups

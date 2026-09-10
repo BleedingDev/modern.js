@@ -51,6 +51,7 @@ import {
   ZOD_VERSION,
 } from '../src/ultramodern-workspace/versions';
 import { createWorkspaceRootPackageScripts } from '../src/ultramodern-workspace/workspace-script-plan';
+import { linkWorkspaceFormatterDependencies } from './helpers/workspace-kit';
 
 const retiredContractPath = '.modernjs/ultramodern-generated-contract.json';
 const retiredPackageSourcePath = '.modernjs/ultramodern-package-source.json';
@@ -109,6 +110,7 @@ function scaffoldWorkspace(name: string) {
     enableTailwind: true,
     packageSource: { strategy: 'workspace' },
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
   return { tempRoot, workspaceDir };
 }
 
@@ -3761,8 +3763,13 @@ export default defineConfig({
     const second = await loadOxfmtConfig(workspaceDir, 'second');
     assert.deepEqual(second.ignorePatterns, patched.ignorePatterns);
 
+    fs.writeFileSync(
+      path.join(workspaceDir, 'extra-ignores.ts'),
+      `export default ${JSON.stringify(patched.ignorePatterns)};\n`,
+      'utf-8',
+    );
     const unparseable = `import { defineConfig } from 'oxfmt';
-import extra from './extra-ignores';
+import extra from './extra-ignores.ts';
 
 export default defineConfig({
   ignorePatterns: [...extra],

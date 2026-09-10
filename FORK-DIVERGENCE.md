@@ -1268,6 +1268,13 @@ pins, complete scope and stored budgets; import-boundary review remains separate
 | `packages/document/docs/zh/guides/advanced-features/bff/function.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
 | `packages/document/docs/zh/guides/advanced-features/bff/operators.mdx` | bleedingdev | Restore documentation examples and displayed source references to the native plugin-bff/server Hono API entry after retiring the redundant hono-server alias; retain the native operators and request-context examples. | `inline-patch` |
 
+### Native template configuration delivery (2026-09-10)
+
+| File | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/toolkit/create/template/biome.json.handlebars` (audited identity: `packages/toolkit/create/template/biome.json`) | bleedingdev | Preserve the exact native Biome 1.9.4 configuration as a template rendered by the existing create and Sandpack template mechanisms. Its template filename prevents repository tooling from interpreting consumer configuration as repository configuration. | `inline-patch` |
+| `packages/toolkit/create/src/index.ts` | bleedingdev | Match the existing subproject exclusion to the configuration's template filename, preserving the native rule that subprojects inherit root tooling. | `inline-patch` |
+
 ### Disabled-RSC ownership reconciliation (2026-09-10)
 
 The earlier native-retention review traced `rscDisabledRuntime.ts` to the

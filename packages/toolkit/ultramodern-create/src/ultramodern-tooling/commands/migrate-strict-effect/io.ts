@@ -46,6 +46,7 @@ export type MigrationIo = {
 
 type MigrationIoBehavior = {
   materializeDryRun: boolean;
+  formattingWorkspaceRoot?: string;
 };
 
 const stagingExcludedEntries = new Set([
@@ -406,6 +407,7 @@ function createMigrationIoWithBehavior(
           'utf-8',
         ),
       ]),
+      behavior.formattingWorkspaceRoot ?? absoluteWorkspaceRoot,
     );
     for (const [index, relativePath] of relativePaths.entries()) {
       io.write(
@@ -572,9 +574,11 @@ function createMigrationIoWithBehavior(
 export function createMigrationIo(
   workspaceRoot: string,
   dryRun: boolean,
+  formattingWorkspaceRoot = workspaceRoot,
 ): MigrationIo {
   return createMigrationIoWithBehavior(workspaceRoot, dryRun, {
     materializeDryRun: false,
+    formattingWorkspaceRoot,
   });
 }
 
@@ -593,6 +597,7 @@ export function withStagedDryRunMigrationIo<T>(
     operation(
       createMigrationIoWithBehavior(stagedWorkspaceRoot, true, {
         materializeDryRun: true,
+        formattingWorkspaceRoot: workspaceRoot,
       }),
     ),
   );

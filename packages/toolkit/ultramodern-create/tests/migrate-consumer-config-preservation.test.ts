@@ -36,6 +36,7 @@ import {
 } from '../src/ultramodern-workspace/module-federation';
 import { createAppTsConfig } from '../src/ultramodern-workspace/tsconfigs';
 import { createPackagedWorkspaceValidationScript } from '../src/ultramodern-workspace/workspace-scripts';
+import { linkWorkspaceFormatterDependencies } from './helpers/workspace-kit';
 
 function readJson(workspaceRoot: string, relativePath: string) {
   return JSON.parse(
@@ -166,6 +167,7 @@ test('migration replaces recognized historical validator with the native tooling
       modernVersion: '3.2.1',
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     const validatorPath = path.join(
       workspaceRoot,
       'scripts/validate-ultramodern-workspace.mts',
@@ -211,6 +213,7 @@ test('migrate converges the published .15 generated Tailwind config to native de
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     const modernConfigPath = path.join(
       workspaceRoot,
       'apps/shell-super-app/modern.config.ts',
@@ -276,6 +279,7 @@ test('migrate composes the previous generated app-tools and release-envelope plu
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     const modernConfigPath = path.join(
       workspaceRoot,
       'apps/shell-super-app/modern.config.ts',
@@ -333,6 +337,7 @@ test('migrate preserves an unmarked consumer Modern config while updating genera
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
 
     const modernConfigPath = path.join(
       workspaceRoot,
@@ -590,6 +595,7 @@ test('migrate refuses a marked ambiguous Module Federation config before writes'
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     const shellPackagePath = 'apps/shell-super-app/package.json';
     const shellPackage = readJson(workspaceRoot, shellPackagePath);
     shellPackage.dependencies['react-router'] = '8.0.0';
@@ -643,6 +649,7 @@ test('migrate preserves a generator-derived Module Federation config with consum
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     const configPath = path.join(
       workspaceRoot,
       'apps/shell-super-app/module-federation.config.ts',
@@ -687,6 +694,7 @@ test('migrate preserves unproven browser and backend federation configs on surfa
       enableTailwind: false,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     addUltramodernVertical({
       workspaceRoot,
       name: 'headless-orders',
@@ -815,6 +823,7 @@ test('migrate rolls back earlier writes when a deterministic late write fails', 
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     const compactPath = '.modernjs/ultramodern.json';
     const compact = readJson(workspaceRoot, compactPath);
     compact.generator.version = '0.0.0-rollback-proof';
@@ -860,6 +869,7 @@ test('migrate preserves consumer Drizzle versions without materializing an unrel
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     addUltramodernVertical({
       workspaceRoot,
       name: 'orders',
@@ -944,6 +954,7 @@ test('migration preserves authored tooling, deployment topology, and federation 
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
     addUltramodernVertical({
       workspaceRoot,
       name: 'orders',
@@ -1161,6 +1172,7 @@ test.each([
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(root);
     addUltramodernVertical({
       workspaceRoot: root,
       name: 'catalog',
@@ -1332,6 +1344,7 @@ test.each([
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(root);
     const config = readUltramodernConfig(root);
     const app = allWorkspaceAppsFromToolingConfig(config)[0];
     const file = path.join(root, app.directory, 'modern.config.ts');
@@ -1441,6 +1454,7 @@ test('BFF build migration recognizes generated predecessors and changes only aut
       modernVersion: '3.8.3',
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(root);
     addUltramodernVertical({
       workspaceRoot: root,
       name: 'catalog',
@@ -1563,6 +1577,7 @@ test('historical generated app tsconfigs add the JSON build input from complete 
       modernVersion: '3.2.1',
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(root);
     for (const preset of ['ui-only', 'api-only'] as const) {
       addUltramodernVertical({
         workspaceRoot: root,
@@ -1632,6 +1647,7 @@ test('historical JSON input migration preserves consumer bytes and requires gene
       modernVersion: '3.2.1',
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(root);
     const config = readUltramodernConfig(root);
     const app = allWorkspaceAppsFromToolingConfig(config)[0];
     assert.ok(app);

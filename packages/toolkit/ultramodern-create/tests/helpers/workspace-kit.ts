@@ -1,7 +1,33 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { generateUltramodernWorkspace } from '../../src/ultramodern-workspace';
+
+const require = createRequire(import.meta.url);
+
+export function linkWorkspaceFormatterDependencies(workspaceDir: string) {
+  const modulesDirectory = path.join(workspaceDir, 'node_modules');
+  fs.mkdirSync(modulesDirectory, { recursive: true });
+  for (const name of ['oxfmt', 'ultracite']) {
+    let providerDirectory = path.dirname(
+      require.resolve(
+        name === 'oxfmt' ? 'oxfmt/package.json' : 'ultracite/oxfmt',
+      ),
+    );
+    while (!fs.existsSync(path.join(providerDirectory, 'package.json'))) {
+      const parent = path.dirname(providerDirectory);
+      if (parent === providerDirectory)
+        throw new Error(`Missing native ${name} provider package`);
+      providerDirectory = parent;
+    }
+    fs.symlinkSync(
+      providerDirectory,
+      path.join(modulesDirectory, name),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+  }
+}
 
 type CreateWorkspaceOptions = {
   tempPrefix?: string;
@@ -36,6 +62,7 @@ export function createWorkspace(
     enableTailwind: true,
     packageSource: { strategy: 'workspace' },
   });
+  linkWorkspaceFormatterDependencies(workspaceDir);
 
   return { tempRoot, workspaceDir };
 }
