@@ -216,13 +216,14 @@ describe('@modern-js/bff-effect package surface', () => {
         compilerManifest.bin.tsgo,
       );
       const result = spawnSync(
-        compilerPath,
-        ['--project', path.join(fixtureRoot, 'tsconfig.json')],
+        process.execPath,
+        [compilerPath, '--project', path.join(fixtureRoot, 'tsconfig.json')],
         {
           encoding: 'utf8',
         },
       );
 
+      expect(result.error).toBeUndefined();
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true });

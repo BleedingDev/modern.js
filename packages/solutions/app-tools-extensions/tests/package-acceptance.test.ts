@@ -114,7 +114,13 @@ describe('@modern-js/app-tools-extensions package acceptance', () => {
           const rootSpecifier = ${rootSpecifier};
           for (const specifier of specifiers) {
             const resolved = require.resolve(specifier);
-            if (!resolved.includes('/dist/cjs/') || resolved.includes('/src/')) {
+            const resolvedPath = resolved
+              .split(require('node:path').sep)
+              .join('/');
+            if (
+              !resolvedPath.includes('/dist/cjs/') ||
+              resolvedPath.includes('/src/')
+            ) {
               throw new Error(\`CJS resolved outside packed output: \${specifier} -> \${resolved}\`);
             }
             const loaded = require(specifier);
@@ -222,8 +228,8 @@ describe('@modern-js/app-tools-extensions package acceptance', () => {
       compilerManifest.bin.tsgo,
     );
     const result = spawnSync(
-      compilerPath,
-      ['--project', path.join(fixtureRoot, 'tsconfig.json')],
+      process.execPath,
+      [compilerPath, '--project', path.join(fixtureRoot, 'tsconfig.json')],
       { encoding: 'utf8' },
     );
     expectSuccessfulProcess(result, 'TypeScript packed package consumer');

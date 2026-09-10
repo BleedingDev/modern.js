@@ -602,11 +602,7 @@ test('migration restores executable Ultracite format and component-style policie
     'migrated-tool-config',
     { tempPrefix: 'um-migrated-tool-config-' },
   );
-  fs.symlinkSync(
-    toolDependencyNodeModules,
-    path.join(workspaceRoot, 'node_modules'),
-    process.platform === 'win32' ? 'junction' : 'dir',
-  );
+  linkWorkspaceFormatterDependencies(workspaceRoot);
   fs.writeFileSync(
     path.join(workspaceRoot, 'oxfmt.config.ts'),
     `import { defineConfig } from 'oxfmt';
