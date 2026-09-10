@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { rstest } from '@rstest/core';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
+import { updateGeneratedTypeScriptSurfaces } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-typescript';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
+import { readUltramodernConfig } from '../src/ultramodern-tooling/config';
 import { readFileTemplate } from '../src/ultramodern-workspace/fs-io';
 import {
   addUltramodernVertical,
@@ -45,6 +47,87 @@ function assertGeneratedFilesAreFormatted(
   );
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
 }
+
+test('authentic .4 flattened-locale runtime migration passes native import sorting and preserves authored helper changes', () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-historical-runtime-format-'),
+  );
+  const fixture = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, 'fixtures/migration-runtime-historical-4.json'),
+      'utf8',
+    ),
+  ) as { files: Array<{ path: string; content: string }> };
+  try {
+    generateUltramodernWorkspace({
+      targetDir: root,
+      packageName: 'historical-app',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource,
+    });
+    addUltramodernVertical({
+      workspaceRoot: root,
+      name: 'orders',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource,
+    });
+    linkWorkspaceFormatterDependencies(root);
+    for (const file of fixture.files)
+      fs.writeFileSync(path.join(root, file.path), file.content);
+    const runtime = fixture.files[0]!;
+    const runtimePath = path.join(root, runtime.path);
+    const config = readUltramodernConfig(root);
+    const run = () => {
+      const io = createMigrationIo(root, false);
+      io.transaction(() => updateGeneratedTypeScriptSurfaces(io, config));
+    };
+    assertGeneratedFilesAreFormatted(root, [runtime.path]);
+    const native = spawnSync(
+      process.execPath,
+      [
+        path.resolve(__dirname, '../node_modules/oxfmt/bin/oxfmt'),
+        '--stdin-filepath',
+        runtime.path,
+      ],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        input: runtime.content.replace(
+          '@modern-js/runtime/boundary-debugger',
+          '@modern-js/boundary-debugger',
+        ),
+      },
+    );
+    assert.equal(native.status, 0, native.stderr);
+    run();
+    assertGeneratedFilesAreFormatted(root, [runtime.path]);
+    assert.equal(fs.readFileSync(runtimePath, 'utf8'), native.stdout);
+    run();
+    assert.equal(fs.readFileSync(runtimePath, 'utf8'), native.stdout);
+    const authored = runtime.content.replace(
+      'return prefix.length > 0',
+      'return prefix.length > 1',
+    );
+    assert.notEqual(authored, runtime.content);
+    fs.writeFileSync(runtimePath, authored);
+    run();
+    assert.equal(
+      fs.readFileSync(runtimePath, 'utf8'),
+      authored.replace(
+        '@modern-js/runtime/boundary-debugger',
+        '@modern-js/boundary-debugger',
+      ),
+    );
+    assert.equal(
+      fs.readFileSync(path.join(root, 'oxfmt.config.ts'), 'utf8'),
+      fixture.files[1]!.content,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('authentic .4 provider and API import migrations use the consumer formatter without reformatting authored API source', async () => {
   const tempRoot = fs.mkdtempSync(

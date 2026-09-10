@@ -51,6 +51,36 @@ function readJsonObject(filePath: string) {
   return jsonObject(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
 }
 
+/** Reconstruct only the .4 generator's complete flattened-locale runtime. */
+function historicalFlattenedLocaleRuntime(generatedSource: string) {
+  const helper = `type LocaleResource = string | { readonly [key: string]: LocaleResource };
+
+const flattenLocaleResource = (
+  resource: LocaleResource,
+  prefix = ''
+): Record<string, string> => {
+  if (typeof resource === 'string') {
+    return prefix.length > 0 ? { [prefix]: resource } : {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(resource).flatMap(([key, value]) => {
+      const nextKey = prefix.length > 0 ? \`\${prefix}.\${key}\` : key;
+      return typeof value === 'string'
+        ? [[nextKey, value]]
+        : Object.entries(flattenLocaleResource(value, nextKey));
+    })
+  );
+};`;
+  return generatedSource
+    .replace(
+      'const i18nInstance = createInstance();',
+      `${helper}\n\nconst i18nInstance = createInstance();`,
+    )
+    .replace(': csResource }', ': flattenLocaleResource(csResource) }')
+    .replace(': enResource }', ': flattenLocaleResource(enResource) }');
+}
+
 /**
  * Move named imports only when the generated target identifies one provider.
  * Authored programs retain every byte outside the migrated module literals;
@@ -60,6 +90,7 @@ function migrateGeneratedProviderImports(
   io: MigrationIo,
   filePath: string,
   generatedSource: string,
+  historicalGeneratedSources: readonly string[] = [],
 ) {
   if (!fs.existsSync(filePath)) return false;
   const source = fs.readFileSync(filePath, 'utf8');
@@ -124,10 +155,10 @@ function migrateGeneratedProviderImports(
     ))
       updated =
         updated.slice(0, edit.start) + edit.content + updated.slice(edit.end);
-    preserveAuthoredSource = generatedUiSourceRequiresRewrite(
-      updated,
+    preserveAuthoredSource = [
       generatedSource,
-    );
+      ...historicalGeneratedSources,
+    ].every(candidate => generatedUiSourceRequiresRewrite(updated, candidate));
   } catch {
     io.log(
       `${path.relative(io.workspaceRoot, filePath)} preserved authored source: native provider imports could not be proven.`,
@@ -598,10 +629,16 @@ export function updateGeneratedTypeScriptSurfaces(
       createAppEnvDts(app, remotes, config.workspace.packageScope),
     );
 
+    const runtimeSource = createAppRuntimeConfig(
+      app,
+      config.workspace.packageScope,
+      remotes,
+    );
     migrateGeneratedProviderImports(
       io,
       path.join(io.workspaceRoot, app.directory, 'src/modern.runtime.ts'),
-      createAppRuntimeConfig(app, config.workspace.packageScope, remotes),
+      runtimeSource,
+      [historicalFlattenedLocaleRuntime(runtimeSource)],
     );
     if ((app.verticalRefs?.length ?? 0) > 0) {
       for (const worker of [false, true]) {
