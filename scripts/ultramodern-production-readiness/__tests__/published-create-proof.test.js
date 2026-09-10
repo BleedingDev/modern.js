@@ -196,6 +196,61 @@ test('builds the supported pnpm dlx package command contract from the authentica
   });
 });
 
+test('orders exact bootstrap specifiers when a reachable package name prefixes another', async () => {
+  const { createPnpmDlxArgs, resolveCreatePackage } = await import(
+    '../published-create-proof/package-cohort.mjs'
+  );
+  const release = makeBootstrapRelease('3.9.0-ultramodern.5');
+  const { version } = release.release;
+  const pluginTarget = '@bleedingdev/modern-js-plugin';
+  const dataLoaderTarget = '@bleedingdev/modern-js-plugin-data-loader';
+  Object.assign(release.aliases, {
+    '@modern-js/plugin': pluginTarget,
+    '@modern-js/plugin-data-loader': dataLoaderTarget,
+  });
+  release.createPackage.packageJson.dependencies[
+    '@modern-js/plugin-data-loader'
+  ] = `npm:${dataLoaderTarget}@${version}`;
+  release.dependencyGraph[release.createPackage.targetName].push(
+    dataLoaderTarget,
+  );
+  release.dependencyGraph[dataLoaderTarget] = [pluginTarget];
+  release.dependencyGraph[pluginTarget] = [];
+  release.packages.push(
+    {
+      sourceName: '@modern-js/plugin-data-loader',
+      targetName: dataLoaderTarget,
+      version,
+      packageJson: {
+        dependencies: {
+          '@modern-js/plugin': `npm:${pluginTarget}@${version}`,
+        },
+      },
+    },
+    {
+      sourceName: '@modern-js/plugin',
+      targetName: pluginTarget,
+      version,
+      packageJson: {},
+    },
+  );
+  release.publishOrder.push(pluginTarget, dataLoaderTarget);
+
+  const args = createPnpmDlxArgs(resolveCreatePackage(release), ['my-app']);
+  assert.deepEqual(
+    args.filter(argument =>
+      argument.startsWith('--config.minimum-release-age-exclude='),
+    ),
+    [
+      `--config.minimum-release-age-exclude=@bleedingdev/modern-js-i18n-utils@${version}`,
+      `--config.minimum-release-age-exclude=${dataLoaderTarget}@${version}`,
+      `--config.minimum-release-age-exclude=${pluginTarget}@${version}`,
+      `--config.minimum-release-age-exclude=@bleedingdev/modern-js-ultramodern-create@${version}`,
+      `--config.minimum-release-age-exclude=@bleedingdev/modern-js-utils@${version}`,
+    ],
+  );
+});
+
 test('fails closed when the authenticated create closure is omitted, broadened, or version-skewed', async () => {
   const { resolveCreatePackage } = await import(
     '../published-create-proof/package-cohort.mjs'

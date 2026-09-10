@@ -303,8 +303,8 @@ function resolveBootstrapReleaseAgePolicy(release, cohort, createPackage) {
     minimumReleaseAge: minimumReleaseAgeMinutes,
     minimumReleaseAgeExclude: Object.freeze(
       [...reachableTargets]
-        .sort((left, right) => left.localeCompare(right))
-        .map(targetName => `${targetName}@${release.release.version}`),
+        .map(targetName => `${targetName}@${release.release.version}`)
+        .sort((left, right) => left.localeCompare(right)),
     ),
     minimumReleaseAgeIgnoreMissingTime: false,
     minimumReleaseAgeStrict: true,

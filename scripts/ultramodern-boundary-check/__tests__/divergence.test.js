@@ -404,9 +404,9 @@ test('canonical snapshot pins the fixed audited base identity', () => {
     '2f4d9c4559e26209a0d77f02c6757f29fe3699a2',
   );
   assert.equal(snapshot.upstreamRef, DEFAULT_UPSTREAM_PROVENANCE_REF);
-  assert.equal(snapshot.totalFiles, 613);
-  assert.equal(snapshot.totalHunks, 2782);
-  assert.equal(snapshot.totalChangedLines, 34329);
+  assert.equal(snapshot.totalFiles, 812);
+  assert.equal(snapshot.totalHunks, 3025);
+  assert.equal(snapshot.totalChangedLines, 51815);
 });
 
 test('canonical verification rejects substituting HEAD for reviewed provenance', () => {
@@ -428,8 +428,8 @@ test('full recorded repository scope remains green and fully measured', () => {
     allowlistPath: DEFAULT_DIVERGENCE_ALLOWLIST_PATH,
   });
   assert.equal(report.ok, true, formatDivergenceReport(report));
-  assert.equal(report.measuredFiles, 613);
-  assert.equal(report.allowlistFiles, 613);
+  assert.equal(report.measuredFiles, 812);
+  assert.equal(report.allowlistFiles, 812);
   assert.equal(report.cleared.length, 0);
 });
 
