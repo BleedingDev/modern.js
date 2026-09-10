@@ -917,6 +917,13 @@ async function runTractorDownstreamAcceptance(
       release,
       minimumReleaseAgeExclude,
     );
+    // pnpm validates the existing lock before resolving new dependencies. A
+    // recently accepted previous cohort is outside this candidate's exact
+    // release-age approvals, so resolve the candidate from a fresh native lock.
+    runImpl(packageManager.pnpmExecutable, ['clean', '--lockfile'], {
+      cwd: options.workspace,
+      env: packageManager.env,
+    });
     runImpl(
       packageManager.pnpmExecutable,
       ['install', '--no-frozen-lockfile'],
