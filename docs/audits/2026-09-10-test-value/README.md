@@ -1,3 +1,5 @@
+Start with the [interactive visual report](show-me-test-audit.html): download and open the HTML locally to filter tiers, expand exact cuts and copy your review choices. It contains all findings and works offline. Choices stay in your browser and do not change repository files.
+
 The fork has a substantial layer of test theatre. The strongest evidence is not the number of source-string assertions: several tests stay green after the behavior they claim to protect is deliberately broken.
 
 I recommend starting with the T3 menu, then removing the fake portfolio certification and duplicate test families. Do not create a replacement for every deleted assertion. Retain a replacement only when it protects a supported behavior that would otherwise lose meaningful coverage.
