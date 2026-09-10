@@ -54,19 +54,33 @@ export function runPnpmLockfileRefresh(
       );
     }
   }
-  try {
-    if (temporaryBytes) fs.writeFileSync(policyPath, temporaryBytes);
+  const install = () => {
     const result = execa.sync(
       'pnpm',
       ['install', '--no-frozen-lockfile', '--ignore-scripts'],
       { cwd: context.workspaceRoot, stdio: 'inherit', reject: false },
     );
     if ('code' in result) throw result;
+    return result.exitCode ?? 1;
+  };
+  try {
+    if (temporaryBytes) fs.writeFileSync(policyPath, temporaryBytes);
+    const status = install();
     if (temporaryBytes && !fs.readFileSync(policyPath).equals(temporaryBytes))
       throw new Error(
         'The staged package manager changed the temporary release-age policy.',
       );
-    return result.exitCode ?? 1;
+    if (status !== 0 || !temporaryBytes || !targetBytes) return status;
+    // pnpm records the install policy in its managed modules metadata. Once
+    // the old lock is resolved, synchronize that metadata under the exact target
+    // policy before invoking the staged checks through pnpm exec.
+    fs.writeFileSync(policyPath, targetBytes);
+    const targetStatus = install();
+    if (!fs.readFileSync(policyPath).equals(targetBytes))
+      throw new Error(
+        'The staged package manager changed the prepared target release-age policy.',
+      );
+    return targetStatus;
   } finally {
     if (temporaryBytes && targetBytes)
       fs.writeFileSync(policyPath, targetBytes);

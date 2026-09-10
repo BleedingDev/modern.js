@@ -485,7 +485,7 @@ test('staged lock refresh retains only approved authenticated source selectors a
   const workspaceRoot = path.join(tempRoot, 'workspace');
   fs.mkdirSync(workspaceRoot);
   const policyPath = path.join(workspaceRoot, 'pnpm-workspace.yaml');
-  const observedPath = path.join(tempRoot, 'observed-policy.yaml');
+  const observedPath = path.join(tempRoot, 'observed-policies.jsonl');
   const previousPath = process.env.PATH;
   const previousLog = process.env.ULTRAMODERN_TEST_PNPM_LOG;
   const oldSelector = '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.4';
@@ -523,23 +523,32 @@ test('staged lock refresh retains only approved authenticated source selectors a
   const context = { invocationCwd: workspaceRoot, workspaceRoot };
   try {
     for (const exitCode of [0, 23]) {
+      fs.writeFileSync(observedPath, '');
       const fixture = installFakePnpm(tempRoot, undefined, {
         exitCode,
-        beforeExit: `fs.copyFileSync('pnpm-workspace.yaml', ${JSON.stringify(observedPath)});`,
+        beforeExit: `fs.appendFileSync(${JSON.stringify(observedPath)}, JSON.stringify(fs.readFileSync('pnpm-workspace.yaml', 'utf8')) + '\\n');`,
       });
       process.env.PATH = `${fixture.binDir}${path.delimiter}${previousPath ?? ''}`;
       process.env.ULTRAMODERN_TEST_PNPM_LOG = fixture.invocationLog;
       fs.writeFileSync(policyPath, targetPolicy);
       assert.equal(runPnpmLockfileRefresh(context, source), exitCode);
       assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
-      const observed = yaml.load(
-        fs.readFileSync(observedPath, 'utf8'),
-      ) as Record<string, unknown>;
+      const observedPolicies = fs
+        .readFileSync(observedPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line) as string);
+      assert.equal(observedPolicies.length, exitCode === 0 ? 2 : 1);
+      const observed = yaml.load(observedPolicies[0]) as Record<
+        string,
+        unknown
+      >;
       assert.deepEqual(
         observed.minimumReleaseAgeExclude,
         [oldSelector, targetSelector, 'reviewed@2.3.4'].sort(),
       );
       assert.equal(observed.minimumReleaseAgeStrict, true);
+      if (exitCode === 0) assert.equal(observedPolicies[1], targetPolicy);
     }
     process.env.PATH = '';
     if (process.platform === 'win32')
@@ -572,12 +581,49 @@ test('staged lock refresh retains only approved authenticated source selectors a
     assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
     assert.ok(fs.existsSync(path.join(workspaceRoot, 'pnpm-lock.yaml')));
     installFakePnpm(tempRoot, undefined, {
+      beforeExit: `if (fs.readFileSync('pnpm-workspace.yaml', 'utf8') === ${JSON.stringify(targetPolicy)}) process.exit(29);`,
+    });
+    fs.writeFileSync(policyPath, originalPolicy);
+    const beforeSecondInstallFailure = snapshotWorkspaceTree(workspaceRoot);
+    assert.equal(
+      await runWorkspaceTransaction(
+        workspaceRoot,
+        stage => {
+          fs.writeFileSync(
+            path.join(stage, 'pnpm-workspace.yaml'),
+            targetPolicy,
+          );
+          return runPnpmLockfileRefresh(
+            { workspaceRoot: stage, invocationCwd: stage },
+            source,
+          );
+        },
+        { commitWhen: status => status === 0 },
+      ),
+      29,
+    );
+    assert.deepEqual(
+      snapshotWorkspaceTree(workspaceRoot),
+      beforeSecondInstallFailure,
+    );
+    fs.writeFileSync(policyPath, targetPolicy);
+    assert.equal(runPnpmLockfileRefresh(context, source), 29);
+    assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
+    installFakePnpm(tempRoot, undefined, {
       beforeExit:
         "fs.appendFileSync('pnpm-workspace.yaml', 'consumerMutation: true\\n');",
     });
     assert.throws(
       () => runPnpmLockfileRefresh(context, source),
       /changed the temporary release-age policy/,
+    );
+    assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
+    installFakePnpm(tempRoot, undefined, {
+      beforeExit: `if (fs.readFileSync('pnpm-workspace.yaml', 'utf8') === ${JSON.stringify(targetPolicy)}) fs.appendFileSync('pnpm-workspace.yaml', 'consumerMutation: true\\n');`,
+    });
+    assert.throws(
+      () => runPnpmLockfileRefresh(context, source),
+      /changed the prepared target release-age policy/,
     );
     assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
   } finally {
