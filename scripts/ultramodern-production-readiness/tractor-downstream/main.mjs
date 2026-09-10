@@ -272,7 +272,10 @@ function createTractorPackageManagerContext({
         bootstrapReleaseAgePolicy.minimumReleaseAge,
       ),
       pnpm_config_minimum_release_age_exclude: JSON.stringify(exactExclusions),
-      pnpm_config_trust_policy_exclude: undefined,
+      // Only the verified source registry may supply exact candidate selectors.
+      // Published acceptance supplies none; inherited overrides remain cleared.
+      pnpm_config_trust_policy_exclude:
+        registryEnv?.PNPM_CONFIG_TRUST_POLICY_EXCLUDE,
       pnpm_config_minimum_release_age_ignore_missing_time: String(
         bootstrapReleaseAgePolicy.minimumReleaseAgeIgnoreMissingTime,
       ),

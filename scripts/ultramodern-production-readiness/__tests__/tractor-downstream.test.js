@@ -890,7 +890,7 @@ test('runner launches Node proof from the installed Playwright browser path', as
   assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, inheritedBrowsersPath);
 });
 
-test('runner rejects inherited package-manager release-age bypasses', async () => {
+test('runner rejects inherited bypasses and preserves verified source selectors', async () => {
   const { createTractorPackageManagerContext } = await runnerPromise;
   const inheritedKeys = [
     'NPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE',
@@ -918,52 +918,61 @@ test('runner rejects inherited package-manager release-age bypasses', async () =
     for (const name of inheritedKeys) {
       process.env[name] = '*';
     }
-    const packageManager = createTractorPackageManagerContext({
-      createPackage: {
-        bootstrapReleaseAgePolicy: {
-          minimumReleaseAge: 1440,
-          minimumReleaseAgeExclude,
-          minimumReleaseAgeIgnoreMissingTime: false,
-          minimumReleaseAgeStrict: true,
+    for (const sourceSelectors of [
+      undefined,
+      JSON.stringify(minimumReleaseAgeExclude),
+    ]) {
+      const packageManager = createTractorPackageManagerContext({
+        createPackage: {
+          bootstrapReleaseAgePolicy: {
+            minimumReleaseAge: 1440,
+            minimumReleaseAgeExclude,
+            minimumReleaseAgeIgnoreMissingTime: false,
+            minimumReleaseAgeStrict: true,
+          },
+          exactSpecifier:
+            '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
+          version: '3.5.0-ultramodern.77',
         },
-        exactSpecifier:
-          '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
-        version: '3.5.0-ultramodern.77',
-      },
-      expectedPnpmVersion: '11.17.0',
-      minimumReleaseAgeExclude,
-      packageManagerRoot: path.join(
-        os.tmpdir(),
-        'tractor-poisoned-package-manager-context',
-      ),
-      registryEnv: {
-        npm_config_registry: 'https://registry.npmjs.org/',
-        pnpm_config_registry: 'https://registry.npmjs.org/',
-      },
-      resolveExactPnpmExecutableImpl: () => '/opt/pnpm-11.17.0/bin/pnpm',
-    });
-    const child = runCommand(
-      process.execPath,
-      [
-        '-e',
-        `process.stdout.write(JSON.stringify(Object.fromEntries(
+        expectedPnpmVersion: '11.17.0',
+        minimumReleaseAgeExclude,
+        packageManagerRoot: path.join(
+          os.tmpdir(),
+          'tractor-poisoned-package-manager-context',
+        ),
+        registryEnv: {
+          npm_config_registry: 'https://registry.npmjs.org/',
+          pnpm_config_registry: 'https://registry.npmjs.org/',
+          PNPM_CONFIG_TRUST_POLICY_EXCLUDE: sourceSelectors,
+        },
+        resolveExactPnpmExecutableImpl: () => '/opt/pnpm-11.17.0/bin/pnpm',
+      });
+      const child = runCommand(
+        process.execPath,
+        [
+          '-e',
+          `process.stdout.write(JSON.stringify(Object.fromEntries(
           Object.entries(process.env).filter(([name]) =>
             /^(?:npm|pnpm)_config_(?:minimum_release_age|trust_policy)_exclude$/iu.test(name),
           ),
         )))`,
-      ],
-      {
-        encoding: 'utf8',
-        env: createProcessEnv(packageManager.env),
-        stdio: 'pipe',
-      },
-    );
-    assert.equal(child.exitCode, 0, child.stderr);
-    assert.deepEqual(JSON.parse(child.stdout), {
-      pnpm_config_minimum_release_age_exclude: JSON.stringify(
-        minimumReleaseAgeExclude,
-      ),
-    });
+        ],
+        {
+          encoding: 'utf8',
+          env: createProcessEnv(packageManager.env),
+          stdio: 'pipe',
+        },
+      );
+      assert.equal(child.exitCode, 0, child.stderr);
+      assert.deepEqual(JSON.parse(child.stdout), {
+        ...(sourceSelectors && {
+          pnpm_config_trust_policy_exclude: sourceSelectors,
+        }),
+        pnpm_config_minimum_release_age_exclude: JSON.stringify(
+          minimumReleaseAgeExclude,
+        ),
+      });
+    }
   } finally {
     for (const [name, value] of Object.entries(inherited)) {
       if (value === undefined) {

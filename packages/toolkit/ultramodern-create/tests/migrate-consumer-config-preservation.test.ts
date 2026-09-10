@@ -12,6 +12,7 @@ import {
   writeGeneratedUiSourceIfChanged,
 } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-ui-source';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
+import { runValidate } from '../src/ultramodern-tooling/commands/validate';
 import {
   allWorkspaceAppsFromToolingConfig,
   readUltramodernConfig,
@@ -194,6 +195,65 @@ test('migration replaces recognized historical validator with the native tooling
     const migrated = fs.readFileSync(validatorPath, 'utf8');
     assert.doesNotMatch(migrated, /schemaVersion: -123/u);
     assert.equal(migrated, nativeSource);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('migration fills historical deployment metadata and validates authored business proofs', async () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-deploy-migration-'),
+  );
+  const workspaceRoot = path.join(tempRoot, 'workspace');
+  try {
+    generateUltramodernWorkspace({
+      targetDir: workspaceRoot,
+      packageName: 'workspace',
+      modernVersion: '3.2.1',
+      packageSource: { strategy: 'workspace' },
+    });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
+    addUltramodernVertical({
+      workspaceRoot,
+      name: 'catalog',
+      modernVersion: '3.2.1',
+    });
+    const compact = readJson(workspaceRoot, '.modernjs/ultramodern.json');
+    const businessProof = {
+      distributedSsrProofRoutes: ['/en', '/en/catalog/custom-sku'],
+      jsonSmokeChecks: [
+        {
+          id: 'catalog-domain',
+          route: '/catalog-api/catalog/custom-sku',
+          expect: { sku: 'custom-sku' },
+        },
+      ],
+    };
+    for (const app of compact.topology.apps) {
+      if (app.kind === 'shell') app.deploy = { cloudflare: businessProof };
+      else delete app.deploy;
+    }
+    writeJson(workspaceRoot, '.modernjs/ultramodern.json', compact);
+    expect(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--skip-install'],
+        workspaceRoot,
+      ),
+    ).toBe(0);
+    const migrated = readJson(workspaceRoot, '.modernjs/ultramodern.json');
+    for (const app of migrated.topology.apps) {
+      expect(app.deploy.cloudflare.assetsBinding).toBe('ASSETS');
+      if (app.kind === 'shell')
+        expect(app.deploy.cloudflare).toMatchObject(businessProof);
+    }
+    expect(runValidate({ workspaceRoot, invocationCwd: workspaceRoot })).toBe(
+      0,
+    );
+    migrated.topology.apps[0].moduleFederation.ssr = false;
+    writeJson(workspaceRoot, '.modernjs/ultramodern.json', migrated);
+    expect(
+      runValidate({ workspaceRoot, invocationCwd: workspaceRoot }),
+    ).not.toBe(0);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

@@ -183,6 +183,15 @@ function synchronizeMigrationDeliveryUnitMetadata(
       stampDeliveryUnitIdentity(entry, scope, app);
       const canonicalEntry = canonicalCompactApps.get(app.id);
       if (canonicalEntry) {
+        const deploy = canonicalEntry.deploy as Record<string, unknown>;
+        entry.deploy = {
+          ...deploy,
+          ...entry.deploy,
+          cloudflare: {
+            ...(deploy.cloudflare as Record<string, unknown>),
+            ...entry.deploy?.cloudflare,
+          },
+        };
         for (const key of ['moduleFederation', 'backendFederation', 'api']) {
           entry[key] = preserveUnknownProjectionFields(
             entry[key],

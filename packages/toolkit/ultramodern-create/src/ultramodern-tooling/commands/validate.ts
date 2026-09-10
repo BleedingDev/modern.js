@@ -41,6 +41,26 @@ export function runValidate(context: CommandContext) {
     compactPrimaryShell,
     remotes,
   ) as Record<string, unknown>;
+  const declaredCompact = readJsonObject(config.sourcePath);
+  const compactTopology = compactConfig.topology as {
+    apps: Array<{
+      id: string;
+      deploy: { cloudflare: Record<string, unknown> };
+    }>;
+  };
+  for (const app of compactTopology.apps) {
+    const declared = declaredCompact.topology?.apps?.find(
+      (entry: { id: string }) => entry.id === app.id,
+    )?.deploy?.cloudflare;
+    // Business routes and assertions are consumer inputs, independently
+    // exercised by the runtime proof. Framework deployment fields retain
+    // their canonical expectations.
+    for (const key of ['distributedSsrProofRoutes', 'jsonSmokeChecks']) {
+      if (declared && Object.hasOwn(declared, key)) {
+        app.deploy.cloudflare[key] = declared[key];
+      }
+    }
+  }
   const releaseCohort =
     config.packageSource?.strategy === 'install'
       ? readWorkspaceReleaseCohort(context.workspaceRoot)
