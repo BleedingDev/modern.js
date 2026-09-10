@@ -85,6 +85,7 @@ export function createPackageTsConfig(
     'locales/**/*.json',
     'package.json',
     'shared',
+    'shared/ultramodern-build.json',
   ];
   if (resolvedOptions.includeServer) {
     include.push('server');

@@ -22,6 +22,7 @@ import {
   distributedSsrFragmentSlug,
   resolveRemoteRefs,
 } from '../../../ultramodern-workspace/descriptors';
+import { formatGeneratedSourceCandidates } from '../../../ultramodern-workspace/fs-io';
 import {
   createAppMfTypesTsConfig,
   createAppTsConfig,
@@ -190,6 +191,71 @@ function appSurfaceIsOwned(
     typeof manifestApp.package === 'string' &&
     packageJson?.name === manifestApp.package
   );
+}
+
+/** Add one missing input only for the complete immediate generated predecessor. */
+function writeAppTypeScriptConfig(
+  io: MigrationIo,
+  config: UltramodernToolingConfig,
+  app: ReturnType<typeof allWorkspaceAppsFromToolingConfig>[number],
+  remotes: ReturnType<typeof allWorkspaceAppsFromToolingConfig>,
+) {
+  const filePath = path.join(io.workspaceRoot, app.directory, 'tsconfig.json');
+  const generated = createAppTsConfig(app, remotes);
+  const stat = fs.lstatSync(filePath, { throwIfNoEntry: false });
+  if (stat === undefined) return writeJsonFile(io, filePath, generated);
+  const preserve = () => {
+    io.log(
+      `${app.directory}/tsconfig.json preserved consumer-owned TypeScript configuration byte-for-byte. ` +
+        'If its generated build module imports shared/ultramodern-build.json, include that JSON input in the composite project.',
+    );
+    return false;
+  };
+  if (!stat.isFile()) return preserve();
+  const source = fs.readFileSync(filePath, 'utf8');
+  let existing: JsonObject | undefined;
+  try {
+    existing = jsonObject(JSON.parse(source));
+  } catch {
+    return preserve();
+  }
+  const input = 'shared/ultramodern-build.json';
+  if (
+    (Array.isArray(existing?.include) && existing.include.includes(input)) ||
+    (Array.isArray(existing?.files) && existing.files.includes(input))
+  )
+    return false;
+  const manifest = generatedManifest(io, config);
+  const manifestApp =
+    manifest && manifestApps(manifest).find(entry => entry.id === app.id);
+  if (!manifestApp || !appSurfaceIsOwned(io, app, manifestApp))
+    return preserve();
+
+  const current = jsonObject(generated)!;
+  const predecessor = {
+    ...current,
+    include: (current.include as string[]).filter(value => value !== input),
+  };
+  // Parsing is only a cheap rejection filter. Duplicate keys, comments and
+  // unrecognized formatting never count as complete predecessor evidence.
+  if (JSON.stringify(existing) !== JSON.stringify(predecessor))
+    return preserve();
+  const previousBytes = `${JSON.stringify(predecessor, null, 2)}\n`;
+  const currentBytes = `${JSON.stringify(current, null, 2)}\n`;
+  let target = currentBytes;
+  if (source !== previousBytes) {
+    const [formattedPrevious, formattedCurrent] =
+      formatGeneratedSourceCandidates([
+        ['previous/tsconfig.json', previousBytes],
+        ['current/tsconfig.json', currentBytes],
+      ]);
+    if (source !== formattedPrevious) return preserve();
+    target = formattedCurrent;
+  }
+  io.log(
+    `${app.directory}/tsconfig.json migrated its recognized generated JSON build input.`,
+  );
+  return io.write(filePath, target);
 }
 
 function shellSurfaceIsOwned(
@@ -515,11 +581,7 @@ export function updateGeneratedTypeScriptSurfaces(
   }
 
   for (const app of apps) {
-    writeMergedTypeScriptConfig(
-      io,
-      path.join(io.workspaceRoot, app.directory, 'tsconfig.json'),
-      createAppTsConfig(app, remotes),
-    );
+    writeAppTypeScriptConfig(io, config, app, remotes);
     writeMergedTypeScriptConfig(
       io,
       path.join(io.workspaceRoot, app.directory, 'tsconfig.mf-types.json'),

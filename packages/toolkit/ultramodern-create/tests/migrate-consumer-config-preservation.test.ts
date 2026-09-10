@@ -34,6 +34,7 @@ import {
   createRemoteModuleFederationConfig,
   createShellModuleFederationConfig,
 } from '../src/ultramodern-workspace/module-federation';
+import { createAppTsConfig } from '../src/ultramodern-workspace/tsconfigs';
 import { createPackagedWorkspaceValidationScript } from '../src/ultramodern-workspace/workspace-scripts';
 
 function readJson(workspaceRoot: string, relativePath: string) {
@@ -1548,5 +1549,175 @@ test('BFF build import adoption requires active supported config provenance', ()
     );
     assert.equal(migrateBffBuildPluginImports(original), expected);
     assert.equal(migrateBffBuildPluginImports(expected), expected);
+  }
+});
+
+test('historical generated app tsconfigs add the JSON build input from complete predecessor evidence', () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-tsconfig-input-migrate-'),
+  );
+  try {
+    generateUltramodernWorkspace({
+      targetDir: root,
+      packageName: 'workspace',
+      modernVersion: '3.2.1',
+      packageSource: { strategy: 'workspace' },
+    });
+    for (const preset of ['ui-only', 'api-only'] as const) {
+      addUltramodernVertical({
+        workspaceRoot: root,
+        name: preset === 'ui-only' ? 'catalog' : 'orders',
+        modernVersion: '3.2.1',
+        enableTailwind: false,
+        packageSource: { strategy: 'workspace' },
+        preset,
+      });
+    }
+    const config = readUltramodernConfig(root);
+    const apps = allWorkspaceAppsFromToolingConfig(config);
+    const remotes = apps.filter(app => app.kind !== 'shell');
+    const predecessors = apps.map(app => {
+      const current = createAppTsConfig(app, remotes) as { include: string[] };
+      const previous = {
+        ...current,
+        include: current.include.filter(
+          input => input !== 'shared/ultramodern-build.json',
+        ),
+      };
+      return [
+        `${app.directory}/tsconfig.json`,
+        `${JSON.stringify(previous, null, 2)}\n`,
+      ] as const;
+    });
+    const formatted = formatGeneratedSourceCandidates(predecessors);
+    for (const [index, [file, raw]] of predecessors.entries()) {
+      fs.writeFileSync(
+        path.join(root, file),
+        index === 0 ? raw : formatted[index],
+      );
+    }
+    const before = snapshotWorkspace(root);
+    const dryIo = createMigrationIo(root, true);
+    updateGeneratedTypeScriptSurfaces(dryIo, config);
+    assert.deepEqual(snapshotWorkspace(root), before);
+    for (const [file] of predecessors)
+      assert.ok(
+        dryIo.plan.includes(`[dry-run] would write ${file}`),
+        dryIo.plan.join('\n'),
+      );
+
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
+    for (const app of apps) {
+      assert.deepEqual(
+        readJson(root, `${app.directory}/tsconfig.json`),
+        createAppTsConfig(app, remotes),
+      );
+    }
+    const after = snapshotWorkspace(root);
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
+    assert.deepEqual(snapshotWorkspace(root), after);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('historical JSON input migration preserves consumer bytes and requires generated app identity', () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-tsconfig-input-owned-'),
+  );
+  try {
+    generateUltramodernWorkspace({
+      targetDir: root,
+      packageName: 'workspace',
+      modernVersion: '3.2.1',
+      packageSource: { strategy: 'workspace' },
+    });
+    const config = readUltramodernConfig(root);
+    const app = allWorkspaceAppsFromToolingConfig(config)[0];
+    assert.ok(app);
+    const file = `${app.directory}/tsconfig.json`;
+    const filePath = path.join(root, file);
+    const current = createAppTsConfig(app) as {
+      include: string[];
+      compilerOptions: Record<string, unknown>;
+      references: unknown[];
+    };
+    const previous = {
+      ...current,
+      include: current.include.filter(
+        input => input !== 'shared/ultramodern-build.json',
+      ),
+    };
+    const raw = `${JSON.stringify(previous, null, 2)}\n`;
+    const variants = [
+      JSON.stringify({
+        ...previous,
+        include: [...previous.include, 'presentation/**/*.ts'],
+      }),
+      JSON.stringify({
+        ...previous,
+        compilerOptions: {
+          ...previous.compilerOptions,
+          paths: { '@product/*': ['./src/product/*'] },
+        },
+      }),
+      JSON.stringify({
+        ...previous,
+        references: [
+          ...previous.references,
+          { path: '../../packages/product' },
+        ],
+      }),
+      raw.replace('{', '{\n  // Consumer configuration'),
+      raw.replace('{', '{\n  "include": ["product"],'),
+      raw.replaceAll('  ', '\t'),
+    ];
+    for (const source of variants) {
+      fs.writeFileSync(filePath, source);
+      const output = captureStdout(() =>
+        updateGeneratedTypeScriptSurfaces(
+          createMigrationIo(root, false),
+          config,
+        ),
+      );
+      assert.equal(fs.readFileSync(filePath, 'utf8'), source);
+      assert.match(output.output, /preserved consumer-owned TypeScript/u);
+      assert.match(output.output, /shared\/ultramodern-build\.json/u);
+    }
+    fs.writeFileSync(filePath, raw);
+    const packagePath = path.join(root, app.directory, 'package.json');
+    const packageBytes = fs.readFileSync(packagePath);
+    const packageJson = JSON.parse(packageBytes.toString());
+    fs.writeFileSync(
+      packagePath,
+      JSON.stringify({ ...packageJson, name: '@consumer/owned' }),
+    );
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
+    assert.equal(fs.readFileSync(filePath, 'utf8'), raw);
+    fs.writeFileSync(packagePath, packageBytes);
+
+    const manifestPath = path.join(root, '.modernjs/ultramodern.json');
+    const manifestBytes = fs.readFileSync(manifestPath);
+    const manifest = JSON.parse(manifestBytes.toString());
+    delete manifest.generator;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
+    assert.equal(fs.readFileSync(filePath, 'utf8'), raw);
+    fs.writeFileSync(manifestPath, manifestBytes);
+
+    const linkedFile = path.join(root, 'consumer-tsconfig.json');
+    fs.writeFileSync(linkedFile, raw);
+    fs.unlinkSync(filePath);
+    fs.symlinkSync(linkedFile, filePath);
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
+    assert.equal(fs.lstatSync(filePath).isSymbolicLink(), true);
+    assert.equal(fs.readFileSync(linkedFile, 'utf8'), raw);
+    fs.unlinkSync(filePath);
+    const currentBytes = `${JSON.stringify(current, null, 4)}\n`;
+    fs.writeFileSync(filePath, currentBytes);
+    updateGeneratedTypeScriptSurfaces(createMigrationIo(root, false), config);
+    assert.equal(fs.readFileSync(filePath, 'utf8'), currentBytes);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

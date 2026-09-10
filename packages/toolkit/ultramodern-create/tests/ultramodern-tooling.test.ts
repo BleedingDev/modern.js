@@ -2478,6 +2478,7 @@ declare module '*.css' {}
       'locales/**/*.json',
       'package.json',
       'shared',
+      'shared/ultramodern-build.json',
       'server',
       'modern.config.ts',
       'module-federation.config.ts',
@@ -2492,6 +2493,7 @@ declare module '*.css' {}
       'locales/**/*.json',
       'package.json',
       'shared',
+      'shared/ultramodern-build.json',
       'server',
       'api',
       'modern.config.ts',
@@ -3008,6 +3010,7 @@ test('generated app tsconfig keeps shells independent from remote declaration ou
     'locales/**/*.json',
     'package.json',
     'shared',
+    'shared/ultramodern-build.json',
     'server',
     'api',
   ]);
