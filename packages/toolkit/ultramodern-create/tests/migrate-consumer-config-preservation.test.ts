@@ -1729,9 +1729,15 @@ test('historical generated app tsconfigs add the JSON build input from complete 
     const apps = allWorkspaceAppsFromToolingConfig(config);
     const remotes = apps.filter(app => app.kind !== 'shell');
     const predecessors = apps.map(app => {
-      const current = createAppTsConfig(app, remotes) as { include: string[] };
+      const current = createAppTsConfig(app, remotes) as {
+        include: string[];
+        compilerOptions: Record<string, unknown>;
+      };
       const previous = {
         ...current,
+        compilerOptions: Object.fromEntries(
+          Object.entries(current.compilerOptions).reverse(),
+        ),
         include: current.include.filter(
           input => input !== 'shared/ultramodern-build.json',
         ),

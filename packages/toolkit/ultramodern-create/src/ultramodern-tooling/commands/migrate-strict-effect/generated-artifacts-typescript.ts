@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { parse } from '@babel/parser';
 import { ULTRAMODERN_CREATE_PACKAGE } from '../../../ultramodern-package-source';
 import {
@@ -275,10 +276,11 @@ function writeAppTypeScriptConfig(
   };
   // Parsing is only a cheap rejection filter. Duplicate keys, comments and
   // unrecognized formatting never count as complete predecessor evidence.
-  if (JSON.stringify(existing) !== JSON.stringify(predecessor))
-    return preserve();
-  const previousBytes = `${JSON.stringify(predecessor, null, 2)}\n`;
-  const currentBytes = `${JSON.stringify(current, null, 2)}\n`;
+  if (!isDeepStrictEqual(existing, predecessor)) return preserve();
+  // Historical composition appended compiler options in a different key
+  // order. Keep that order while proving the complete predecessor semantics.
+  const previousBytes = `${JSON.stringify(existing, null, 2)}\n`;
+  const currentBytes = `${JSON.stringify({ ...existing, include: current.include }, null, 2)}\n`;
   let target = currentBytes;
   if (source !== previousBytes) {
     const [formattedPrevious, formattedCurrent] =
