@@ -219,10 +219,19 @@ async function createRegistryUser(registryUrl, fetchImpl = fetch) {
 // instead of proxying through Verdaccio. The acceptance profile hard-asserts
 // the cohort's lockfile tarball provenance after install, so a silently
 // ignored scope override cannot fall through to npmjs unnoticed.
-function createRegistryEnv({ userConfigPath, cacheDir }) {
+function createRegistryEnv({ userConfigPath, cacheDir, verifiedPackages = [] }) {
   return {
     npm_config_cache: cacheDir,
     npm_config_userconfig: userConfigPath,
+    // Source candidates cannot carry npm trusted-publisher evidence before
+    // publication. Only exact artifacts verified by this registry are exempt;
+    // public history, unrelated dependencies, and published acceptance retain
+    // the consumer's normal no-downgrade policy.
+    ...(verifiedPackages.length > 0 && {
+      PNPM_CONFIG_TRUST_POLICY_EXCLUDE: JSON.stringify(
+        verifiedPackages.map(pkg => `${pkg.targetName}@${pkg.version}`),
+      ),
+    }),
   };
 }
 
@@ -480,6 +489,11 @@ async function startEphemeralRegistry({
       token,
       { fetchImpl },
     );
+    registry.env = createRegistryEnv({
+      userConfigPath,
+      cacheDir,
+      verifiedPackages: release.packages,
+    });
     console.log(`[registry] seed end (${Date.now() - seedStartedAt}ms)`);
     return registry;
   } catch (error) {

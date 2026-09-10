@@ -3460,6 +3460,25 @@ test('local acceptance registry env carries no registry override keys', async ()
     Object.keys(env).filter(key => key.toLowerCase().includes('registry')),
     [],
   );
+  const verified = createRegistryEnv({
+    userConfigPath: '/tmp/registry/.npmrc',
+    cacheDir: '/tmp/registry/npm-cache',
+    verifiedPackages: [
+      {
+        targetName: '@bleedingdev/modern-js-runtime',
+        version: '3.9.0-ultramodern.5',
+      },
+      {
+        targetName: '@bleedingdev/modern-js-create',
+        version: '3.9.0-ultramodern.5',
+      },
+    ],
+  });
+  assert.deepEqual(JSON.parse(verified.PNPM_CONFIG_TRUST_POLICY_EXCLUDE), [
+    '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.5',
+    '@bleedingdev/modern-js-create@3.9.0-ultramodern.5',
+  ]);
+  assert.equal(verified.PNPM_CONFIG_TRUST_POLICY, undefined);
 });
 
 test('local acceptance packument reader verifies seeded dist metadata and fails closed', async () => {
