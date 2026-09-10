@@ -56,7 +56,12 @@ function runChecked(command, args, options = {}) {
   return result.stdout?.trim() ?? '';
 }
 
-function createVerdaccioConfig({ storageDir, htpasswdPath, scope }) {
+function createVerdaccioConfig({
+  storageDir,
+  htpasswdPath,
+  scope,
+  sidecarNames = [],
+}) {
   return [
     `storage: ${JSON.stringify(storageDir)}`,
     'auth:',
@@ -70,6 +75,14 @@ function createVerdaccioConfig({ storageDir, htpasswdPath, scope }) {
     '    max_fails: 100',
     '    fail_timeout: 1s',
     'packages:',
+    // Published sidecars are seeded from their accepted bytes too. Looking them
+    // up upstream during that seed would reject the existing version with 409.
+    ...sidecarNames.flatMap(name => [
+      `  ${JSON.stringify(name)}:`,
+      '    access: $all',
+      '    publish: $authenticated',
+      '    unpublish: $authenticated',
+    ]),
     `  ${JSON.stringify(`@${scope}/*`)}:`,
     '    access: $all',
     '    publish: $authenticated',
@@ -398,6 +411,9 @@ async function startEphemeralRegistry({
       storageDir,
       htpasswdPath,
       scope: release.targetScope,
+      sidecarNames: release.sidecars
+        ? readStagedSidecars(releaseDir).sidecars.map(sidecar => sidecar.name)
+        : [],
     }),
   );
 

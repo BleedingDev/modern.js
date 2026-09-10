@@ -3382,7 +3382,7 @@ test('local acceptance registry tolerates transient npm uplink failures', async 
   });
 });
 
-test('local acceptance registry keeps published cohort history and audit fallback available', async () => {
+test('local acceptance registry keeps published cohort history without conflicting with exact sidecar seeds', async () => {
   const { createVerdaccioConfig } = await import(
     '../lib/source-create-proof/runtime-proof/registry.mjs'
   );
@@ -3391,6 +3391,7 @@ test('local acceptance registry keeps published cohort history and audit fallbac
       storageDir: '/tmp/registry-storage',
       htpasswdPath: '/tmp/registry-htpasswd',
       scope: 'bleedingdev',
+      sidecarNames: ['@bleedingdev/image-size'],
     }),
   );
 
@@ -3402,6 +3403,11 @@ test('local acceptance registry keeps published cohort history and audit fallbac
     publish: '$authenticated',
     unpublish: '$authenticated',
     proxy: 'npmjs',
+  });
+  assert.deepEqual(config.packages['@bleedingdev/image-size'], {
+    access: '$all',
+    publish: '$authenticated',
+    unpublish: '$authenticated',
   });
   assert.deepEqual(config.packages['**'], {
     access: '$all',
