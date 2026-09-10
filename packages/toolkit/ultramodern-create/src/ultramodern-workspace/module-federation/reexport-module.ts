@@ -28,7 +28,7 @@ export function createUltramodernBuildModule(
   app: WorkspaceApp,
   includeUiMarker = appEmitsBrowserUi(app),
 ): string {
-  return `import buildArtifact from './ultramodern-build.json' with { type: 'json' };
+  return `import buildArtifact = require('./ultramodern-build.json');
 import { resolveUltramodernBuildArtifact } from '@modern-js/runtime-extensions/build-identity';
 
 declare const ULTRAMODERN_BUILD_MARKER: string;

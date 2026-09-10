@@ -318,7 +318,7 @@ test('legacy identity projection preserves artifact-only identity and extensions
         path.join(root, 'custom/app/shared/ultramodern-build.ts'),
         'utf8',
       ),
-    ).toContain("from './ultramodern-build.json'");
+    ).toContain("require('./ultramodern-build.json')");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

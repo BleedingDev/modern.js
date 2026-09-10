@@ -60,7 +60,7 @@ test.each([
   }
   const module = createUltramodernBuildModule('identity-proof', shell);
   expect(module).toContain(
-    "import buildArtifact from './ultramodern-build.json'",
+    "import buildArtifact = require('./ultramodern-build.json')",
   );
   expect(module).toContain('resolveUltramodernBuildArtifact(buildArtifact,');
   expect(module).not.toContain(recorded.buildMarker);
