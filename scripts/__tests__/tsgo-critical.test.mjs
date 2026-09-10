@@ -43,9 +43,10 @@ const consumerConfigs = [
   'tests/integration/routes-tanstack-mf/mf-remote-2/tsconfig.typecheck.json',
   'tests/integration/bff-effect/tsconfig.json',
   'tests/integration/superapp-portfolio/tsconfig.json',
+  'tests/integration/bff-cross-project/bff-client-app/tsconfig.json',
 ];
 
-test('all nine critical configs remain covered; consumers keep every strict diagnostic', () => {
+test('all ten critical configs remain covered; consumers keep every strict diagnostic', () => {
   const configs = readFileSync(
     join(repoRoot, 'scripts/tsgo-critical.txt'),
     'utf8',
