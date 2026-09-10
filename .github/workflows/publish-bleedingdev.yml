@@ -288,6 +288,7 @@ jobs:
             --filter "@modern-js/ultramodern-create..." \
             --filter "@modern-js/code-tools..." \
             --filter "@modern-js/app-tools..." \
+            --filter "@modern-js/ultramodern-app-tools..." \
             --filter "@modern-js/image..." \
             --filter "@modern-js/runtime..." \
             --filter "@modern-js/plugin-i18n..." \

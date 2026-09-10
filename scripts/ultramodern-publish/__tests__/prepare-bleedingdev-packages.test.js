@@ -3382,7 +3382,7 @@ test('local acceptance registry tolerates transient npm uplink failures', async 
   });
 });
 
-test('local acceptance registry keeps the catch-all npmjs proxy for audit fallback', async () => {
+test('local acceptance registry keeps published cohort history and audit fallback available', async () => {
   const { createVerdaccioConfig } = await import(
     '../lib/source-create-proof/runtime-proof/registry.mjs'
   );
@@ -3401,6 +3401,7 @@ test('local acceptance registry keeps the catch-all npmjs proxy for audit fallba
     access: '$all',
     publish: '$authenticated',
     unpublish: '$authenticated',
+    proxy: 'npmjs',
   });
   assert.deepEqual(config.packages['**'], {
     access: '$all',

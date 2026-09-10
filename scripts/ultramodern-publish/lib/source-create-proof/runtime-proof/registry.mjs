@@ -74,6 +74,10 @@ function createVerdaccioConfig({ storageDir, htpasswdPath, scope }) {
     '    access: $all',
     '    publish: $authenticated',
     '    unpublish: $authenticated',
+    // pnpm validates the consumer's existing lockfile before replacing its old
+    // cohort. Keep published versions and their release times visible alongside
+    // the exact candidate tarballs verified by the seed loop below.
+    '    proxy: npmjs',
     "  '**':",
     '    access: $all',
     '    proxy: npmjs',
