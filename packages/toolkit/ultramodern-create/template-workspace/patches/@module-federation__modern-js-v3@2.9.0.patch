@@ -17,7 +17,7 @@ index 247cf19..d3e6a21b 100644
      };
      const resolveSharedStrategyPlugin = ()=>resolvePackageFile('@module-federation/modern-js-v3', 'dist/esm/cli/mfRuntimePlugins/shared-strategy.mjs', 'dist/cjs/cli/mfRuntimePlugins/shared-strategy.js');
      const resolveInjectNodeFetchPlugin = ()=>resolvePackageFile('@module-federation/modern-js-v3', 'dist/esm/cli/mfRuntimePlugins/inject-node-fetch.mjs', 'dist/cjs/cli/mfRuntimePlugins/inject-node-fetch.js');
-+    const resolveManifestRecoveryPlugin = ()=>resolvePackageFile('@modern-js/runtime', 'dist/esm/module-federation/manifest-recovery-runtime-plugin.mjs', 'dist/cjs/module-federation/manifest-recovery-runtime-plugin.js', process.cwd());
++    const resolveManifestRecoveryPlugin = ()=>require.resolve('@modern-js/federation-runtime/manifest-recovery-runtime-plugin', { paths: [process.cwd()] });
      const resolveNodeRuntimePlugin = ()=>resolvePackageFile('@module-federation/node', 'dist/src/runtimePlugin.mjs', 'dist/src/runtimePlugin.js');
      const resolveNodeRecordRemoteHashPlugin = ()=>resolvePackageFile('@module-federation/node', 'dist/src/recordDynamicRemoteEntryHashPlugin.mjs', 'dist/src/recordDynamicRemoteEntryHashPlugin.js');
      function setEnv(enableSSR) {
@@ -100,7 +100,7 @@ index a390de85925ec6f5abff007aa7ba7da8890942d1..b45f6bae8b19d08c50367d2b31783cd6
      return configPlugin_resolvePackageFile('@module-federation/modern-js-v3', 'dist/esm/cli/mfRuntimePlugins/inject-node-fetch.mjs', 'dist/cjs/cli/mfRuntimePlugins/inject-node-fetch.js');
  };
 +var configPlugin_resolveManifestRecoveryPlugin = function() {
-+    return configPlugin_resolvePackageFile('@modern-js/runtime', 'dist/esm/module-federation/manifest-recovery-runtime-plugin.mjs', 'dist/cjs/module-federation/manifest-recovery-runtime-plugin.js', process.cwd());
++    return require.resolve('@modern-js/federation-runtime/manifest-recovery-runtime-plugin', { paths: [process.cwd()] });
 +};
  var configPlugin_resolveNodeRuntimePlugin = function() {
      return configPlugin_resolvePackageFile('@module-federation/node', 'dist/src/runtimePlugin.mjs', 'dist/src/runtimePlugin.js');
@@ -203,7 +203,7 @@ index 41356987ccc29a62903944cfb4a559dd46d1cb90..ccd7d5889d2ddf5b29d25c0edb078efe
  };
  const resolveSharedStrategyPlugin = ()=>resolvePackageFile('@module-federation/modern-js-v3', 'dist/esm/cli/mfRuntimePlugins/shared-strategy.mjs', 'dist/cjs/cli/mfRuntimePlugins/shared-strategy.js');
  const resolveInjectNodeFetchPlugin = ()=>resolvePackageFile('@module-federation/modern-js-v3', 'dist/esm/cli/mfRuntimePlugins/inject-node-fetch.mjs', 'dist/cjs/cli/mfRuntimePlugins/inject-node-fetch.js');
-+const resolveManifestRecoveryPlugin = ()=>resolvePackageFile('@modern-js/runtime', 'dist/esm/module-federation/manifest-recovery-runtime-plugin.mjs', 'dist/cjs/module-federation/manifest-recovery-runtime-plugin.js', process.cwd());
++const resolveManifestRecoveryPlugin = ()=>require.resolve('@modern-js/federation-runtime/manifest-recovery-runtime-plugin', { paths: [process.cwd()] });
  const resolveNodeRuntimePlugin = ()=>resolvePackageFile('@module-federation/node', 'dist/src/runtimePlugin.mjs', 'dist/src/runtimePlugin.js');
  const resolveNodeRecordRemoteHashPlugin = ()=>resolvePackageFile('@module-federation/node', 'dist/src/recordDynamicRemoteEntryHashPlugin.mjs', 'dist/src/recordDynamicRemoteEntryHashPlugin.js');
  function setEnv(enableSSR) {

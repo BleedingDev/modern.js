@@ -441,6 +441,25 @@ function assertModernJsV3PatchBehavior(): Promise<void> {
     packageDir,
     'dist/cjs/cli/configPlugin.js',
   );
+  for (const format of ['cjs', 'esm', 'esm-node']) {
+    const extension = format === 'cjs' ? 'js' : 'mjs';
+    const appliedSource = fs.readFileSync(
+      path.join(packageDir, `dist/${format}/cli/configPlugin.${extension}`),
+      'utf8',
+    );
+    assert.ok(
+      appliedSource.includes(
+        "require.resolve('@modern-js/federation-runtime/manifest-recovery-runtime-plugin', { paths: [process.cwd()] })",
+      ),
+      `${format} must resolve the application's public federation runtime export`,
+    );
+    assert.ok(
+      !appliedSource.includes(
+        'dist/cjs/module-federation/manifest-recovery-runtime-plugin.js',
+      ),
+      `${format} must not resolve the retired native runtime artifact`,
+    );
+  }
   const configPlugin = require(configPluginPath) as {
     moduleFederationConfigPlugin: (config: Record<string, unknown>) => {
       setup(api: Record<string, unknown>): Promise<void>;
@@ -561,20 +580,37 @@ function assertModernJsV3PatchBehavior(): Promise<void> {
       );
       const runtimePackageDir = path.join(
         serverWorkspace,
-        'node_modules/@modern-js/runtime',
+        'node_modules/@modern-js/federation-runtime',
       );
       const manifestRecoveryPath = path.join(
         runtimePackageDir,
-        'dist/cjs/module-federation/manifest-recovery-runtime-plugin.js',
+        'entrypoints/recovery.cjs',
       );
       fs.mkdirSync(path.dirname(manifestRecoveryPath), { recursive: true });
       fs.writeFileSync(
         path.join(runtimePackageDir, 'package.json'),
-        `${JSON.stringify({ main: './index.js', name: '@modern-js/runtime' })}\n`,
+        `${JSON.stringify({
+          name: '@bleedingdev/modern-js-federation-runtime',
+          exports: {
+            './manifest-recovery-runtime-plugin': {
+              node: {
+                require: './entrypoints/recovery.cjs',
+                import: './entrypoints/recovery.mjs',
+              },
+              default: './entrypoints/browser.mjs',
+            },
+          },
+        })}\n`,
       );
-      fs.writeFileSync(
-        path.join(runtimePackageDir, 'index.js'),
-        'module.exports = {};\n',
+      assert.equal(
+        fs.existsSync(
+          path.join(
+            serverWorkspace,
+            'node_modules/@modern-js/runtime/dist/cjs/module-federation/manifest-recovery-runtime-plugin.js',
+          ),
+        ),
+        false,
+        'the application must not need the retired native runtime path',
       );
       fs.writeFileSync(
         manifestRecoveryPath,

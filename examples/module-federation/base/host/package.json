@@ -15,6 +15,7 @@
     "node": ">=26.7.0"
   },
   "dependencies": {
+    "@modern-js/federation-runtime": "workspace:*",
     "@modern-js/runtime": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
