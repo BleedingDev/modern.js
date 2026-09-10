@@ -1215,7 +1215,13 @@ export function runMigrateStrictEffect(
     : runWorkspaceTransaction(
         context.workspaceRoot,
         stage =>
-          withContext(createMigrationIo(stage, false, context.workspaceRoot)),
+          withContext(
+            createMigrationIo(
+              stage,
+              false,
+              skipInstall ? context.workspaceRoot : stage,
+            ),
+          ),
         {
           commitWhen: migrationResult => migrationResult.status === 0,
           inspectChanges: changes => {

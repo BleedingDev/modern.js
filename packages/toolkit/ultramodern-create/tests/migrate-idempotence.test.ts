@@ -116,6 +116,13 @@ snapshots: {}
 ) {
   const binDir = path.join(tempRoot, 'bin');
   const invocationLog = path.join(tempRoot, 'pnpm-invocations.log');
+  const formatterRoot = path.join(tempRoot, 'formatter-providers');
+  if (!fs.existsSync(formatterRoot))
+    linkWorkspaceFormatterDependencies(formatterRoot);
+  const formatterProviders = ['oxfmt', 'ultracite'].map(name => [
+    name,
+    fs.realpathSync(path.join(formatterRoot, 'node_modules', name)),
+  ]);
   writeNodeCommandFixture(
     binDir,
     'pnpm',
@@ -123,6 +130,12 @@ snapshots: {}
 ${options.requireLockfilePresent ? "if (!fs.existsSync('pnpm-lock.yaml')) process.exit(1);" : ''}
 fs.appendFileSync(process.env.ULTRAMODERN_TEST_PNPM_LOG, process.argv.slice(2).join(' ') + '\\n');
 fs.writeFileSync('pnpm-lock.yaml', ${JSON.stringify(lockfile)});
+if (process.argv[2] === 'install') {
+  fs.mkdirSync('node_modules', { recursive: true });
+  for (const [name, target] of ${JSON.stringify(formatterProviders)}) {
+    if (!fs.existsSync('node_modules/' + name)) fs.symlinkSync(target, 'node_modules/' + name, process.platform === 'win32' ? 'junction' : 'dir');
+  }
+}
 ${options.beforeExit ?? ''}
 process.exit(${options.exitCode ?? 0});
 `,
@@ -239,11 +252,10 @@ test('migration subprocesses preserve staged command order, nonzero exits and la
   }
 });
 
-test('source-checkout migrate uses workspace links and is byte-idempotent after install', async () => {
+test('source-checkout migrate formats with staged dependencies and is byte-idempotent without a live install', async () => {
   const { tempRoot, workspaceDir } = createWorkspace('migration-idempotence', {
     tempPrefix: 'um-migration-idempotence-',
   });
-  linkWorkspaceFormatterDependencies(workspaceDir);
   const previousPath = process.env.PATH;
   const previousInvocationLog = process.env.ULTRAMODERN_TEST_PNPM_LOG;
 
