@@ -336,6 +336,73 @@ test('historical BFF build adoption authenticates providers without adding build
   });
 });
 
+test('historical roots authenticate the required native peer before adopting its alias', () => {
+  const source = {
+    strategy: 'install' as const,
+    modernPackageVersion: '3.9.0-ultramodern.5',
+    aliasScope: 'bleedingdev',
+    aliasPackageNamePrefix: 'modern-js-',
+  };
+  const provider = '@modern-js/app-tools';
+  const packages = [
+    provider,
+    '@modern-js/runtime-renderer-extensions',
+    '@modern-js/plugin-bff-build-extensions',
+    '@modern-js/plugin-bff-extensions',
+  ].map(sourceName => ({
+    sourceName,
+    targetName: sourceName.replace('@modern-js/', '@bleedingdev/modern-js-'),
+    version: source.modernPackageVersion,
+  }));
+  const original = {
+    modernjs: { workspace: 'ultramodern-superapp', consumer: 'keep' },
+    devDependencies: {
+      '@modern-js/plugin-bff':
+        'npm:@bleedingdev/modern-js-plugin-bff@3.8.2-ultramodern.12',
+      'consumer-tool': '^2.0.0',
+    },
+    dependencies: { consumer: '^1.0.0' },
+    scripts: { custom: 'consumer --keep' },
+    pnpm: { overrides: { consumer: '^1.0.0' } },
+  };
+  for (const rejected of [
+    packages.filter(item => item.sourceName !== provider),
+    packages.map(item =>
+      item.sourceName === provider
+        ? { ...item, version: '3.8.2-ultramodern.12' }
+        : item,
+    ),
+  ]) {
+    const manifest = structuredClone(original);
+    assert.throws(
+      () => updateModernDependencies(manifest, source, { packages: rejected }),
+      /app-tools is absent from the authenticated target cohort/u,
+    );
+    assert.deepEqual(manifest, original);
+  }
+  const manifest: Record<string, any> = structuredClone(original);
+  assert.equal(updateModernDependencies(manifest, source, { packages }), true);
+  assert.equal(
+    manifest.devDependencies[provider],
+    'npm:@bleedingdev/modern-js-app-tools@3.9.0-ultramodern.5',
+  );
+  assert.equal(
+    manifest.devDependencies['consumer-tool'],
+    original.devDependencies['consumer-tool'],
+  );
+  for (const field of ['modernjs', 'dependencies', 'scripts', 'pnpm'] as const)
+    assert.deepEqual(manifest[field], original[field]);
+  assert.equal(updateModernDependencies(manifest, source, { packages }), false);
+  const unrelated = { devDependencies: { 'consumer-tool': '^2.0.0' } };
+  assert.equal(
+    updateModernDependencies(unrelated, source, { packages }),
+    false,
+  );
+  assert.deepEqual(unrelated, {
+    devDependencies: { 'consumer-tool': '^2.0.0' },
+  });
+});
+
 test('same-contract BFF cohort updates only declared dependencies and never adopts the build plugin', () => {
   const source = cohort('3.9.0-ultramodern.3');
   const target = cohort('3.9.0-ultramodern.4');
@@ -354,7 +421,14 @@ test('same-contract BFF cohort updates only declared dependencies and never adop
   });
   target.aliases['@modern-js/plugin-bff-build-extensions'] =
     '@bleedingdev/modern-js-plugin-bff-build-extensions';
+  target.packages.push({
+    sourceName: '@modern-js/app-tools',
+    targetName: '@bleedingdev/modern-js-app-tools',
+    version: target.release.version,
+  });
+  target.aliases['@modern-js/app-tools'] = '@bleedingdev/modern-js-app-tools';
   const manifest = {
+    modernjs: { workspace: 'ultramodern-superapp' },
     dependencies: {
       '@modern-js/plugin-bff':
         'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.3',
@@ -368,6 +442,7 @@ test('same-contract BFF cohort updates only declared dependencies and never adop
     },
   ]);
   assert.deepEqual(manifest, {
+    modernjs: { workspace: 'ultramodern-superapp' },
     dependencies: {
       '@modern-js/plugin-bff':
         'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.4',

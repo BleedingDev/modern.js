@@ -100,6 +100,7 @@ export function updateModernDependencies(
     }
     if (packageJson.modernjs?.workspace === 'ultramodern-superapp') {
       rendererSections.add('devDependencies');
+      providers.push(['devDependencies', '@modern-js/app-tools']);
     }
     for (const section of rendererSections) {
       providers.push([section, '@modern-js/runtime-renderer-extensions']);

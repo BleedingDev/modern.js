@@ -3944,6 +3944,7 @@ test('migration authenticates direct renderer dependencies and preserves consume
   };
   const cohort = {
     packages: [
+      '@modern-js/app-tools',
       '@modern-js/ultramodern-app-tools',
       '@modern-js/app-tools-extensions',
       '@modern-js/federation-runtime',

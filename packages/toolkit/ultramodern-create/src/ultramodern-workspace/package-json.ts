@@ -263,6 +263,10 @@ export function createRootPackageJson(
     },
     devDependencies: {
       ...ULTRAMODERN_PACKAGE_PINS.rootDevDependencies,
+      '@modern-js/app-tools': modernPackageSpecifier(
+        '@modern-js/app-tools',
+        packageSource,
+      ),
       '@modern-js/plugin-bff-extensions': modernPackageSpecifier(
         '@modern-js/plugin-bff-extensions',
         packageSource,

@@ -253,6 +253,7 @@ test('root package json pins workspace package versions and bridge workspace glo
     '@types/node': '^26.4.1',
     '@effect/tsgo': '0.41.0',
     '@modern-js/code-tools': packageVersion,
+    '@modern-js/app-tools': packageVersion,
     '@modern-js/app-tools-extensions': packageVersion,
     '@modern-js/ultramodern-app-tools': packageVersion,
     '@modern-js/runtime-renderer-extensions': packageVersion,
@@ -272,6 +273,43 @@ test('root package json pins workspace package versions and bridge workspace glo
     wrangler: '4.116.0',
     'zephyr-agent': '1.2.4',
   });
+});
+
+test('generated roots provide the native app-tools peer required by their BFF build plugin', () => {
+  const buildPlugin = JSON.parse(
+    fs.readFileSync(
+      path.resolve(
+        __dirname,
+        '../../../cli/plugin-bff-build-extensions/package.json',
+      ),
+      'utf8',
+    ),
+  );
+  assert.ok(buildPlugin.peerDependencies['@modern-js/app-tools']);
+  assert.notEqual(
+    buildPlugin.peerDependenciesMeta?.['@modern-js/app-tools']?.optional,
+    true,
+  );
+  for (const [packageSource, expected] of [
+    [workspacePackageSource, 'workspace:*'],
+    [installPackageSource, packageVersion],
+    [
+      {
+        ...installPackageSource,
+        aliasScope: 'bleedingdev',
+        aliasPackageNamePrefix: 'modern-js-',
+      },
+      `npm:@bleedingdev/modern-js-app-tools@${packageVersion}`,
+    ],
+  ] as const) {
+    const root = packageRecord(
+      createRootPackageJson(scope, packageSource, [createCatalogVertical()]),
+    );
+    const dependencies = packageRecord(root.devDependencies);
+    assert.ok(dependencies['@modern-js/plugin-bff-build-extensions']);
+    assert.equal(dependencies['@modern-js/app-tools'], expected);
+    assert.equal(root.pnpm, undefined);
+  }
 });
 
 test('app package generation throws for unknown remote refs', () => {
