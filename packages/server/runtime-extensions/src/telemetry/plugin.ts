@@ -135,14 +135,13 @@ export const injectTelemetryPlugin = (): ServerPlugin => ({
 
     const {
       healthMonitor,
-      canaryCompatibility,
       gateSnapshotStorePromise,
       runtimeFallbackSignalConfig,
       runtimeStatusAuthConfig,
     } = setupTelemetryHealthMonitoring({
       registry,
       appDirectory,
-      legacyHealthConfig: telemetryConfig.canary,
+      healthConfig: telemetryConfig.health,
     });
 
     if (runtimeFallbackSignalConfig) {
@@ -154,7 +153,6 @@ export const injectTelemetryPlugin = (): ServerPlugin => ({
       createRuntimeStatusMiddleware({
         registry,
         healthMonitor,
-        canaryCompatibility,
         runtimeFallbackSignalConfig,
         runtimeStatusAuthConfig,
       }),
@@ -192,7 +190,7 @@ export const injectTelemetryPlugin = (): ServerPlugin => ({
       api,
       registry,
       telemetryConfig,
-      legacyHealthConfig: telemetryConfig.canary,
+      healthConfig: telemetryConfig.health,
       healthMonitor,
       gateSnapshotStorePromise,
       appDirectory,

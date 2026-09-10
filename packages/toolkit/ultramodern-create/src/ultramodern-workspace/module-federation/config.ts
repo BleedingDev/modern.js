@@ -185,8 +185,6 @@ const defaultAssetPrefix = defaultRemoteAssetPrefix;`;
       ).filter(port => typeof port === 'number' && Number.isFinite(port)),
     ),
   ].toSorted((left, right) => left - right);
-  const legacyCorsSource = `const moduleFederationDevServerOrigin =
-  envValue('ULTRAMODERN_MF_DEV_ORIGIN') || 'http://localhost:${shellApp.port}';`;
   const configuredCorsSource = `const moduleFederationDevServerAllowedOrigins = [
 ${developmentPorts.map(port => `  'http://localhost:${port}',`).join('\n')}
 ];`;
@@ -197,12 +195,10 @@ ${developmentPorts.map(port => `  'http://localhost:${port}',`).join('\n')}
             origin: moduleFederationDevServerAllowedOrigins,
           },
         },`;
-  const useConfiguredCorsAllowlist = configuredDevPorts !== undefined;
-  const configuredCorsHeader = useConfiguredCorsAllowlist
-    ? developmentPorts.length === 1
+  const configuredCorsHeader =
+    developmentPorts.length === 1
       ? "'Access-Control-Allow-Origin': moduleFederationDevServerAllowedOrigins[0],"
-      : ''
-    : "'Access-Control-Allow-Origin': moduleFederationDevServerOrigin,";
+      : '';
   return renderFileTemplate('workspace/apps/modern.config.ts', {
     value0: `${bffImport}${tailwindImport}`,
     value1: app.id,
@@ -226,10 +222,8 @@ ${developmentPorts.map(port => `  'http://localhost:${port}',`).join('\n')}
     value16: createRspackUniqueName(app),
     value17: createRspackChunkLoadingGlobal(app),
     value18: tailwindBuilderPluginsConfig,
-    value19: useConfiguredCorsAllowlist
-      ? configuredCorsSource
-      : legacyCorsSource,
-    value20: useConfiguredCorsAllowlist ? configuredCorsDevServer : '',
+    value19: configuredCorsSource,
+    value20: configuredCorsDevServer,
     value21: configuredCorsHeader,
     value22: uiImports,
     value23: zephyrPluginSource,

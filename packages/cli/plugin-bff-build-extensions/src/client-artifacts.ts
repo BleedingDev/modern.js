@@ -5,7 +5,6 @@ import type {
 } from '@modern-js/app-tools';
 import { ApiRouter } from '@modern-js/bff-core';
 import type { CLIPluginAPI } from '@modern-js/plugin';
-import type { GeneratedEffectClientArtifacts } from '@modern-js/plugin-bff-extensions/client-generator';
 import {
   buildOperationContractMap,
   deriveOperationVersion,
@@ -20,7 +19,6 @@ export interface BffGenerationMetadata {
   runtimeFramework: 'effect' | 'hono';
   relativeEffectEntry: string;
   operationContracts: OperationContractMap;
-  effectArtifacts?: GeneratedEffectClientArtifacts;
 }
 
 export function registerBffClientArtifacts(
@@ -31,9 +29,8 @@ export function registerBffClientArtifacts(
     const { generation } = context;
     const config = api.getNormalizedConfig();
     if (api.getAppContext().bffRuntimeFramework === 'effect') {
-      const { generateEffectClient, resolveEffectEntryPaths } = await import(
-        '@modern-js/plugin-bff-extensions/client-generator'
-      );
+      const { resolveEffectOperationContracts, resolveEffectEntryPaths } =
+        await import('@modern-js/plugin-bff-extensions/effect-source-loader');
       const { sourceEffectEntry, relativeEffectEntry } =
         resolveEffectEntryPaths({
           appDir: generation.appDirectory,
@@ -44,32 +41,21 @@ export function registerBffClientArtifacts(
         throw new Error(
           `Cannot resolve Effect BFF entry in ${generation.apiDirectory}.`,
         );
-      const artifacts = await generateEffectClient({
+      const operationContracts = await resolveEffectOperationContracts({
         appDir: generation.appDirectory,
-        apiDir: generation.apiDirectory,
         resourcePath: sourceEffectEntry,
         prefix: generation.prefix,
-        port: Number(generation.port),
-        target: 'bundle',
         requestId: generation.requestId,
-        requestCreator: generation.requestCreator || BFF_REQUEST_RUNTIME,
-        httpMethodDecider: generation.httpMethodDecider,
-        dataPlatformBatch: config.bff?.effect?.dataPlatform?.batch,
       });
-      if (!artifacts)
+      if (operationContracts === null) {
         throw new Error(
-          `Effect cross-project client generation failed for ${sourceEffectEntry}.`,
+          `Cannot resolve exported Effect HttpApi in ${sourceEffectEntry}.`,
         );
-      context.additionalArtifacts.push({
-        sourcePath: path.relative(generation.apiDirectory, sourceEffectEntry),
-        code: artifacts.code,
-        declaration: artifacts.declaration,
-      });
+      }
       metadata.set(generation, {
         runtimeFramework: 'effect',
         relativeEffectEntry,
-        operationContracts: artifacts.operationContracts,
-        effectArtifacts: artifacts,
+        operationContracts,
       });
     } else {
       const router = new ApiRouter({

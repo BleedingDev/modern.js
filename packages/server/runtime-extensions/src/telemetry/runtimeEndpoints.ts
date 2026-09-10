@@ -15,12 +15,10 @@ import type {
   TelemetryHealthMonitor,
   TelemetryRegistry,
 } from '../telemetryCore';
-import type { TelemetryCanaryCompatibility } from './canaryCompatibility';
 
 type RuntimeStatusMiddlewareOptions = {
   registry: TelemetryRegistry;
   healthMonitor?: TelemetryHealthMonitor;
-  canaryCompatibility?: TelemetryCanaryCompatibility;
   runtimeFallbackSignalConfig?: RuntimeFallbackSignalConfig;
   runtimeStatusAuthConfig?: RuntimeFallbackSignalAuthConfig;
 };
@@ -89,7 +87,6 @@ export const createRuntimeFallbackSignalMiddleware = (
 export const createRuntimeStatusMiddleware = ({
   registry,
   healthMonitor,
-  canaryCompatibility,
   runtimeFallbackSignalConfig,
   runtimeStatusAuthConfig,
 }: RuntimeStatusMiddlewareOptions) => ({
@@ -128,13 +125,6 @@ export const createRuntimeStatusMiddleware = ({
               ...healthSnapshot,
             }
           : { enabled: false },
-        canary:
-          healthSnapshot && canaryCompatibility
-            ? {
-                enabled: true,
-                ...canaryCompatibility.getStatusSnapshot(healthSnapshot),
-              }
-            : { enabled: false },
         runtimeFallbackSignal: runtimeFallbackSignalConfig
           ? {
               enabled: true,

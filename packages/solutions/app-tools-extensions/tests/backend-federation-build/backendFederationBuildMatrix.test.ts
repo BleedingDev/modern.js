@@ -12,7 +12,7 @@ import backendFederationBuildPlugin, {
 import { readBuildIdentity } from '../../src/backend-federation-build/config';
 
 type ConfigShape = 'compact' | 'full';
-type IdentitySource = 'json' | 'legacy-ts';
+type IdentitySource = 'json';
 
 const unitId = 'tractor-store-vertical-demo/explore';
 const appId = 'explore';
@@ -72,38 +72,6 @@ const writeJsonBuildIdentity = async (
   await writeJson(
     path.join(appDirectory, ULTRAMODERN_BUILD_ARTIFACT_PATH),
     createBuildArtifact(overrides),
-  );
-};
-
-const writeLegacyBuildIdentity = async (
-  appDirectory: string,
-  overrides: Record<string, unknown> = {},
-) => {
-  const identity = {
-    appId,
-    build: buildMarker,
-    packageName,
-    version,
-    unitId,
-    sourceRevision: 'legacy-source',
-    ...overrides,
-  };
-  const modulePath = path.join(appDirectory, ULTRAMODERN_BUILD_MODULE_PATH);
-
-  await fs.mkdir(path.dirname(modulePath), { recursive: true });
-  await fs.writeFile(
-    modulePath,
-    [
-      'export const ultramodernBuildIdentity = {',
-      `  appId: '${identity.appId}',`,
-      `  build: '${identity.build}',`,
-      `  packageName: '${identity.packageName}',`,
-      `  version: '${identity.version}',`,
-      `  unitId: '${identity.unitId}',`,
-      `  sourceRevision: '${identity.sourceRevision}',`,
-      '};',
-      '',
-    ].join('\n'),
   );
 };
 
@@ -197,11 +165,7 @@ const writeWorkspace = async ({
     },
   });
 
-  if (identitySource === 'json') {
-    await writeJsonBuildIdentity(appDirectory, identityOverrides);
-  } else {
-    await writeLegacyBuildIdentity(appDirectory, identityOverrides);
-  }
+  await writeJsonBuildIdentity(appDirectory, identityOverrides);
 
   return { workspaceRoot, appDirectory, distDirectory };
 };
@@ -339,22 +303,10 @@ describe('backend federation build emit matrix', () => {
       identitySourceRevision: 'json-source',
     },
     {
-      name: 'compact config with legacy TS build identity',
-      configShape: 'compact',
-      identitySource: 'legacy-ts',
-      identitySourceRevision: 'legacy-source',
-    },
-    {
       name: 'full config with JSON build identity',
       configShape: 'full',
       identitySource: 'json',
       identitySourceRevision: 'json-source',
-    },
-    {
-      name: 'full config with legacy TS build identity',
-      configShape: 'full',
-      identitySource: 'legacy-ts',
-      identitySourceRevision: 'legacy-source',
     },
   ] as const;
 
@@ -437,7 +389,7 @@ describe('backend federation build emit matrix', () => {
     });
   }
 
-  for (const identitySource of ['json', 'legacy-ts'] as const) {
+  for (const identitySource of ['json'] as const) {
     it(`rejects cross-vertical appId drift for ${identitySource} build identity`, async () => {
       const { appDirectory, distDirectory } = await writeWorkspace({
         configShape: 'compact',

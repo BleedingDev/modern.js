@@ -1,12 +1,13 @@
 // @effect-diagnostics anyUnknownInErrorContext:off asyncFunction:off
-import api from '@api/index';
 import {
+  makeEffectHttpApiClient,
   makeEffectRpcClient,
   runEffectRequest,
   runEffectView,
   view,
 } from '@modern-js/bff-effect/effect-client';
 import { useEffect, useState } from 'react';
+import { bffEffectApi } from '../../shared/effect-api';
 import { bffRpcGroup } from '../../shared/effect-rpc';
 
 const userCardView = view<{
@@ -24,30 +25,26 @@ export default function Page() {
   const [rpcMessage, setRpcMessage] = useState('pending');
 
   useEffect(() => {
-    api.client.greetings.hello({}).then(data => {
-      setEffectMessage(data.message);
-    });
-
-    const userByIdRequest = api.client.greetings.userById({
-      params: { id: '42' },
-      query: { source: 'browser' },
-    });
-
-    userByIdRequest.then(data => {
-      setUserMessage(`${data.id}:${data.source}`);
-    });
-
-    runEffectView(userByIdRequest, userCardView).then(data => {
-      setProjectionMessage(data.id);
-    });
-
-    api.client.greetings
-      .echo({
-        payload: { text: 'echo-from-client' },
-      })
-      .then(data => {
-        setEchoMessage(data.echoed);
+    runEffectRequest(
+      makeEffectHttpApiClient(bffEffectApi, { baseUrl: '/bff-api' }),
+    ).then(client => {
+      runEffectRequest(client.greetings.hello({})).then(data => {
+        setEffectMessage(data.message);
       });
+      const userByIdRequest = runEffectRequest(
+        client.greetings.userById({
+          params: { id: '42' },
+          query: { source: 'browser' },
+        }),
+      );
+      userByIdRequest.then(data => setUserMessage(`${data.id}:${data.source}`));
+      runEffectView(userByIdRequest, userCardView).then(data =>
+        setProjectionMessage(data.id),
+      );
+      runEffectRequest(
+        client.greetings.echo({ payload: { text: 'echo-from-client' } }),
+      ).then(data => setEchoMessage(data.echoed));
+    });
 
     runEffectRequest(
       makeEffectRpcClient(bffRpcGroup, {

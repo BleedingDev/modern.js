@@ -15,9 +15,7 @@
  * hook that derives the producer namespace from a VERIFIED channel (mTLS
  * peer identity, gateway-authenticated JWT claims, service-mesh headers
  * stripped at the edge, ...). Requests fail closed when a namespace allowlist
- * is configured without this hook unless `allowClientAssertedNamespace` is
- * explicitly enabled. That escape hatch keeps legacy local/demo ergonomics:
- * the client-asserted namespace must match the allowlist. When the hook is
+ * is configured without this hook. When the hook is
  * present, the client-asserted namespace must match the verified namespace
  * and the allowlist is checked against the verified value.
  *
@@ -79,7 +77,6 @@ export type CrossProjectPolicyViolation = {
 const DEFAULT_DENY_STATUS = 403;
 const NAMESPACE_ALLOWLIST_REQUIRES_VERIFIER_MESSAGE =
   'cross-project namespace allowlist requires verifyProducerIdentity';
-let hasWarnedAdvisoryNamespaceAllowlist = false;
 
 export interface CrossProjectPolicyConfig {
   enabled?: boolean;
@@ -89,12 +86,6 @@ export interface CrossProjectPolicyConfig {
   requireOperationSchemaHash?: boolean;
   requireOperationVersion?: boolean;
   allowedNamespaces?: string[];
-  /**
-   * Explicit local/demo escape hatch for legacy clients that only provide
-   * client-built requestId namespaces. Defaults to false. Enabling this keeps
-   * `allowedNamespaces` advisory and must not be used as authorization.
-   */
-  allowClientAssertedNamespace?: boolean;
   envelopeHeader?: string;
   operationContextHeader?: string;
   operationContextDetailHeader?: string;
@@ -111,8 +102,7 @@ export interface CrossProjectPolicyConfig {
    * `undefined` (identity could not be verified) denies the request.
    *
    * By default, `allowedNamespaces` requires this hook and fails closed
-   * without it. Set `allowClientAssertedNamespace` only for local/demo
-   * ergonomics where advisory client-asserted namespace checks are acceptable.
+   * without it.
    */
   verifyProducerIdentity?: (
     headers: Record<string, unknown>,
@@ -340,18 +330,6 @@ const createViolation = (
   status,
 });
 
-const warnAdvisoryNamespaceAllowlist = () => {
-  if (hasWarnedAdvisoryNamespaceAllowlist) {
-    return;
-  }
-  hasWarnedAdvisoryNamespaceAllowlist = true;
-  console.warn(
-    `[Modern.js BFF] ${NAMESPACE_ALLOWLIST_REQUIRES_VERIFIER_MESSAGE}. ` +
-      'allowClientAssertedNamespace=true will continue to evaluate allowlist ' +
-      'against client-asserted requestId namespaces only.',
-  );
-};
-
 type ProducerIdentityVerifier = NonNullable<
   CrossProjectPolicyConfig['verifyProducerIdentity']
 >;
@@ -366,7 +344,6 @@ type CrossProjectPolicyEvaluationState = {
   requireOperationSchemaHash: boolean;
   requireOperationVersion: boolean;
   allowUnknownOperations: boolean;
-  allowClientAssertedNamespace: boolean;
   verifyProducerIdentity?: ProducerIdentityVerifier;
   allowedNamespaces: string[];
   envelopeHeader: string;
@@ -401,7 +378,6 @@ const createCrossProjectPolicyEvaluationState = (
   requireOperationSchemaHash: policy.requireOperationSchemaHash ?? true,
   requireOperationVersion: policy.requireOperationVersion ?? true,
   allowUnknownOperations: policy.allowUnknownOperations ?? false,
-  allowClientAssertedNamespace: policy.allowClientAssertedNamespace ?? false,
   verifyProducerIdentity:
     typeof policy.verifyProducerIdentity === 'function'
       ? policy.verifyProducerIdentity
@@ -440,14 +416,11 @@ const checkNamespaceAllowlistVerifier: CrossProjectPolicyCheck = state => {
     state.allowedNamespaces.length > 0 &&
     state.verifyProducerIdentity === undefined
   ) {
-    if (!state.allowClientAssertedNamespace) {
-      return createViolation(
-        'producer_identity_mismatch',
-        NAMESPACE_ALLOWLIST_REQUIRES_VERIFIER_MESSAGE,
-        state.status,
-      );
-    }
-    warnAdvisoryNamespaceAllowlist();
+    return createViolation(
+      'producer_identity_mismatch',
+      NAMESPACE_ALLOWLIST_REQUIRES_VERIFIER_MESSAGE,
+      state.status,
+    );
   }
   return undefined;
 };

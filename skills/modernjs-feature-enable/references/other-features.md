@@ -30,7 +30,6 @@ v3 **不再使用 `@modern-js/plugin-tailwindcss`**，改为 Rsbuild 原生方�
 2. 创建 `tailwind.config.{ts,js}`（IDE 智能补全也需要）。
 3. 在入口 CSS 引入 Tailwind 指令（`@tailwind base/components/utilities;` 或 v4 的 `@import`）。
 
-> 若项目是从 v2 迁移来的、仍有 `@modern-js/plugin-tailwindcss`，用 `modernjs-migrate-to-v3` 处理。
 
 ## 微前端（`microFrontend`）—— 不是本 skill 的当前启用项
 

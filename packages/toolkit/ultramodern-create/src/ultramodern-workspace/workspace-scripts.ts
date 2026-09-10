@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { UltramodernReleaseCohort } from '../ultramodern-release-cohort';
-import type { MigrationIo } from '../ultramodern-tooling/commands/migrate-strict-effect/io';
 import { appHasApi } from './descriptors';
 import {
   readFileTemplate,
@@ -9,10 +8,7 @@ import {
   workspaceTemplateDir,
   writeFileReplacing,
 } from './fs-io';
-import {
-  generatedToolingCommands,
-  selectGeneratedToolingCommands,
-} from './tooling-command-catalog';
+import { selectGeneratedToolingCommands } from './tooling-command-catalog';
 import type { WorkspaceApp } from './types';
 import { WORKSPACE_SCRIPT_SEGMENT_PATTERN } from './workspace-script-plan';
 import { createWorkspaceValidationContract } from './workspace-validation-contract';
@@ -164,7 +160,7 @@ export function writeGeneratedWorkspaceScripts(
   additionalShells: WorkspaceApp[] = [],
   primaryShell?: WorkspaceApp,
   options: {
-    io?: MigrationIo;
+    io?: { writeGenerated: (filePath: string, content: string) => unknown };
     compactConfig?: Record<string, unknown>;
     ownership?: Record<string, unknown>;
     developmentOverlay?: Record<string, unknown>;
@@ -186,25 +182,19 @@ export function writeGeneratedWorkspaceScripts(
     ),
   })) {
     if (options.io) {
-      if (artifact.legacyPath) {
-        options.io.remove(path.join(targetDir, artifact.legacyPath));
-      }
       options.io.writeGenerated(
         path.join(targetDir, artifact.relativePath),
         artifact.content,
       );
     } else {
       writeFileReplacing(targetDir, artifact.relativePath, artifact.content);
-      if (artifact.legacyPath) {
-        fs.rmSync(path.join(targetDir, artifact.legacyPath), { force: true });
-      }
     }
   }
 }
 
 // The canonical `setup-agent-reference-repos` script is vendored under
 // template-workspace/ and copied (then renamed to .mts) during fresh scaffolds.
-// Migrate has no copy step, so it materializes the same canonical source here.
+// Additional apps materialize the same canonical source here.
 function createAgentReferenceReposSetupScript(): string {
   return fs.readFileSync(
     path.join(workspaceTemplateDir, 'scripts/setup-agent-reference-repos.mjs'),
@@ -214,7 +204,6 @@ function createAgentReferenceReposSetupScript(): string {
 
 interface WorkspaceScriptDefinition {
   relativePath: string;
-  legacyPath?: string;
   createContent: () => string;
   requiresRemotes?: boolean;
 }
@@ -223,7 +212,6 @@ interface WorkspaceScriptDefinition {
 const workspaceScriptDefinitions: readonly WorkspaceScriptDefinition[] = [
   {
     relativePath: 'scripts/check-ultramodern-i18n-boundaries.mts',
-    legacyPath: 'scripts/check-ultramodern-i18n-boundaries.mjs',
     createContent: createWorkspaceI18nBoundaryValidationScript,
   },
   {
@@ -232,12 +220,10 @@ const workspaceScriptDefinitions: readonly WorkspaceScriptDefinition[] = [
   },
   {
     relativePath: 'scripts/bootstrap-agent-skills.mts',
-    legacyPath: 'scripts/bootstrap-agent-skills.mjs',
     createContent: createSkillsToolWrapperScript,
   },
   {
     relativePath: 'scripts/setup-agent-reference-repos.mts',
-    legacyPath: 'scripts/setup-agent-reference-repos.mjs',
     createContent: createAgentReferenceReposSetupScript,
   },
 ];
@@ -245,7 +231,6 @@ const workspaceScriptDefinitions: readonly WorkspaceScriptDefinition[] = [
 export interface WorkspaceScriptArtifact {
   relativePath: string;
   content: string;
-  legacyPath?: string;
   generatedDataBinding?: string;
 }
 
@@ -263,7 +248,6 @@ export function createWorkspaceScriptArtifacts(options: {
       })),
     ...selectGeneratedToolingCommands(options).map(command => ({
       relativePath: command.wrapperPath,
-      legacyPath: command.legacyPath,
       content:
         command.id === 'validate' && options.validationScript !== undefined
           ? options.validationScript
@@ -271,15 +255,3 @@ export function createWorkspaceScriptArtifacts(options: {
     })),
   ];
 }
-
-export const migratedWorkspaceScriptArtifacts = createWorkspaceScriptArtifacts;
-
-// Reference rewriting follows exactly the artifacts that have a legacy path.
-export const migratedWorkspaceScriptBasenames: readonly string[] = [
-  ...workspaceScriptDefinitions
-    .filter(definition => definition.legacyPath !== undefined)
-    .map(definition => path.basename(definition.relativePath, '.mts')),
-  ...generatedToolingCommands
-    .filter(command => command.legacyPath !== undefined)
-    .map(command => command.wrapperName),
-];

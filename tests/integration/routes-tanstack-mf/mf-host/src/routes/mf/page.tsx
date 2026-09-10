@@ -1,6 +1,11 @@
-import hostEffectBff from '@api/effect/index';
+import {
+  Effect,
+  makeEffectHttpApiClient,
+  runEffectRequest,
+} from '@modern-js/bff-effect/effect-client';
 import { useMatch } from '@modern-js/plugin-tanstack/runtime';
 import * as React from 'react';
+import { hostEffectApi } from '../../../shared/effect/api';
 import { lazyRemoteComponent, RemoteErrorBoundary } from './remoteLoader';
 import { RemoteOneRuntimeApp, RemoteTwoRuntimeApp } from './remoteRuntimeApps';
 import {
@@ -26,8 +31,11 @@ export default function MfPage() {
     let canceled = false;
     setClientReady(true);
 
-    hostEffectBff.client.greetings
-      .hello({})
+    runEffectRequest(
+      makeEffectHttpApiClient(hostEffectApi, { baseUrl: '/host-api' }).pipe(
+        Effect.flatMap(client => client.greetings.hello({})),
+      ),
+    )
       .then(data => {
         if (!canceled) {
           setEffectMessage(data.message);

@@ -117,15 +117,20 @@ const layer = HttpApiBuilder.layer(bffApi).pipe(
 export default defineEffectBff({ api: bffApi, layer });
 ```
 
-在浏览器代码中通过 `@api/index` 调用接口：
+从共享契约创建原生、完全类型推导的客户端：
 
 ```ts title="src/routes/page.tsx"
-import api from '@api/index';
+import { Effect, makeEffectHttpApiClient } from '@modern-js/bff-effect/effect-client';
+import { bffApi } from '../../shared/api';
 
-const response = await api.client.hello.ping({});
+const response = await Effect.runPromise(
+  makeEffectHttpApiClient(bffApi, { baseUrl: '/api' }).pipe(
+    Effect.flatMap(client => client.hello.ping({})),
+  ),
+);
 ```
 
-`api.client.*` 由 BFF loader 针对 `@api/index` 导入物化生成。不要直接导入 `api/index` 并期望在服务端代码、脚本或测试中运行 `client`；直接导入入口时拿到的是服务端运行时定义，其中的 `client` 只是类型占位。
+请求、响应和声明的错误类型均从 `bffApi` 推导，无需生成客户端代码或导入服务端入口。
 
 原生 Hono 应用从 `@modern-js/plugin-bff/server` 导入操作符。生成的 UltraModern
 应用继续使用严格 Effect API。Worker handler 及其请求上下文使用

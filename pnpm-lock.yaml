@@ -4194,6 +4194,9 @@ importers:
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
+      '@modern-js/plugin-bff-build-extensions':
+        specifier: workspace:*
+        version: link:../../../../packages/cli/plugin-bff-build-extensions
       '@modern-js/plugin-bff-extensions':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff-extensions
@@ -4231,9 +4234,6 @@ importers:
       '@modern-js/app-tools':
         specifier: workspace:*
         version: link:../../../../packages/solutions/app-tools
-      '@modern-js/plugin-bff-build-extensions':
-        specifier: workspace:*
-        version: link:../../../../packages/cli/plugin-bff-build-extensions
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -4258,6 +4258,9 @@ importers:
 
   tests/integration/bff-cross-project/bff-client-app:
     dependencies:
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../packages/server/bff-effect
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
@@ -4270,6 +4273,9 @@ importers:
       bff-api-app:
         specifier: workspace:*
         version: link:../bff-api-app
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@10.2.2)
@@ -4319,6 +4325,9 @@ importers:
 
   tests/integration/bff-cross-project/bff-indep-client-app:
     dependencies:
+      '@modern-js/bff-effect':
+        specifier: workspace:*
+        version: link:../../../../packages/server/bff-effect
       '@modern-js/plugin-bff':
         specifier: workspace:*
         version: link:../../../../packages/cli/plugin-bff
@@ -4334,6 +4343,9 @@ importers:
       bff-api-app:
         specifier: workspace:*
         version: link:../bff-api-app
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@10.2.2)

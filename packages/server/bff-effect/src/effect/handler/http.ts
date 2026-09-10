@@ -66,8 +66,8 @@ export function createHttpApiHandler<
   ) => {
     // Policy seam first: every HttpApi request, direct or batched item,
     // passes through here, so batch fan-out cannot bypass validator. The
-    // interceptor receives the original request and may own malformed or
-    // legacy payloads; delegated requests still pass through body validation.
+    // interceptor receives the original request; delegated requests still
+    // pass through body validation.
     const policyDenial = options.validateRequest?.(request);
     if (policyDenial) {
       return policyDenial;

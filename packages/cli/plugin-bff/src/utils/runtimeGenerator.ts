@@ -42,14 +42,18 @@ export declare const configure: typeof initProducerClient;
 
 export default async function runtimeGenerator(
   options: RuntimeGeneratorOptions,
-  rendered?: BffGeneratedModule,
+  rendered?: BffGeneratedModule | null,
 ) {
-  const module = rendered ?? renderBffRuntime(options);
   const directory = path.resolve(
     options.appDirectory,
     options.relativeDistPath,
     'runtime',
   );
+  if (rendered === null) {
+    await fs.remove(directory);
+    return;
+  }
+  const module = rendered ?? renderBffRuntime(options);
   await fs.outputFile(path.join(directory, 'index.js'), module.code);
   await fs.outputFile(path.join(directory, 'index.d.ts'), module.declaration);
 }

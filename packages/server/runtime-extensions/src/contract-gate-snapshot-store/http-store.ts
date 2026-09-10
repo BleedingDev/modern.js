@@ -8,16 +8,6 @@ import { CONTRACT_GATE_SNAPSHOT_SCHEMA_VERSION } from './types';
 
 const DEFAULT_HTTP_STORE_TIMEOUT_MS = 5_000;
 
-const BUILTIN_HTTP_STATE_STORE_MODULES = new Set([
-  'http',
-  // historical aliases kept for config compatibility with the era when these
-  // modules lived inside @modern-js/server-core.
-  '@modern-js/server-core/http',
-  '@modern-js/server-core/contract-gate-http-store',
-  '@modern-js/server-runtime-extensions/http',
-  '@modern-js/server-runtime-extensions/contract-gate-http-store',
-]);
-
 const normalizeHttpStoreOptions = (
   options: Record<string, unknown> | undefined,
 ): ContractGateSnapshotHttpStoreOptions => {
@@ -149,7 +139,7 @@ export const tryResolveBuiltinSnapshotStore = (input: {
   stateStore: ContractGateSnapshotStoreUserConfig;
 }): ContractGateSnapshotStore | undefined => {
   const moduleName = input.stateStore.module.trim();
-  if (!BUILTIN_HTTP_STATE_STORE_MODULES.has(moduleName)) {
+  if (moduleName !== 'http') {
     return undefined;
   }
 

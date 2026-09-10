@@ -3,5 +3,5 @@
 ---
 
 Pin generated `msgpackr` and `zod` overrides to the versions covered by the
-UltraModern security patches so fresh and migrated workspaces retain the
+UltraModern security patches so generated workspaces retain the
 hardened dependency implementations.

@@ -2,11 +2,6 @@ import type { RouterProviderFactory } from '@modern-js/runtime-extensions/router
 import { rstest } from '@rstest/core';
 import type { RouterExtendsHooks } from '../src/runtime/hooks';
 
-const REGISTRY_SLOT: unique symbol = Symbol.for(
-  '@modern-js/runtime:router-providers:v3',
-);
-const host = globalThis as { [REGISTRY_SLOT]?: unknown };
-
 type RuntimeContextModule = typeof import('@modern-js/runtime/context');
 type RouterModule = typeof import('../src/runtime/router');
 
@@ -71,7 +66,6 @@ function setupRouterWrapper(vertical: Vertical) {
 
 describe('TanStack provider runtime-realm isolation', () => {
   beforeEach(() => {
-    delete host[REGISTRY_SLOT];
     rstest.resetModules();
     (
       globalThis as typeof globalThis & {
@@ -81,7 +75,6 @@ describe('TanStack provider runtime-realm isolation', () => {
   });
 
   afterEach(() => {
-    delete host[REGISTRY_SLOT];
     rstest.resetModules();
   });
 
@@ -104,15 +97,6 @@ describe('TanStack provider runtime-realm isolation', () => {
       expect(routerB.useMatches).toBe(verticalB.useMatches);
       expect(routerB.Link).not.toBe(verticalA.Link);
       expect(routerB.useMatches).not.toBe(verticalA.useMatches);
-
-      // Mixed-version callers that do not supply a realm still see the shared
-      // keep-first fallback, but production wrappers no longer consume it.
-      expect(verticalB.providers.resolveRouterProvider('tanstack')).toBe(
-        verticalA.factory,
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/keeping the first registration/),
-      );
     } finally {
       warnSpy.mockRestore();
     }

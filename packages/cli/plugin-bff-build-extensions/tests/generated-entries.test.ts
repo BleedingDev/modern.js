@@ -109,7 +109,7 @@ async function runtimeGenerator(options: {
 }
 
 describe('fork producer generated entries', () => {
-  test('client generator marks generated client output as ESM', async () => {
+  test('Effect producer build emits server entries without generating client code or client exports', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-client-module-'),
     );
@@ -119,7 +119,23 @@ describe('fork producer generated entries', () => {
       await fs.promises.mkdir(apiDir, { recursive: true });
       await fs.promises.writeFile(
         path.join(appDir, 'package.json'),
-        JSON.stringify({ name: 'module-app', version: '1.0.0' }, null, 2),
+        JSON.stringify(
+          {
+            name: 'module-app',
+            version: '1.0.0',
+            exports: {
+              './runtime': {
+                import: './.modern-js/runtime/index.js',
+                types: './.modern-js/runtime/index.d.ts',
+              },
+            },
+            typesVersions: {
+              '*': { runtime: ['./.modern-js/runtime/index.d.ts'] },
+            },
+          },
+          null,
+          2,
+        ),
       );
       await fs.promises.writeFile(
         path.join(apiDir, 'index.js'),
@@ -145,6 +161,14 @@ const api = HttpApi.make('ModuleApi').add(
         `,
       );
 
+      await fs.promises.mkdir(path.join(appDir, '.modern-js', 'runtime'), {
+        recursive: true,
+      });
+      await fs.promises.writeFile(
+        path.join(appDir, '.modern-js', 'runtime', 'index.js'),
+        'exports.configure = () => {};',
+      );
+
       await clientGenerator({
         prefix: '/api',
         appDir,
@@ -158,20 +182,22 @@ const api = HttpApi.make('ModuleApi').add(
         bffRuntimeFramework: 'effect',
       });
 
-      const clientPackageJson = JSON.parse(
-        await fs.promises.readFile(
-          path.join(appDir, '.modern-js', 'client', 'package.json'),
-          'utf8',
-        ),
+      expect(fs.existsSync(path.join(appDir, '.modern-js', 'client'))).toBe(
+        false,
       );
-      expect(clientPackageJson).toEqual({
-        private: true,
-        name: 'module-app-bff-client',
-        type: 'module',
-      });
-      await expect(
-        fs.promises.stat(path.join(appDir, '.modern-js', 'client', 'index.js')),
-      ).resolves.toBeDefined();
+      const manifest = JSON.parse(
+        await fs.promises.readFile(path.join(appDir, 'package.json'), 'utf8'),
+      );
+      expect(manifest.exports).not.toHaveProperty('./api/*');
+      expect(manifest.exports).not.toHaveProperty('./runtime');
+      expect(manifest.typesVersions['*']).not.toHaveProperty('runtime');
+      expect(fs.existsSync(path.join(appDir, '.modern-js', 'runtime'))).toBe(
+        false,
+      );
+      expect(manifest.typesVersions['*']).not.toHaveProperty('api/*');
+      expect(
+        fs.existsSync(path.join(appDir, '.modern-js', 'plugin', 'index.js')),
+      ).toBe(true);
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }

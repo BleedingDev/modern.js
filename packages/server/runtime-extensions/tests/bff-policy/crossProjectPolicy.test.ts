@@ -780,40 +780,6 @@ describe('cross-project policy producer identity binding', () => {
     }
   });
 
-  test('explicit client-asserted namespace opt-out warns and remains advisory', () => {
-    const warnSpy = rstest
-      .spyOn(console, 'warn')
-      .mockImplementation(() => undefined);
-
-    try {
-      const firstResult = withNodeEnv('development', () =>
-        evaluateCrossProjectPolicy(spoofableHeaders, {
-          enabled: true,
-          allowedNamespaces: ['crm'],
-          allowClientAssertedNamespace: true,
-          requireOperationContext: false,
-        }),
-      );
-      const secondResult = withNodeEnv('development', () =>
-        evaluateCrossProjectPolicy(spoofableHeaders, {
-          enabled: true,
-          allowedNamespaces: ['crm'],
-          allowClientAssertedNamespace: true,
-          requireOperationContext: false,
-        }),
-      );
-
-      expect(firstResult).toBeNull();
-      expect(secondResult).toBeNull();
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy.mock.calls[0][0]).toContain(
-        NAMESPACE_ALLOWLIST_REQUIRES_VERIFIER_MESSAGE,
-      );
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   test('in production, namespace allowlist without verifier fails closed', () => {
     const violation = withNodeEnv('production', () =>
       evaluateCrossProjectPolicy(spoofableHeaders, {

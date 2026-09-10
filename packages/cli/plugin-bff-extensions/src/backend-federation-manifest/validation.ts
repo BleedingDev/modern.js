@@ -48,11 +48,6 @@ function resolveExpectedBuildMarker(
     );
   }
 
-  // Intentionally no fallback to `buildVersion` here: this is only used to
-  // compare against manifest `deliveryUnit.buildMarker`, which is a
-  // separate, additive field. Callers that only pass `buildVersion` (the
-  // pre-ADR-0019 expectation shape) must not be forced to also match a
-  // delivery-unit build marker on the manifest.
   return expected.buildMarker;
 }
 
@@ -70,7 +65,6 @@ export function validateBackendFederationManifest(
   const manifestShape = validateBackendFederationManifestContract(manifest, {
     expectedContractVersion: false,
     expectedNodeAdapterVersion: false,
-    validateDeliveryUnit: false,
   });
   assertManifestAdapter(
     manifestShape.ok,
@@ -151,6 +145,11 @@ export function validateBackendFederationManifest(
   const manifestUnitId =
     stringValue(deliveryUnit.boundary?.unitId) ??
     stringValue(deliveryUnit.top?.unitId);
+  assertManifestAdapter(
+    manifestUnitId && stringValue(deliveryUnit.boundary?.buildMarker),
+    'manifest_invalid',
+    'Backend federation manifest requires delivery-unit unitId and buildMarker.',
+  );
   assertVersionValue(manifestUnitId, expected.unitId, 'deliveryUnit.unitId');
   assertVersionValue(
     stringValue(deliveryUnit.boundary?.buildMarker),
@@ -214,16 +213,14 @@ export function validateLoadedBackendFederationContract(
     stringValue(deliveryUnit.top?.unitId);
   const manifestBuildMarker = stringValue(deliveryUnit.boundary?.buildMarker);
 
-  // Only enforced when both sides declare the field: absence on either side
-  // is a legacy manifest/expose and must stay backward compatible.
-  assertConsistentValue(
-    manifestUnitId,
+  assertVersionValue(
     stringValue(compatibility.unitId),
+    manifestUnitId,
     'deliveryUnit.unitId vs expose compatibility.unitId',
   );
-  assertConsistentValue(
-    manifestBuildMarker,
+  assertVersionValue(
     stringValue(compatibility.build),
+    manifestBuildMarker,
     'deliveryUnit.buildMarker vs expose compatibility.build',
   );
 }

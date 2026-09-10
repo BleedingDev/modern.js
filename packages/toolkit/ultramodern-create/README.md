@@ -180,41 +180,7 @@ Package source is explicit and recorded in `.modernjs/ultramodern.json`.
 | `install` | Published BleedingDev package cohort or release proof | Default for the BleedingDev create package; optional `--ultramodern-package-version`, `--ultramodern-package-registry` (serves the cohort scope only; release-age metadata for every other dependency is validated against npmjs), `--ultramodern-package-scope`, and `--ultramodern-package-name-prefix` |
 | `workspace` | Local monorepo testing against unreleased packages | `--workspace` or `--ultramodern-package-source=workspace` |
 
-## Migrating Older Workspaces
-
-Older generated repos should move by adopting one published BleedingDev cohort
-at a time. Start with a dry-run vertical addition so validation reports
-topology, ownership, package-source, overlay, Tailwind prefix, Module Federation,
-and compact UltraModern config conflicts before files are written:
-
-```bash
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest catalog --vertical --dry-run
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest catalog --vertical
-mise install
-mise exec -- pnpm install
-mise exec -- pnpm check
-mise exec -- pnpm build
-```
-
-For strict Effect API migrations, update generated package metadata and Modern
-package aliases through the framework command before hand-editing app code:
-
-```bash
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.10 ultramodern \
-  migrate-strict-effect --version 3.5.0-ultramodern.10
-pnpm api:check
-pnpm contract:check
-pnpm check
-pnpm build
-```
-
-The command updates `.modernjs/ultramodern.json`, root `modernjs.packageSource`,
-generated Modern package aliases, framework-owned toolchain pins, old direct
-topology metadata, strict Effect pnpm overrides/trust policy, and the pnpm
-lockfile. It does not invent compatibility shims or move business code behind
-your back. If `pnpm api:check` still fails, migrate the source to
-`shared/api.ts`, `api/index.ts`, and `src/api/*-client.ts` and delete
-`api/effect`, `api/lambda`, `shared/effect`, and `src/effect` paths.
+## Framework Cohort
 
 Generated strict Effect workspaces pin the compatible Effect cohort through
 `pnpm-workspace.yaml` overrides: `effect@4.0.0-rc.112`,

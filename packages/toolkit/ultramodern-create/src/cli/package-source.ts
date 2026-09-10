@@ -4,10 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { resolveCreatePackageRoot } from '../create-package-root';
 import {
   BLEEDINGDEV_CREATE_PACKAGE,
-  BLEEDINGDEV_FRAMEWORK_VERSION_ENV,
   BLEEDINGDEV_PACKAGE_NAME_PREFIX,
   BLEEDINGDEV_PACKAGE_SCOPE,
-  LEGACY_BLEEDINGDEV_CREATE_PACKAGE,
   type ResolvedUltramodernPackageSource,
   ULTRAMODERN_FRAMEWORK_VERSION_ENV,
   WORKSPACE_PACKAGE_VERSION,
@@ -41,10 +39,7 @@ export function readCreatePackageJson(): CreatePackageJson {
 export function isBleedingDevCreatePackage(
   createPackage: CreatePackageJson,
 ): boolean {
-  return (
-    createPackage.name === BLEEDINGDEV_CREATE_PACKAGE ||
-    createPackage.name === LEGACY_BLEEDINGDEV_CREATE_PACKAGE
-  );
+  return createPackage.name === BLEEDINGDEV_CREATE_PACKAGE;
 }
 
 export function getBleedingDevFrameworkVersion(
@@ -110,10 +105,7 @@ function hasExplicitUltramodernPackageSource(
 function readBleedingDevFrameworkVersionFromRegistry(
   fallbackVersion: string,
 ): string {
-  const envVersion = (
-    process.env[ULTRAMODERN_FRAMEWORK_VERSION_ENV] ??
-    process.env[BLEEDINGDEV_FRAMEWORK_VERSION_ENV]
-  )?.trim();
+  const envVersion = process.env[ULTRAMODERN_FRAMEWORK_VERSION_ENV]?.trim();
   if (envVersion) {
     if (!semverPattern.test(envVersion)) {
       console.error(

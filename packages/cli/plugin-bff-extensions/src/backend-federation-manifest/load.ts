@@ -7,6 +7,12 @@ import {
 } from '../backend-federation';
 import { loadBackendFederatedEffectApi } from '../backend-federation/load';
 import { BackendFederationManifestAdapterError } from './errors';
+import {
+  backendFederationMetadata,
+  manifestDeliveryUnit,
+  stringValue,
+  versionBoundaryMetadata,
+} from './metadata';
 import { loadBackendFederationManifest } from './reference';
 import { resolveBackendFederationRemoteFromManifest } from './remote';
 import type {
@@ -204,6 +210,19 @@ export async function loadBackendFederatedEffectApiFromManifest(
       );
     }
 
+    const deliveryUnit = manifestDeliveryUnit(
+      backendFederationMetadata(manifest),
+      versionBoundaryMetadata(manifest),
+    );
+    const unitId =
+      stringValue(deliveryUnit.boundary?.unitId) ??
+      stringValue(deliveryUnit.top?.unitId);
+    const buildMarker = stringValue(deliveryUnit.boundary?.buildMarker);
+    if (!unitId || !buildMarker)
+      throw new BackendFederationManifestAdapterError(
+        'manifest_invalid',
+        'Backend federation manifest requires delivery-unit identity.',
+      );
     const loaded = await loadBackendFederatedEffectApi({
       hostName: options.hostName,
       remote,
@@ -214,20 +233,7 @@ export async function loadBackendFederatedEffectApiFromManifest(
         timeoutMs: 0,
       },
       ...(options.runtime ? { runtime: options.runtime } : {}),
-      // MV-G23: route the manifest adapter through the raw loader's shared
-      // delivery-unit identity validation when an identity is expected.
-      ...(options.expected?.unitId && options.expected.buildMarker
-        ? {
-            expected: {
-              unitId: options.expected.unitId,
-              buildMarker: options.expected.buildMarker,
-            },
-            // The manifest's identity is already validated against
-            // `expected`; legacy exposes without identity metadata stay
-            // loadable (mismatching declared values still fail).
-            allowMissingIdentityMetadata: true,
-          }
-        : {}),
+      expected: { unitId, buildMarker },
     }).catch((error: unknown) => {
       throw new BackendFederationManifestAdapterError(
         scope?.timedOut() === true ? 'timeout' : classifyLoadError(error),

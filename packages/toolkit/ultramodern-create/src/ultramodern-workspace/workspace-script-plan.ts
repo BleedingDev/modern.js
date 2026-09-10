@@ -53,7 +53,6 @@ export interface WorkspaceRootScriptPlan {
   nodeProof: string;
   mfTypes: string;
   performanceReadiness: string;
-  migrateStrictEffect: string;
   zeropsMaterialize: string;
   contractCheck: string;
   typecheck: string;
@@ -71,7 +70,6 @@ const workspaceRootPackageScriptNames = {
   nodeProof: rootToolingScriptName('backendFederationProof'),
   mfTypes: rootToolingScriptName('mfTypes'),
   performanceReadiness: rootToolingScriptName('performanceReadiness'),
-  migrateStrictEffect: rootToolingScriptName('migrateStrictEffect'),
   zeropsMaterialize: rootToolingScriptName('zeropsMaterialize'),
   contractCheck: rootToolingScriptName('validate'),
   typecheck: 'typecheck',
@@ -232,7 +230,7 @@ export function createWorkspaceRootScriptPlan(
   const hasBackendSurface = remotes.some(appHasApi);
   // Enumerate configured shells (G28) instead of hard-coding the single
   // ./apps/shell-super-app. The default is the primary shell alone, so a
-  // single-shell workspace produces byte-identical legacy scripts.
+  // single-shell workspace produces byte-identical default scripts.
   const shells =
     options.shells && options.shells.length > 0 ? options.shells : [shellApp];
   const shellBuild = shells
@@ -295,7 +293,6 @@ export function createWorkspaceRootScriptPlan(
     nodeProof: rootToolingWrapperCommand('backendFederationProof'),
     mfTypes: rootToolingWrapperCommand('mfTypes'),
     performanceReadiness: rootToolingWrapperCommand('performanceReadiness'),
-    migrateStrictEffect: rootToolingWrapperCommand('migrateStrictEffect'),
     zeropsMaterialize: rootToolingWrapperCommand('zeropsMaterialize'),
     contractCheck: rootToolingWrapperCommand('validate'),
     typecheck:

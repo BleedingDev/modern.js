@@ -77,22 +77,6 @@ export type EffectRpcBffHandlerOptions = Pick<
   | 'disableFatalDefects'
 >;
 
-type EffectApiPromiseClient<TClient> = {
-  [GroupName in keyof TClient]: {
-    [EndpointName in keyof TClient[GroupName]]: TClient[GroupName][EndpointName] extends (
-      ...args: infer TArgs
-    ) => infer TResult
-      ? TResult extends EffectType.Effect<unknown, unknown, unknown>
-        ? (
-            ...args: TArgs
-          ) => Promise<
-            Exclude<EffectType.Success<TResult>, readonly [unknown, unknown]>
-          >
-        : never
-      : never;
-  };
-};
-
 export type EffectApiClientFromApi<
   TApi extends HttpApi.Constraint = HttpApi.Top,
 > =
@@ -103,10 +87,6 @@ export type EffectApiClientFromApi<
         never
       >
     : never;
-
-export type EffectApiPromiseClientFromApi<
-  TApi extends HttpApi.Constraint = HttpApi.Top,
-> = EffectApiPromiseClient<EffectApiClientFromApi<TApi>>;
 
 export type EffectBffDefinition<
   TApi extends HttpApi.Constraint = HttpApi.Top,
@@ -147,12 +127,6 @@ export type EffectDataPlatformBatchOptions = {
    * Defaults to `65536` (64KiB).
    */
   maxBatchBytes?: number;
-  /**
-   * Client-side micro-batch flush window in milliseconds.
-   * Server runtime ignores this value and passes it through for codegen.
-   * Defaults to `8`.
-   */
-  flushIntervalMs?: number;
   /**
    * Maximum per-batch internal request concurrency.
    * Defaults to `4`.
@@ -241,7 +215,6 @@ export type EffectBffRuntime<
   TLayer extends EffectRuntimeLayer = EffectRuntimeLayer,
 > = {
   createHandler: EffectBffHandlerFactory<TApi, TLayer>;
-  client: EffectApiPromiseClientFromApi<TApi>;
 };
 
 export type EffectBffOpenApiConfig =

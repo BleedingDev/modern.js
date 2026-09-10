@@ -67,7 +67,7 @@ function isIgnoredRelativePath(relativePath: string): boolean {
   const segments = normalizePath(relativePath).split('/');
   return segments.some((segment, index) => {
     // These names are valid workspace packages, not generated output. Keep
-    // matching MigrationIo's stage so dry-run and publication see the same tree.
+    // so dry-run and publication see the same tree.
     if (
       index === 1 &&
       ['apps', 'verticals', 'packages'].includes(segments[0]) &&

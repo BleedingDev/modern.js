@@ -7,9 +7,9 @@ export {
 export {
   createOtlpTelemetryExporter,
   createVictoriaMetricsTelemetryExporter,
-  maybeWarnLegacyOtlpEndpoint,
   type OtlpExporterOptions,
   type VictoriaMetricsExporterOptions,
+  warnOnMetricsOtlpEndpoint,
 } from './telemetry/exporters';
 export {
   type TelemetryContractGateStatus,

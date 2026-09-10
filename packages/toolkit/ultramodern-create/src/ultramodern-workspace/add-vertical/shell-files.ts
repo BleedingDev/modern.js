@@ -1,8 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createMigrationIo } from '../../ultramodern-tooling/commands/migrate-strict-effect/io';
-import { updateGeneratedPackageScripts } from '../../ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
-import { preserveConsumerWorkspaceArtifacts } from '../../ultramodern-tooling/commands/migrate-strict-effect/workspace-artifact-ownership';
 import { createShellApiClient } from '../api';
 import {
   createAppEnvDts,
@@ -38,6 +35,7 @@ import {
   rewriteWorkspaceAssetsForApp,
 } from '../public-surface';
 import type { JsonValue, ResolvedPackageSource, WorkspaceApp } from '../types';
+import { preserveConsumerWorkspaceArtifacts } from '../workspace-artifact-ownership';
 
 export function updateRootWorkspaceScripts(
   workspaceRoot: string,
@@ -71,11 +69,14 @@ export function updateRootWorkspaceScripts(
   if (existingScripts.dev === previousRootPackage.scripts.dev) {
     rootPackage.scripts.dev = generatedRootPackage.scripts.dev;
   }
-  updateGeneratedPackageScripts(rootPackage, {
-    relativePackageFile: 'package.json',
-    bridgeEnabled: Boolean(bridge),
-    apps: [primaryShell, ...remotes, ...additionalShells],
-  });
+  for (const [name, command] of Object.entries(generatedRootPackage.scripts)) {
+    if (
+      existingScripts[name] === undefined ||
+      existingScripts[name] === previousRootPackage.scripts[name]
+    ) {
+      rootPackage.scripts[name] = command;
+    }
+  }
   writeJsonFile(packagePath, rootPackage as JsonValue);
 }
 
@@ -205,7 +206,7 @@ export function rewriteShellAppFiles(
     devPorts,
   );
   const { io } = preserveConsumerWorkspaceArtifacts(
-    createMigrationIo(workspaceRoot, false),
+    workspaceRoot,
     before.artifacts,
   );
   for (const artifact of next.artifacts) {
@@ -235,10 +236,14 @@ export function rewriteShellAppFiles(
     },
     scripts: { ...next.packageJson.scripts, ...existing.scripts },
   };
-  updateGeneratedPackageScripts(packageJson, {
-    relativePackageFile: `${shell.directory}/package.json`,
-    apps: [shell, ...remotes],
-  });
+  for (const [name, command] of Object.entries(next.packageJson.scripts)) {
+    if (
+      existing.scripts?.[name] === undefined ||
+      existing.scripts[name] === before.packageJson.scripts?.[name]
+    ) {
+      packageJson.scripts[name] = command;
+    }
+  }
   writeJsonFile(packagePath, packageJson as JsonValue);
   rewriteWorkspaceAssetsForApp(workspaceRoot, next.shellHost);
 }

@@ -1,10 +1,8 @@
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import type { HttpMethodDecider } from '@modern-js/types';
 import type { Rspack } from '@rsbuild/core';
 import {
   bundleEffectWorkerRuntimeSource,
-  generateEffectClientCode,
   generateEffectWorkerRuntimeWrapper,
   resolveEffectEntryFile,
 } from './index';
@@ -14,20 +12,7 @@ export interface EffectBffLoaderOptions {
   appDir: string;
   apiDir: string;
   effectEntry: string;
-  port: number;
-  target: string;
-  requestCreator?: string;
   requestId?: string;
-  httpMethodDecider?: HttpMethodDecider;
-  effectDataPlatformBatch?: {
-    enabled?: boolean;
-    endpoint?: string;
-    flushIntervalMs?: number;
-    maxBatchSize?: number;
-    maxBatchBytes?: number;
-    requestTimeoutMs?: number;
-    allowedMethods?: string[];
-  };
 }
 
 export default async function loader(
@@ -77,24 +62,9 @@ export default async function loader(
         ),
       );
     } else {
-      const code = await generateEffectClientCode({
-        appDir: options.appDir,
-        apiDir: options.apiDir,
-        resourcePath: this.resourcePath,
-        prefix: options.prefix,
-        port: Number(options.port),
-        target: options.target,
-        requestId: options.requestId,
-        requestCreator: options.requestCreator,
-        httpMethodDecider: options.httpMethodDecider,
-        dataPlatformBatch: options.effectDataPlatformBatch,
-        onDependency: dependency => this.addDependency(dependency),
-      });
-      if (code === null)
-        throw new Error(
-          `Failed to generate Effect client for ${this.resourcePath}`,
-        );
-      callback(undefined, code);
+      throw new Error(
+        'Effect BFF entries are server-only. Import the shared HttpApi contract and use HttpApiClient.make (or makeEffectHttpApiClient) for a fully inferred client.',
+      );
     }
   } catch (error) {
     callback(error instanceof Error ? error : new Error(String(error)));

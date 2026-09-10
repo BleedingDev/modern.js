@@ -475,7 +475,7 @@ function verifyPublishOutcomeAtSourceCommit(
   }
   if (
     outcome.schema !== 'bleedingdev.ultramodern.publish-outcome' ||
-    ![4, 5, 6].includes(outcome.schemaVersion)
+    outcome.schemaVersion !== 6
   ) {
     throw new Error('Publish outcome schema is not recoverable');
   }
@@ -489,10 +489,7 @@ function verifyPublishOutcomeAtSourceCommit(
   const hasPublishedOperationalEvidence = fs.existsSync(
     publishedOperationalEvidencePath,
   );
-  if (
-    (outcome.schemaVersion === 4 && !hasPublishedOperationalEvidence) ||
-    ([5, 6].includes(outcome.schemaVersion) && hasPublishedOperationalEvidence)
-  ) {
+  if (hasPublishedOperationalEvidence) {
     throw new Error(
       'Publish outcome archive does not match its schema operational evidence profile',
     );
@@ -559,14 +556,6 @@ function verifyPublishOutcomeAtSourceCommit(
     '--dry-run',
     'false',
   ];
-  if (outcome.schemaVersion === 4) {
-    createArgs.splice(
-      createArgs.indexOf('--published-receipt'),
-      0,
-      '--published-operational-evidence',
-      publishedOperationalEvidencePath,
-    );
-  }
   run('node', createArgs, { stdio: ['ignore', 'ignore', 'inherit'] });
   const reconstructedOutcome = readJsonFile(
     reconstructedOutcomePath,

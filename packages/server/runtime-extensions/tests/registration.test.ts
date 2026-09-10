@@ -7,7 +7,7 @@ describe('plugin registration', () => {
     config.server = {
       telemetry: {
         enabled: true,
-        canary: {
+        health: {
           enabled: true,
         },
       },

@@ -74,6 +74,10 @@ jobs:
         # (scripts/prepare-root.mjs); run the build gate explicitly.
         run: mise exec -- pnpm run prepare-build
 
+      - name: Build cross-project type-check dependency
+        if: ${{steps.skip-ci.outputs.RESULT != 'true'}}
+        run: mise exec -- pnpm --dir tests/integration/bff-cross-project/bff-api-app build
+
       - name: Validate critical packages with tsgo
         if: ${{steps.skip-ci.outputs.RESULT != 'true'}}
         run: mise exec -- pnpm run validate:tsgo

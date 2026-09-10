@@ -7,7 +7,6 @@ import {
   detectPresetFlag,
   resolveVerticalCliInput,
 } from '../../../src/cli/flags';
-import { migrateStrictEffectHelp } from '../../../src/ultramodern-tooling/commands/migrate-strict-effect/help';
 import { shellApp } from '../../../src/ultramodern-workspace/descriptors';
 import {
   GENERATED_TOOLING_COMMANDS,
@@ -23,31 +22,8 @@ const commands = JSON.parse(
   fs.readFileSync(new URL('./commands.json', import.meta.url), 'utf8'),
 );
 
-test('documented migration uses the existing command and generated script', () => {
-  const migration = GENERATED_TOOLING_COMMANDS.migrateStrictEffect;
-  assert.equal(commands.migration[1], migration.command);
-  assert.equal(commands.migrationScript, migration.rootScript);
-  assert.equal(commands.migrationWrapper, migration.wrapperPath);
-  assert.deepEqual(commands.previewMigration, [
-    ...commands.migration,
-    '--dry-run',
-  ]);
-  assert.match(migrateStrictEffectHelp, /--version <version>/);
-  assert.match(migrateStrictEffectHelp, /--dry-run/);
-  assert.match(migrateStrictEffectHelp, /--skip-install/);
-  assert.match(migrateStrictEffectHelp, /lockfile/);
-  assert.match(migrateStrictEffectHelp, /same-contract/);
-  assert.match(migrateStrictEffectHelp, /migration/i);
-  assert.equal(generatedToolingCommandList().includes('update'), false);
-  assert.equal(generatedToolingCommandList().includes('rollback'), false);
-});
-
 test('documented acceptance does not duplicate API and contract checks', () => {
   const scripts = createWorkspaceRootPackageScripts();
-  assert.equal(
-    scripts['migrate:strict-effect'],
-    'node ./scripts/migrate-strict-effect.mts',
-  );
   assert.equal(scripts.check?.split('pnpm api:check:files').length, 2);
   assert.equal(scripts.check?.split('pnpm contract:check').length, 2);
   assert.equal(scripts.check?.includes('pnpm node:proof'), false);

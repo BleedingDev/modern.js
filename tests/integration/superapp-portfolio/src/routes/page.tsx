@@ -1,7 +1,12 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off
-import effectBff from '@api/effect/index';
+import {
+  Effect,
+  makeEffectHttpApiClient,
+  runEffectRequest,
+} from '@modern-js/bff-effect/effect-client';
 import { useMatch } from '@modern-js/plugin-tanstack/runtime';
 import { useEffect, useState } from 'react';
+import { portfolioApi } from '../../shared/portfolio-api';
 import type {
   PilotChaosMode,
   PilotModuleId,
@@ -11,8 +16,10 @@ import type {
   PortfolioApp,
 } from '../../shared/portfolio-state';
 
-type BootstrapData = Awaited<
-  ReturnType<typeof effectBff.client.portfolio.bootstrap>
+const client = makeEffectHttpApiClient(portfolioApi, { baseUrl: '/bff-api' });
+type PortfolioClient = Effect.Success<typeof client>;
+type BootstrapData = Effect.Success<
+  ReturnType<PortfolioClient['portfolio']['bootstrap']>
 >;
 
 const pilotChaosModes: PilotChaosMode[] = [
@@ -54,7 +61,9 @@ export default function PortfolioPage() {
   }, []);
 
   const refreshPortfolio = async () => {
-    const nextData = await effectBff.client.portfolio.bootstrap({});
+    const nextData = await runEffectRequest(
+      client.pipe(Effect.flatMap(api => api.portfolio.bootstrap({}))),
+    );
     setData(nextData);
     const runs = nextData.pilotRuns as PilotRun[];
     setPilotRun(runs[runs.length - 1] ?? null);
@@ -82,7 +91,9 @@ export default function PortfolioPage() {
   const resetPilot = async () => {
     setIsRunning(true);
     try {
-      await effectBff.client.portfolio.reset({});
+      await runEffectRequest(
+        client.pipe(Effect.flatMap(api => api.portfolio.reset({}))),
+      );
       await refreshPortfolio();
     } finally {
       setIsRunning(false);
@@ -92,18 +103,24 @@ export default function PortfolioPage() {
   const runPilot = async () => {
     setIsRunning(true);
     try {
-      const result = await effectBff.client.portfolio.runPilot({
-        params: {
-          scenario,
-        },
-        payload: {
-          tenant: 'superapp-global',
-          actor: 'browser.pilot',
-          requestId: `ui-${scenario}-${chaos}`,
-          modules,
-          chaos,
-        },
-      });
+      const result = await runEffectRequest(
+        client.pipe(
+          Effect.flatMap(api =>
+            api.portfolio.runPilot({
+              params: {
+                scenario,
+              },
+              payload: {
+                tenant: 'superapp-global',
+                actor: 'browser.pilot',
+                requestId: `ui-${scenario}-${chaos}`,
+                modules,
+                chaos,
+              },
+            }),
+          ),
+        ),
+      );
       setPilotRun(result.run as PilotRun);
       await refreshPortfolio();
     } finally {

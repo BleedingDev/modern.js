@@ -17,7 +17,6 @@ const TARGETS = {
   codex: '.agents/skills',
   cursor: '.cursor/skills',
 };
-const LEGACY_SKILL_NAMES = ['modernjs-dependency-audit'];
 
 function usage() {
   console.log(`Sync Modern.js maintainer skills into agent tool directories.
@@ -116,25 +115,6 @@ function relativeSymlinkTarget(fromDir, toDir) {
   return relative.startsWith('.') ? relative : `.${path.sep}${relative}`;
 }
 
-function cleanupLegacyLinks(targetRoot, dryRun) {
-  for (const name of LEGACY_SKILL_NAMES) {
-    const legacyPath = path.join(targetRoot, name);
-    try {
-      fs.lstatSync(legacyPath);
-    } catch {
-      continue;
-    }
-
-    if (dryRun) {
-      console.log(
-        `[dry-run] remove legacy: ${path.relative(REPO_ROOT, legacyPath)}`,
-      );
-      continue;
-    }
-    fs.rmSync(legacyPath, { recursive: true, force: true });
-  }
-}
-
 function cleanupBrokenSkillLinks(targetRoot, dryRun) {
   if (!fs.existsSync(targetRoot)) return;
 
@@ -209,7 +189,6 @@ async function main() {
 
   for (const targetName of targetNames) {
     const targetRoot = path.join(REPO_ROOT, TARGETS[targetName]);
-    cleanupLegacyLinks(targetRoot, dryRun);
     cleanupBrokenSkillLinks(targetRoot, dryRun);
     for (const skill of skills) {
       syncSkill(skill, targetName, dryRun);

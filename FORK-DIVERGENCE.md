@@ -33,6 +33,20 @@ every PR.
 
 ---
 
+### 2026-09-10 native Effect clients
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-bff/src/utils/client-generator/write-package.ts` | bleedingdev | Do not advertise wildcard client exports or types when no client artifacts were emitted. Effect clients now use shared HttpApi contracts through native type inference; omit exports for an absent generated request runtime while server plugin generation continues through existing build hooks. | `inline-patch` |
+| `packages/solutions/app-tools/src/types/plugin.ts` | bleedingdev | Let the existing generated-entry hook omit the request runtime with null when an integration needs only server plugin metadata. | `extension-point` + `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/runtimeGenerator.ts` | bleedingdev | Honor an omitted request runtime and remove the previous generated runtime directory so a native inferred-client build leaves no custom client configuration module. | `extension-point` + `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/package-json.ts` | bleedingdev | Remove stale framework-managed runtime exports and type mappings when the generated runtime is omitted, while preserving unrelated authored exports. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/clientGenerator.test.ts` | bleedingdev | Assert that an empty client build does not advertise a missing wildcard API export. | `inline-patch` |
+| `packages/document/docs/en/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/en/configure/app/bff/effect.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/zh/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/zh/configure/app/bff/effect.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+
 ### 2026-09-10 native declarations and tutorial qualification
 
 | Audited-base-owned path | Owner | Reason | Disposition |

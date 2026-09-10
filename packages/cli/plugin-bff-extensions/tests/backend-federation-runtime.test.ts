@@ -55,6 +55,15 @@ function createBackendManifest() {
       type: 'module',
     },
     backendFederation: {
+      deliveryUnit: {
+        schemaVersion: 1,
+        kind: 'microvertical-delivery-unit',
+        packageName: '@tractor-store-vertical-demo/catalog',
+        version: '1.2.3',
+        sourceRevision: 'a'.repeat(40),
+        unitId: 'catalog@21',
+        buildMarker: 'catalog-build-123',
+      },
       role: 'microvertical-server',
       name: 'verticalCatalogBackend',
       runtimeFramework: 'effect',
@@ -66,6 +75,15 @@ function createBackendManifest() {
       manifestUrl: 'https://catalog.example.test/backend-mf-manifest.json',
       containerEntry: 'service:verticalCatalogBackend',
       versionBoundary: {
+        deliveryUnit: {
+          schemaVersion: 1,
+          kind: 'microvertical-delivery-unit',
+          packageName: '@tractor-store-vertical-demo/catalog',
+          version: '1.2.3',
+          sourceRevision: 'a'.repeat(40),
+          unitId: 'catalog@21',
+          buildMarker: 'catalog-build-123',
+        },
         invariant: 'web-and-api-same-build',
         packageName: '@tractor-store-vertical-demo/catalog',
         version: '1.2.3',
@@ -78,7 +96,15 @@ function createBackendManifest() {
 function withDeliveryUnitIdentity(
   manifest: ReturnType<typeof createBackendManifest>,
 ) {
-  const identity = { buildMarker: 'catalog-build-123', unitId: 'catalog@21' };
+  const identity = {
+    schemaVersion: 1,
+    kind: 'microvertical-delivery-unit',
+    packageName: '@tractor-store-vertical-demo/catalog',
+    version: '1.2.3',
+    sourceRevision: 'a'.repeat(40),
+    buildMarker: 'catalog-build-123',
+    unitId: 'catalog@21',
+  };
   Object.assign(manifest.backendFederation, {
     deliveryUnit: identity,
     versionBoundary: {
@@ -110,6 +136,7 @@ function createManifestEffectApiModule(
   return {
     backendFederationContract: {
       compatibility: {
+        unitId: 'catalog@21',
         build: 'catalog-build-123',
         contractVersion: BACKEND_FEDERATION_CONTRACT_VERSION,
         nodeAdapterVersion: BACKEND_FEDERATION_NODE_ADAPTER_VERSION,
@@ -177,6 +204,7 @@ describe('backend federation runtime', () => {
   test('rejects unverified network entries without an integrity record', async () => {
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'unverifiedNetworkBackendHost',
         remote: {
           entry: 'https://catalog.example.test/backendRemoteEntry.cjs',
@@ -200,6 +228,7 @@ describe('backend federation runtime', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         entryPolicy: {
           ...({ allowTrustedEntryProvider: true } as Record<string, unknown>),
           fetch: async () => new Response(mutatedSource),
@@ -244,6 +273,7 @@ describe('backend federation runtime', () => {
     try {
       await expect(
         loadBackendFederatedEffectApi({
+          expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
           hostName: 'globalBypassBackendHost',
           remote: {
             entry: 'https://catalog.example.test/backendRemoteEntry.cjs',
@@ -264,6 +294,7 @@ describe('backend federation runtime', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         entryPolicy: {
           ...({ allowUnverifiedNetworkEntry: true } as Record<string, unknown>),
           evaluateCommonJs() {
@@ -289,6 +320,7 @@ describe('backend federation runtime', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'customRuntimeBypassBackendHost',
         remote: {
           entry: 'https://catalog.example.test/backendRemoteEntry.cjs',
@@ -307,6 +339,7 @@ describe('backend federation runtime', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'customRuntimeEffectiveNetworkHost',
         remotes: [
           {
@@ -330,6 +363,7 @@ describe('backend federation runtime', () => {
     const loadRemote = rs.fn(async () => createManifestEffectApiModule());
 
     const loaded = await loadBackendFederatedEffectApi({
+      expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
       hostName: 'customRuntimeEffectiveStaticHost',
       remotes: [
         {
@@ -421,6 +455,7 @@ module.exports = {
     return async () => ({
       default: { brand: 'defineEffectBff-runtime' },
       backendFederationContract: {
+        compatibility: { unitId: 'catalog@21', build: 'catalog-build-123' },
         runtimeFramework: 'effect',
         strictEffectApproach: true,
       },
@@ -434,11 +469,13 @@ module.exports = {
     };
 
     const loaded = await loadBackendFederatedEffectApi({
+      expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
       hostName: 'shellBackendHost',
       remote,
     });
 
     expect(loaded.backendFederationContract).toEqual({
+      compatibility: { unitId: 'catalog@21', build: 'catalog-build-123' },
       runtimeFramework: 'effect',
       strictEffectApproach: true,
     });
@@ -700,6 +737,7 @@ module.exports = {
   test('fails closed for network entries supplied through the edge remotes array', async () => {
     await expect(
       loadEdgeBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'cloudflareArrayNetworkBackendHost',
         remoteName: 'verticalCheckoutBackend',
         remotes: [
@@ -776,6 +814,7 @@ module.exports = {
       }),
     ]);
     expect(loaded.backendFederationContract?.compatibility).toEqual({
+      unitId: 'catalog@21',
       build: 'catalog-build-123',
       contractVersion: BACKEND_FEDERATION_CONTRACT_VERSION,
       nodeAdapterVersion: BACKEND_FEDERATION_NODE_ADAPTER_VERSION,
@@ -872,6 +911,7 @@ module.exports = {
               manifestUrl: `${origin}${request.url}`,
               containerEntry: `${origin}/${entryFile}`,
               deliveryUnit: {
+                ...createBackendManifest().backendFederation.deliveryUnit,
                 unitId: 'catalog@21',
                 buildMarker: 'catalog-build-123',
               },
@@ -881,6 +921,8 @@ module.exports = {
                 version: '1.2.3',
                 buildVersion: 'catalog-build-123',
                 deliveryUnit: {
+                  ...createBackendManifest().backendFederation.versionBoundary
+                    .deliveryUnit,
                   unitId: 'catalog@21',
                   buildMarker: 'catalog-build-123',
                 },
@@ -986,14 +1028,6 @@ module.exports = {
 
   test('resolves backend federation manifest URLs from generated env metadata', async () => {
     const manifest: any = createBackendManifest();
-    manifest.backendFederation.deliveryUnit = {
-      unitId: 'catalog@21',
-      buildMarker: 'catalog-build-123',
-    };
-    manifest.backendFederation.versionBoundary.deliveryUnit = {
-      unitId: 'catalog@21',
-      buildMarker: 'catalog-build-123',
-    };
     const fetchedUrls: string[] = [];
 
     const loaded = await loadBackendFederatedEffectApiFromManifest({
@@ -1326,6 +1360,7 @@ module.exports = {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: `${name}BackendHost`,
         remote,
         runtime,
@@ -1338,7 +1373,10 @@ module.exports = {
       deliveryUnit: Record<string, unknown>,
     ) {
       const manifest = createBackendManifest();
-      manifest.backendFederation.versionBoundary.deliveryUnit = deliveryUnit;
+      manifest.backendFederation.versionBoundary.deliveryUnit = {
+        ...manifest.backendFederation.versionBoundary.deliveryUnit,
+        ...deliveryUnit,
+      };
       return manifest;
     }
 
@@ -1363,7 +1401,7 @@ module.exports = {
           ],
         }),
       ).rejects.toMatchObject({
-        code: 'version_mismatch',
+        code: 'manifest_invalid',
         failureEvent: 'modernjs:microvertical-server-fallback',
       });
     });
@@ -1497,6 +1535,7 @@ describe('caller-pinned backend federation regressions', () => {
 
   const strictEffectApiModule = (remoteName = 'verticalExploreBackend') => ({
     backendFederationContract: {
+      compatibility: { unitId: 'catalog@21', build: 'catalog-build-123' },
       name: remoteName,
       runtimeFramework: 'effect',
       strictEffectApproach: true,
@@ -1520,7 +1559,11 @@ describe('caller-pinned backend federation regressions', () => {
     };
     const { remote, runtime } = createPinnedBackendRuntime({ entryExports });
 
-    const loaded = await loadBackendFederatedEffectApi({ runtime, remote });
+    const loaded = await loadBackendFederatedEffectApi({
+      expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+      runtime,
+      remote,
+    });
 
     expect(globalThis.__modernBackendHostName).toBe('proofHost');
     expect(loaded.backendFederationContract?.name).toBe(
@@ -1548,7 +1591,11 @@ describe('caller-pinned backend federation regressions', () => {
       scheme: 'service',
     });
 
-    const loaded = await loadBackendFederatedEffectApi({ runtime, remote });
+    const loaded = await loadBackendFederatedEffectApi({
+      expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+      runtime,
+      remote,
+    });
 
     expect(globalThis.__modernBackendServiceBindingHostName).toBe('proofHost');
     expect(loaded.api).toEqual({ id: 'api' });
@@ -1573,7 +1620,11 @@ describe('caller-pinned backend federation regressions', () => {
       });
 
       await expect(
-        loadBackendFederatedEffectApi({ runtime, remote }),
+        loadBackendFederatedEffectApi({
+          expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+          runtime,
+          remote,
+        }),
       ).rejects.toThrow('cannot execute network backend federation entries');
       expect(fetchCalls).toEqual([]);
     } finally {
@@ -1595,7 +1646,11 @@ describe('caller-pinned backend federation regressions', () => {
     });
 
     await expect(
-      loadBackendFederatedEffectApi({ runtime, remote }),
+      loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+        runtime,
+        remote,
+      }),
     ).rejects.toThrow('must expose strict Effect metadata');
   });
 
@@ -1605,7 +1660,11 @@ describe('caller-pinned backend federation regressions', () => {
     });
 
     await expect(
-      loadBackendFederatedEffectApi({ runtime, remote }),
+      loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+        runtime,
+        remote,
+      }),
     ).rejects.toThrow('metadata name mismatch');
   });
 
@@ -1622,7 +1681,11 @@ describe('caller-pinned backend federation regressions', () => {
     });
 
     await expect(
-      loadBackendFederatedEffectApi({ runtime, remote }),
+      loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+        runtime,
+        remote,
+      }),
     ).rejects.toThrow('must expose runtime');
   });
 
@@ -1630,7 +1693,11 @@ describe('caller-pinned backend federation regressions', () => {
     const { remote, runtime } = createPinnedBackendRuntime({ module: null });
 
     await expect(
-      loadBackendFederatedEffectApi({ runtime, remote }),
+      loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+        runtime,
+        remote,
+      }),
     ).rejects.toThrow('must load an object module');
   });
 
@@ -1646,6 +1713,7 @@ describe('caller-pinned backend federation regressions', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         remote,
         runtime,
       }),
@@ -1659,6 +1727,7 @@ describe('caller-pinned backend federation regressions', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         runtime,
         remote,
         expose: './wrong',

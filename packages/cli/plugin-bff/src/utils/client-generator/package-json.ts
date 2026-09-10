@@ -4,6 +4,7 @@ import path from 'path';
 import {
   EXPORT_PREFIX,
   GENERATED_RUNTIME_DIRS,
+  RUNTIME_DIR,
   TYPE_PREFIX,
   toPosixPath,
 } from './files';
@@ -115,7 +116,11 @@ export function mergePackageJson(
   }
 
   Object.keys(starTypes).forEach(key => {
-    if (generatedTypeKeys.has(key) || key.startsWith(TYPE_PREFIX)) {
+    if (
+      generatedTypeKeys.has(key) ||
+      key.startsWith(TYPE_PREFIX) ||
+      (key === RUNTIME_DIR && isManagedTypeEntry(starTypes[key]))
+    ) {
       delete starTypes[key];
     }
   });
@@ -152,7 +157,11 @@ export function mergePackageJson(
   }
 
   Object.keys(packageExports).forEach(key => {
-    if (generatedExportKeys.has(key) || key.startsWith(EXPORT_PREFIX)) {
+    if (
+      generatedExportKeys.has(key) ||
+      key.startsWith(EXPORT_PREFIX) ||
+      (key === `./${RUNTIME_DIR}` && isManagedExportEntry(packageExports[key]))
+    ) {
       delete packageExports[key];
     }
   });

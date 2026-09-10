@@ -42,7 +42,7 @@ function appToolsVersion(pkg) {
   );
 }
 
-// 1) 依赖：加官方包 @modern-js/<pkg>。版本协议处理（与 migrate-to-v3 一致）：
+// 1) 依赖：加官方包 @modern-js/<pkg>。版本协议处理：
 //    普通 semver / workspace: / catalog:（名称无关）→ 复用 app-tools 的 spec；
 //    link: / file: / portal: / npm:（指向具体包路径/别名）→ 不写、进 manual（否则指错包）。
 function addModernDep(dir, pkgName) {
@@ -72,7 +72,7 @@ function addModernDep(dir, pkgName) {
   note(changed, `依赖：添加 ${pkgName}@${hint}`);
 }
 
-// 2) modern.config：import <pluginName> + 追加到顶层 plugins（复用 migrate-to-v3 的健壮逻辑）。
+// 2) modern.config：import <pluginName> + 追加到顶层 plugins。
 //    幂等：plugins 已有该 plugin() 调用则跳过；alias / 已有 import 都正确处理。
 function addPluginToConfig(dir, { importPkg, pluginName }) {
   const configFile = findConfigFile(dir);

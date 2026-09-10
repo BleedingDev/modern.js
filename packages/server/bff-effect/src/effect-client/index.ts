@@ -30,11 +30,16 @@ import {
 } from 'effect/unstable/rpc';
 
 import { getRpcSerializationLayer } from '../effect/rpcSerialization';
+import {
+  type EffectCrossProjectClientOptions,
+  withCrossProjectPolicy,
+} from './cross-project';
 
 export * as Effect from 'effect/Effect';
 export * as Layer from 'effect/Layer';
 export * as Schema from 'effect/Schema';
 export * as HttpClientError from 'effect/unstable/http/HttpClientError';
+export type { EffectCrossProjectClientOptions } from './cross-project';
 export {
   HttpApi,
   HttpApiClient,
@@ -49,6 +54,7 @@ export {
 };
 
 export type EffectHttpApiClientOptions = {
+  crossProject?: EffectCrossProjectClientOptions;
   baseUrl?: URL | string;
   requestContext?: RequestContextInput;
   transformClient?: (client: HttpClient.HttpClient) => HttpClient.HttpClient;
@@ -233,9 +239,13 @@ export function makeEffectHttpApiClient<
             }),
           );
 
+    const policyClient =
+      options?.crossProject !== undefined
+        ? withCrossProjectPolicy(api, options.crossProject, contextClient)
+        : contextClient;
     return typeof options?.transformClient === 'function'
-      ? options.transformClient(contextClient)
-      : contextClient;
+      ? options.transformClient(policyClient)
+      : policyClient;
   };
 
   return HttpApiClient.make(api, {

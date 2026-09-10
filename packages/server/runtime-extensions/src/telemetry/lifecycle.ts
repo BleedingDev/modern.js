@@ -8,9 +8,9 @@ import { ContractGateSnapshotObserver } from '../contractGateSnapshotObserver';
 import {
   createOtlpTelemetryExporter,
   createVictoriaMetricsTelemetryExporter,
-  maybeWarnLegacyOtlpEndpoint,
   TelemetryHealthMonitor,
   TelemetryRegistry,
+  warnOnMetricsOtlpEndpoint,
 } from '../telemetryCore';
 
 type TelemetryLifecycleApi = {
@@ -22,7 +22,7 @@ type RegisterTelemetryLifecycleOptions = {
   api: TelemetryLifecycleApi;
   registry: TelemetryRegistry;
   telemetryConfig: ServerTelemetryUserConfig;
-  legacyHealthConfig: ServerTelemetryUserConfig['canary'] | undefined;
+  healthConfig: ServerTelemetryUserConfig['health'] | undefined;
   healthMonitor?: TelemetryHealthMonitor;
   gateSnapshotStorePromise?: Promise<ContractGateSnapshotStore>;
   appDirectory: string;
@@ -51,7 +51,7 @@ export const registerTelemetryLifecycle = ({
   api,
   registry,
   telemetryConfig,
-  legacyHealthConfig,
+  healthConfig,
   healthMonitor,
   gateSnapshotStorePromise,
   appDirectory,
@@ -82,7 +82,7 @@ export const registerTelemetryLifecycle = ({
     prepared = true;
 
     if (telemetryConfig.exporters?.otlp?.enabled) {
-      maybeWarnLegacyOtlpEndpoint(telemetryConfig.exporters.otlp.endpoint);
+      warnOnMetricsOtlpEndpoint(telemetryConfig.exporters.otlp.endpoint);
       await registry.register(
         createOtlpTelemetryExporter(telemetryConfig.exporters.otlp),
       );
@@ -111,11 +111,11 @@ export const registerTelemetryLifecycle = ({
         monitor: healthMonitor,
         gateSnapshotPath: resolveContractGateSnapshotPath(
           appDirectory,
-          legacyHealthConfig?.autopilot?.gateSnapshotPath,
+          healthConfig?.snapshotObservation?.gateSnapshotPath,
         ),
         gateSnapshotStore,
-        pollIntervalMs: legacyHealthConfig?.autopilot?.pollIntervalMs,
-        gateStaleAfterMs: legacyHealthConfig?.autopilot?.gateStaleAfterMs,
+        pollIntervalMs: healthConfig?.snapshotObservation?.pollIntervalMs,
+        gateStaleAfterMs: healthConfig?.snapshotObservation?.gateStaleAfterMs,
       });
     }
     if (contractGateSnapshotObserver) {

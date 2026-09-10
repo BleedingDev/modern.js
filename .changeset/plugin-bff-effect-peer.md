@@ -13,10 +13,8 @@ runtime-only consumers must not be forced to install the application solution.
 
 `@modern-js/plugin-bff/server-plugin` now loads the Effect adapter through a
 dynamic import, so the Hono lane no longer pulls `effect/*` into its eager module
-graph. The existing Effect, edge, client, and data-platform compatibility
-subpaths delegate to the fork-owned `@modern-js/bff-effect` runtime and
-`@modern-js/plugin-bff-extensions` integration packages without introducing a
-package cycle or an `adapter-kit` forwarding layer.
+graph. Effect, edge, client, and data-platform APIs are owned by
+`@modern-js/bff-effect`; integration uses `@modern-js/plugin-bff-extensions`.
 
 Move builder and esbuild to development-only dependencies, remove telemetry and
 federation runtime dependencies whose consumers moved to the extracted owners,

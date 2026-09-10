@@ -1,15 +1,6 @@
-/**
- * Registers TanStack in the @modern-js/runtime compatibility registry.
- * Runtime entries bind the exported local factory into their own provider
- * realm; registration remains for older runtime wrappers and mixed cohorts.
- *
- * This module is intentionally side-effectful (see `sideEffects` in
- * package.json).
- */
 import {
   type RouterProviderFactory,
   type RouterProviderPlugin,
-  registerRouterProvider,
 } from '@modern-js/runtime-extensions/router-provider';
 import { tanstackRouterPlugin } from './plugin';
 
@@ -22,5 +13,3 @@ import { tanstackRouterPlugin } from './plugin';
 export const tanstackRouterProviderFactory: RouterProviderFactory =
   userConfig =>
     tanstackRouterPlugin(userConfig) as unknown as RouterProviderPlugin;
-
-registerRouterProvider('tanstack', tanstackRouterProviderFactory);

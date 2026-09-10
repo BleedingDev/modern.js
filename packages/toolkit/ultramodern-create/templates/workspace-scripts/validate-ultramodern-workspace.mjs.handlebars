@@ -3739,7 +3739,6 @@ if (hasDeliveryUnits) {
 assert(rootPackage.scripts?.['mf:types'] === 'node ./scripts/assert-mf-types.mts', 'Root must expose mf:types');
 assert(rootPackage.scripts?.['cloudflare:deploy'] === expectedCloudflareDeployScript, 'Root must expose cloudflare:deploy');
 assert(rootPackage.scripts?.['cloudflare:proof'] === 'node ./scripts/proof-cloudflare-version.mts --out .codex/reports/cloudflare-version-proof/public-url-proof.json', 'Root must expose cloudflare:proof');
-assert(rootPackage.scripts?.['migrate:strict-effect'] === 'node ./scripts/migrate-strict-effect.mts', 'Root must expose migrate:strict-effect');
 assert(rootPackage.scripts?.['skills:install'] === 'node ./scripts/bootstrap-agent-skills.mts', 'Root must expose skills:install');
 assert(rootPackage.scripts?.['skills:check'] === 'node ./scripts/bootstrap-agent-skills.mts --check', 'Root must expose skills:check');
 const postinstall = rootPackage.scripts?.postinstall;

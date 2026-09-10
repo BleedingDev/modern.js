@@ -4,8 +4,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import execa from '@modern-js/utils/execa';
-import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
-import { ensureSharedApiInfrastructure } from '../src/ultramodern-tooling/commands/migrate-strict-effect/shared-api-infrastructure';
+
 import { addUltramodernVertical } from '../src/ultramodern-workspace';
 import { formatGeneratedWorkspaceFiles } from '../src/ultramodern-workspace/fs-io';
 import { createWorkspace } from './helpers/workspace-kit';
@@ -267,54 +266,6 @@ test('generated APIs pass real Oxlint after Oxfmt with the current preset and na
       },
     );
     assert.equal(checked.status, 0, `${checked.stdout}\n${checked.stderr}`);
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('Tractor-shaped migration preserves the root barrel bytes and module graph under real Oxlint', () => {
-  const { tempRoot, workspaceDir } = createWorkspace('tractor-api-lint');
-  try {
-    provisionGeneratedLintDependencies(workspaceDir);
-    provisionApiDependencies(workspaceDir, 'tractor-api-lint');
-    addUltramodernVertical({
-      workspaceRoot: workspaceDir,
-      name: 'catalog',
-      modernVersion: '3.9.0',
-    });
-    addUltramodernVertical({
-      workspaceRoot: workspaceDir,
-      name: 'checkout',
-      modernVersion: '3.9.0',
-    });
-    const owner = path.join(workspaceDir, 'packages/shared-contracts');
-    const indexPath = path.join(owner, 'src/index.ts');
-    const rootIndex = `${fs.readFileSync(indexPath, 'utf8')}\nexport * from './business.ts';\n`;
-    fs.writeFileSync(
-      path.join(owner, 'src/business.ts'),
-      'export const business = true;\n',
-    );
-    fs.writeFileSync(indexPath, rootIndex);
-    formatGeneratedWorkspaceFiles(workspaceDir);
-    const before = fs.readFileSync(indexPath);
-    const manifestPath = path.join(owner, 'package.json');
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    delete manifest.exports['./microvertical-api-baseline'];
-    delete manifest.exports['./server/effect-bff-runtime'];
-    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
-    fs.rmSync(path.join(owner, 'src/effect-bff-runtime.ts'));
-    const io = createMigrationIo(workspaceDir, false);
-    io.transaction(() =>
-      ensureSharedApiInfrastructure(io, 'tractor-api-lint', {
-        strategy: 'workspace',
-        modernPackageVersion: '3.9.0',
-      }),
-    );
-    assert.deepEqual(fs.readFileSync(indexPath), before);
-    assertGeneratedWorkspaceLintClean(
-      workspaceDir,
-      'additive migration with lightweight consumer root',
-    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

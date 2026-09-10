@@ -67,7 +67,7 @@ function shareDispose(dispose: () => Promise<void>) {
   };
 }
 
-function rejectLegacyEffectModuleShape(
+function rejectUnsupportedEffectModuleShape(
   options: ResolveEffectBffModuleHandlerOptions,
   shape: string,
 ) {
@@ -119,8 +119,8 @@ function resolveClassifiedEffectBffModuleHandler(
     return null;
   }
 
-  if (facts.legacyShape) {
-    if (rejectLegacyEffectModuleShape(options, facts.legacyShape)) {
+  if (facts.unsupportedShape) {
+    if (rejectUnsupportedEffectModuleShape(options, facts.unsupportedShape)) {
       return null;
     }
   }
@@ -137,7 +137,7 @@ function resolveClassifiedEffectBffModuleHandler(
     }
 
     if (facts.api === undefined || !facts.hasRuntimeLayer) {
-      rejectLegacyEffectModuleShape(
+      rejectUnsupportedEffectModuleShape(
         options,
         'unbranded `createHandler` export',
       );

@@ -1,17 +1,5 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off
-/**
- * Shared Effect HttpApi endpoint reflection used by BOTH sides of the
- * cross-project contract:
- *
- * - the `@modern-js/plugin-bff-extensions/client-generator` package stamps
- *   each generated operation with a per-endpoint contract hash;
- * - the `@modern-js/plugin-bff-extensions/effect-adapter` package derives the
- *   expected operation-contract map for the cross-project policy from the
- *   same endpoints.
- *
- * Keeping route-path normalization and the endpoint -> contract mapping in
- * one module is what guarantees the two hashes agree.
- */
+/** Shared endpoint normalization and identity hashing for server policy metadata. */
 import {
   createOperationContractHash,
   type OperationContractSource,
@@ -38,13 +26,7 @@ type HttpApiGroupLike = {
 };
 
 type HttpApiEndpointLike = {
-  /**
-   * effect 4.0.0-beta.98 renamed the endpoint `name` property to `identifier`,
-   * matching `HttpApiGroup`. `name` is kept as a fallback so reflection over an
-   * older Effect build does not silently degrade to the class name.
-   */
   identifier?: unknown;
-  name?: unknown;
   method?: unknown;
   path?: unknown;
 };
@@ -52,9 +34,6 @@ type HttpApiEndpointLike = {
 function resolveEffectEndpointName(endpoint: HttpApiEndpointLike): string {
   if (typeof endpoint.identifier === 'string' && endpoint.identifier) {
     return endpoint.identifier;
-  }
-  if (typeof endpoint.name === 'string' && endpoint.name) {
-    return endpoint.name;
   }
   return '';
 }
@@ -168,7 +147,7 @@ export async function extractHttpApiFromModule(
     isValidatorAwareHandlerFactory,
     isHttpApi,
   });
-  return facts?.legacyShape ||
+  return facts?.unsupportedShape ||
     facts?.api === undefined ||
     !facts.hasRuntimeLayer ||
     (facts.createHandler !== undefined && !facts.createHandlerValidatorAware)

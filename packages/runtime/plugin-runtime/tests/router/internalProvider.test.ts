@@ -1,9 +1,6 @@
 import {
   createRouterPlugin,
   type RouterProviderFactory,
-  registerRouterProvider,
-  resolveRouterProvider,
-  unsafe_resetRouterProvidersForTesting,
 } from '@modern-js/runtime-extensions/router-provider';
 import { rstest } from '@rstest/core';
 import { routerProviderRegistryHooks } from '../../src/router/runtime/hooks';
@@ -17,17 +14,10 @@ async function nativeProvider() {
 }
 
 describe('native provider and injected fork composition', () => {
-  afterEach(() => unsafe_resetRouterProvidersForTesting());
-
-  it('exports the native provider directly and registers it only through explicit composition', async () => {
+  it('exports the native provider directly', async () => {
     const factory = await nativeProvider();
     const { routerPlugin } = await import('../../src/router/runtime/plugin');
     expect(factory).toBe(routerPlugin);
-    createRouterPlugin({
-      defaultProvider: { name: 'react-router', factory },
-      registryHooks: routerProviderRegistryHooks,
-    });
-    expect(resolveRouterProvider()).toBe(factory);
   });
 
   it('binds each wrapper to its local provider and canonical hook registry', async () => {
@@ -62,12 +52,8 @@ describe('native provider and injected fork composition', () => {
     expect(setupB).toHaveBeenCalledWith(apiB);
   });
 
-  it('rejects a compatibility provider missing from the local realm', async () => {
+  it('rejects a provider missing from the local realm', async () => {
     const factory = await nativeProvider();
-    const foreign = rstest.fn(() => {
-      throw new Error('foreign provider invoked');
-    });
-    registerRouterProvider('tanstack', foreign);
     const wrapper = createRouterPlugin({
       defaultProvider: { name: 'react-router', factory },
       registryHooks: routerProviderRegistryHooks,
@@ -77,6 +63,5 @@ describe('native provider and injected fork composition', () => {
         getRuntimeConfig: () => ({ router: { framework: 'tanstack' } }),
       }),
     ).toThrow(/not registered in the app-owned router provider realm/);
-    expect(foreign).not.toHaveBeenCalled();
   });
 });

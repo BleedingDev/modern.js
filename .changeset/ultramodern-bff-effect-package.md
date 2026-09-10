@@ -13,8 +13,6 @@ Forgeable `EFFECT_VALIDATOR_AWARE_FACTORY` and
 public package surface.
 
 Keep dispatcher APIs on the canonical `@modern-js/bff-effect/effect-edge`
-entry instead of publishing a redundant `effect-edge/dispatcher` subpath. The
-historical `@modern-js/plugin-bff/effect-edge/dispatcher` compatibility path
-continues to delegate to that canonical edge entry. The edge dispatcher omits
+entry. The edge dispatcher omits
 the Scalar and Swagger UI namespaces so evaluator-bearing browser payloads do
 not enter Worker bundles; the Node Effect surface remains unchanged.
