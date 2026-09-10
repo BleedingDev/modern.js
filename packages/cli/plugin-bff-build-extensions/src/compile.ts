@@ -23,6 +23,8 @@ export function registerBffCompilation(api: CLIPluginAPI<AppTools>) {
     serialized.delete(context);
     await transformServerGlobalVars([...context.outputDirectories], globals);
     if (api.getAppContext().bffRuntimeFramework !== 'effect') return;
+    // Hosted APIs use the producer's compiled entry; it is not emitted by this app.
+    if (api.getNormalizedConfig().bff?.isCrossProjectServer === true) return;
     const { bundleBuiltEffectEntryForNode } = await import(
       '@modern-js/plugin-bff-extensions/effect-source-loader'
     );

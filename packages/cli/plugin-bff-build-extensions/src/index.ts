@@ -83,6 +83,8 @@ export const bffPlugin = (): CliPlugin<AppTools> => ({
       if (api.getAppContext().bffRuntimeFramework !== 'effect') return;
       const { appDirectory, apiDirectory } = api.getAppContext();
       const bff = api.getNormalizedConfig().bff;
+      if (!fs.existsSync(apiDirectory) && bff?.effect?.entry === undefined)
+        return;
       const { resolveEffectEntryFile } = await import(
         '@modern-js/plugin-bff-extensions/effect-source-loader'
       );

@@ -1,17 +1,24 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off
-import effectBff from '@api/effect/index';
+import {
+  Effect,
+  makeEffectHttpApiClient,
+  runEffectRequest,
+} from '@modern-js/bff-effect/effect-client';
 import { useMatch } from '@modern-js/plugin-tanstack/runtime';
 import { useEffect, useState } from 'react';
+import { portfolioApi } from '../../../../shared/portfolio-api';
 import type {
   PortfolioApp,
   PortfolioErpState,
 } from '../../../../shared/portfolio-state';
 
-type BootstrapData = Awaited<
-  ReturnType<typeof effectBff.client.portfolio.bootstrap>
+const client = makeEffectHttpApiClient(portfolioApi, { baseUrl: '/bff-api' });
+type PortfolioClient = Effect.Success<typeof client>;
+type BootstrapData = Effect.Success<
+  ReturnType<PortfolioClient['portfolio']['bootstrap']>
 >;
-type ErpData = Awaited<
-  ReturnType<typeof effectBff.client.portfolio.erpBootstrap>
+type ErpData = Effect.Success<
+  ReturnType<PortfolioClient['portfolio']['erpBootstrap']>
 >;
 
 export default function PortfolioAppPage() {
@@ -24,7 +31,9 @@ export default function PortfolioAppPage() {
   const [chatReceipt, setChatReceipt] = useState('pending');
 
   useEffect(() => {
-    effectBff.client.portfolio.bootstrap({}).then((data: BootstrapData) => {
+    runEffectRequest(
+      client.pipe(Effect.flatMap(api => api.portfolio.bootstrap({}))),
+    ).then((data: BootstrapData) => {
       setApp(
         ((data.apps as PortfolioApp[]).find(
           item => item.id === loaderData.appId,
@@ -33,44 +42,59 @@ export default function PortfolioAppPage() {
     });
 
     if (loaderData.appId === 'enterprise-mega-erp') {
-      effectBff.client.portfolio
-        .erpBootstrap({})
-        .then((data: ErpData) => setErp(data));
+      runEffectRequest(
+        client.pipe(Effect.flatMap(api => api.portfolio.erpBootstrap({}))),
+      ).then((data: ErpData) => setErp(data));
     } else {
       setErp(null);
     }
   }, [loaderData.appId]);
 
   const runWorkflow = async () => {
-    if (!loaderData.appId) {
+    const appId = loaderData.appId;
+    if (!appId) {
       setEventId('unknown-app');
       return;
     }
 
-    const result = await effectBff.client.portfolio.runWorkflow({
-      params: {
-        appId: loaderData.appId,
-      },
-      payload: {
-        action: app?.profiles.smoke.workflows[0] ?? 'smoke',
-        actor: 'browser.operator',
-        requestId: `ui-${loaderData.appId}`,
-      },
-    });
+    const result = await runEffectRequest(
+      client.pipe(
+        Effect.flatMap(api =>
+          api.portfolio.runWorkflow({
+            params: {
+              appId,
+            },
+            payload: {
+              action: app?.profiles.smoke.workflows[0] ?? 'smoke',
+              actor: 'browser.operator',
+              requestId: `ui-${loaderData.appId}`,
+            },
+          }),
+        ),
+      ),
+    );
     setEventId(`${result.event.id}:${result.event.status}`);
   };
 
   const approveFirst = async () => {
-    const result = await effectBff.client.portfolio.decideErpApproval({
-      params: {
-        id: 'ap-1001',
-      },
-      payload: {
-        decision: 'approved',
-        actor: 'browser.operator',
-      },
-    });
-    const next = await effectBff.client.portfolio.erpBootstrap({});
+    const result = await runEffectRequest(
+      client.pipe(
+        Effect.flatMap(api =>
+          api.portfolio.decideErpApproval({
+            params: {
+              id: 'ap-1001',
+            },
+            payload: {
+              decision: 'approved',
+              actor: 'browser.operator',
+            },
+          }),
+        ),
+      ),
+    );
+    const next = await runEffectRequest(
+      client.pipe(Effect.flatMap(api => api.portfolio.erpBootstrap({}))),
+    );
     setApprovalStatus(
       `${result.id}:${result.status}:${result.pendingApprovals}`,
     );
@@ -78,15 +102,23 @@ export default function PortfolioAppPage() {
   };
 
   const sendChat = async () => {
-    const result = await effectBff.client.portfolio.sendErpChat({
-      payload: {
-        channel: 'incident-war-room',
-        author: 'ops.commander',
-        text: 'Reroute high priority loads',
-        priority: 'urgent',
-      },
-    });
-    const next = await effectBff.client.portfolio.erpBootstrap({});
+    const result = await runEffectRequest(
+      client.pipe(
+        Effect.flatMap(api =>
+          api.portfolio.sendErpChat({
+            payload: {
+              channel: 'incident-war-room',
+              author: 'ops.commander',
+              text: 'Reroute high priority loads',
+              priority: 'urgent',
+            },
+          }),
+        ),
+      ),
+    );
+    const next = await runEffectRequest(
+      client.pipe(Effect.flatMap(api => api.portfolio.erpBootstrap({}))),
+    );
     setChatReceipt(`${result.message.id}:${result.totalMessages}`);
     setErp(next);
   };

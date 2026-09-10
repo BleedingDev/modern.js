@@ -5,7 +5,6 @@ import {
   Schema,
 } from '@modern-js/bff-effect/effect-client';
 
-/** @type {any} */
 export const bffCrossProjectEffectApi = HttpApi.make(
   'CrossProjectEffectApi',
 ).add(

@@ -3,10 +3,8 @@
   "compilerOptions": {
     "declaration": true,
     "jsx": "preserve",
-    "baseUrl": "./",
     "paths": {
-      "@shared/*": ["./shared/*"],
-      "@api/*": ["./api/lambda/*"]
+      "@shared/*": ["./shared/*"]
     },
     "types": ["@rstest/core/globals"]
   },

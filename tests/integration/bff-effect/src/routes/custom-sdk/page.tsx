@@ -12,14 +12,10 @@ export default function CustomSdkPage() {
     runEffectRequest(
       makeEffectHttpApiClient(bffEffectApi, {
         baseUrl: '/bff-api',
-        transformResponse: response =>
-          response.pipe(
-            Effect.map(() => ({
-              message: 'Hello Effect Custom SDK',
-              runtime: 'effect' as const,
-            })),
-          ),
-      }).pipe(Effect.flatMap(client => client.greetings.hello({}))),
+      }).pipe(
+        Effect.flatMap(client => client.greetings.hello({})),
+        Effect.map(data => ({ ...data, message: 'Hello Effect Custom SDK' })),
+      ),
     ).then(data => setMessage(data.message));
   }, []);
   return <div className="custom-sdk-message">{message}</div>;

@@ -33,3 +33,9 @@ No SDK generation or backend-entry import is required.
 the `@api/index` client transform, and `/effect-client-runtime` have been
 removed. Move consumers to the shared contract and execute native client
 operations with Effect.
+
+For APIs hosted through a cross-project plugin, pass `crossProject` to the
+native client helper: `{ requestId: 'catalog', operationVersion: 2, prefix: '/api' }`.
+Use the producer's request ID, package major version, and server mount path.
+Effect HTTP middleware derives operation headers from the shared contract;
+the server continues to reject missing or stale contract headers.

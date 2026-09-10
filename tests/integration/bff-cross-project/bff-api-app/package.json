@@ -24,7 +24,8 @@
     "tsconfig-paths": "4.2.0",
     "zod": "^4.5.4",
     "@modern-js/bff-effect": "workspace:*",
-    "@modern-js/plugin-bff-extensions": "workspace:*"
+    "@modern-js/plugin-bff-extensions": "workspace:*",
+    "@modern-js/plugin-bff-build-extensions": "workspace:*"
   },
   "devDependencies": {
     "@modern-js/app-tools": "workspace:*",
@@ -38,80 +39,20 @@
     "typescript": "^7.0.2"
   },
   "exports": {
-    "./api/*": {
-      "import": "./dist-1/client/*.js",
-      "types": "./dist-1/client/*.d.ts"
-    },
+    "./effect-contract": "./shared/effect/api.ts",
     "./plugin": {
       "import": "./dist-1/plugin/index.js",
       "require": "./dist-1/plugin/index.js",
       "types": "./dist-1/plugin/index.d.ts"
-    },
-    "./runtime": {
-      "import": "./dist-1/runtime/index.js",
-      "require": "./dist-1/runtime/index.js",
-      "types": "./dist-1/runtime/index.d.ts"
-    },
-    "./api/context/index": {
-      "import": "./dist-1/client/context/index.js",
-      "types": "./dist-1/client/context/index.d.ts"
-    },
-    "./api/effect/index": {
-      "import": "./dist-1/client/effect/index.js",
-      "types": "./dist-1/client/effect/index.d.ts"
-    },
-    "./api/index": {
-      "import": "./dist-1/client/index.js",
-      "types": "./dist-1/client/index.d.ts"
-    },
-    "./api/portable": {
-      "import": "./dist-1/client/portable.js",
-      "types": "./dist-1/client/portable.d.ts"
-    },
-    "./api/upload": {
-      "import": "./dist-1/client/upload.js",
-      "types": "./dist-1/client/upload.d.ts"
-    },
-    "./api/user/[id]": {
-      "import": "./dist-1/client/user/[id].js",
-      "types": "./dist-1/client/user/[id].d.ts"
-    },
-    "./api/user/index": {
-      "import": "./dist-1/client/user/index.js",
-      "types": "./dist-1/client/user/index.d.ts"
     }
   },
   "typesVersions": {
     "*": {
-      "api/*": [
-        "./dist-1/client/*.d.ts"
-      ],
-      "runtime": [
-        "./dist-1/runtime/index.d.ts"
+      "effect-contract": [
+        "./shared/effect/api.ts"
       ],
       "plugin": [
         "./dist-1/plugin/index.d.ts"
-      ],
-      "api/context/index": [
-        "./dist-1/client/context/index.d.ts"
-      ],
-      "api/effect/index": [
-        "./dist-1/client/effect/index.d.ts"
-      ],
-      "api/index": [
-        "./dist-1/client/index.d.ts"
-      ],
-      "api/portable": [
-        "./dist-1/client/portable.d.ts"
-      ],
-      "api/upload": [
-        "./dist-1/client/upload.d.ts"
-      ],
-      "api/user/[id]": [
-        "./dist-1/client/user/[id].d.ts"
-      ],
-      "api/user/index": [
-        "./dist-1/client/user/index.d.ts"
       ]
     }
   },
@@ -119,6 +60,7 @@
     "dist-1/client/**/*",
     "dist-1/runtime/**/*",
     "dist-1/plugin/**/*",
-    "dist-1/**/*.d.ts"
+    "dist-1/**/*.d.ts",
+    "shared/effect/api.ts"
   ]
 }

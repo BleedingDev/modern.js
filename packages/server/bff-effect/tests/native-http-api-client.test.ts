@@ -1,6 +1,7 @@
 import * as Effect from 'effect/Effect';
 import * as Layer from 'effect/Layer';
 import * as Schema from 'effect/Schema';
+import { FetchHttpClient } from 'effect/unstable/http';
 import {
   HttpApi,
   HttpApiBuilder,
@@ -84,6 +85,91 @@ test('native HttpApi clients encode requests and decode responses and declared e
         .pipe(Effect.flip),
     );
     expect(invalid._tag).toBe('SchemaError');
+  } finally {
+    transport.mockRestore();
+    await server.dispose();
+  }
+});
+
+test('native transport supplies verifiable cross-project contracts for parameterized routes', async () => {
+  const { buildOperationContractMap } = await import(
+    '@modern-js/server-runtime-extensions/bff-policy/node'
+  );
+  const { evaluateCrossProjectPolicy, resolveCrossProjectRequestObservation } =
+    await import('@modern-js/server-runtime-extensions/bff-policy');
+  const expectedOperationContracts = buildOperationContractMap({
+    requestId: 'inventory',
+    operationVersion: 2,
+    handlers: [
+      { name: 'read', httpMethod: 'GET', routePath: '/api/items/:id' },
+    ],
+  });
+  const policy = {
+    enabled: true,
+    requestId: 'inventory',
+    expectedOperationContracts,
+  };
+  const server = createHttpApiHandler({
+    api,
+    layer: HttpApiBuilder.layer(api).pipe(Layer.provide(handlers)),
+  });
+  const violations: Array<string | null> = [];
+  const transport = rstest
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation((input, init) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      const observed = resolveCrossProjectRequestObservation(
+        { method: request.method, pathname: url.pathname },
+        policy,
+      );
+      const violation = evaluateCrossProjectPolicy(
+        Object.fromEntries(request.headers),
+        policy,
+        observed,
+      );
+      violations.push(violation?.reason ?? null);
+      if (violation)
+        return Promise.resolve(Response.json(violation, { status: 403 }));
+      url.pathname = url.pathname.slice('/api'.length);
+      return server.handler(new Request(url, request));
+    });
+  try {
+    const client = await Effect.runPromise(
+      makeEffectHttpApiClient(api, {
+        baseUrl: 'http://native-client.test/api',
+        crossProject: {
+          requestId: 'inventory',
+          operationVersion: 2,
+          prefix: '/api',
+        },
+      }),
+    );
+    await expect(
+      Effect.runPromise(
+        client.items
+          .read({ params: { id: 'a b' }, query: { count: 3 } })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, transport)),
+      ),
+    ).resolves.toEqual({ id: 'a b', count: 3 });
+    const stale = await Effect.runPromise(
+      makeEffectHttpApiClient(api, {
+        baseUrl: 'http://native-client.test/api',
+        crossProject: {
+          requestId: 'inventory',
+          operationVersion: 1,
+          prefix: '/api',
+        },
+      }),
+    );
+    await expect(
+      Effect.runPromise(
+        stale.items
+          .read({ params: { id: 'old' }, query: { count: 3 } })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, transport)),
+      ),
+    ).rejects.toBeDefined();
+    expect(violations).toEqual([null, 'operation_version_mismatch']);
   } finally {
     transport.mockRestore();
     await server.dispose();

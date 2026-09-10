@@ -3,7 +3,7 @@ import {
   type HttpApiLike,
   type HttpApiReflect,
 } from '@modern-js/bff-effect/effect';
-import { compatibleRequire, upath as path } from '@modern-js/utils';
+import { HttpApi } from 'effect/unstable/httpapi';
 import { loadEffectSourceModule } from './loader';
 
 type HttpApiRuntime = {
@@ -11,49 +11,19 @@ type HttpApiRuntime = {
   reflect: HttpApiReflect;
 };
 
-let httpApiRuntimePromise: Promise<HttpApiRuntime> | undefined;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isHttpApiRuntime(value: unknown): value is HttpApiRuntime {
-  return (
-    isRecord(value) &&
-    typeof value.isHttpApi === 'function' &&
-    typeof value.reflect === 'function'
-  );
-}
-
 export function getHttpApiRuntime(): Promise<HttpApiRuntime> {
-  if (httpApiRuntimePromise === undefined) {
-    httpApiRuntimePromise = compatibleRequire('effect/unstable/httpapi', false)
-      .catch(error => {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.includes("Cannot find module 'effect/unstable/httpapi'")) {
-          throw error;
-        }
-        const effectPackageJson = require.resolve('effect/package.json');
-        const effectHttpApiRuntimePath = path.join(
-          path.dirname(effectPackageJson),
-          'dist',
-          'unstable',
-          'httpapi',
-          'index.js',
-        );
-        return compatibleRequire(effectHttpApiRuntimePath, false);
-      })
-      .then(mod => {
-        if (isRecord(mod) && isHttpApiRuntime(mod.HttpApi)) {
-          return mod.HttpApi;
-        }
-        throw new Error(
-          '[BFF][Effect] Unable to resolve HttpApi runtime from effect/unstable/httpapi.',
-        );
+  return Promise.resolve({
+    isHttpApi: HttpApi.isHttpApi,
+    reflect: (api, handlers) => {
+      if (!HttpApi.isHttpApi(api)) {
+        throw new TypeError('[BFF][Effect] Expected an HttpApi contract.');
+      }
+      HttpApi.reflect(api, {
+        onGroup: handlers.onGroup ?? (() => {}),
+        onEndpoint: handlers.onEndpoint,
       });
-  }
-
-  return httpApiRuntimePromise;
+    },
+  });
 }
 
 export function loadEffectApi(options: {
