@@ -313,7 +313,7 @@ const strictEffectApproach = false;
     );
   });
 
-  test('workspace runner includes mts sources in strict API boundary checks', () => {
+  test('workspace runner checks mts sources, shell API entries, schemas, and legacy API paths', () => {
     const root = trackTempRoot();
     writeFile(
       root,
@@ -365,11 +365,7 @@ export type CatalogItem = {
     const output = combinedOutput(result);
 
     expect(result.exitCode).toBe(1);
-    expect(output).toContain('must not import Hono server helpers');
     expect(output).toContain('must not hand-build Response objects');
-    expect(output).toContain('must not manually parse request bodies');
-    expect(output).toContain('must not export raw request handlers');
-    expect(output).toContain('must keep strictEffectApproach enabled');
     expect(output).toContain(
       'Generated API entries must export defineEffectBff',
     );

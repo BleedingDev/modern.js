@@ -49,6 +49,13 @@ describe('ultramodern boundary debugger browser overlay', () => {
     globalThis.ResizeObserver =
       FakeResizeObserver as unknown as typeof ResizeObserver;
     rects.clear();
+    rects.set('primary-control', new DOMRect(72, 96, 180, 44));
+    rects.set('decide-surface', new DOMRect(64, 180, 720, 260));
+    rects.set('checkout-control', new DOMRect(116, 284, 220, 48));
+    Object.defineProperty(document.documentElement, 'scrollHeight', {
+      configurable: true,
+      get: () => 1200,
+    });
     Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
       configurable: true,
       value() {
