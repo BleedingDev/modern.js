@@ -1,12 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseExpression } from '@babel/parser';
+import { yaml } from '@modern-js/utils';
 import type { ResolvedUltramodernPackageSource } from '../../../ultramodern-package-source';
 import {
   assertReleaseCohortPackageSource,
   parseUltramodernReleaseCohort,
   RELEASE_COHORT_PROJECTION_PATH,
   readWorkspaceReleaseCohort,
+  releaseCohortSelectors,
   type UltramodernReleaseCohort,
 } from '../../../ultramodern-release-cohort';
 import { appEmitsBrowserUi } from '../../../ultramodern-workspace/descriptors';
@@ -135,6 +137,128 @@ export function readInstalledSourceCohort(
     );
   }
   return cohort;
+}
+
+/** Replace only authenticated cohort scalar values, retaining YAML layout and comments. */
+export function replaceReleaseAgeSelectors(
+  source: string,
+  current: UltramodernReleaseCohort,
+  target: UltramodernReleaseCohort,
+): string {
+  const { document } = parsePnpmWorkspaceYaml(source);
+  if (JSON.stringify(current.aliases) !== JSON.stringify(target.aliases))
+    throw new Error(
+      'Release-age selector aliases differ from the authenticated source cohort.',
+    );
+  const from = releaseCohortSelectors(current);
+  const to = releaseCohortSelectors(target);
+  const selectors = document.minimumReleaseAgeExclude;
+  if (
+    !Array.isArray(selectors) ||
+    new Set(selectors).size !== selectors.length ||
+    from.some(value => selectors.filter(item => item === value).length !== 1)
+  )
+    throw new Error(
+      'Release-age selectors do not match the authenticated source cohort.',
+    );
+  const replacements = new Map(from.map((value, index) => [value, to[index]]));
+  // The bundled js-yaml parser exposes source offsets; its legacy declaration
+  // file still describes only the load/dump API.
+  type Event = {
+    type: number;
+    valueStart: number;
+    valueEnd: number;
+    anchorStart: number;
+    tagStart: number;
+    style: number;
+  };
+  const parser = yaml as unknown as {
+    parseEvents(source: string): Event[];
+    getScalarValue(source: string, event: Event): string;
+    EVENT_DOCUMENT: number;
+    EVENT_MAPPING: number;
+    EVENT_SEQUENCE: number;
+    EVENT_SCALAR: number;
+    EVENT_POP: number;
+    SCALAR_STYLE_SINGLE_QUOTED: number;
+    SCALAR_STYLE_DOUBLE_QUOTED: number;
+  };
+  type Node = { event: Event; children: Node[] };
+  const roots: Node[] = [];
+  const stack: Node[] = [];
+  for (const event of parser.parseEvents(source)) {
+    if (event.type === parser.EVENT_POP) {
+      stack.pop();
+      continue;
+    }
+    const node = { event, children: [] };
+    (stack.at(-1)?.children ?? roots).push(node);
+    if (
+      [
+        parser.EVENT_DOCUMENT,
+        parser.EVENT_MAPPING,
+        parser.EVENT_SEQUENCE,
+      ].includes(event.type)
+    )
+      stack.push(node);
+  }
+  const mapping = roots[0]?.children[0];
+  if (mapping?.event.type !== parser.EVENT_MAPPING)
+    throw new Error('Release-age policy requires a YAML mapping.');
+  const keyIndex = mapping.children.findIndex(
+    (node, index) =>
+      index % 2 === 0 &&
+      node.event.type === parser.EVENT_SCALAR &&
+      parser.getScalarValue(source, node.event) === 'minimumReleaseAgeExclude',
+  );
+  const sequence = mapping.children[keyIndex + 1];
+  if (
+    keyIndex < 0 ||
+    sequence?.event.type !== parser.EVENT_SEQUENCE ||
+    sequence.event.anchorStart !== -1 ||
+    sequence.event.tagStart !== -1
+  )
+    throw new Error(
+      'Release-age selectors require an unaliased YAML sequence.',
+    );
+  const edits: Array<{ start: number; end: number; value: string }> = [];
+  for (const node of sequence.children) {
+    if (node.event.type !== parser.EVENT_SCALAR)
+      throw new Error('Release-age selectors require literal YAML scalars.');
+    const value = parser.getScalarValue(source, node.event);
+    const replacement = replacements.get(value);
+    if (replacement === undefined || replacement === value) continue;
+    if (
+      node.event.anchorStart !== -1 ||
+      node.event.tagStart !== -1 ||
+      ![
+        parser.SCALAR_STYLE_SINGLE_QUOTED,
+        parser.SCALAR_STYLE_DOUBLE_QUOTED,
+      ].includes(node.event.style)
+    )
+      throw new Error(
+        'Release-age selectors require unaliased quoted scalar values.',
+      );
+    edits.push({
+      start: node.event.valueStart,
+      end: node.event.valueEnd,
+      value: replacement,
+    });
+  }
+  for (const edit of edits.sort((left, right) => right.start - left.start))
+    source = source.slice(0, edit.start) + edit.value + source.slice(edit.end);
+  const expected = {
+    ...document,
+    minimumReleaseAgeExclude: selectors.map(
+      value => replacements.get(value) ?? value,
+    ),
+  };
+  if (
+    JSON.stringify(parsePnpmWorkspaceYaml(source).document) !==
+    JSON.stringify(expected)
+  )
+    throw new Error('Release-age selector edits changed unrelated YAML data.');
+  return source;
 }
 
 function matchesNativeSource(
@@ -342,11 +466,41 @@ export function prepareSameContractUpdate(
       );
     }
   }
+  const policyWrites: UpdateWrite[] = [];
   const policyPreview = createMigrationIo(io.workspaceRoot, true);
-  updateGeneratedPnpmWorkspacePolicy(policyPreview, packageSource, {
-    releaseCohort: target,
-  });
-  if (policyPreview.plan.length)
+  updateGeneratedPnpmWorkspacePolicy(
+    {
+      ...policyPreview,
+      write(file, content) {
+        policyWrites.push({
+          path: path.relative(io.workspaceRoot, file),
+          content,
+        });
+        return true;
+      },
+    },
+    packageSource,
+    { releaseCohort: target },
+  );
+  const policyPath = 'pnpm-workspace.yaml';
+  const policySource = fs.readFileSync(
+    path.join(io.workspaceRoot, policyPath),
+    'utf8',
+  );
+  const policyContent = replaceReleaseAgeSelectors(
+    policySource,
+    source,
+    target,
+  );
+  const targetPolicy =
+    policyWrites.find(write => write.path === policyPath)?.content ??
+    policySource;
+  if (
+    policyPreview.plan.length ||
+    policyWrites.some(write => write.path !== policyPath) ||
+    JSON.stringify(parsePnpmWorkspaceYaml(targetPolicy).document) !==
+      JSON.stringify(parsePnpmWorkspaceYaml(policyContent).document)
+  )
     return historical(
       'The target release policy requires a pnpm-workspace.yaml migration.',
     );
@@ -356,7 +510,16 @@ export function prepareSameContractUpdate(
       entry => entry.pattern,
     ),
   });
-  const writes: UpdateWrite[] = [];
+  const writes: UpdateWrite[] =
+    policyContent === policySource
+      ? []
+      : [
+          {
+            path: policyPath,
+            content: policyContent,
+            pointers: ['/minimumReleaseAgeExclude'],
+          },
+        ];
   for (const relativePath of manifests) {
     const text = fs.readFileSync(
       path.join(io.workspaceRoot, relativePath),

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { updateModernDependencies } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
-import { shellApp } from '../src/ultramodern-workspace/descriptors';
 
 test('migration updates declared extension packages throughout the authenticated cohort', () => {
   const source = {
@@ -49,7 +48,9 @@ import { parseUltramodernReleaseCohort } from '../src/ultramodern-release-cohort
 import { updateSameContractDependencies } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
 import {
   assertSameContractDelta,
+  prepareSameContractUpdate,
   replaceJsonStringLeaves,
+  replaceReleaseAgeSelectors,
 } from '../src/ultramodern-tooling/commands/migrate-strict-effect/same-contract';
 
 function cohort(version: string) {
@@ -523,4 +524,177 @@ test('i18n descriptor adoption authenticates the target and preserves native pac
   assert.deepEqual(unrelated, {
     dependencies: { i18next: 'consumer-version' },
   });
+});
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { yaml } from '@modern-js/utils';
+import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
+import { updateGeneratedPnpmWorkspacePolicy } from '../src/ultramodern-tooling/commands/migrate-strict-effect/pnpm-policy';
+import { createWorkspace, snapshotWorkspace } from './helpers/workspace-kit';
+
+test('release-age YAML edits touch only authenticated sequence scalar values', () => {
+  const source = cohort('3.9.0-ultramodern.5');
+  const target = cohort('3.9.0-ultramodern.6');
+  const selector = '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.5';
+  const input = `# ${selector}\r\nminimumReleaseAgeExclude: ["${selector}", 'consumer@1.2.3'] # keep\r\nconsumer: '${selector}'\r\n`;
+  const expected = input.replace(
+    `"${selector}"`,
+    '"@bleedingdev/modern-js-runtime@3.9.0-ultramodern.6"',
+  );
+  assert.equal(replaceReleaseAgeSelectors(input, source, target), expected);
+  assert.equal(replaceReleaseAgeSelectors(expected, target, target), expected);
+  for (const invalid of [
+    `minimumReleaseAgeExclude: ['consumer@1.2.3']`,
+    `minimumReleaseAgeExclude: ['${selector}', '${selector}']`,
+    `shared: &selectors ['${selector}']\nminimumReleaseAgeExclude: *selectors`,
+    `minimumReleaseAgeExclude: [&selector '${selector}']\nconsumer: *selector`,
+  ])
+    assert.throws(
+      () => replaceReleaseAgeSelectors(invalid, source, target),
+      /Release-age/,
+    );
+});
+
+test('native same-contract classifier accepts only exact cohort policy advancement and repeats without writes', () => {
+  const { tempRoot, workspaceDir } = createWorkspace('cohort-policy');
+  try {
+    const source = cohort('3.9.0-ultramodern.5');
+    const target = cohort('3.9.0-ultramodern.6');
+    const packageSource = {
+      strategy: 'install' as const,
+      modernPackageVersion: source.release.version,
+      aliasScope: 'bleedingdev',
+      aliasPackageNamePrefix: 'modern-js-',
+    };
+    const compactPath = path.join(workspaceDir, '.modernjs/ultramodern.json');
+    const raw = JSON.parse(fs.readFileSync(compactPath, 'utf8'));
+    raw.packageSource = packageSource;
+    fs.writeFileSync(compactPath, JSON.stringify(raw, null, 2) + '\n');
+    const rootPath = path.join(workspaceDir, 'package.json');
+    const root = JSON.parse(fs.readFileSync(rootPath, 'utf8'));
+    root.modernjs.packageSource = {
+      strategy: 'install',
+      config: './.modernjs/ultramodern.json',
+    };
+    fs.writeFileSync(rootPath, JSON.stringify(root, null, 2) + '\n');
+    fs.writeFileSync(
+      path.join(workspaceDir, '.modernjs/release-cohort.json'),
+      JSON.stringify(source, null, 2) + '\n',
+    );
+    for (const [relative, content] of Object.entries(
+      snapshotWorkspace(workspaceDir),
+    )) {
+      if (!relative.endsWith('package.json')) continue;
+      const manifest = JSON.parse(content);
+      for (const section of [
+        'dependencies',
+        'devDependencies',
+        'peerDependencies',
+        'optionalDependencies',
+      ]) {
+        if (manifest[section]?.['@modern-js/runtime']) {
+          manifest[section]['@modern-js/runtime'] =
+            `npm:@bleedingdev/modern-js-runtime@${source.release.version}`;
+        }
+      }
+      fs.writeFileSync(
+        path.join(workspaceDir, relative),
+        `${JSON.stringify(manifest, null, 2)}\n`,
+      );
+    }
+    updateGeneratedPnpmWorkspacePolicy(
+      createMigrationIo(workspaceDir, false),
+      packageSource,
+      { releaseCohort: source },
+    );
+    const policyPath = path.join(workspaceDir, 'pnpm-workspace.yaml');
+    const originalPolicy = fs.readFileSync(policyPath, 'utf8');
+    const comment =
+      '# authored policy comment: @bleedingdev/modern-js-runtime@3.9.0-ultramodern.5\r\n';
+    fs.writeFileSync(
+      policyPath,
+      comment + originalPolicy.replaceAll('\n', '\r\n'),
+    );
+    const before = snapshotWorkspace(workspaceDir);
+    const plan = prepareSameContractUpdate(
+      createMigrationIo(workspaceDir, true),
+      raw,
+      { ...packageSource, modernPackageVersion: target.release.version },
+      target,
+      source,
+    );
+    assert.equal(plan.classification, 'same-contract', plan.reason);
+    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
+    const write = plan.writes.find(item => item.path === 'pnpm-workspace.yaml');
+    assert.ok(write);
+    assert.deepEqual(write.pointers, ['/minimumReleaseAgeExclude']);
+    assert.equal(
+      write.content,
+      comment +
+        originalPolicy
+          .replace(
+            '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.5',
+            '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.6',
+          )
+          .replaceAll('\n', '\r\n'),
+    );
+    assert.ok(
+      plan.writes.every(item => !/\.(?:[cm]?[jt]sx?)$/.test(item.path)),
+    );
+    const alteredPolicy = yaml.load(before['pnpm-workspace.yaml']) as Record<
+      string,
+      unknown
+    >;
+    delete alteredPolicy.trustPolicy;
+    fs.writeFileSync(policyPath, yaml.dump(alteredPolicy));
+    const incompatible = prepareSameContractUpdate(
+      createMigrationIo(workspaceDir, true),
+      raw,
+      { ...packageSource, modernPackageVersion: target.release.version },
+      target,
+      source,
+    );
+    assert.equal(incompatible.classification, 'historical-migration');
+    fs.writeFileSync(policyPath, before['pnpm-workspace.yaml']);
+    assert.throws(
+      () =>
+        prepareSameContractUpdate(
+          createMigrationIo(workspaceDir, true),
+          raw,
+          { ...packageSource, modernPackageVersion: target.release.version },
+          target,
+          target,
+        ),
+      /installed source cohort/,
+    );
+    for (const item of plan.writes)
+      fs.writeFileSync(path.join(workspaceDir, item.path), item.content);
+    const repeated = prepareSameContractUpdate(
+      createMigrationIo(workspaceDir, true),
+      JSON.parse(fs.readFileSync(compactPath, 'utf8')),
+      { ...packageSource, modernPackageVersion: target.release.version },
+      target,
+      target,
+    );
+    assert.equal(repeated.classification, 'same-contract', repeated.reason);
+    assert.deepEqual(repeated.writes, []);
+    const file = (content: string) => ({
+      content: Buffer.from(content),
+      mode: 0o644,
+    });
+    assert.throws(
+      () =>
+        assertSameContractDelta(plan, [
+          {
+            relativePath: 'pnpm-workspace.yaml',
+            before: file(before['pnpm-workspace.yaml']),
+            after: file(write.content + 'trustPolicy: off\n'),
+          },
+        ]),
+      /unapproved change/,
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });

@@ -2794,7 +2794,7 @@ const assertTsConfigReferenceGraph = () => {
   assert(baseTsConfig.compilerOptions?.skipLibCheck !== true, 'tsconfig.base.json must not use skipLibCheck');
   assertSameJson(
     shellTsConfig.include ?? [],
-    ['src', 'locales/**/*.json', 'package.json', 'shared', 'server'],
+    ['src', 'locales/**/*.json', 'package.json', 'shared', 'shared/ultramodern-build.json', 'server'],
     'apps/shell-super-app/tsconfig.json include',
     'restore the generated shell typecheck boundary',
   );
@@ -2848,6 +2848,7 @@ const assertTsConfigReferenceGraph = () => {
         'locales/**/*.json',
         'package.json',
         'shared',
+        'shared/ultramodern-build.json',
         'server',
         ...(vertical.emitsApi ? ['api'] : []),
       ],
@@ -2901,7 +2902,7 @@ const assertTsConfigReferenceGraph = () => {
     );
     assertSameJson(
       shellTsConfig.include ?? [],
-      ['src', 'locales/**/*.json', 'package.json', 'shared', 'server'],
+      ['src', 'locales/**/*.json', 'package.json', 'shared', 'shared/ultramodern-build.json', 'server'],
       `${shell.path}/tsconfig.json include`,
       'restore the generated additional-shell typecheck boundary',
     );
