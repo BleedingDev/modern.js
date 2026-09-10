@@ -25,9 +25,7 @@ interface GeneratedToolingCommand {
   requiresRemotes?: boolean;
   contractKey: string;
   rootScript?: string;
-  templatePath?:
-    | `templates/workspace-scripts/${string}.mjs`
-    | `templates/workspace-scripts/${string}.mts`;
+  templatePath?: `templates/workspace-scripts/${string}.mjs`;
   cwd?: 'invocation';
 }
 
@@ -153,7 +151,7 @@ export const generatedToolingCommands = [
     wrapperName: 'proof-workerd-ssr',
     contractKey: 'cloudflareSsrProof',
     rootScript: 'cloudflare:ssr-proof',
-    templatePath: 'templates/workspace-scripts/proof-workerd-ssr.mts',
+    templatePath: 'templates/workspace-scripts/proof-workerd-ssr.mjs',
     requiresRemotes: true,
   }),
 ] as const satisfies readonly GeneratedToolingCommand[];
