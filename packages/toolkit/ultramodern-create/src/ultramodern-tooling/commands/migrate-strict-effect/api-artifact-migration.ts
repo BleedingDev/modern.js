@@ -586,4 +586,5 @@ export function migratePackageOwnedApiArtifacts(
     io.log(
       `API infrastructure: retired ${removals.size} hash-proven generated files; imports now resolve ${owner}.`,
     );
+  return new Set(edits.keys());
 }

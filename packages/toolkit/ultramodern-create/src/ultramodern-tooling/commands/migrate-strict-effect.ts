@@ -6,6 +6,7 @@ import {
   type UltramodernReleaseCohort,
 } from '../../ultramodern-release-cohort';
 import { runWorkspaceTransaction } from '../../ultramodern-workspace/add-vertical/transaction';
+import { createSharedApi } from '../../ultramodern-workspace/api';
 import { createAppEnvDts } from '../../ultramodern-workspace/app-files';
 import {
   createDevelopmentOverlay,
@@ -13,7 +14,11 @@ import {
   createUltramodernConfig,
 } from '../../ultramodern-workspace/contracts';
 import { stampDeliveryUnitIdentity } from '../../ultramodern-workspace/delivery-unit-stamp';
-import { appEmitsBrowserUi } from '../../ultramodern-workspace/descriptors';
+import {
+  appEmitsBrowserUi,
+  appHasApi,
+  resolveApiProtocol,
+} from '../../ultramodern-workspace/descriptors';
 import { ULTRAMODERN_WORKSPACE_POLICY } from '../../ultramodern-workspace/policy';
 import { createAdditionalShellConfigEntry } from '../../ultramodern-workspace/shells';
 import { generatedToolingCommands } from '../../ultramodern-workspace/tooling-command-catalog';
@@ -57,6 +62,7 @@ import {
   updateGeneratedTypeScriptSurfaces,
   updateGeneratedZeropsArtifacts,
 } from './migrate-strict-effect/generated-artifacts';
+import { generatedUiSourceRequiresRewrite } from './migrate-strict-effect/generated-ui-source';
 import { migrateStrictEffectHelp } from './migrate-strict-effect/help';
 import {
   runPnpmLockfileRefresh,
@@ -900,7 +906,7 @@ function migrateStrictEffect(
   const hasBackendSurface = verticalApps.some(app => app.api);
   const shellOnly = verticalApps.length === 0;
 
-  migratePackageOwnedApiArtifacts(
+  const migratedApiFiles = migratePackageOwnedApiArtifacts(
     io,
     migrated.workspace.packageScope,
     packageSource,
@@ -1001,6 +1007,21 @@ function migrateStrictEffect(
       entry => entry.pattern,
     ),
   });
+
+  // Compare final imports after both API migrations before claiming generated ownership.
+  for (const app of migratedWorkspace.apps) {
+    if (!appHasApi(app) || resolveApiProtocol(app) !== 'rest') continue;
+    const relativePath = path.posix.join(app.directory, 'shared/api.ts');
+    if (!migratedApiFiles.has(relativePath)) continue;
+    const filePath = path.join(io.workspaceRoot, relativePath);
+    const source = fs.readFileSync(filePath, 'utf8');
+    const generated = createSharedApi(app, {
+      scope: migrated.workspace.packageScope,
+    });
+    if (!generatedUiSourceRequiresRewrite(source, generated)) {
+      io.writeGenerated(filePath, source);
+    }
+  }
 
   const canRetireLegacyOxfmtCliExclusion =
     ensureGeneratedOxfmtIgnorePatterns(io);

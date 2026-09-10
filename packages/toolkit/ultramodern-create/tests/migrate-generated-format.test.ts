@@ -12,6 +12,10 @@ import {
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace/index';
 import { migratedWorkspaceScriptArtifacts } from '../src/ultramodern-workspace/workspace-scripts';
+import {
+  linkWorkspaceFormatterDependencies,
+  snapshotWorkspace,
+} from './helpers/workspace-kit';
 
 const packageSource = { strategy: 'workspace' } as const;
 
@@ -41,6 +45,134 @@ function assertGeneratedFilesAreFormatted(
   );
   assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
 }
+
+test('authentic .4 provider and API import migrations use the consumer formatter without reformatting authored API source', async () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-historical-import-format-'),
+  );
+  const workspaceRoot = path.join(tempRoot, 'historical-app');
+  const fixture = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, 'fixtures/migration-format-historical-4.json'),
+      'utf8',
+    ),
+  ) as { files: Array<{ path: string; content: string }> };
+  try {
+    generateUltramodernWorkspace({
+      targetDir: workspaceRoot,
+      packageName: 'historical-app',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource,
+    });
+    addUltramodernVertical({
+      workspaceRoot,
+      name: 'orders',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource,
+    });
+    addUltramodernVertical({
+      workspaceRoot,
+      name: 'custom',
+      preset: 'api-only',
+      modernVersion: '3.2.1',
+      packageSource,
+    });
+    linkWorkspaceFormatterDependencies(workspaceRoot);
+    for (const file of fixture.files) {
+      fs.writeFileSync(path.join(workspaceRoot, file.path), file.content);
+    }
+    const sharedManifestPath = path.join(
+      workspaceRoot,
+      'packages/shared-contracts/package.json',
+    );
+    const sharedManifest = JSON.parse(
+      fs.readFileSync(sharedManifestPath, 'utf8'),
+    );
+    sharedManifest.exports['./microvertical-api-baseline'] =
+      './src/microvertical-api-baseline.ts';
+    fs.writeFileSync(sharedManifestPath, JSON.stringify(sharedManifest));
+
+    const authoredPath = 'verticals/custom/shared/api.ts';
+    const originalApi = fs
+      .readFileSync(path.join(workspaceRoot, authoredPath), 'utf8')
+      .replaceAll(
+        '@modern-js/bff-effect/microvertical-api',
+        '@historical-app/shared-contracts/microvertical-api-baseline',
+      )
+      .replaceAll(
+        '@modern-js/bff-effect/effect-client',
+        '@modern-js/plugin-bff/effect-client',
+      );
+    const authoredApi = `${originalApi}\r\n// Authored API implementation and formatting.\r\nexport const customEndpoint =  "keep these bytes";\r\n`;
+    fs.writeFileSync(path.join(workspaceRoot, authoredPath), authoredApi);
+
+    const before = snapshotWorkspace(workspaceRoot);
+    const output = rstest.spyOn(process.stdout, 'write').mockReturnValue(true);
+    let dryOutput: string;
+    try {
+      assert.equal(
+        await runUltramodernToolingCli(
+          ['migrate-strict-effect', '--dry-run'],
+          workspaceRoot,
+        ),
+        0,
+      );
+      dryOutput = output.mock.calls.map(call => String(call[0])).join('');
+    } finally {
+      output.mockRestore();
+    }
+    assert.deepEqual(snapshotWorkspace(workspaceRoot), before);
+    assert.equal(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--skip-install'],
+        workspaceRoot,
+      ),
+      0,
+    );
+    const generatedPaths = fixture.files.slice(0, 4).map(file => file.path);
+    assertGeneratedFilesAreFormatted(workspaceRoot, generatedPaths);
+    assert.equal(
+      fs.readFileSync(path.join(workspaceRoot, 'oxfmt.config.ts'), 'utf8'),
+      before['oxfmt.config.ts'],
+    );
+    assert.equal(
+      fs.readFileSync(path.join(workspaceRoot, authoredPath), 'utf8'),
+      authoredApi
+        .replaceAll(
+          '@historical-app/shared-contracts/microvertical-api-baseline',
+          '@modern-js/bff-effect/microvertical-api',
+        )
+        .replaceAll(
+          '@modern-js/plugin-bff/effect-client',
+          '@modern-js/bff-effect/effect-client',
+        ),
+    );
+    const after = snapshotWorkspace(workspaceRoot);
+    for (const file of new Set([
+      ...Object.keys(before),
+      ...Object.keys(after),
+    ])) {
+      if (before[file] === after[file]) continue;
+      const verb = after[file] === undefined ? 'delete' : 'write';
+      assert.ok(
+        dryOutput.includes(`[dry-run] would ${verb} ${file}`),
+        `Finalized dry-run omitted ${file}`,
+      );
+    }
+    assert.equal(
+      await runUltramodernToolingCli(
+        ['migrate-strict-effect', '--skip-install'],
+        workspaceRoot,
+      ),
+      0,
+    );
+    assert.deepEqual(snapshotWorkspace(workspaceRoot), after);
+  } finally {
+    fs.rmSync(tempRoot, { force: true, recursive: true });
+  }
+});
 
 test.each([
   { printWidth: 80, singleQuote: false, trailingComma: 'none' },

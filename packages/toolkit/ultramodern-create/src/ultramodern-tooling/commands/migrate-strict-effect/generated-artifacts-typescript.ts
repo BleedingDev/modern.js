@@ -134,7 +134,7 @@ function migrateGeneratedProviderImports(
     );
     return false;
   }
-  return io.write(filePath, updated);
+  return io.writeGenerated(filePath, updated);
 }
 
 function writeMergedTypeScriptConfig(
