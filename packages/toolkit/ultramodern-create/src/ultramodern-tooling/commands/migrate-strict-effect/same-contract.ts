@@ -12,10 +12,10 @@ import {
   type UltramodernReleaseCohort,
 } from '../../../ultramodern-release-cohort';
 import { appEmitsBrowserUi } from '../../../ultramodern-workspace/descriptors';
-import { formatGeneratedSourceCandidates } from '../../../ultramodern-workspace/fs-io';
 import { createUltramodernBuildModule } from '../../../ultramodern-workspace/module-federation';
 import { createWorkspaceValidationScript } from '../../../ultramodern-workspace/workspace-scripts';
 import { normalizeWorkspaceInputs } from '../../config';
+import { generatedUiSourceRequiresRewrite } from './generated-ui-source';
 import {
   createMigrationIo,
   listWorkspacePackageFiles,
@@ -269,14 +269,9 @@ function matchesNativeSource(
   const file = path.join(workspaceRoot, relativePath);
   if (!fs.existsSync(file)) return false;
   const source = fs.readFileSync(file, 'utf8');
-  return (
-    source === expected ||
-    source ===
-      formatGeneratedSourceCandidates(
-        [[relativePath, expected]],
-        workspaceRoot,
-      )[0]
-  );
+  // Stages deliberately have no installed dependencies yet. Ownership is a
+  // complete-program comparison, independent of the consumer formatter config.
+  return !generatedUiSourceRequiresRewrite(source, expected);
 }
 
 export function hasCoherentCohortLock(

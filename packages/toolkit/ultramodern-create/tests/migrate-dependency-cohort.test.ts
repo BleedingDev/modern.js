@@ -532,6 +532,7 @@ import path from 'node:path';
 import { yaml } from '@modern-js/utils';
 import { createMigrationIo } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 import { updateGeneratedPnpmWorkspacePolicy } from '../src/ultramodern-tooling/commands/migrate-strict-effect/pnpm-policy';
+import { runWorkspaceTransaction } from '../src/ultramodern-workspace/add-vertical/transaction';
 import {
   createWorkspace,
   linkWorkspaceFormatterDependencies,
@@ -665,13 +666,28 @@ test.each([
       comment + originalPolicy.replaceAll('\n', '\r\n'),
     );
     const before = snapshotWorkspace(workspaceDir);
-    const plan = prepareSameContractUpdate(
-      createMigrationIo(workspaceDir, true),
-      raw,
-      { ...packageSource, modernPackageVersion: target.release.version },
-      target,
-      source,
-    );
+    const prepareStaged = (installedSource: typeof source) =>
+      runWorkspaceTransaction(workspaceDir, stage => {
+        assert.notEqual(stage, workspaceDir);
+        assert.equal(fs.existsSync(path.join(stage, 'node_modules')), false);
+        assert.equal(
+          fs.readFileSync(path.join(stage, 'oxfmt.config.ts'), 'utf8'),
+          fs.readFileSync(path.join(workspaceDir, 'oxfmt.config.ts'), 'utf8'),
+        );
+        return prepareSameContractUpdate(
+          createMigrationIo(stage, false, workspaceDir),
+          JSON.parse(
+            fs.readFileSync(
+              path.join(stage, '.modernjs/ultramodern.json'),
+              'utf8',
+            ),
+          ),
+          { ...packageSource, modernPackageVersion: target.release.version },
+          target,
+          installedSource,
+        );
+      });
+    const plan = prepareStaged(source);
     assert.equal(plan.classification, 'same-contract', plan.reason);
     assert.deepEqual(snapshotWorkspace(workspaceDir), before);
     const write = plan.writes.find(item => item.path === 'pnpm-workspace.yaml');
@@ -718,13 +734,7 @@ test.each([
     );
     for (const item of plan.writes)
       fs.writeFileSync(path.join(workspaceDir, item.path), item.content);
-    const repeated = prepareSameContractUpdate(
-      createMigrationIo(workspaceDir, true),
-      JSON.parse(fs.readFileSync(compactPath, 'utf8')),
-      { ...packageSource, modernPackageVersion: target.release.version },
-      target,
-      target,
-    );
+    const repeated = prepareStaged(target);
     assert.equal(repeated.classification, 'same-contract', repeated.reason);
     assert.deepEqual(repeated.writes, []);
     const authoredValidator =
@@ -732,13 +742,7 @@ test.each([
       "\nexport const consumerValidationPolicy = 'keep';\n";
     fs.writeFileSync(validatorPath, authoredValidator);
     const authoredBefore = snapshotWorkspace(workspaceDir);
-    const authoredPlan = prepareSameContractUpdate(
-      createMigrationIo(workspaceDir, true),
-      JSON.parse(fs.readFileSync(compactPath, 'utf8')),
-      { ...packageSource, modernPackageVersion: target.release.version },
-      target,
-      target,
-    );
+    const authoredPlan = prepareStaged(target);
     assert.equal(authoredPlan.classification, 'historical-migration');
     assert.match(authoredPlan.reason, /validator/);
     assert.deepEqual(snapshotWorkspace(workspaceDir), authoredBefore);
