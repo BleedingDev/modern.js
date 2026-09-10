@@ -194,7 +194,7 @@ jobs:
 
   contract-gates-summary:
     name: Contract Gates Summary
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-testing
     if: always()
     needs:
       - contract-gates
