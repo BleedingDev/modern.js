@@ -187,6 +187,13 @@ test('maintained workspaces can own packages, routes, platform APIs, and deploym
       extends: '../../tsconfig.base.json',
       files: [],
     });
+    mutateJson(workspaceDir, '.modernjs/ultramodern.json', value => {
+      const cloudflare = value.topology.apps.find(
+        (app: { id: string }) => app.id === 'catalog',
+      ).deploy.cloudflare;
+      delete cloudflare.routes.ssr;
+      delete cloudflare.routes.locale;
+    });
     mutateJson(workspaceDir, 'topology/reference-topology.json', value => {
       value.sharedPackages.push(owned);
       value.shell.authentication = { owner: 'platform-services' };
