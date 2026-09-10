@@ -3445,18 +3445,72 @@ importers:
 
   packages/toolkit/ultramodern-sandpack-profile:
     devDependencies:
+      '@modern-js/app-tools':
+        specifier: workspace:*
+        version: link:../../solutions/app-tools
+      '@modern-js/i18n-integration':
+        specifier: workspace:*
+        version: link:../../runtime/i18n-integration
+      '@modern-js/plugin-i18n':
+        specifier: workspace:*
+        version: link:../../runtime/plugin-i18n
+      '@modern-js/plugin-tanstack':
+        specifier: workspace:*
+        version: link:../../runtime/plugin-tanstack
       '@modern-js/rslib':
         specifier: workspace:*
         version: link:../../../scripts/rslib
+      '@modern-js/runtime':
+        specifier: workspace:*
+        version: link:../../runtime/plugin-runtime
+      '@modern-js/runtime-renderer-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/renderer-extensions
+      '@modern-js/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
+      '@modern-js/ultramodern-app-tools':
+        specifier: workspace:*
+        version: link:../../solutions/ultramodern-app-tools
+      '@rsbuild/plugin-tailwindcss':
+        specifier: 2.0.3
+        version: 2.0.3(@rsbuild/core@2.2.3(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0))(@rspack/core@2.2.2(@module-federation/runtime-tools@2.9.0)(@swc/helpers@0.5.23))
       '@rslib/core':
         specifier: 1.0.0
         version: 1.0.0(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)(typescript@7.0.2)
       '@types/node':
         specifier: ^26.4.1
         version: 26.4.1
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.7
+        version: 19.2.7(@types/react@19.2.18)
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260707.2
         version: 7.0.0-dev.20260707.2
+      effect:
+        specifier: 4.0.0-rc.112
+        version: 4.0.0-rc.112
+      i18next:
+        specifier: 26.4.2
+        version: 26.4.2(typescript@7.0.2)
+      playwright:
+        specifier: ^1.63.0
+        version: 1.63.0
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      tailwindcss:
+        specifier: 4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   packages/toolkit/utils:
     dependencies:
@@ -11928,6 +11982,14 @@ packages:
       '@rsbuild/core':
         optional: true
 
+  '@rsbuild/plugin-tailwindcss@2.0.3':
+    resolution: {integrity: sha512-sl7mN0fyoP0W+zEyFR2xEMVAS2cZPlOAqsXwI8Ei9tUSvV7V4G8Xw2WBVCOQ/B4KEFfJ6H1+TEuPlAzHLEfc4g==}
+    peerDependencies:
+      '@rsbuild/core': ^2.0.0
+    peerDependenciesMeta:
+      '@rsbuild/core':
+        optional: true
+
   '@rsbuild/plugin-type-check@1.6.0':
     resolution: {integrity: sha512-AZDLYGUfqAqwn50pkliVgI9UN4+AsM8yh0XqySCianYUeftSPa4By7tyP7+TBXpnJ6Ev3xaha/cS/462MNT18w==}
     peerDependencies:
@@ -12750,6 +12812,17 @@ packages:
 
   '@tailwindcss/postcss@4.3.3':
     resolution: {integrity: sha512-JTSZZGQi1AyKirbLN3azmjVzef92tcX7h+iSqPdaeStyFpGpDlKvvpxeOE8njhbUanbRwr3z8DyzhICWnMtQeg==}
+
+  '@tailwindcss/webpack@4.3.3':
+    resolution: {integrity: sha512-e7A7ubt+D+MzXAlQcOaDaHMD5oYzxULVdZVjLzGVStIXebGfD4RcVHxBSRP7xE+G8sS3o691zyfIbhm/veOLjQ==}
+    peerDependencies:
+      '@rspack/core': ^1.0.0 || ^2.0.0
+      webpack: ^5.0.0
+    peerDependenciesMeta:
+      '@rspack/core':
+        optional: true
+      webpack:
+        optional: true
 
   '@tanstack/history@1.162.2':
     resolution: {integrity: sha512-Lemp3DJbzNqcin/nZpWxycDaEqySDbnIshDbyHJMMCapD4ZQMe57szRpBXOfzfP6fyWAtHNrLrcBUyANJ6Vlow==}
@@ -26203,6 +26276,15 @@ snapshots:
       - supports-color
       - typescript
 
+  '@rsbuild/plugin-tailwindcss@2.0.3(@rsbuild/core@2.2.3(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0))(@rspack/core@2.2.2(@module-federation/runtime-tools@2.9.0)(@swc/helpers@0.5.23))':
+    dependencies:
+      '@tailwindcss/webpack': 4.3.3(@rspack/core@2.2.2(@module-federation/runtime-tools@2.9.0)(@swc/helpers@0.5.23))
+    optionalDependencies:
+      '@rsbuild/core': 2.2.3(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)
+    transitivePeerDependencies:
+      - '@rspack/core'
+      - webpack
+
   '@rsbuild/plugin-type-check@1.6.0(@rsbuild/core@2.2.3(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0))(@rspack/core@2.2.2(@module-federation/runtime-tools@2.9.0)(@swc/helpers@0.5.23))(@typescript/native-preview@7.0.0-dev.20260707.2)(typescript@7.0.2)':
     dependencies:
       deepmerge: 4.3.1
@@ -27068,6 +27150,15 @@ snapshots:
       '@tailwindcss/oxide': 4.3.3
       postcss: 8.5.28
       tailwindcss: 4.3.3
+
+  '@tailwindcss/webpack@4.3.3(@rspack/core@2.2.2(@module-federation/runtime-tools@2.9.0)(@swc/helpers@0.5.23))':
+    dependencies:
+      '@alloc/quick-lru': 5.2.0
+      '@tailwindcss/node': 4.3.3
+      '@tailwindcss/oxide': 4.3.3
+      tailwindcss: 4.3.3
+    optionalDependencies:
+      '@rspack/core': 2.2.2(@module-federation/runtime-tools@2.9.0)(@swc/helpers@0.5.23)
 
   '@tanstack/history@1.162.2': {}
 

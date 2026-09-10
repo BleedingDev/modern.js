@@ -17,6 +17,10 @@ const packageJson = `${JSON.stringify(
       pnpm: '>=11.24.0',
     },
     dependencies: {
+      '@modern-js/i18n-integration':
+        'npm:@bleedingdev/modern-js-i18n-integration@latest',
+      '@modern-js/runtime-renderer-extensions':
+        'npm:@bleedingdev/modern-js-runtime-renderer-extensions@latest',
       '@modern-js/plugin-i18n': 'npm:@bleedingdev/modern-js-plugin-i18n@latest',
       '@modern-js/plugin-tanstack':
         'npm:@bleedingdev/modern-js-plugin-tanstack@latest',
@@ -27,6 +31,8 @@ const packageJson = `${JSON.stringify(
       'react-dom': '19.2.8',
     },
     devDependencies: {
+      '@modern-js/ultramodern-app-tools':
+        'npm:@bleedingdev/modern-js-ultramodern-app-tools@latest',
       '@modern-js/app-tools': 'npm:@bleedingdev/modern-js-app-tools@latest',
       '@modern-js/tsconfig': 'npm:@bleedingdev/modern-js-tsconfig@latest',
       '@rsbuild/plugin-tailwindcss': '2.0.3',
@@ -66,7 +72,8 @@ const codeSandboxTasks = `${JSON.stringify(
   2,
 )}\n`;
 
-const modernConfig = `import { appTools, defineConfig } from '@modern-js/app-tools';
+const modernConfig = `import { defineConfig } from '@modern-js/app-tools';
+import { ultramodernAppTools } from '@modern-js/ultramodern-app-tools';
 import { i18nPlugin } from '@modern-js/plugin-i18n';
 import { tanstackRouterPlugin } from '@modern-js/plugin-tanstack';
 import { pluginTailwindcss } from '@rsbuild/plugin-tailwindcss';
@@ -81,7 +88,7 @@ export default defineConfig({
     buildCache: false,
   },
   plugins: [
-    appTools(),
+    ultramodernAppTools(),
     tanstackRouterPlugin(),
     i18nPlugin({
       htmlLangAttr: true,
@@ -95,12 +102,6 @@ export default defineConfig({
   ],
   server: {
     ssr: false,
-  },
-  source: {
-    alias: {
-      '@modern-js/plugin-i18n/runtime':
-        '@modern-js/plugin-i18n/runtime/no-react-i18next',
-    },
   },
 });
 `;
@@ -140,7 +141,7 @@ export default defineRuntimeConfig({
 });
 `;
 
-const layout = `import { useModernI18n } from '@modern-js/plugin-i18n/runtime';
+const layout = `import { useModernI18n } from '@modern-js/plugin-i18n/runtime/consumer';
 import { Link, Outlet } from '@modern-js/plugin-tanstack/runtime';
 
 export default function Layout() {
@@ -171,7 +172,7 @@ export default function Layout() {
 }
 `;
 
-const page = `import { useModernI18n } from '@modern-js/plugin-i18n/runtime';
+const page = `import { useModernI18n } from '@modern-js/plugin-i18n/runtime/consumer';
 import { Effect, pipe } from 'effect';
 import './index.css';
 
