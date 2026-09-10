@@ -5,7 +5,10 @@ import path from 'node:path';
 import { format } from 'oxfmt';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
 import { migrateBffBuildPluginImports } from '../src/ultramodern-tooling/commands/migrate-strict-effect/bff-build-plugin-migration';
-import { updateGeneratedModernConfigs } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-modern-configs';
+import {
+  migrateAppToolsConfigImports,
+  updateGeneratedModernConfigs,
+} from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-modern-configs';
 import { updateGeneratedTypeScriptSurfaces } from '../src/ultramodern-tooling/commands/migrate-strict-effect/generated-artifacts-typescript';
 import {
   generatedUiSourceRequiresRewrite,
@@ -1403,7 +1406,10 @@ test.each([
               '@modern-js/runtime-extensions/boundary-debugger',
               '@modern-js/boundary-debugger',
             )
-        : authored;
+        : authored.replaceAll(
+            '@modern-js/app-tools/config',
+            '@modern-js/app-tools-extensions/config',
+          );
       assert.equal(
         fs.readFileSync(path.join(root, file), 'utf8'),
         expected,
@@ -1519,7 +1525,13 @@ test.each([
       const authored = `${predecessor}\nexport const authoredBusinessPolicy = 'keep';\n`;
       fs.writeFileSync(file, authored);
       run();
-      assert.equal(fs.readFileSync(file, 'utf8'), authored);
+      assert.equal(
+        fs.readFileSync(file, 'utf8'),
+        authored.replaceAll(
+          '@modern-js/app-tools/config',
+          '@modern-js/app-tools-extensions/config',
+        ),
+      );
     }
     assert.ok(templateReads > 0);
   } finally {
@@ -1879,4 +1891,28 @@ test('historical JSON input migration preserves consumer bytes and requires gene
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('config import migration preserves authored bytes, comments, and ordinary strings', () => {
+  const source = [
+    '// import { example } from "@modern-js/app-tools/config";',
+    'import { getBuildConfigEnvironment as environment } from "@modern-js/app-tools/config";',
+    "import type { Config } from '@modern-js/app-tools/config';",
+    'export const text = "@modern-js/app-tools/config";',
+    'export default { custom: environment(), exposes: { "./Tractor": "./src/Tractor.tsx" } };',
+    '',
+  ].join('\r\n');
+  const expected = source
+    .replace(
+      'as environment } from "@modern-js/app-tools/config"',
+      'as environment } from "@modern-js/app-tools-extensions/config"',
+    )
+    .replace(
+      "{ Config } from '@modern-js/app-tools/config'",
+      "{ Config } from '@modern-js/app-tools-extensions/config'",
+    );
+  assert.equal(migrateAppToolsConfigImports(source), expected);
+  assert.equal(migrateAppToolsConfigImports(expected), expected);
+  const malformed = `${source}\nexport default {`;
+  assert.equal(migrateAppToolsConfigImports(malformed), malformed);
 });

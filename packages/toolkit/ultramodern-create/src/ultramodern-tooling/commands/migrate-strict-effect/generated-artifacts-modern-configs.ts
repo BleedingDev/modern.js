@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { parse } from '@babel/parser';
 import { configuredDevelopmentPorts } from '../../../ultramodern-workspace/add-vertical/workspace-state';
 import {
   createFederatedComponentsRegistry,
@@ -33,6 +34,33 @@ import {
 } from './generated-ui-source';
 import { type MigrationIo, readJsonFile } from './io';
 import { appDeclaresReactRouter } from './react-router-retirement';
+
+/** Move the former fork config subpath without rewriting authored programs. */
+export function migrateAppToolsConfigImports(source: string) {
+  let program;
+  try {
+    program = parse(source, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    }).program;
+  } catch {
+    return source;
+  }
+  let updated = source;
+  for (const statement of program.body.toReversed()) {
+    if (
+      statement.type !== 'ImportDeclaration' ||
+      statement.source.value !== '@modern-js/app-tools/config'
+    ) {
+      continue;
+    }
+    updated =
+      updated.slice(0, statement.source.start! + 1) +
+      '@modern-js/app-tools-extensions/config' +
+      updated.slice(statement.source.end! - 1);
+  }
+  return updated;
+}
 
 function writeOwnedTypeScriptConfig(
   io: MigrationIo,
@@ -258,8 +286,9 @@ export function updateGeneratedModernConfigs(
       io.writeGenerated(modernConfigPath, generatedModernConfig);
     } else {
       const existingModernConfig = fs.readFileSync(modernConfigPath, 'utf-8');
-      const migratedImports =
-        migrateBffBuildPluginImports(existingModernConfig);
+      const migratedImports = migrateAppToolsConfigImports(
+        migrateBffBuildPluginImports(existingModernConfig),
+      );
       if (
         !generatedUiSourceRequiresRewrite(
           migratedImports,
@@ -282,7 +311,7 @@ export function updateGeneratedModernConfigs(
         io.log(
           `${path.relative(io.workspaceRoot, modernConfigPath)} ` +
             (migratedImports !== existingModernConfig
-              ? 'migrated its BFF build imports; all other source was preserved because the Modern config is consumer-owned.'
+              ? 'migrated its framework config imports; all other source was preserved because the Modern config is consumer-owned.'
               : 'was preserved: an existing Modern config is consumer-owned unless its generated ownership can be proven.'),
         );
       }
@@ -345,6 +374,16 @@ export function updateGeneratedModernConfigs(
         generatedModuleFederationConfig,
         recognizedModuleFederationConfigs,
       );
+      if (fs.existsSync(moduleFederationConfigPath)) {
+        const existingConfig = fs.readFileSync(
+          moduleFederationConfigPath,
+          'utf8',
+        );
+        const migratedConfig = migrateAppToolsConfigImports(existingConfig);
+        if (migratedConfig !== existingConfig) {
+          io.write(moduleFederationConfigPath, migratedConfig);
+        }
+      }
     } else {
       removeOwnedTypeScriptConfig(
         io,
