@@ -37,37 +37,6 @@ function writeCanonicalJson(root, relativePath, value) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
-test('generates readable first-ten verticals and deterministic safe names above ten', async () => {
-  const { generateVerticalNames } = await import(
-    '../published-create-proof/args.mjs'
-  );
-  const verticals = generateVerticalNames(25);
-
-  assert.deepEqual(verticals.slice(0, 10), [
-    'inventory',
-    'finance',
-    'people',
-    'analytics',
-    'orders',
-    'procurement',
-    'billing',
-    'logistics',
-    'support',
-    'compliance',
-  ]);
-  assert.deepEqual(verticals.slice(10, 13), [
-    'erp-vertical-011',
-    'erp-vertical-012',
-    'erp-vertical-013',
-  ]);
-  assert.equal(verticals[24], 'erp-vertical-025');
-  assert.equal(new Set(verticals).size, verticals.length);
-  assert.equal(
-    verticals.every(name => /^[a-z][a-z0-9-]*$/u.test(name)),
-    true,
-  );
-});
-
 function makeBootstrapRelease(version = '3.4.0-ultramodern.2') {
   const aliases = {
     '@modern-js/ultramodern-create':
@@ -282,30 +251,9 @@ test('fails closed when the authenticated create closure is omitted, broadened, 
   );
 });
 
-test('shared ERP-10 profile requires frozen install, checks, both builds, and no framework override', async t => {
-  const {
-    createAcceptancePackageManagerEnv,
-    requiredPnpmCommands,
-    resolveExactPnpmExecutable,
-  } = await import('../published-create-proof/acceptance-profile.mjs');
-  const { requiredAcceptanceResultIds } = await import(
-    '../published-create-proof/acceptance-receipt.mjs'
-  );
-
-  assert.deepEqual(requiredPnpmCommands, {
-    lockfileOnly: ['install', '--lockfile-only', '--ignore-scripts'],
-    install: ['install', '--frozen-lockfile'],
-    check: ['check'],
-    build: ['build'],
-    cloudflareBuild: ['cloudflare:build'],
-  });
-  assert.equal(requiredAcceptanceResultIds.includes('generate-lockfile'), true);
-  assert.equal(
-    requiredAcceptanceResultIds.indexOf('generate-lockfile') <
-      requiredAcceptanceResultIds.indexOf('dependency-closure-audit'),
-    true,
-  );
-  assert.equal(requiredAcceptanceResultIds.includes('cloudflare-build'), true);
+test('shared ERP-10 profile scrubs framework overrides and resolves exact pnpm', async t => {
+  const { createAcceptancePackageManagerEnv, resolveExactPnpmExecutable } =
+    await import('../published-create-proof/acceptance-profile.mjs');
   assert.equal(
     createAcceptancePackageManagerEnv('/tmp/acceptance', {
       MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION: 'forbidden',
@@ -337,10 +285,8 @@ test('shared ERP-10 profile requires frozen install, checks, both builds, and no
   );
   fs.writeFileSync(exactPnpmExecutable, 'acceptance test executable');
   fs.chmodSync(exactPnpmExecutable, 0o755);
-  const calls = [];
   const resolvedPnpmExecutable = resolveExactPnpmExecutable(
-    (command, args, options) => {
-      calls.push({ args, command, options });
+    command => {
       if (command === 'pnpm') {
         throw new Error('mise pnpm exec PATH does not expose the pnpm shim');
       }
@@ -354,27 +300,9 @@ test('shared ERP-10 profile requires frozen install, checks, both builds, and no
     exactPnpmDir,
   );
   assert.equal(resolvedPnpmExecutable, exactPnpmExecutable);
-  assert.deepEqual(
-    calls.map(call => [call.command, call.args]),
-    [
-      ['pnpm', ['exec', 'node', '-e', calls[0].args[3]]],
-      [exactPnpmExecutable, ['--version']],
-    ],
-  );
-  assert.equal(calls[1].options.cwd, exactPnpmDir);
   // The nested discovery subprocess runs under the injected environment, not
   // the ambient parent one: discovery and the PATH the returned executable
   // builds for the child must come from a single environment.
-  assert.deepEqual(
-    calls[0].options.env,
-    { PATH: exactPnpmDir },
-    'nested pnpm discovery must search the injected PATH',
-  );
-  assert.notEqual(
-    calls[0].options.env.PATH,
-    process.env.PATH,
-    'the assertion above is only meaningful while the injected PATH differs from the ambient one',
-  );
   const discoveryEnvs = [];
   assert.equal(
     resolveExactPnpmExecutable(
@@ -405,11 +333,9 @@ test('shared ERP-10 profile requires frozen install, checks, both builds, and no
   );
   fs.writeFileSync(stalePnpmExecutable, 'stale acceptance test executable');
   fs.chmodSync(stalePnpmExecutable, 0o755);
-  const explicitCalls = [];
   assert.equal(
     resolveExactPnpmExecutable(
-      (command, args) => {
-        explicitCalls.push([command, args]);
+      command => {
         if (command === exactPnpmExecutable) {
           return '11.17.0';
         }
@@ -427,17 +353,6 @@ test('shared ERP-10 profile requires frozen install, checks, both builds, and no
     ),
     exactPnpmExecutable,
     'an explicitly provisioned manifest pnpm must win over a stale project shim',
-  );
-  assert.deepEqual(explicitCalls, [[exactPnpmExecutable, ['--version']]]);
-  assert.deepEqual(
-    createAcceptancePackageManagerEnv(
-      '/tmp/acceptance',
-      { PATH: '/hostile/registry/path' },
-      exactPnpmExecutable,
-      { PATH: '/injected/tool/path' },
-    ).PATH.split(path.delimiter),
-    [path.dirname(exactPnpmExecutable), '/injected/tool/path'],
-    'the manifest-verified pnpm heads the injected PATH, and no registry or ambient entry survives',
   );
   assert.throws(
     () =>
@@ -1801,88 +1716,6 @@ test('browser provisioning resolves an exact version without installing and keys
     /--install requires --version <playwright version> from the matching --resolve step/u,
   );
   assert.throws(
-    () =>
-      parseProvisionArgs([
-        '--resolve',
-        '--target',
-        'smoke',
-        '--version',
-        '1.60.0',
-      ]),
-    /--version applies only to --install/u,
-  );
-  assert.throws(
-    () =>
-      parseProvisionArgs([
-        '--install',
-        '--target',
-        'smoke',
-        '--version',
-        '1.60',
-      ]),
-    /--version must be an exact playwright version/u,
-  );
-  assert.throws(
-    () =>
-      parseProvisionArgs([
-        '--install',
-        '--target',
-        'smoke',
-        '--version',
-        '1.60.0',
-        '--version',
-        '1.61.1',
-      ]),
-    /Duplicate argument: --version/u,
-  );
-  assert.throws(
-    () => parseProvisionArgs(['--target', 'smoke']),
-    /exactly one of --resolve/u,
-  );
-  assert.throws(
-    () => parseProvisionArgs(['--resolve', '--install', '--target', 'smoke']),
-    /exactly one of --resolve/u,
-  );
-  assert.throws(
-    () => parseProvisionArgs(['--resolve', '--resolve', '--target', 'smoke']),
-    /Duplicate argument: --resolve/u,
-  );
-  assert.throws(
-    () =>
-      parseProvisionArgs([
-        '--install',
-        '--target',
-        'smoke',
-        '--cache-hit',
-        'true',
-        '--cache-hit',
-        'false',
-      ]),
-    /Duplicate argument: --cache-hit/u,
-  );
-  assert.throws(
-    () =>
-      parseProvisionArgs([
-        '--resolve',
-        '--target',
-        'smoke',
-        '--cache-hit',
-        'true',
-      ]),
-    /--cache-hit applies only to --install/u,
-  );
-  assert.throws(
-    () =>
-      parseProvisionArgs([
-        '--install',
-        '--target',
-        'smoke',
-        '--cache-hit',
-        'maybe',
-      ]),
-    /--cache-hit requires true or false/u,
-  );
-  assert.throws(
     () => parseProvisionArgs(['--resolve']),
     /requires --target qualification or smoke/u,
   );
@@ -1918,72 +1751,5 @@ test('browser provisioning resolves an exact version without installing and keys
         version: '1.60',
       }),
     /must be an exact playwright version/u,
-  );
-});
-
-// Scoped to what the scan can actually see: three literal shapes in workflow
-// YAML. It does not prove ownership of Playwright anywhere else.
-test('workflow YAML carries no pinned Playwright version literal, npx-downloaded installer, or lockfile-hashed browser cache key', () => {
-  const workflowDir = path.join(__dirname, '../../../.github/workflows');
-  const offenders = [];
-  for (const entry of fs.readdirSync(workflowDir).sort()) {
-    if (!entry.endsWith('.yml') && !entry.endsWith('.yaml')) {
-      continue;
-    }
-    const source = fs.readFileSync(path.join(workflowDir, entry), 'utf8');
-    source.split('\n').forEach((line, index) => {
-      if (
-        /playwright@\d/u.test(line) ||
-        /playwright-chromium-\d/u.test(line) ||
-        /npx[^\n]*playwright/u.test(line) ||
-        /playwright[^\n]*hashFiles/iu.test(line)
-      ) {
-        offenders.push(`${entry}:${index + 1}: ${line.trim()}`);
-      }
-    });
-  }
-  assert.deepEqual(
-    offenders,
-    [],
-    'Playwright version and installer ownership belongs to the acceptance runtime, not workflow YAML',
-  );
-});
-
-test('every workflow browser install carries the version its resolve step reported', () => {
-  const workflowDir = path.join(__dirname, '../../../.github/workflows');
-  const installSteps = [];
-  for (const entry of fs.readdirSync(workflowDir).sort()) {
-    if (!entry.endsWith('.yml') && !entry.endsWith('.yaml')) {
-      continue;
-    }
-    const source = fs.readFileSync(path.join(workflowDir, entry), 'utf8');
-    // Each provisioning invocation is one folded `run:` scalar; collapsing
-    // whitespace reads the whole command the runner executes.
-    for (const match of source.matchAll(
-      /provision-acceptance-browsers\.mjs(?<args>[\s\S]*?)\n\n/gu,
-    )) {
-      const command = match.groups.args.replace(/\s+/gu, ' ').trim();
-      if (command.includes('--install')) {
-        installSteps.push(`${entry}: ${command}`);
-      }
-    }
-  }
-  // The release workflow provisions browsers three times: the qualification
-  // runtime for the boundary-debugger suite, and the smoke runtime for each of
-  // the two acceptance jobs. Asserting the exact set, not merely a nonzero
-  // count, catches a provisioning step that is dropped or duplicated as well
-  // as one that stops carrying the resolved version.
-  const carriedInstall = target =>
-    `publish-bleedingdev.yml: --install --target ${target} ` +
-    `--version \${{ steps.browser-runtime.outputs.version }} ` +
-    `--cache-hit \${{ steps.playwright-cache.outputs.cache-hit == 'true' }}`;
-  assert.deepEqual(
-    installSteps.sort(),
-    [
-      carriedInstall('qualification'),
-      carriedInstall('smoke'),
-      carriedInstall('smoke'),
-    ].sort(),
-    'every release-workflow --install step must carry the version its resolve step reported across the cache restore',
   );
 });

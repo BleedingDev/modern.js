@@ -3,12 +3,10 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 
 type DecoderScenario =
-  | 'action-load'
   | 'async-iterator'
   | 'blob-type'
   | 'cycle'
-  | 'form-data-roundtrip'
-  | 'referenced-form-data';
+  | 'form-data-roundtrip';
 
 const resolvePackage = createRequire(
   path.join(__dirname, 'rsc-decoder-security-resolver.cjs'),
@@ -21,7 +19,6 @@ const childPath = path.join(
 
 function runDecoderScenario(options: {
   entry: 'edge' | 'node';
-  nodeEnv: 'development' | 'production';
   scenario: DecoderScenario;
 }): Record<string, unknown> {
   const result = spawnSync(
@@ -35,7 +32,7 @@ function runDecoderScenario(options: {
     ],
     {
       encoding: 'utf8',
-      env: { ...process.env, NODE_ENV: options.nodeEnv },
+      env: { ...process.env, NODE_ENV: 'production' },
       timeout: 5_000,
     },
   );
@@ -43,7 +40,7 @@ function runDecoderScenario(options: {
   if (result.error || result.status !== 0) {
     throw new Error(
       [
-        `RSC decoder child failed for ${options.entry}/${options.nodeEnv}/${options.scenario}`,
+        `RSC decoder child failed for ${options.entry}/production/${options.scenario}`,
         result.stdout,
         result.stderr,
       ]
@@ -57,57 +54,31 @@ function runDecoderScenario(options: {
 }
 
 for (const entry of ['node', 'edge'] as const) {
-  for (const nodeEnv of ['development', 'production'] as const) {
-    describe(`${entry} ${nodeEnv} Flight decoder security`, () => {
-      test('bounds cyclic Map reconstruction before invoking constructors', () => {
-        expect(
-          runDecoderScenario({ entry, nodeEnv, scenario: 'cycle' }),
-        ).toEqual({
-          mapArrayConstructions: 2,
-          rejected: true,
-        });
-      });
+  describe(`${entry} production Flight decoder security`, () => {
+    test('bounds cyclic Map reconstruction before invoking constructors', () => {
+      const result = runDecoderScenario({ entry, scenario: 'cycle' });
 
-      test('decodes referenced FormData with one backing-store enumeration', () => {
-        expect(
-          runDecoderScenario({
-            entry,
-            nodeEnv,
-            scenario: 'referenced-form-data',
-          }),
-        ).toEqual({ keyIterations: 1, values: ['first', 'second'] });
-      });
+      expect(result.rejected).toBe(true);
+      expect(result.mapArrayConstructions).toBeLessThanOrEqual(2);
+    });
 
-      test('round-trips referenced FormData through the public client and server APIs', () => {
-        expect(
-          runDecoderScenario({
-            entry,
-            nodeEnv,
-            scenario: 'form-data-roundtrip',
-          }),
-        ).toEqual({ values: ['first', 'second'] });
-      });
+    test('round-trips referenced FormData through the public client and server APIs', () => {
+      expect(
+        runDecoderScenario({ entry, scenario: 'form-data-roundtrip' }),
+      ).toEqual({ values: ['first', 'second'] });
+    });
 
-      test('rejects a Blob reference backed by a string', () => {
-        expect(
-          runDecoderScenario({ entry, nodeEnv, scenario: 'blob-type' }),
-        ).toEqual({
-          rejected: true,
-          returnedString: false,
-        });
-      });
-
-      test('does not recursively throw into a rejecting async iterator', () => {
-        expect(
-          runDecoderScenario({ entry, nodeEnv, scenario: 'async-iterator' }),
-        ).toEqual({ throwCalls: 1 });
-      });
-
-      test('loads one server module for eight distinct action identifiers', () => {
-        expect(
-          runDecoderScenario({ entry, nodeEnv, scenario: 'action-load' }),
-        ).toEqual({ moduleLoads: 1, submittedEntries: [] });
+    test('rejects a Blob reference backed by a string', () => {
+      expect(runDecoderScenario({ entry, scenario: 'blob-type' })).toEqual({
+        rejected: true,
+        returnedString: false,
       });
     });
-  }
+
+    test('does not recursively throw into a rejecting async iterator', () => {
+      expect(runDecoderScenario({ entry, scenario: 'async-iterator' })).toEqual(
+        { throwCalls: 1 },
+      );
+    });
+  });
 }

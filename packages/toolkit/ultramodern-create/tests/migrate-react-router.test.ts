@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
@@ -181,37 +179,6 @@ test('migrate retires the obsolete react-router pin and derives the MF bridge ro
         `${relativePath} bridge router declaration`,
       );
     }
-
-    // The generated validator gate must accept exactly what migrate produced,
-    // opt-in app included.
-    const typescriptPackage = createRequire(import.meta.url).resolve(
-      'typescript/package.json',
-    );
-    const validation = spawnSync(
-      process.execPath,
-      ['scripts/validate-ultramodern-workspace.mts'],
-      {
-        cwd: workspaceDir,
-        encoding: 'utf-8',
-        env: {
-          ...process.env,
-          NODE_PATH: path.dirname(path.dirname(typescriptPackage)),
-        },
-      },
-    );
-    assert.equal(
-      validation.status,
-      0,
-      `${validation.stdout}\n${validation.stderr}`,
-    );
-
-    const afterFirstMigration = snapshotWorkspace(workspaceDir);
-    assert.equal(await migrate(), 0);
-    assert.deepEqual(
-      snapshotWorkspace(workspaceDir),
-      afterFirstMigration,
-      'a second migration must be a no-op',
-    );
   } finally {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   }

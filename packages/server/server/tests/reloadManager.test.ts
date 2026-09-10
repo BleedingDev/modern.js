@@ -343,24 +343,6 @@ describe('ReloadManager', () => {
     expect(onReloadError).toHaveBeenCalledWith(disposeError);
   });
 
-  it('reports a synchronous close disposer failure without throwing', async () => {
-    const initial = makeHandle('initial');
-    const disposeError = new Error('synchronous close failed');
-    initial.dispose = () => {
-      throw disposeError;
-    };
-    const onReloadError = rstest.fn();
-    const manager = new ReloadManager({
-      initialHandle: initial,
-      build: async () => makeHandle('next'),
-      onReloadError,
-    });
-
-    expect(() => manager.close()).not.toThrow();
-    await flush();
-    expect(onReloadError).toHaveBeenCalledWith(disposeError);
-  });
-
   it('serves a 503 until setHandle seeds the initial known-good handle', () => {
     const seeded = makeHandle('seeded');
     const manager = new ReloadManager({

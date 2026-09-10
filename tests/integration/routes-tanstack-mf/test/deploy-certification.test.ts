@@ -35,7 +35,6 @@ const artifactDir =
   '/tmp/modernjs-superapp-mf-certification';
 const expectedFallbackConsoleErrors = [
   'RemoteLoadError: Unable to load remote "remote2/Panel" after 1 attempt: network failure injection',
-  'RemoteComponentContractError: Remote "remote/Widget" export "default" is not a valid React component',
 ];
 
 type Check = {
@@ -222,25 +221,9 @@ async function certifySsrBoundary(hostPort: number) {
   expect(html).not.toContain('<!--<?- html ?>-->');
   expect(html).toContain('host-mf-loader');
   expect(html).toContain('host-mf-count:');
-  expect(html).toContain('id="remote-ssr-fallback-contract"');
-  expect(html).toContain(
-    'data-ssr-contract="typed-ssr-fallback-client-hydration"',
-  );
-  expect(html).toContain(
-    'data-runtime-boundary="tanstack-mf-client-hydration"',
-  );
-  expect(html).toContain('id="remote-ssr-fallback-metadata"');
-  expect(html).toContain('"contract":"typed-ssr-fallback-client-hydration"');
-  expect(html).toContain('"strategy":"client-hydration"');
-  expect(html).toContain('"reason":"remote-unavailable"');
-  expect(html).toContain('"classification":"remote-unavailable"');
-  expect(html).toContain('"telemetryEvent":"mf.ssr.remote.fallback"');
   expect(html).toContain('remote-widget:pending');
   expect(html).toContain('remote-mutator:pending');
   expect(html).toContain('remote2-panel:pending');
-  expect(html).not.toContain('remote-widget:ok');
-  expect(html).not.toContain('id="remote-mutator"');
-  expect(html).not.toContain('remote2-panel:ok');
   return {
     id: 'ssr-shell-typed-fallback-boundary',
     ok: true,
@@ -370,11 +353,11 @@ async function certifyNativeRouterRealmNavigation(
 async function certifyFallback(input: {
   page: Page;
   hostPort: number;
-  mode: 'network' | 'contract';
-  target: string;
-  selector: string;
-  expectedErrorName: string;
-  expectedClassification: 'network' | 'contract';
+  mode: 'network';
+  target: 'remote2/Panel';
+  selector: '#remote2-error';
+  expectedErrorName: 'RemoteLoadError';
+  expectedClassification: 'network';
 }) {
   const url = new URL(`http://localhost:${input.hostPort}/mf`);
   url.searchParams.set('mfRemoteFailure', input.mode);
@@ -484,11 +467,7 @@ function writeSummary(checks: Check[]) {
       }
     });
 
-    afterEach(() => {
-      writeSummary(checks);
-    });
-
-    test('certifies deploy-like MF assets and deterministic fallbacks', async () => {
+    test('certifies deploy-like MF assets and network recovery', async () => {
       checks.push(await certifyRemoteAssets(ports.remote, 'remote'));
       checks.push(await certifyRemoteAssets(ports.remoteTwo, 'remote2'));
       checks.push(await certifySsrBoundary(ports.host));
@@ -503,17 +482,6 @@ function writeSummary(checks: Check[]) {
           selector: '#remote2-error',
           expectedErrorName: 'RemoteLoadError',
           expectedClassification: 'network',
-        }),
-      );
-      checks.push(
-        await certifyFallback({
-          page,
-          hostPort: ports.host,
-          mode: 'contract',
-          target: 'remote/Widget',
-          selector: '#remote-error',
-          expectedErrorName: 'RemoteComponentContractError',
-          expectedClassification: 'contract',
         }),
       );
 

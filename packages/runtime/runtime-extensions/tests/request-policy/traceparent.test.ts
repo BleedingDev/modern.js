@@ -4,19 +4,14 @@ describe('parseTraceparent', () => {
   const traceId = '4bf92f3577b34da6a3ce929d0e0e4736';
   const spanId = '00f067aa0ba902b7';
 
-  test('parses a valid sampled traceparent', () => {
-    expect(parseTraceparent(`00-${traceId}-${spanId}-01`)).toEqual({
+  test.each([
+    ['01', true],
+    ['00', false],
+  ])('parses a valid traceparent with flags %s', (flags, sampled) => {
+    expect(parseTraceparent(`00-${traceId}-${spanId}-${flags}`)).toEqual({
       traceId,
       spanId,
-      sampled: true,
-    });
-  });
-
-  test('parses a valid unsampled traceparent', () => {
-    expect(parseTraceparent(`00-${traceId}-${spanId}-00`)).toEqual({
-      traceId,
-      spanId,
-      sampled: false,
+      sampled,
     });
   });
 

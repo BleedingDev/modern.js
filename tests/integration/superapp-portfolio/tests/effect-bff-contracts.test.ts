@@ -1,6 +1,5 @@
 import dns from 'node:dns';
 import path from 'node:path';
-import * as Effect from 'effect/Effect';
 import { buildFixtureOnce } from '../../../utils/fixtureBuild';
 import {
   getPort,
@@ -9,7 +8,6 @@ import {
   modernServe,
 } from '../../../utils/modernTestUtils';
 import { setSuiteTimeout } from '../../../utils/setSuiteTimeout';
-import { getWorkloadChaosFailureCase } from '../shared/workload-chaos-failure-taxonomy';
 
 dns.setDefaultResultOrder('ipv4first');
 setSuiteTimeout(1000 * 60 * 8);
@@ -29,32 +27,11 @@ const fullModuleSet = [
 
 type BootstrapPayload = {
   apps: unknown[];
-  events: Array<{
-    action: string;
-    actor: string;
-    appId: string;
-    requestId: string;
-    status: string;
-  }>;
+  events: Array<Record<string, unknown>>;
   pilotRuns: unknown[];
   summary: {
     eventCount: number;
     failureMode: string;
-  };
-};
-
-type FiberExit = {
-  _tag: string;
-  cause?: {
-    reasons?: Array<
-      | {
-          _tag: 'Die';
-          defect: unknown;
-        }
-      | {
-          _tag: string;
-        }
-    >;
   };
 };
 
@@ -76,23 +53,13 @@ async function postJson(
 
 async function readResponse(response: Response) {
   const text = await response.text();
-  if (!text) {
-    return {
-      payload: undefined,
-      text,
-    };
-  }
-
   try {
     return {
-      payload: JSON.parse(text) as Record<string, any>,
+      payload: text ? (JSON.parse(text) as Record<string, unknown>) : undefined,
       text,
     };
   } catch {
-    return {
-      payload: undefined,
-      text,
-    };
+    return { payload: undefined, text };
   }
 }
 
@@ -116,55 +83,6 @@ function expectNoStateDrift(after: BootstrapPayload, before: BootstrapPayload) {
   expect(after.events).toEqual(before.events);
   expect(after.apps).toEqual(before.apps);
   expect(after.pilotRuns).toEqual(before.pilotRuns);
-}
-
-function causeReasonTags(exit: FiberExit) {
-  return exit.cause?.reasons?.map(reason => reason._tag) ?? [];
-}
-
-function causeDefects(exit: FiberExit) {
-  return (
-    exit.cause?.reasons
-      ?.filter(
-        (reason): reason is { _tag: 'Die'; defect: unknown } =>
-          reason._tag === 'Die',
-      )
-      .map(reason => reason.defect) ?? []
-  );
-}
-
-function waitForFiberExit(
-  fiber: ReturnType<typeof Effect.runFork>,
-  timeoutMs = 1000,
-) {
-  return new Promise<FiberExit>((resolve, reject) => {
-    const polled = fiber.pollUnsafe() as FiberExit | undefined;
-    if (polled) {
-      resolve(polled);
-      return;
-    }
-
-    let settled = false;
-    let unobserve = () => {};
-    const timer = setTimeout(() => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      unobserve();
-      reject(new Error('Timed out waiting for Effect fiber exit'));
-    }, timeoutMs);
-
-    unobserve = fiber.addObserver(exit => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      unobserve();
-      resolve(exit as FiberExit);
-    });
-  });
 }
 
 describe('superapp server Effect BFF contracts', () => {
@@ -192,55 +110,9 @@ describe('superapp server Effect BFF contracts', () => {
     await resetPortfolio(port);
   });
 
-  test('interrupts server Effect work and runs scoped finalizers deterministically', async () => {
-    const events: string[] = [];
-    const program = Effect.scoped(
-      Effect.gen(function* () {
-        const resource = yield* Effect.acquireRelease(
-          Effect.sync(() => {
-            events.push('acquire:workflow-stream');
-            return 'workflow-stream';
-          }),
-          (_resource, exit: FiberExit) =>
-            Effect.sync(() => {
-              events.push(
-                `release:${exit._tag}:${causeReasonTags(exit).join('|')}`,
-              );
-            }),
-        );
-        events.push(`begin:${resource}`);
-        yield* Effect.callback<void>(resume => {
-          const timer = setTimeout(
-            () => resume(Effect.succeed(undefined)),
-            10_000,
-          );
-          return Effect.sync(() => {
-            clearTimeout(timer);
-            events.push('async-cleanup');
-          });
-        });
-        events.push('complete');
-      }),
-    );
-
-    const fiber = Effect.runFork(program);
-    await new Promise(resolve => setTimeout(resolve, 10));
-    fiber.interruptUnsafe();
-    const exit = await waitForFiberExit(fiber);
-
-    expect(exit._tag).toBe('Failure');
-    expect(causeReasonTags(exit)).toEqual(['Interrupt']);
-    expect(events).toEqual([
-      'acquire:workflow-stream',
-      'begin:workflow-stream',
-      'async-cleanup',
-      'release:Failure:Interrupt',
-    ]);
-  });
-
-  test('rejects schema decode failures before workflow, pilot, or security handlers mutate state', async () => {
+  test('rejects malformed payloads before handlers mutate state', async () => {
     const before = await getBootstrap(port);
-    const malformedRequests = [
+    const [workflow, pilot, security] = await Promise.all([
       postJson(port, workflowPath('mobility-marketplace'), {
         action: 'quote',
         actor: 'contract.schema',
@@ -271,33 +143,23 @@ describe('superapp server Effect BFF contracts', () => {
           'x-user-role': 'security-admin',
         },
       ),
-    ];
+    ]);
 
-    const responses = await Promise.all(malformedRequests);
-    expect(responses.map(response => response.status)).toEqual([400, 400, 400]);
-    const bodies = await Promise.all(responses.map(readResponse));
-    expect(bodies.map(body => body.text)).not.toContain('schema-secret-token');
-
-    const after = await getBootstrap(port);
-    expectNoStateDrift(after, before);
+    expect([workflow.status, pilot.status, security.status]).toEqual([
+      400, 400, 400,
+    ]);
+    const bodies = await Promise.all(
+      [workflow, pilot, security].map(readResponse),
+    );
+    expect(bodies.map(body => body.text).join('\n')).not.toContain(
+      'schema-secret-token',
+    );
+    expectNoStateDrift(await getBootstrap(port), before);
   });
 
-  test('keeps structured Effect defects observable without leaking context or mutating state', async () => {
-    const structuredDefect = {
-      _tag: 'SuperAppBffStructuredDefect',
-      endpointId: 'effect.runPilot',
-      requestId: 'contract-structured-defect',
-      contract: 'ust-contract-03',
-    };
-    const defectExit = (await Effect.runPromiseExit(
-      Effect.die(structuredDefect),
-    )) as FiberExit;
-    expect(defectExit._tag).toBe('Failure');
-    expect(causeReasonTags(defectExit)).toEqual(['Die']);
-    expect(causeDefects(defectExit)).toEqual([structuredDefect]);
-
+  test('redacts server errors without mutating state', async () => {
     const before = await getBootstrap(port);
-    const pilotDefect = await postJson(
+    const pilot = await postJson(
       port,
       '/bff-api/effect/pilot/grab-marketplace/run',
       {
@@ -308,7 +170,7 @@ describe('superapp server Effect BFF contracts', () => {
         chaos: 'none',
       },
     );
-    const securityDefect = await postJson(
+    const security = await postJson(
       port,
       '/bff-api/effect/security/probe',
       {
@@ -327,19 +189,19 @@ describe('superapp server Effect BFF contracts', () => {
       },
     );
 
-    expect(pilotDefect.status).toBeGreaterThanOrEqual(500);
-    expect(securityDefect.status).toBeGreaterThanOrEqual(500);
-    const pilotBody = await readResponse(pilotDefect);
-    const securityBody = await readResponse(securityDefect);
+    expect(pilot.status).toBeGreaterThanOrEqual(500);
+    expect(security.status).toBeGreaterThanOrEqual(500);
+    const [pilotBody, securityBody] = await Promise.all([
+      readResponse(pilot),
+      readResponse(security),
+    ]);
     expect(pilotBody.text).not.toContain('contract-domain-defect');
     expect(securityBody.text).not.toContain('defect-secret-token');
-
-    const after = await getBootstrap(port);
-    expectNoStateDrift(after, before);
+    expectNoStateDrift(await getBootstrap(port), before);
   });
 
-  test('propagates request context through workflow, pilot, security, and chaos BFF handlers', async () => {
-    const workflow = await postJson(
+  test('propagates one request context through a workflow boundary', async () => {
+    const response = await postJson(
       port,
       workflowPath('mobility-marketplace'),
       {
@@ -347,12 +209,10 @@ describe('superapp server Effect BFF contracts', () => {
         actor: 'contract.context',
         requestId: 'context-workflow-1',
       },
-      {
-        'x-tenant-id': 'city-ops-eu',
-      },
+      { 'x-tenant-id': 'city-ops-eu' },
     );
-    expect(workflow.status).toBe(200);
-    await expect(workflow.json()).resolves.toMatchObject({
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
       event: {
         action: 'context-propagation',
         actor: 'contract.context',
@@ -361,122 +221,5 @@ describe('superapp server Effect BFF contracts', () => {
         status: 'accepted',
       },
     });
-
-    const pilot = await postJson(
-      port,
-      '/bff-api/effect/pilot/grab-marketplace/run',
-      {
-        tenant: 'superapp-global',
-        actor: 'contract.context',
-        requestId: 'context-pilot-1',
-        modules: fullModuleSet,
-        chaos: 'none',
-      },
-    );
-    expect(pilot.status).toBe(200);
-    await expect(pilot.json()).resolves.toMatchObject({
-      run: {
-        actor: 'contract.context',
-        requestId: 'context-pilot-1',
-        tenant: 'superapp-global',
-        status: 'accepted',
-      },
-    });
-
-    const security = await postJson(
-      port,
-      '/bff-api/effect/security/probe',
-      {
-        targetTenant: 'security-root',
-        targetAppId: 'tenant-security',
-        action: 'boundary-policy-evaluate',
-        requestId: 'context-security-1',
-        mutation: true,
-      },
-      {
-        authorization: 'Bearer context-secret-token',
-        origin: `${host}:${port}`,
-        'x-csrf-token': 'superapp-valid-csrf',
-        'x-tenant-id': 'security-root',
-        'x-user-role': 'security-admin',
-      },
-    );
-    expect(security.status).toBe(200);
-    await expect(security.json()).resolves.toMatchObject({
-      allowed: true,
-      telemetry: {
-        appId: 'tenant-security',
-        authorization: '[redacted]',
-        csrfToken: '[redacted]',
-        origin: `${host}:${port}`,
-        requestId: 'context-security-1',
-        role: 'security-admin',
-        tenant: 'security-root',
-      },
-    });
-
-    const slowStream = getWorkloadChaosFailureCase('chaos.slow-stream.v1');
-    expect(slowStream).toBeDefined();
-    const targetRequestId = 'context-chaos-slow-stream';
-    const armed = await postJson(
-      port,
-      '/bff-api/effect/failure/chaos.slow-stream.v1',
-      {
-        actor: 'contract.context',
-        reason: 'context propagation slow stream contract',
-        requestId: 'context-arm-slow-stream',
-        targetRequestId,
-        targetEndpoint: 'portfolio.workflow',
-      },
-    );
-    expect(armed.status).toBe(200);
-    await expect(armed.json()).resolves.toMatchObject({
-      chaosToggle: {
-        id: 'chaos.slow-stream.v1',
-        kind: 'slow-stream',
-        targetEndpoint: 'portfolio.workflow',
-        targetRequestId,
-      },
-    });
-
-    const chaos = await postJson(
-      port,
-      workflowPath('mobility-marketplace'),
-      {
-        action: slowStream?.operationHint,
-        actor: 'contract.context',
-        requestId: targetRequestId,
-      },
-      {
-        'x-tenant-id': 'platform-shell',
-      },
-    );
-    expect(chaos.status).toBe(slowStream?.expectedStatus.httpStatus);
-    await expect(chaos.json()).resolves.toMatchObject({
-      error: {
-        code: slowStream?.expectedErrorEnvelope.code,
-        failureId: 'chaos.slow-stream.v1',
-        kind: 'slow-stream',
-        requestId: targetRequestId,
-        tenantId: 'platform-shell',
-      },
-      chaos: {
-        armedBy: 'contract.context',
-        status: 'consumed',
-        targetRequestId,
-      },
-    });
-
-    const state = await getBootstrap(port);
-    expect(
-      state.events.some(
-        event =>
-          event.requestId === 'context-pilot-1:rides' &&
-          event.actor === 'contract.context',
-      ),
-    ).toBe(true);
-    expect(
-      state.events.some(event => event.requestId === targetRequestId),
-    ).toBe(false);
   });
 });

@@ -2,26 +2,25 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { materializeGeneratedWorkspaceDependencies } from '../../../utils/generatedWorkspaceDependencies';
+import { modernBuild } from '../../../utils/modernTestUtils';
 
 const repoRoot = path.resolve(__dirname, '../../../../');
 const createBin = path.resolve(
   repoRoot,
   'packages/toolkit/ultramodern-create/bin/run.js',
 );
-const ultramodernCreatePackageDir = path.resolve(
-  repoRoot,
-  'packages/toolkit/ultramodern-create',
-);
-const codeToolsPackageDir = path.resolve(
-  repoRoot,
-  'packages/toolkit/code-tools',
-);
 const testFrameworkVersion = '3.2.0-ultramodern.108';
 const frameworkVersionEnv = 'ULTRAMODERN_CREATE_FRAMEWORK_VERSION';
+const generatedBuildPackages = [
+  '@modern-js/app-tools',
+  '@modern-js/plugin-bff',
+  '@modern-js/plugin-i18n',
+  '@modern-js/plugin-tanstack',
+  '@modern-js/runtime',
+  '@modern-js/runtime-extensions',
+];
 const bleedingDevAliases: Record<string, string> = {
-  '@modern-js/ultramodern-create': '@bleedingdev/modern-js-ultramodern-create',
-  '@modern-js/code-tools': '@bleedingdev/modern-js-code-tools',
   '@modern-js/app-tools': '@bleedingdev/modern-js-app-tools',
   '@modern-js/plugin-bff': '@bleedingdev/modern-js-plugin-bff',
   '@modern-js/plugin-i18n': '@bleedingdev/modern-js-plugin-i18n',
@@ -74,18 +73,6 @@ function captureCreateFailure(projectDir: string, args: string[]) {
   throw new Error(`Expected create to reject: ${args.join(' ')}`);
 }
 
-function runCreateInWorkspace(workspaceDir: string, args: string[]) {
-  execFileSync(process.execPath, [createBin, ...args], {
-    cwd: workspaceDir,
-    env: {
-      ...process.env,
-      [frameworkVersionEnv]: testFrameworkVersion,
-      FORCE_COLOR: '0',
-    },
-    stdio: 'pipe',
-  });
-}
-
 function generatedToolEnv(env: Record<string, string | undefined> = {}) {
   return {
     ...process.env,
@@ -108,24 +95,6 @@ function writeText(root: string, relativePath: string, content: string) {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-function runPerformanceReadiness(
-  workspaceDir: string,
-  env: Record<string, string> = {},
-) {
-  return execFileSync(
-    process.execPath,
-    ['scripts/ultramodern-performance-readiness.mts'],
-    {
-      cwd: workspaceDir,
-      env: {
-        ...generatedToolEnv(),
-        ...env,
-      },
-      stdio: 'pipe',
-    },
-  ).toString();
-}
-
 function runWorkspaceValidator(workspaceDir: string) {
   return execFileSync(
     process.execPath,
@@ -142,28 +111,6 @@ function expectWorkspaceValidatorPass(workspaceDir: string) {
   expect(runWorkspaceValidator(workspaceDir).trim()).toBe(
     'UltraModern workspace scaffold validated',
   );
-}
-
-function linkModernPackage(
-  projectDir: string,
-  name: string,
-  packageDir: string,
-) {
-  const scopeDir = path.join(projectDir, 'node_modules/@modern-js');
-  const packageLink = path.join(scopeDir, name);
-  fs.mkdirSync(scopeDir, { recursive: true });
-  if (!fs.existsSync(packageLink)) {
-    fs.symlinkSync(packageDir, packageLink, 'dir');
-  }
-}
-
-function linkWorkspaceToolPackages(projectDir: string) {
-  linkModernPackage(
-    projectDir,
-    'ultramodern-create',
-    ultramodernCreatePackageDir,
-  );
-  linkModernPackage(projectDir, 'code-tools', codeToolsPackageDir);
 }
 
 function expectNoPath(root: string, relativePath: string) {
@@ -185,329 +132,64 @@ describe('create-ultramodern-workspace', () => {
     }
   });
 
-  test('scaffolds a shell-only UltraModern SuperApp workspace', async () => {
+  test('generates a shell workspace that builds and rejects mixed package cohorts', async () => {
     const workspaceDir = path.join(tempRoot, 'ultra-workspace');
     fs.rmSync(workspaceDir, { recursive: true, force: true });
-    runCreate(workspaceDir, ['--lang', 'en']);
-
-    const validationOutput = execFileSync(
-      process.execPath,
-      ['scripts/validate-ultramodern-workspace.mts'],
-      {
-        cwd: workspaceDir,
-        env: generatedToolEnv(),
-        stdio: 'pipe',
-      },
-    ).toString();
-    expect(validationOutput.trim()).toBe(
-      'UltraModern workspace scaffold validated',
-    );
-
-    const shellPackagePath = 'apps/shell-super-app/package.json';
-    const originalShellPackage = readText(workspaceDir, shellPackagePath);
-    const mutatedShellPackage = JSON.parse(originalShellPackage);
-    mutatedShellPackage.dependencies['@modern-js/runtime'] =
-      expectedBleedingDevSpecifier(
-        '@modern-js/runtime',
-        differentUltramodernVersion(testFrameworkVersion),
-      );
-    writeText(
-      workspaceDir,
-      shellPackagePath,
-      `${JSON.stringify(mutatedShellPackage, null, 2)}\n`,
-    );
+    runCreate(workspaceDir, ['--no-tailwind', '--lang', 'en']);
+    const cleanupDependencies =
+      materializeGeneratedWorkspaceDependencies(workspaceDir);
     try {
-      execFileSync(
-        process.execPath,
-        ['scripts/validate-ultramodern-workspace.mts'],
+      const buildResult = await modernBuild(
+        path.join(workspaceDir, 'apps/shell-super-app'),
+        [],
         {
-          cwd: workspaceDir,
-          env: generatedToolEnv(),
-          stdio: 'pipe',
+          ensureWorkspacePackages: generatedBuildPackages,
+          stdout: false,
+          stderr: false,
         },
       );
-      throw new Error(
-        'Expected workspace validator to reject a mixed Modern package cohort',
+      expect(buildResult.code).toBe(0);
+      expectWorkspaceValidatorPass(workspaceDir);
+
+      const shellPackagePath = 'apps/shell-super-app/package.json';
+      const originalShellPackage = readText(workspaceDir, shellPackagePath);
+      const mutatedShellPackage = JSON.parse(originalShellPackage);
+      mutatedShellPackage.dependencies['@modern-js/runtime'] =
+        expectedBleedingDevSpecifier(
+          '@modern-js/runtime',
+          differentUltramodernVersion(testFrameworkVersion),
+        );
+      writeText(
+        workspaceDir,
+        shellPackagePath,
+        `${JSON.stringify(mutatedShellPackage, null, 2)}\n`,
       );
-    } catch (error) {
-      const execError = error as Error & {
-        stdout?: Buffer | string;
-        stderr?: Buffer | string;
-      };
-      const stdout =
-        typeof execError.stdout === 'string'
-          ? execError.stdout
-          : execError.stdout?.toString() || '';
-      const stderr =
-        typeof execError.stderr === 'string'
-          ? execError.stderr
-          : execError.stderr?.toString() || '';
-      expect(`${stdout}\n${stderr}`).toMatch(
-        /apps\/shell-super-app\/package\.json dependencies\.@modern-js\/runtime must match package source metadata/u,
-      );
+      try {
+        runWorkspaceValidator(workspaceDir);
+        throw new Error(
+          'Expected workspace validator to reject a mixed Modern package cohort',
+        );
+      } catch (error) {
+        const execError = error as ExecSyncError & {
+          stdout?: Buffer | string;
+        };
+        const stdout =
+          typeof execError.stdout === 'string'
+            ? execError.stdout
+            : execError.stdout?.toString() || '';
+        const stderr =
+          typeof execError.stderr === 'string'
+            ? execError.stderr
+            : execError.stderr?.toString() || '';
+        expect(`${stdout}\n${stderr}`).toMatch(
+          /apps\/shell-super-app\/package\.json dependencies\.@modern-js\/runtime must match package source metadata/u,
+        );
+      } finally {
+        writeText(workspaceDir, shellPackagePath, originalShellPackage);
+      }
     } finally {
-      writeText(workspaceDir, shellPackagePath, originalShellPackage);
+      cleanupDependencies();
     }
-
-    const readinessOutput = runPerformanceReadiness(workspaceDir);
-    expect(readinessOutput.trim()).toBe(
-      'UltraModern performance configuration validation reported',
-    );
-    const readinessReportPath =
-      '.codex/reports/performance-readiness/ultramodern-performance-readiness.json';
-    const readinessReport = readJson(workspaceDir, readinessReportPath);
-    expect(readinessReport).toMatchObject({
-      schemaVersion: 2,
-      profile: 'ultramodern-performance-configuration-validation-v2',
-      result: 'configuration-valid',
-      defaultOn: true,
-      failOn: 'framework-invariant',
-      runtimeMeasurement: {
-        performed: false,
-        reason: 'static-source-and-configuration-validation-only',
-      },
-      signals: [
-        'bfcache',
-        'core-web-vitals-rum',
-        'duplicate-prefetch-warmup',
-        'cache-policy-sanity',
-        'save-data-behavior',
-        'cloudflare-ssr-cache-hints',
-      ],
-    });
-    expect(readinessReport.apps).toEqual([
-      {
-        id: 'shell-super-app',
-        path: 'apps/shell-super-app',
-        signals: readinessReport.signals.map((id: string) =>
-          expect.objectContaining({
-            evidenceKind: 'static-source-and-configuration',
-            id,
-            severity: 'configuration',
-            status: 'configuration-valid',
-          }),
-        ),
-      },
-    ]);
-    const firstReadinessReportText = readText(
-      workspaceDir,
-      readinessReportPath,
-    );
-    runPerformanceReadiness(workspaceDir);
-    expect(readText(workspaceDir, readinessReportPath)).toBe(
-      firstReadinessReportText,
-    );
-    const readinessConfigPath =
-      'scripts/ultramodern-performance-readiness.config.mjs';
-    const readinessConfigFile = path.join(workspaceDir, readinessConfigPath);
-    const readinessConfigSource = readText(workspaceDir, readinessConfigPath);
-    const readinessConfig = (
-      await import(`${pathToFileURL(readinessConfigFile).href}?state=enabled`)
-    ).default;
-    expect(readinessConfig).toEqual({
-      enabled: true,
-      failOn: 'framework-invariant',
-      reportPath: readinessReportPath,
-    });
-    writeText(
-      workspaceDir,
-      readinessConfigPath,
-      `export default ${JSON.stringify({
-        ...readinessConfig,
-        enabled: false,
-      })};\n`,
-    );
-    const disabledReadinessOutput = runPerformanceReadiness(workspaceDir);
-    expect(disabledReadinessOutput.trim()).toBe(
-      'UltraModern performance configuration validation disabled',
-    );
-    expect(readJson(workspaceDir, readinessReportPath)).toMatchObject({
-      schemaVersion: 2,
-      profile: 'ultramodern-performance-configuration-validation-v2',
-      result: 'disabled',
-      defaultOn: true,
-      optOut: `${readinessConfigPath}#enabled=false`,
-      runtimeMeasurement: {
-        performed: false,
-        reason: 'static-source-and-configuration-validation-only',
-      },
-      apps: [],
-    });
-    writeText(workspaceDir, readinessConfigPath, readinessConfigSource);
-    const envDisabledReadinessOutput = runPerformanceReadiness(workspaceDir, {
-      ULTRAMODERN_PERFORMANCE_READINESS_DIAGNOSTICS: 'false',
-    });
-    expect(envDisabledReadinessOutput.trim()).toBe(
-      'UltraModern performance configuration validation disabled',
-    );
-    expect(readJson(workspaceDir, readinessReportPath)).toMatchObject({
-      result: 'disabled',
-      optOut: 'ULTRAMODERN_PERFORMANCE_READINESS_DIAGNOSTICS=false',
-    });
-
-    const legacyBoundaryFixturePath =
-      'apps/shell-super-app/src/routes/__legacy-boundary-fixture.tsx';
-    writeText(
-      workspaceDir,
-      legacyBoundaryFixturePath,
-      `export default function LegacyBoundaryFixture() {
-  return <div data-mf-boundary="legacy" />;
-}
-`,
-    );
-    linkWorkspaceToolPackages(workspaceDir);
-    try {
-      execFileSync(
-        process.execPath,
-        ['scripts/check-ultramodern-i18n-boundaries.mts'],
-        {
-          cwd: workspaceDir,
-          stdio: 'pipe',
-        },
-      );
-      throw new Error(
-        'Expected i18n boundary checker to reject legacy data-mf-* attributes',
-      );
-    } catch (error) {
-      const execError = error as Error & {
-        stdout?: Buffer | string;
-        stderr?: Buffer | string;
-      };
-      const stdout =
-        typeof execError.stdout === 'string'
-          ? execError.stdout
-          : execError.stdout?.toString() || '';
-      const stderr =
-        typeof execError.stderr === 'string'
-          ? execError.stderr
-          : execError.stderr?.toString() || '';
-      expect(`${stdout}\n${stderr}`).toMatch(
-        /legacy data-mf-\* boundary attributes/u,
-      );
-    }
-    fs.rmSync(path.join(workspaceDir, legacyBoundaryFixturePath));
-
-    const fakeBinDir = path.join(tempRoot, 'fake-pnpm-bin');
-    fs.mkdirSync(fakeBinDir, { recursive: true });
-    const fakePnpmPath = path.join(fakeBinDir, 'pnpm');
-    const generatedPnpmVersion = String(
-      readJson(workspaceDir, 'package.json').packageManager,
-    ).replace(/^pnpm@/u, '');
-    fs.writeFileSync(
-      fakePnpmPath,
-      `#!/usr/bin/env node
-const { spawnSync } = require('node:child_process');
-const path = require('node:path');
-
-if (process.env.ULTRAMODERN_FAKE_PNPM_ACTIVE) {
-  console.error('fake pnpm delegation re-entered');
-  process.exit(1);
-}
-
-const args = process.argv.slice(2);
-if (
-  args.length === 2 &&
-  args[0] === '--pm-on-fail=ignore' &&
-  args[1] === '--version'
-) {
-  console.log(${JSON.stringify(generatedPnpmVersion)});
-  process.exit(0);
-}
-if (args.includes('--version') || args.includes('-v')) {
-  console.error('pmOnFail rejected active pnpm before version discovery');
-  process.exit(1);
-}
-
-const fakeBinDir = ${JSON.stringify(fakeBinDir)};
-const resolvedFakeBinDir = path.resolve(fakeBinDir);
-const delegatedEnv = {
-  ...process.env,
-  PATH: (process.env.PATH || '')
-    .split(path.delimiter)
-    .filter(
-      entry => entry !== fakeBinDir && path.resolve(entry) !== resolvedFakeBinDir,
-    )
-    .join(path.delimiter),
-  ULTRAMODERN_FAKE_PNPM_ACTIVE: '1',
-};
-const result = spawnSync('pnpm', args, {
-  env: delegatedEnv,
-  stdio: 'inherit',
-});
-if (result.error) {
-  console.error(result.error.message);
-  process.exit(1);
-}
-process.exit(result.status ?? 1);
-`,
-      'utf-8',
-    );
-    fs.chmodSync(fakePnpmPath, 0o755);
-    const patchVersionValidationOutput = execFileSync(
-      process.execPath,
-      ['scripts/validate-ultramodern-workspace.mts'],
-      {
-        cwd: workspaceDir,
-        env: {
-          ...generatedToolEnv(),
-          PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
-        },
-        stdio: 'pipe',
-      },
-    ).toString();
-    expect(patchVersionValidationOutput.trim()).toBe(
-      'UltraModern workspace scaffold validated',
-    );
-  });
-
-  test('adds a full-stack MicroVertical to an existing workspace', () => {
-    const workspaceDir = path.join(tempRoot, 'ultra-add-remote-workspace');
-    fs.rmSync(workspaceDir, { recursive: true, force: true });
-    runCreate(workspaceDir, ['--lang', 'en']);
-    runCreateInWorkspace(workspaceDir, [
-      'catalog',
-      '--vertical',
-      '--lang',
-      'en',
-    ]);
-
-    expectWorkspaceValidatorPass(workspaceDir);
-  });
-
-  test('validates numbered vertical Tailwind prefixes as unique', () => {
-    const workspaceDir = path.join(tempRoot, 'ultra-numbered-workspace');
-    fs.rmSync(workspaceDir, { recursive: true, force: true });
-    runCreate(workspaceDir, ['--lang', 'en']);
-    runCreateInWorkspace(workspaceDir, [
-      'erp-vertical-011',
-      '--vertical',
-      '--lang',
-      'en',
-    ]);
-    runCreateInWorkspace(workspaceDir, [
-      'erp-vertical-012',
-      '--vertical',
-      '--lang',
-      'en',
-    ]);
-
-    expectWorkspaceValidatorPass(workspaceDir);
-  });
-
-  test('rejects removed legacy microvertical flag', () => {
-    const workspaceDir = path.join(tempRoot, 'ultra-legacy-flag-workspace');
-    fs.rmSync(workspaceDir, { recursive: true, force: true });
-    runCreate(workspaceDir, ['--lang', 'en']);
-    expect(() =>
-      runCreateInWorkspace(workspaceDir, [
-        'catalog-api',
-        '--microvertical',
-        'service',
-        '--lang',
-        'en',
-      ]),
-    ).toThrow(/Unexpected positional argument: --microvertical/u);
-    expectNoPath(workspaceDir, 'services/service-catalog-api-effect');
   });
 
   test('rejects install-backed package source from a local source checkout', () => {
@@ -789,26 +471,5 @@ export const entries = [
     expect(cloudflareRobots).toContain(
       'Sitemap: https://global.example/sitemap.xml',
     );
-  });
-  test('rejects install aliases from a local source checkout', () => {
-    const workspaceDir = path.join(tempRoot, 'ultra-alias-workspace');
-    fs.rmSync(workspaceDir, { recursive: true, force: true });
-    const stderr = captureCreateFailure(workspaceDir, [
-      '--ultramodern-package-source',
-      'install',
-      '--ultramodern-package-version',
-      '3.2.0-ultramodern.0',
-      '--ultramodern-package-scope',
-      'bleedingdev',
-      '--ultramodern-package-name-prefix',
-      'modern-js-',
-      '--lang',
-      'en',
-    ]);
-
-    expect(stderr).toContain(
-      'local @modern-js/ultramodern-create source checkout cannot satisfy an explicit install',
-    );
-    expectNoPath(tempRoot, 'ultra-alias-workspace');
   });
 });

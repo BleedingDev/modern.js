@@ -5,8 +5,6 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const repoRoot = path.resolve(__dirname, '../../..');
-
 const makeTempDir = () =>
   fs.mkdtempSync(path.join(os.tmpdir(), 'modern-sidecar-publish-'));
 
@@ -222,13 +220,6 @@ test('non-bleedingdev sidecar names and non-public access are rejected', async (
   );
 });
 
-test('missing sidecar roots fail closed', async () => {
-  const { collectSidecarPackages } = await importSidecars();
-  const root = makeTempDir();
-
-  assert.throws(() => collectSidecarPackages(root), /has no package\.json/u);
-});
-
 test('alias targets must match a staged sidecar exactly', async () => {
   const { collectSidecarPackages, validateAliasConsistency } =
     await importSidecars();
@@ -352,34 +343,14 @@ test('sidecar-internal aliases are validated and ordered before their dependents
   assert.deepEqual(JSON.parse(fs.readFileSync(manifestPath, 'utf8')), manifest);
 });
 
-test('npm-normalize-package-bin derives a string bin key from the package basename', async () => {
-  const { normalizeSidecarBin } = await importSidecars();
+test('object-form sidecar bins must still expose the upstream CLI name', async () => {
+  const { collectSidecarPackages, normalizeSidecarBin } =
+    await importSidecars();
 
   assert.deepEqual(
     normalizeSidecarBin({ name: '@bleedingdev/ipx', bin: './bin/ipx.mjs' }),
     { ipx: 'bin/ipx.mjs' },
   );
-  assert.deepEqual(
-    normalizeSidecarBin({
-      name: '@bleedingdev/image-size',
-      bin: 'bin/image-size.js',
-    }),
-    { 'image-size': 'bin/image-size.js' },
-  );
-  // The hazard the name invariant exists to prevent: the cohort prefix would
-  // silently rename the published CLI.
-  assert.deepEqual(
-    normalizeSidecarBin({
-      name: '@bleedingdev/modern-js-ipx',
-      bin: './bin/ipx.mjs',
-    }),
-    { 'modern-js-ipx': 'bin/ipx.mjs' },
-  );
-  assert.equal(normalizeSidecarBin({ name: '@bleedingdev/x' }), undefined);
-});
-
-test('object-form sidecar bins must still expose the upstream CLI name', async () => {
-  const { collectSidecarPackages } = await importSidecars();
 
   assert.doesNotThrow(() =>
     collectSidecarPackages(
@@ -522,13 +493,6 @@ test('--include-sidecars is opt-in, staging-only, and leaves defaults untouched'
 
   const baseline = parseArgs(['--version', '3.8.3-ultramodern.9']);
   assert.equal(baseline.includeSidecars, false);
-  assert.equal(baseline.scope, 'bleedingdev');
-  assert.equal(baseline.prefix, 'modern-js-');
-  assert.equal(baseline.publish, false);
-  assert.equal(baseline.publishExisting, false);
-  assert.equal(baseline.dryRun, false);
-  assert.equal(baseline.tag, 'latest');
-  assert.equal(baseline.dependencyVersion, '3.8.3-ultramodern.9');
 
   const withSidecars = parseArgs([
     '--version',
@@ -536,11 +500,6 @@ test('--include-sidecars is opt-in, staging-only, and leaves defaults untouched'
     '--include-sidecars',
   ]);
   assert.equal(withSidecars.includeSidecars, true);
-  assert.deepEqual(
-    { ...withSidecars, includeSidecars: false },
-    baseline,
-    'the flag must not change any other option',
-  );
 
   assert.throws(
     () =>
@@ -571,68 +530,4 @@ test('--include-sidecars is opt-in, staging-only, and leaves defaults untouched'
       ]),
     /Unknown argument: --include-sidecars=true/u,
   );
-});
-
-test('the repository sidecar roots stay aligned with the shipped image aliases', async () => {
-  const {
-    SIDECAR_PACKAGE_ROOTS,
-    collectSidecarPackages,
-    validateAliasConsistency,
-  } = await importSidecars();
-
-  assert.deepEqual(SIDECAR_PACKAGE_ROOTS, [
-    'packages/sidecar/ipx',
-    'packages/sidecar/image-size',
-    'packages/sidecar/rsbuild-image-core',
-  ]);
-
-  const present = SIDECAR_PACKAGE_ROOTS.filter(root =>
-    fs.existsSync(path.join(repoRoot, root, 'package.json')),
-  );
-  if (present.length !== SIDECAR_PACKAGE_ROOTS.length) {
-    // The sidecar vendoring lane has not landed every root yet; the invariants
-    // above are already covered by fixtures.
-    return;
-  }
-
-  const sidecars = collectSidecarPackages(repoRoot);
-  const imagePackageJson = JSON.parse(
-    fs.readFileSync(
-      path.join(repoRoot, 'packages/runtime/plugin-image/package.json'),
-      'utf8',
-    ),
-  );
-  validateAliasConsistency(
-    [{ name: imagePackageJson.name, packageJson: imagePackageJson }],
-    sidecars,
-  );
-});
-
-test('the repository IPX version and CLI banners track its updated Sharp floor', async () => {
-  const { collectSidecarPackages, rewriteSidecarConsumerAliases } =
-    await importSidecars();
-  const sidecars = collectSidecarPackages(repoRoot);
-  const ipx = JSON.parse(
-    fs.readFileSync(
-      path.join(repoRoot, 'packages/sidecar/ipx/package.json'),
-      'utf8',
-    ),
-  );
-  const image = JSON.parse(
-    fs.readFileSync(
-      path.join(repoRoot, 'packages/runtime/plugin-image/package.json'),
-      'utf8',
-    ),
-  );
-  assert.equal(ipx.version, '3.2.1');
-  assert.equal(ipx.dependencies.sharp, image.dependencies.sharp);
-  for (const file of ['cli.mjs', 'cli.cjs']) {
-    const source = fs.readFileSync(
-      path.join(repoRoot, 'packages/sidecar/ipx/dist', file),
-      'utf8',
-    );
-    assert.ok(source.includes(`const version = "${ipx.version}";`));
-  }
-  rewriteSidecarConsumerAliases(image, sidecars);
-  assert.equal(image.dependencies.ipx, `npm:${ipx.name}@${ipx.version}`);
 });

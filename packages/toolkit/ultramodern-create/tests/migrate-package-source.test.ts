@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { createMigrationPackageSource } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-source';
 import { readUltramodernConfig } from '../src/ultramodern-tooling/config';
+import { createPackageRoot } from '../src/ultramodern-workspace/fs-io';
 import { createWorkspace } from './helpers/workspace-kit';
 
 const migrationVersion = '3.8.2-ultramodern.7';
@@ -12,10 +14,21 @@ test('migration preserves persisted install and workspace registries unless the 
     { tempPrefix: 'um-migration-package-source-registry-' },
   );
   let sourceCheckoutSpy: ReturnType<typeof rstest.spyOn> | undefined;
-
   try {
     const current = readUltramodernConfig(workspaceDir);
-    sourceCheckoutSpy = rstest.spyOn(fs, 'existsSync').mockReturnValue(false);
+    const checkoutPath = path.join(createPackageRoot, 'src');
+    const actualExistsSync = fs.existsSync.bind(fs);
+    sourceCheckoutSpy = rstest
+      .spyOn(fs, 'existsSync')
+      .mockImplementation(candidate => {
+        if (
+          typeof candidate === 'string' &&
+          path.resolve(candidate) === checkoutPath
+        ) {
+          return false;
+        }
+        return actualExistsSync(candidate);
+      });
 
     for (const registry of [
       'https://registry.npmjs.org/',
@@ -39,8 +52,10 @@ test('migration preserves persisted install and workspace registries unless the 
 
     const overrideRegistry = 'https://override.example.test/npm/';
     assert.equal(
-      createMigrationPackageSource(['--registry', overrideRegistry], current)
-        .registry,
+      createMigrationPackageSource(
+        ['--workspace', '--registry', overrideRegistry],
+        current,
+      ).registry,
       overrideRegistry,
     );
     assert.equal(

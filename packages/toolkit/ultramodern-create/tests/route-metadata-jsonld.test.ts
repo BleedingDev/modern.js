@@ -137,7 +137,22 @@ const values = [
   organizationJsonLd({ name: 'Organization' }),
 ];
 const routeValue = defineRouteJsonLd(values);
-if (routeValue !== values || values.some(value => value['@context'] !== 'https://schema.org')) {
+const expectedTypes = [
+  'WebPage',
+  'WebApplication',
+  'SoftwareApplication',
+  'BreadcrumbList',
+  'FAQPage',
+  'Organization',
+];
+if (
+  routeValue !== values ||
+  values.some(
+    (value, index) =>
+      value['@context'] !== 'https://schema.org' ||
+      value['@type'] !== expectedTypes[index],
+  )
+) {
   throw new Error('generated JSON-LD builders violated their runtime contract');
 }
 `,

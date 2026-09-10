@@ -3,123 +3,32 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { rstest } from '@rstest/core';
+import puppeteer from 'puppeteer';
+import { materializeGeneratedWorkspaceDependencies } from '../../../utils/generatedWorkspaceDependencies';
+import {
+  getPort,
+  killApp,
+  launchOptions,
+  modernBuild,
+  modernServe,
+} from '../../../utils/modernTestUtils';
 
 const repoRoot = path.resolve(__dirname, '../../../../');
 const createBin = path.resolve(
   repoRoot,
   'packages/toolkit/ultramodern-create/bin/run.js',
 );
-const expectedEffectVersion = '4.0.0-rc.112';
+const frameworkVersionEnv = 'ULTRAMODERN_CREATE_FRAMEWORK_VERSION';
+const testFrameworkVersion = '3.2.0-ultramodern.108';
+const generatedBuildPackages = [
+  '@modern-js/app-tools',
+  '@modern-js/plugin-bff',
+  '@modern-js/plugin-i18n',
+  '@modern-js/plugin-tanstack',
+  '@modern-js/runtime',
+  '@modern-js/runtime-extensions',
+];
 const shellAppPath = 'apps/shell-super-app';
-
-function readJson<T = any>(baseDir: string, relativePath: string): T {
-  return JSON.parse(fs.readFileSync(path.join(baseDir, relativePath), 'utf-8'));
-}
-
-function expectPnpm11OrNewerPackageManager(packageManager: unknown): string {
-  expect(typeof packageManager).toBe('string');
-  const match = /^pnpm@(\d+)\.(\d+)\.(\d+)$/u.exec(String(packageManager));
-  expect(match).not.toBeNull();
-  expect(Number(match?.[1])).toBeGreaterThanOrEqual(11);
-  return `${match?.[1]}.${match?.[2]}.${match?.[3]}`;
-}
-
-interface MiseToolState {
-  active: boolean;
-  installed: boolean;
-  requested_version: string;
-  source: {
-    path: string;
-    type: string;
-  };
-  version: string;
-}
-
-function readActiveMiseTool(projectDir: string, tool: string): MiseToolState {
-  const output = execFileSync(
-    'mise',
-    ['ls', '--json', '--current', '-C', projectDir, tool],
-    {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
-  const tools = JSON.parse(output) as MiseToolState[];
-  expect(tools).toHaveLength(1);
-  return tools[0];
-}
-
-function readPnpmVersionFromMise(projectDir: string): string {
-  return execFileSync(
-    'mise',
-    ['exec', '-C', projectDir, '--', 'pnpm', '--version'],
-    {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  ).trim();
-}
-
-function readPnpmConfig<T = any>(
-  projectDir: string,
-  key: string,
-): T | undefined {
-  const env = { ...process.env };
-  for (const envKey of Object.keys(env)) {
-    if (/^(?:npm|pnpm)_config_/i.test(envKey)) {
-      delete env[envKey];
-    }
-  }
-  const output = execFileSync('pnpm', ['config', 'get', key, '--json'], {
-    cwd: projectDir,
-    env,
-    encoding: 'utf-8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-  return output ? JSON.parse(output) : undefined;
-}
-
-function expectPnpm11Policy(projectDir: string) {
-  expect(readPnpmConfig(projectDir, 'minimumReleaseAge')).toBe(1440);
-  expect(readPnpmConfig(projectDir, 'minimumReleaseAgeStrict')).toBe(true);
-  expect(readPnpmConfig(projectDir, 'minimumReleaseAgeIgnoreMissingTime')).toBe(
-    false,
-  );
-  const minimumReleaseAgeExclude = readPnpmConfig<string[]>(
-    projectDir,
-    'minimumReleaseAgeExclude',
-  );
-  expect(Array.isArray(minimumReleaseAgeExclude)).toBe(true);
-  expect(minimumReleaseAgeExclude).toEqual([
-    ...new Set(minimumReleaseAgeExclude),
-  ]);
-  expect(
-    minimumReleaseAgeExclude?.every(selector => selector.lastIndexOf('@') > 0),
-  ).toBe(true);
-  expect(
-    minimumReleaseAgeExclude?.some(selector => selector.includes('*')),
-  ).toBe(false);
-  expect(
-    minimumReleaseAgeExclude?.some(selector =>
-      selector.startsWith('@bleedingdev/modern-js-'),
-    ),
-  ).toBe(false);
-  expect(readPnpmConfig(projectDir, 'trustPolicy')).toBe('no-downgrade');
-  expect(readPnpmConfig(projectDir, 'trustPolicyIgnoreAfter')).toBe(1440);
-  expect(
-    new Set(readPnpmConfig<string[]>(projectDir, 'trustPolicyExclude')),
-  ).toEqual(
-    new Set([
-      `effect@${expectedEffectVersion}`,
-      `@effect/opentelemetry@${expectedEffectVersion}`,
-    ]),
-  );
-  expect(readPnpmConfig(projectDir, 'blockExoticSubdeps')).toBe(true);
-  expect(readPnpmConfig(projectDir, 'engineStrict')).toBe(true);
-  expect(readPnpmConfig(projectDir, 'pmOnFail')).toBe('error');
-  expect(readPnpmConfig(projectDir, 'verifyDepsBeforeRun')).toBe('error');
-  expect(readPnpmConfig(projectDir, 'strictDepBuilds')).toBe(true);
-}
 
 function runCreate(cwd: string, args: string[]) {
   execFileSync(process.execPath, [createBin, ...args], {
@@ -127,28 +36,57 @@ function runCreate(cwd: string, args: string[]) {
     env: {
       ...process.env,
       FORCE_COLOR: '0',
+      [frameworkVersionEnv]: testFrameworkVersion,
     },
     stdio: 'pipe',
   });
 }
 
+async function buildAndReadShellBackground(
+  workspaceDir: string,
+  expectedBackground: string,
+) {
+  const appDir = path.join(workspaceDir, shellAppPath);
+  const buildResult = await modernBuild(appDir, [], {
+    ensureWorkspacePackages: generatedBuildPackages,
+    stdout: false,
+    stderr: false,
+  });
+  expect(buildResult.code).toBe(0);
+
+  const port = await getPort();
+  const server = await modernServe(appDir, port, {
+    ensureWorkspacePackages: generatedBuildPackages,
+  });
+  const browser = await puppeteer.launch(launchOptions as any);
+  const page = await browser.newPage();
+  try {
+    await page.goto(`http://127.0.0.1:${port}/en/`, {
+      waitUntil: 'networkidle0',
+    });
+    const background = await page.$eval(
+      'main',
+      element => getComputedStyle(element).backgroundColor,
+    );
+    expect(background).toBe(expectedBackground);
+  } finally {
+    await page.close();
+    await browser.close();
+    await killApp(server);
+  }
+}
+
 describe('create-tailwind', () => {
   let tempRoot = '';
-  let withTailwindDir = '';
-  let withoutTailwindDir = '';
 
   beforeAll(() => {
     rstest.setConfig({
-      testTimeout: 1000 * 60 * 3,
-      hookTimeout: 1000 * 60 * 3,
+      testTimeout: 1000 * 60 * 5,
+      hookTimeout: 1000 * 60 * 5,
     });
     tempRoot = fs.mkdtempSync(
       path.join(os.tmpdir(), 'modern-create-tailwind-'),
     );
-    withTailwindDir = path.join(tempRoot, 'with-tailwind');
-    withoutTailwindDir = path.join(tempRoot, 'without-tailwind');
-    runCreate(tempRoot, ['with-tailwind', '--lang', 'en']);
-    runCreate(tempRoot, ['without-tailwind', '--no-tailwind', '--lang', 'en']);
   });
 
   afterAll(() => {
@@ -157,123 +95,51 @@ describe('create-tailwind', () => {
     }
   });
 
-  test('scaffolds Tailwind v4 in the generated workspace by default', () => {
-    const shellDir = path.join(withTailwindDir, shellAppPath);
-    expect(fs.existsSync(path.join(shellDir, 'tailwind.config.ts'))).toBe(true);
-    expect(fs.existsSync(path.join(shellDir, 'postcss.config.mjs'))).toBe(
-      false,
-    );
-    expect(
-      fs.existsSync(path.join(shellDir, 'src/routes/[lang]/page.tsx')),
-    ).toBe(true);
+  test('builds Tailwind-enabled and opt-out generated shells', async () => {
+    const withTailwindDir = path.join(tempRoot, 'with-tailwind');
+    const withoutTailwindDir = path.join(tempRoot, 'without-tailwind');
+    const generatedDirs = [withTailwindDir, withoutTailwindDir];
+    // A failed generated build can leave its destination behind before the
+    // runner retries the test.  Keep each attempt independent of those
+    // partial outputs so the generator reaches the actual build assertion.
+    for (const generatedDir of generatedDirs) {
+      fs.rmSync(generatedDir, { recursive: true, force: true });
+    }
 
-    const shellPackage = readJson(shellDir, 'package.json');
-    expect(shellPackage.devDependencies.tailwindcss).toBe('^4.3.3');
-    expect(shellPackage.devDependencies['@rsbuild/plugin-tailwindcss']).toBe(
-      '^2.0.3',
-    );
-    const shellModernConfig = fs.readFileSync(
-      path.join(shellDir, 'modern.config.ts'),
-      'utf-8',
-    );
-    expect(shellModernConfig).toContain('pluginTailwindcss()');
-    expect(shellModernConfig).not.toContain('optimize: false');
-  });
+    try {
+      runCreate(tempRoot, ['with-tailwind', '--lang', 'en']);
+      runCreate(tempRoot, [
+        'without-tailwind',
+        '--no-tailwind',
+        '--lang',
+        'en',
+      ]);
 
-  test('supports --no-tailwind opt-out', () => {
-    const shellDir = path.join(withoutTailwindDir, shellAppPath);
-    expect(fs.existsSync(path.join(shellDir, 'tailwind.config.ts'))).toBe(
-      false,
-    );
-    expect(fs.existsSync(path.join(shellDir, 'postcss.config.mjs'))).toBe(
-      false,
-    );
-
-    const shellPackage = readJson(shellDir, 'package.json');
-    expect(shellPackage.devDependencies.tailwindcss).toBeUndefined();
-    expect(
-      shellPackage.devDependencies['@rsbuild/plugin-tailwindcss'],
-    ).toBeUndefined();
-  });
-
-  test('adds a Tailwind-enabled vertical to a Tailwind workspace', () => {
-    runCreate(withTailwindDir, ['catalog', '--vertical', '--lang', 'en']);
-
-    const verticalDir = path.join(withTailwindDir, 'verticals/catalog');
-    expect(fs.existsSync(path.join(verticalDir, 'tailwind.config.ts'))).toBe(
-      true,
-    );
-    const verticalPackage = readJson(verticalDir, 'package.json');
-    expect(verticalPackage.devDependencies.tailwindcss).toBe('^4.3.3');
-    const verticalModernConfig = fs.readFileSync(
-      path.join(verticalDir, 'modern.config.ts'),
-      'utf-8',
-    );
-    expect(verticalModernConfig).toContain('pluginTailwindcss()');
-    expect(verticalModernConfig).not.toContain('optimize: false');
-  });
-
-  test('vertical inherits --no-tailwind workspace setting', () => {
-    runCreate(withoutTailwindDir, ['billing', '--vertical', '--lang', 'en']);
-
-    const verticalDir = path.join(withoutTailwindDir, 'verticals/billing');
-    expect(fs.existsSync(path.join(verticalDir, 'package.json'))).toBe(true);
-    expect(fs.existsSync(path.join(verticalDir, 'tailwind.config.ts'))).toBe(
-      false,
-    );
-    const verticalPackage = readJson(verticalDir, 'package.json');
-    expect(verticalPackage.devDependencies.tailwindcss).toBeUndefined();
-  });
-
-  test('uses workspace links for a local source checkout', () => {
-    expect(
-      fs.existsSync(
-        path.join(withTailwindDir, '.modernjs/ultramodern-package-source.json'),
-      ),
-    ).toBe(false);
-    expect(
-      fs.existsSync(
-        path.join(withTailwindDir, '.modernjs/release-cohort.json'),
-      ),
-    ).toBe(false);
-
-    const ultramodernConfig = readJson(
-      withTailwindDir,
-      '.modernjs/ultramodern.json',
-    );
-    expect(ultramodernConfig.packageSource).toEqual({
-      strategy: 'workspace',
-      modernPackageVersion: 'workspace:*',
-    });
-
-    const shellPackage = readJson(
-      path.join(withTailwindDir, shellAppPath),
-      'package.json',
-    );
-    expect(shellPackage.dependencies['@modern-js/runtime']).toBe('workspace:*');
-    expect(shellPackage.devDependencies['@modern-js/app-tools']).toBe(
-      'workspace:*',
-    );
-  });
-
-  test('pins the pnpm toolchain and hardening policy on the workspace root', () => {
-    const rootPackage = readJson(withTailwindDir, 'package.json');
-    const pnpmVersion = expectPnpm11OrNewerPackageManager(
-      rootPackage.packageManager,
-    );
-    expect(rootPackage.engines.pnpm).toBe('>=11');
-    const misePnpm = readActiveMiseTool(withTailwindDir, 'pnpm');
-    expect(misePnpm).toMatchObject({
-      active: true,
-      installed: true,
-      requested_version: pnpmVersion,
-      source: {
-        path: fs.realpathSync(path.join(withTailwindDir, '.mise.toml')),
-        type: 'mise.toml',
-      },
-      version: pnpmVersion,
-    });
-    expect(readPnpmVersionFromMise(withTailwindDir)).toBe(pnpmVersion);
-    expectPnpm11Policy(withTailwindDir);
+      const cleanupDependencies: Array<() => void> = [];
+      try {
+        cleanupDependencies.push(
+          materializeGeneratedWorkspaceDependencies(withTailwindDir),
+        );
+        cleanupDependencies.push(
+          materializeGeneratedWorkspaceDependencies(withoutTailwindDir),
+        );
+        await buildAndReadShellBackground(
+          withTailwindDir,
+          'rgb(241, 234, 220)',
+        );
+        await buildAndReadShellBackground(
+          withoutTailwindDir,
+          'rgba(0, 0, 0, 0)',
+        );
+      } finally {
+        for (const cleanup of cleanupDependencies.reverse()) {
+          cleanup();
+        }
+      }
+    } finally {
+      for (const generatedDir of generatedDirs) {
+        fs.rmSync(generatedDir, { recursive: true, force: true });
+      }
+    }
   });
 });

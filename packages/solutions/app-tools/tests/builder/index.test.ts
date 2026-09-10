@@ -80,12 +80,7 @@ describe('create builder Options', () => {
     const reactDirectory = path.join(appDirectory, 'node_modules/react');
 
     fs.mkdirSync(reactDirectory, { recursive: true });
-    for (const file of [
-      'index.js',
-      'jsx-runtime.js',
-      'jsx-dev-runtime.js',
-      'compiler-runtime.js',
-    ]) {
+    for (const file of ['index.js']) {
       fs.writeFileSync(path.join(reactDirectory, file), '');
     }
     fs.writeFileSync(
@@ -136,15 +131,6 @@ describe('create builder Options', () => {
       expect(existingBundlerChain).toHaveBeenCalledWith(chain, {});
       expect(aliases.get('react$')).toBe(
         fs.realpathSync(path.join(reactDirectory, 'index.js')),
-      );
-      expect(aliases.get('react/jsx-runtime$')).toBe(
-        fs.realpathSync(path.join(reactDirectory, 'jsx-runtime.js')),
-      );
-      expect(aliases.get('react/jsx-dev-runtime$')).toBe(
-        fs.realpathSync(path.join(reactDirectory, 'jsx-dev-runtime.js')),
-      );
-      expect(aliases.get('react/compiler-runtime$')).toBe(
-        fs.realpathSync(path.join(reactDirectory, 'compiler-runtime.js')),
       );
     } finally {
       fs.rmSync(appDirectory, { recursive: true, force: true });

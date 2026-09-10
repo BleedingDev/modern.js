@@ -49,33 +49,24 @@ describe('Effect batch telemetry isolation', () => {
     rs.restoreAllMocks();
   });
 
-  test('settles requests when the event callback throws', async () => {
-    const addEvent = rs.fn();
+  test.each([
+    'event callback',
+    'active-span event emission',
+  ] as const)('settles requests when the %s observer throws', async observer => {
+    const callbackError = new Error(`${observer} failed`);
+    const onEvent = rs.fn(() => {
+      if (observer === 'event callback') {
+        throw callbackError;
+      }
+    });
+    const addEvent = rs.fn(() => {
+      if (observer === 'active-span event emission') {
+        throw callbackError;
+      }
+    });
     rs.spyOn(trace, 'getActiveSpan').mockReturnValue({
       addEvent,
     } as unknown as Span);
-    const callbackError = new Error('observer failed');
-    const { bucketRegistry, request } = createQueue(() => {
-      throw callbackError;
-    });
-
-    await expect(
-      Promise.all([
-        request('http://localhost/first'),
-        request('http://localhost/second'),
-      ]),
-    ).resolves.toEqual([{ path: '/first' }, { path: '/second' }]);
-    expect(bucketRegistry.size).toBe(0);
-    expect(addEvent).toHaveBeenCalled();
-  });
-
-  test('settles requests when active-span event emission throws', async () => {
-    rs.spyOn(trace, 'getActiveSpan').mockReturnValue({
-      addEvent: () => {
-        throw new Error('telemetry exporter failed');
-      },
-    } as unknown as Span);
-    const onEvent = rs.fn();
     const { bucketRegistry, request } = createQueue(onEvent);
 
     await expect(
@@ -86,5 +77,6 @@ describe('Effect batch telemetry isolation', () => {
     ).resolves.toEqual([{ path: '/first' }, { path: '/second' }]);
     expect(bucketRegistry.size).toBe(0);
     expect(onEvent).toHaveBeenCalled();
+    expect(addEvent).toHaveBeenCalled();
   });
 });

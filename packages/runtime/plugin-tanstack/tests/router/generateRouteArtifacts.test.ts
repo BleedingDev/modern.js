@@ -1,19 +1,11 @@
-// Behavioral coverage for the headless routes-generate entry point: the
-// export-shape test in cli.test.ts would pass even if the body were
-// reverted, so this file pins the actual prepare-only drive contract —
-// createRunOptions against the app dir, cli.init with build-command
-// semantics, the MODERN_ARGV gate that makes analyze.onPrepare fire
-// generateEntryCode, and the absolute config-file resolution that keeps
-// headless runs (cwd != appDirectory) from feeding `false` into node's
-// path APIs.
+// The headless entry must drive the real TanStack artifact writer. Checking
+// only the createRunOptions/cli.init choreography would allow a no-op CLI to
+// pass while leaving router.gen.ts stale or missing.
 const createRunOptionsMock = rstest.fn(async (options: unknown) => ({
   mockRunOptions: true,
   received: options,
 }));
-const cliInitMock = rstest.fn(async (options: unknown) => ({
-  appContext: {},
-  received: options,
-}));
+const cliInitMock = rstest.fn(async () => ({ appContext: {} }));
 
 rstest.mock('@modern-js/app-tools/cli/run', () => ({
   createRunOptions: createRunOptionsMock,
@@ -26,7 +18,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { INTERNAL_RUNTIME_PLUGINS } from '@modern-js/utils';
-import { generateTanstackRouteArtifacts } from '../../src/cli';
+import {
+  generateTanstackRouteArtifacts,
+  writeTanstackRouterTypesForEntries,
+} from '../../src/cli';
 
 function makeAppDir(withConfig: boolean): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tanstack-routes-gen-'));
@@ -46,9 +41,55 @@ describe('generateTanstackRouteArtifacts (headless routes-generate)', () => {
     cliInitMock.mockClear();
   });
 
-  it('drives a prepare-only cli.init with build-command semantics', async () => {
+  it('writes a real route artifact through the prepare-only CLI drive', async () => {
     const previousArgv = process.env.MODERN_ARGV;
     const appDirectory = makeAppDir(true);
+    const srcDirectory = path.join(appDirectory, 'src');
+    const componentPath = path.join(srcDirectory, 'routes', 'page.tsx');
+    fs.mkdirSync(path.dirname(componentPath), { recursive: true });
+    fs.writeFileSync(
+      componentPath,
+      'export default function Page() { return null; }\n',
+      'utf-8',
+    );
+
+    const runOptions = {
+      cwd: appDirectory,
+      version: '9.9.9-test',
+      internalPlugins: INTERNAL_RUNTIME_PLUGINS,
+      configFile: path.resolve(appDirectory, 'modern.config'),
+    };
+    createRunOptionsMock.mockResolvedValue({
+      mockRunOptions: true,
+      received: runOptions,
+    });
+    cliInitMock.mockImplementation(async () => {
+      await writeTanstackRouterTypesForEntries({
+        appContext: {
+          srcDirectory,
+          internalSrcAlias: '@/_',
+          entrypoints: [{ entryName: 'main', isMainEntry: true }],
+        } as any,
+        routesByEntry: {
+          main: [
+            {
+              type: 'nested',
+              id: 'layout',
+              isRoot: true,
+              children: [
+                {
+                  type: 'nested',
+                  id: 'page',
+                  index: true,
+                  _component: '@/_/routes/page',
+                },
+              ],
+            },
+          ] as any,
+        },
+      });
+      return { appContext: {} };
+    });
 
     try {
       await generateTanstackRouteArtifacts({
@@ -61,26 +102,25 @@ describe('generateTanstackRouteArtifacts (headless routes-generate)', () => {
         string,
         unknown
       >;
-      expect(runOptionsArg.cwd).toBe(appDirectory);
-      expect(runOptionsArg.version).toBe('9.9.9-test');
-      expect(runOptionsArg.internalPlugins).toBe(INTERNAL_RUNTIME_PLUGINS);
-
-      // The config file is resolved to an absolute base path against the app
-      // directory (not process.cwd()). Without this, a headless run from a
-      // different cwd finds no config, `findExists` returns `false`, and that
-      // boolean reaches `path.isAbsolute` deep inside plugin/cli.
-      expect(runOptionsArg.configFile).toBe(
-        path.resolve(appDirectory, 'modern.config'),
-      );
+      expect(runOptionsArg).toEqual(runOptions);
 
       expect(cliInitMock).toHaveBeenCalledTimes(1);
       const initArg = cliInitMock.mock.calls[0][0] as Record<string, unknown>;
       expect(initArg.command).toBe('build');
       expect(initArg.mockRunOptions).toBe(true);
-
-      // checkIsBuildCommands() resolves the command from MODERN_ARGV — this
-      // is what lets analyze.onPrepare fire generateEntryCode headlessly.
       expect(process.env.MODERN_ARGV).toBe('node modern build');
+
+      const routerArtifact = fs.readFileSync(
+        path.join(srcDirectory, 'modern-tanstack', 'main', 'router.gen.ts'),
+        'utf-8',
+      );
+      const registerArtifact = fs.readFileSync(
+        path.join(srcDirectory, 'modern-tanstack', 'register.gen.d.ts'),
+        'utf-8',
+      );
+      expect(routerArtifact).toContain('createRootRouteWithContext');
+      expect(routerArtifact).toContain('routeTree');
+      expect(registerArtifact).toContain('./main/router.gen');
     } finally {
       fs.rmSync(appDirectory, { force: true, recursive: true });
       if (previousArgv === undefined) {
@@ -91,7 +131,7 @@ describe('generateTanstackRouteArtifacts (headless routes-generate)', () => {
     }
   });
 
-  it('throws a clear error (never a boolean path crash) when no config file exists', async () => {
+  it('throws a clear error when no config file exists', async () => {
     const appDirectory = makeAppDir(false);
 
     try {

@@ -9,33 +9,23 @@ function expectError(input: string, error: SurfaceRefParseError) {
   expect(parseSurfaceRef(input)).toEqual({ ok: false, error });
 }
 
+const validReferences: Array<[string, ParsedSurfaceRef]> = [
+  ['acme/checkout#cart', { unitId: 'acme/checkout', surfaceId: 'cart' }],
+  [
+    'acme/checkout#cart@v2',
+    { unitId: 'acme/checkout', surfaceId: 'cart', major: 2 },
+  ],
+  ['checkout#cart@v10', { unitId: 'checkout', surfaceId: 'cart', major: 10 }],
+  [
+    'Acme-2/check_out.v1#Cart_2.x-y',
+    { unitId: 'Acme-2/check_out.v1', surfaceId: 'Cart_2.x-y' },
+  ],
+];
+
 describe('parseSurfaceRef', () => {
-  it('parses a coordinated-zone reference', () => {
-    expect(parseSurfaceRef('acme/checkout#cart')).toEqual({
-      ok: true,
-      ref: { unitId: 'acme/checkout', surfaceId: 'cart' },
-    });
-  });
-
-  it('parses an external-major reference', () => {
-    expect(parseSurfaceRef('acme/checkout#cart@v2')).toEqual({
-      ok: true,
-      ref: { unitId: 'acme/checkout', surfaceId: 'cart', major: 2 },
-    });
-  });
-
-  it('parses single-segment unit ids and multi-digit majors', () => {
-    expect(parseSurfaceRef('checkout#cart@v10')).toEqual({
-      ok: true,
-      ref: { unitId: 'checkout', surfaceId: 'cart', major: 10 },
-    });
-  });
-
-  it('allows the full SegmentChar alphabet', () => {
-    expect(parseSurfaceRef('Acme-2/check_out.v1#Cart_2.x-y')).toEqual({
-      ok: true,
-      ref: { unitId: 'Acme-2/check_out.v1', surfaceId: 'Cart_2.x-y' },
-    });
+  it.each(validReferences)('parses and formats %s', (input, ref) => {
+    expect(parseSurfaceRef(input)).toEqual({ ok: true, ref });
+    expect(formatSurfaceRef(ref)).toBe(input);
   });
 
   it('rejects empty input', () => {
@@ -85,35 +75,6 @@ describe('parseSurfaceRef', () => {
 });
 
 describe('formatSurfaceRef', () => {
-  it('formats coordinated and external references', () => {
-    expect(
-      formatSurfaceRef({ unitId: 'acme/checkout', surfaceId: 'cart' }),
-    ).toBe('acme/checkout#cart');
-    expect(
-      formatSurfaceRef({
-        unitId: 'acme/checkout',
-        surfaceId: 'cart',
-        major: 2,
-      }),
-    ).toBe('acme/checkout#cart@v2');
-  });
-
-  it('round-trips every valid reference', () => {
-    const inputs = [
-      'acme/checkout#cart',
-      'acme/checkout#cart@v2',
-      'checkout#cart@v10',
-      'A.b-c_d/e#f-g_h.i@v123',
-    ];
-    for (const input of inputs) {
-      const parsed = parseSurfaceRef(input);
-      expect(parsed.ok).toBe(true);
-      if (parsed.ok) {
-        expect(formatSurfaceRef(parsed.ref)).toBe(input);
-      }
-    }
-  });
-
   it('throws for invalid direct inputs with the shared invariant', () => {
     const invalid: Array<[ParsedSurfaceRef, string]> = [
       [{ unitId: '', surfaceId: 'cart' }, 'empty-unit-id'],

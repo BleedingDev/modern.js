@@ -1,12 +1,18 @@
-import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { build, getHrefByEntryName } from '@scripts/shared';
 import { join, resolve } from 'path';
 
 const fixtures = __dirname;
 
-const getLinks = async (
-  page: Page,
+const getAttribute = (tag: string, name: string): string | null => {
+  const match = new RegExp(
+    `(?:^|\\s)${name}\\b(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+)))?`,
+    'i',
+  ).exec(tag);
+  return match ? (match[1] ?? match[2] ?? match[3] ?? '') : null;
+};
+
+const getLinks = (
   files: Record<string, string>,
   rel: 'dns-prefetch' | 'preconnect',
 ) => {
@@ -14,13 +20,13 @@ const getLinks = async (
     name.endsWith('index.html'),
   )?.[1];
   expect(html).toBeDefined();
-  await page.setContent(html!);
-  return page.locator(`link[rel="${rel}"]`).evaluateAll(links =>
-    links.map(link => ({
-      crossOrigin: link.getAttribute('crossorigin'),
-      href: link.getAttribute('href'),
-    })),
-  );
+  return [...(html ?? '').matchAll(/<link\b[^>]*>/gi)]
+    .map(match => match[0])
+    .filter(tag => getAttribute(tag, 'rel') === rel)
+    .map(tag => ({
+      crossOrigin: getAttribute(tag, 'crossorigin'),
+      href: getAttribute(tag, 'href'),
+    }));
 };
 
 test.describe('performance configure multi', () => {
@@ -77,9 +83,7 @@ test('should generate and execute a vendor chunk when splitChunks.preset is "sin
   builder.close();
 });
 
-test('should generate preconnect link when preconnect is defined', async ({
-  page,
-}) => {
+test('should generate preconnect link when preconnect is defined', async () => {
   const builder = await build({
     cwd: join(fixtures, 'basic'),
     entry: {
@@ -101,7 +105,7 @@ test('should generate preconnect link when preconnect is defined', async ({
   });
 
   const files = await builder.unwrapOutputJSON();
-  const links = await getLinks(page, files, 'preconnect');
+  const links = getLinks(files, 'preconnect');
 
   expect(links).toEqual([
     { crossOrigin: null, href: 'http://aaaa.com' },
@@ -109,9 +113,7 @@ test('should generate preconnect link when preconnect is defined', async ({
   ]);
 });
 
-test('should generate dnsPrefetch link when dnsPrefetch is defined', async ({
-  page,
-}) => {
+test('should generate dnsPrefetch link when dnsPrefetch is defined', async () => {
   const builder = await build({
     cwd: join(fixtures, 'basic'),
     entry: {
@@ -125,7 +127,7 @@ test('should generate dnsPrefetch link when dnsPrefetch is defined', async ({
   });
 
   const files = await builder.unwrapOutputJSON();
-  const links = await getLinks(page, files, 'dns-prefetch');
+  const links = getLinks(files, 'dns-prefetch');
 
   expect(links).toEqual([{ crossOrigin: null, href: 'http://aaaa.com' }]);
 });

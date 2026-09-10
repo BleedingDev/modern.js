@@ -1,30 +1,18 @@
-const callableLoadable = Object.assign(rstest.fn(), {
-  lazy: rstest.fn(),
-  loadableReady: rstest.fn(),
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    Context: 'loadable-context',
-  },
-});
-
-rstest.mock('@loadable/component', () => ({
-  default: {
-    default: callableLoadable,
-    lazy: callableLoadable.lazy,
-    loadableReady: callableLoadable.loadableReady,
-    __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:
-      callableLoadable.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED,
-  },
-}));
+import * as loadableDependency from '@loadable/component';
+import loadable, { lazy, loadableReady } from '../../src/exports/loadable';
 
 describe('runtime loadable export', () => {
-  test('unwraps nested CommonJS default exports to the callable loadable function', async () => {
-    const loadable = await import('../../src/exports/loadable');
+  test('imports the real dependency and creates callable loadable components', () => {
+    expect(typeof loadableDependency.default).toBe('function');
+    expect(typeof loadable).toBe('function');
+    expect(typeof lazy).toBe('function');
+    expect(typeof loadableReady).toBe('function');
 
-    expect(loadable.default).toBe(callableLoadable);
-    expect(loadable.lazy).toBe(callableLoadable.lazy);
-    expect(loadable.loadableReady).toBe(callableLoadable.loadableReady);
-    expect(loadable.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED).toBe(
-      callableLoadable.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED,
-    );
+    const loader = () => Promise.resolve({ default: () => null });
+    const component = (loadable as any)(loader);
+    const lazyComponent = (lazy as any)(loader);
+
+    expect(component).toMatchObject({ render: expect.any(Function) });
+    expect(lazyComponent).toMatchObject({ render: expect.any(Function) });
   });
 });

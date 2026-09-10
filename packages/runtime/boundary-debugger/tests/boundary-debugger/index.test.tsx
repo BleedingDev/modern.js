@@ -31,7 +31,7 @@ describe('ultramodern boundary debugger', () => {
   it('does not render debug controls during SSR', () => {
     let WrappedApp: React.ComponentType | undefined;
     const plugin = ultramodernBoundaryDebuggerPlugin({
-      controlMode: 'hidden',
+      controlMode: 'visible',
       enabledByDefault: true,
       legacySelector: '[data-mf-remote]',
       metadata: {

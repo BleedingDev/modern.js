@@ -20,7 +20,6 @@ const ensureWorkspacePackages = [
   '@modern-js/plugin-bff',
   '@modern-js/server-utils',
 ];
-const buildDoneMarker = /(?:^|\n)File \((?:client|server)\)\s+/i;
 dns.setDefaultResultOrder('ipv4first');
 
 async function createIsolatedAppDir(prefix: string) {
@@ -193,9 +192,6 @@ describe('pure-esm-project in prod', () => {
     port = await getPort();
 
     await modernBuild(appDir, [], {
-      stdout: false,
-      stderr: false,
-      marker: buildDoneMarker,
       ensureWorkspacePackages,
     });
 

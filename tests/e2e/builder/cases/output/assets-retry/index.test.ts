@@ -4,17 +4,27 @@ import type { Page } from '@playwright/test';
 import { build, getHrefByEntryName } from '@scripts/shared';
 
 const expectMissingImageWasRetried = async (page: Page) => {
-  await page.evaluate(() => {
-    const image = document.createElement('img');
-    image.id = 'missing-asset';
-    image.src = '/definitely-missing-asset.png';
-    document.body.appendChild(image);
-  });
+  const requestUrls: string[] = [];
+  const onRequest = (request: import('@playwright/test').Request) => {
+    if (new URL(request.url()).pathname === '/definitely-missing-asset.png') {
+      requestUrls.push(request.url());
+    }
+  };
 
-  await expect(page.locator('#missing-asset')).toHaveAttribute(
-    'data-rb-retry-times',
-    '3',
-  );
+  page.on('request', onRequest);
+  try {
+    await page.evaluate(() => {
+      const image = document.createElement('img');
+      image.src = '/definitely-missing-asset.png';
+      document.body.appendChild(image);
+    });
+
+    await expect
+      .poll(() => requestUrls.length, { timeout: 10000 })
+      .toBeGreaterThan(1);
+  } finally {
+    page.off('request', onRequest);
+  }
 };
 
 test('should execute the inline assets retry runtime by default', async ({

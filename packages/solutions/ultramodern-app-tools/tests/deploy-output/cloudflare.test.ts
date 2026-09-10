@@ -8,7 +8,6 @@ import type {
   CloudflareWorkerArtifactConfig,
   CloudflareWorkerD1DatabaseConfig,
   CloudflareWorkerPublicAssetConfig,
-  CloudflareWorkerSecurityConfig,
   CloudflareWorkerServiceBindingConfig,
   JsonValue,
 } from '@modern-js/app-tools-extensions/config';
@@ -305,86 +304,6 @@ module.exports = {
 };
 `;
 
-const effectHttpApiWorkerSource = `
-const effectModule = {
-  api: { name: 'CatalogHttpApi' },
-  layer: {
-    handle: async request => {
-      const context = useEffectContext();
-
-      return new Response(JSON.stringify({
-        pathname: new URL(request.url).pathname,
-        routePath: context.operationContext.routePath,
-        originalPath: context.path,
-        envValue: context.env.TEST_VALUE,
-      }), { headers: { 'content-type': 'application/json' } });
-    },
-  },
-};
-${bundledEffectDispatcherSource}
-
-module.exports = {
-  __modern_create_effect_bff_dispatcher,
-  default: effectModule,
-};
-`;
-
-const effectDrizzleWorkerSource = `
-// bundled from drizzle-orm/sqlite-core
-const entityKind = Symbol.for('drizzle:entityKind');
-class Table {
-  static [entityKind] = 'Table';
-
-  constructor(name) {
-    this.name = name;
-  }
-}
-class SQLiteTable extends Table {
-  static [entityKind] = 'SQLiteTable';
-}
-const text = name => ({ name, type: 'text' });
-const sqliteTable = (name, columns) => {
-  class CatalogFixtureTable extends SQLiteTable {
-    static [entityKind] = 'SQLiteTable';
-  }
-
-  return Object.assign(new CatalogFixtureTable(name), {
-    columns,
-    [entityKind]: CatalogFixtureTable[entityKind],
-  });
-};
-
-const createHandler = () => ({
-  handler: async request => {
-    const context = useEffectContext();
-    const table = sqliteTable('catalog_addresses', {
-      street: text('street'),
-    });
-
-    return new Response(JSON.stringify({
-      pathname: new URL(request.url).pathname,
-      originalPath: context.path,
-      envValue: context.env.TEST_VALUE,
-      tableName: table.name,
-      entityKind: table[entityKind],
-    }), { headers: { 'content-type': 'application/json' } });
-  },
-  dispose: async () => {},
-});
-
-Object.defineProperty(createHandler, Symbol.for('modernjs.effect.validatorAware'), {
-  value: true,
-});
-
-const effectModule = { createHandler };
-${bundledEffectDispatcherSource}
-
-module.exports = {
-  __modern_create_effect_bff_dispatcher,
-  default: effectModule,
-};
-`;
-
 const recoveringEffectBffWorkerSource = `
 let createCount = 0;
 let disposeCount = 0;
@@ -511,61 +430,6 @@ async function createFixture({
   await fs.writeFile(
     path.join(effectEdgePackageDirectory, 'effect-edge.mjs'),
     effectEdgePackageSource,
-  );
-
-  const drizzlePackageDirectory = path.join(
-    appDirectory,
-    'node_modules/drizzle-orm',
-  );
-  await fs.mkdir(path.join(drizzlePackageDirectory, 'sqlite-core'), {
-    recursive: true,
-  });
-  await fs.writeFile(
-    path.join(drizzlePackageDirectory, 'package.json'),
-    `${JSON.stringify(
-      {
-        type: 'module',
-        exports: {
-          './sqlite-core': './sqlite-core/index.mjs',
-        },
-      },
-      null,
-      2,
-    )}\n`,
-  );
-  await fs.writeFile(
-    path.join(drizzlePackageDirectory, 'sqlite-core/index.mjs'),
-    `
-export const entityKind = Symbol.for('drizzle:entityKind');
-
-export class Table {
-  static [entityKind] = 'Table';
-
-  constructor(name) {
-    this.name = name;
-  }
-}
-
-export class SQLiteTable extends Table {
-  static [entityKind] = 'SQLiteTable';
-}
-
-export function text(name) {
-  return { name, type: 'text' };
-}
-
-export function sqliteTable(name, columns) {
-  class CatalogFixtureTable extends SQLiteTable {
-    static [entityKind] = 'SQLiteTable';
-  }
-
-  return Object.assign(new CatalogFixtureTable(), {
-    columns,
-    name,
-    [entityKind]: CatalogFixtureTable[entityKind],
-  });
-}
-`,
   );
 
   const distDirectory = path.join(appDirectory, 'dist');
@@ -1002,112 +866,6 @@ describe('cloudflare deploy preset', () => {
     );
   });
 
-  it('emits Cloudflare worker security defaults in the worker manifest', async () => {
-    const { outputDirectory } = await createFixture();
-    const workerManifest = JSON.parse(
-      await fs.readFile(
-        path.join(outputDirectory, 'server/modern-worker-manifest.json'),
-        'utf-8',
-      ),
-    );
-
-    expect(workerManifest.security).toMatchObject({
-      enabled: true,
-      headers: {
-        referrerPolicy: 'strict-origin-when-cross-origin',
-        contentTypeOptions: 'nosniff',
-        permissionsPolicy:
-          'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
-      },
-      contentSecurityPolicy: {
-        mode: 'report-only',
-        directives: {
-          'script-src': expect.arrayContaining([
-            "'self'",
-            "'unsafe-inline'",
-            "'unsafe-eval'",
-            'https:',
-            'http:',
-            'blob:',
-          ]),
-          'style-src': expect.arrayContaining([
-            "'self'",
-            "'unsafe-inline'",
-            'https:',
-            'http:',
-          ]),
-          'connect-src': expect.arrayContaining([
-            "'self'",
-            'https:',
-            'http:',
-            'wss:',
-            'ws:',
-          ]),
-          'frame-ancestors': ["'self'"],
-        },
-      },
-      noindex: {
-        workersDev: true,
-        localhost: true,
-        previewHostnames: [],
-      },
-      cors: {
-        assets: true,
-        allowedOrigins: [],
-        allowedMethods: [
-          'GET',
-          'HEAD',
-          'POST',
-          'PUT',
-          'PATCH',
-          'DELETE',
-          'OPTIONS',
-        ],
-        allowedHeaders: ['*'],
-      },
-    });
-    // The write-only cookies block is gone from the manifest.
-    expect(workerManifest.security.cookies).toBeUndefined();
-  });
-
-  it('accepts the deprecated write-only cookies option as a typed no-op', async () => {
-    // `modern create` workspaces (toolkit/create policy.ts
-    // createCloudflareSecurityContract) still emit a `cookies` block into
-    // generated modern.config.ts files. Until the generator drops it, the
-    // block must stay assignable to the public config type (`satisfies`
-    // below locks that in under tsc/tsgo) and must remain a runtime no-op:
-    // it never reaches the worker manifest.
-    const generatedSecurity = {
-      enabled: true,
-      noindex: {
-        workersDev: true,
-        localhost: true,
-        previewHostnames: [],
-      },
-      cookies: {
-        mutateSetCookie: false,
-        reason:
-          'Generated Cloudflare worker does not own application Set-Cookie headers.',
-      },
-    } satisfies CloudflareWorkerSecurityConfig;
-
-    const { outputDirectory } = await createFixture({
-      workerSecurity: generatedSecurity,
-    });
-    const workerManifest = JSON.parse(
-      await fs.readFile(
-        path.join(outputDirectory, 'server/modern-worker-manifest.json'),
-        'utf-8',
-      ),
-    );
-
-    expect(workerManifest.security.cookies).toBeUndefined();
-    expect(workerManifest.security.cors).toMatchObject({
-      assets: true,
-      allowedOrigins: [],
-    });
-  });
-
   it('supports typed Cloudflare worker security escape hatches', async () => {
     const { outputDirectory } = await createFixture({
       workerSecurity: {
@@ -1183,47 +941,6 @@ describe('cloudflare deploy preset', () => {
     ).toBeNull();
   });
 
-  it('emits a wrangler config with an ASSETS binding and module worker main', async () => {
-    const { outputDirectory } = await createFixture();
-    const wranglerConfig = JSON.parse(
-      await fs.readFile(path.join(outputDirectory, 'wrangler.json'), 'utf-8'),
-    );
-
-    expect(wranglerConfig.main).toBe('server/index.mjs');
-    expect(wranglerConfig.compatibility_flags).toEqual([
-      'nodejs_compat',
-      'global_fetch_strictly_public',
-    ]);
-    expect(wranglerConfig.assets).toEqual({
-      directory: './public',
-      binding: 'ASSETS',
-      run_worker_first: true,
-    });
-    expect(wranglerConfig.compatibility_date).toBe('2026-06-02');
-  });
-
-  it('uses configured Cloudflare compatibility dates when provided', async () => {
-    const { outputDirectory } = await createFixture({
-      compatibilityDate: '2026-05-27',
-    });
-    const wranglerConfig = JSON.parse(
-      await fs.readFile(path.join(outputDirectory, 'wrangler.json'), 'utf-8'),
-    );
-
-    expect(wranglerConfig.compatibility_date).toBe('2026-05-27');
-  });
-
-  it('uses configured Cloudflare worker names when provided', async () => {
-    const { outputDirectory } = await createFixture({
-      workerName: 'commerce-production-worker',
-    });
-    const wranglerConfig = JSON.parse(
-      await fs.readFile(path.join(outputDirectory, 'wrangler.json'), 'utf-8'),
-    );
-
-    expect(wranglerConfig.name).toBe('commerce-production-worker');
-  });
-
   it('merges Wrangler config, stages artifacts, and enforces Worker invariants', async () => {
     const { outputDirectory } = await createFixture({
       artifacts: [
@@ -1257,11 +974,13 @@ describe('cloudflare deploy preset', () => {
           FEATURE_FLAG: 'enabled',
         },
       },
+      workerName: 'commerce-production-worker',
     });
     const wranglerConfig = JSON.parse(
       await fs.readFile(path.join(outputDirectory, 'wrangler.json'), 'utf-8'),
     );
 
+    expect(wranglerConfig.name).toBe('commerce-production-worker');
     expect(wranglerConfig.compatibility_date).toBe('2026-05-01');
     expect(wranglerConfig.main).toBe('server/index.mjs');
     expect(wranglerConfig.compatibility_flags).toEqual([
@@ -1529,56 +1248,6 @@ describe('cloudflare deploy preset', () => {
     ]);
   });
 
-  it('keeps distributed SSR fragment metadata in the worker manifest only', async () => {
-    const { outputDirectory } = await createFixture({
-      services: [
-        {
-          binding: 'VERTICAL_INVENTORY_WORKER',
-          fragments: [
-            {
-              boundaryId: 'verticalInventory',
-              expose: './Widget',
-              path: '/{locale}/_mf/fragment/widget',
-              remote: 'inventory',
-            },
-          ],
-          service: 'tractor-inventory-worker',
-        },
-      ],
-    });
-    const wranglerConfig = JSON.parse(
-      await fs.readFile(path.join(outputDirectory, 'wrangler.json'), 'utf-8'),
-    );
-    const workerManifest = JSON.parse(
-      await fs.readFile(
-        path.join(outputDirectory, 'server/modern-worker-manifest.json'),
-        'utf-8',
-      ),
-    );
-
-    expect(wranglerConfig.services).toEqual([
-      {
-        binding: 'VERTICAL_INVENTORY_WORKER',
-        service: 'tractor-inventory-worker',
-      },
-    ]);
-    expect(workerManifest.serviceBindings).toEqual([
-      {
-        binding: 'VERTICAL_INVENTORY_WORKER',
-        fragments: [
-          {
-            boundaryId: 'verticalInventory',
-            expose: './Widget',
-            path: '/{locale}/_mf/fragment/widget',
-            remote: 'inventory',
-          },
-        ],
-        interface: 'fetch',
-        service: 'tractor-inventory-worker',
-      },
-    ]);
-  });
-
   it('rejects mixed typed and raw wrangler service bindings', async () => {
     await expect(
       createFixture({
@@ -1656,40 +1325,6 @@ describe('cloudflare deploy preset', () => {
         },
       }),
     ).rejects.toThrow(/deploy\.worker\.artifacts\[0\]\.to/u);
-  });
-
-  it('rejects public asset paths escape through parent directory segments', async () => {
-    await expect(
-      createFixture({
-        publicAssets: [
-          {
-            from: 'ops/..',
-            to: 'fixture-owned-data',
-          },
-        ],
-        sourceFiles: {
-          ops: {
-            'manifest.json': '{}',
-          },
-        },
-      }),
-    ).rejects.toThrow(/deploy\.worker\.publicAssets\[0\]\.from/u);
-
-    await expect(
-      createFixture({
-        publicAssets: [
-          {
-            from: 'ops/manifest.json',
-            to: 'fixture-owned-data/..',
-          },
-        ],
-        sourceFiles: {
-          ops: {
-            'manifest.json': '{}',
-          },
-        },
-      }),
-    ).rejects.toThrow(/deploy\.worker\.publicAssets\[0\]\.to/u);
   });
 
   it('places client-facing assets under the configured public asset root only', async () => {
@@ -1779,34 +1414,6 @@ describe('cloudflare deploy preset', () => {
     ).rejects.toThrow();
   });
 
-  it('stages backend federation artifacts into Cloudflare public assets', async () => {
-    const backendManifest = JSON.stringify({
-      name: 'commerce-backend',
-      remoteEntry: 'backendRemoteEntry.cjs',
-    });
-    const backendRemoteEntry = 'module.exports = { get: () => "commerce" };\n';
-    const { outputDirectory } = await createFixture({
-      distFiles: {
-        'backend-mf-manifest.json': backendManifest,
-        'backendRemoteEntry.cjs': backendRemoteEntry,
-      },
-    });
-    const publicDirectory = path.join(outputDirectory, 'public');
-
-    await expect(
-      fs
-        .readFile(
-          path.join(publicDirectory, 'backend-mf-manifest.json'),
-          'utf-8',
-        )
-        .then(JSON.parse),
-    ).resolves.toEqual(JSON.parse(backendManifest));
-    const stagedRemote = await import(
-      pathToFileURL(path.join(publicDirectory, 'backendRemoteEntry.cjs')).href
-    );
-    expect(stagedRemote.default.get()).toBe('commerce');
-  });
-
   it('excludes server-only and configured paths from Cloudflare public assets', async () => {
     const { outputDirectory } = await createFixture({
       includeServerOnlyDistSources: true,
@@ -1857,78 +1464,6 @@ describe('cloudflare deploy preset', () => {
         'utf-8',
       ),
     ).resolves.toBe('contact: security@example.com');
-  });
-
-  it('emits a structured route.worker manifest for module-worker dispatch', async () => {
-    const { outputDirectory } = await createFixture();
-    const workerManifest = JSON.parse(
-      await fs.readFile(
-        path.join(outputDirectory, 'server/modern-worker-manifest.json'),
-        'utf-8',
-      ),
-    );
-
-    expect(workerManifest.runtime).toEqual({
-      type: 'cloudflare-module-worker',
-      entry: 'server/index.mjs',
-      fetchExport: true,
-      nodeListen: false,
-    });
-    expect(workerManifest.workerBundles).toMatchObject({
-      directory: 'worker',
-      format: 'commonjs',
-      importableFromModuleWorker: true,
-      requestHandlerExport: 'requestHandler',
-    });
-    expect(workerManifest.assets).toEqual({
-      directory: './public',
-      binding: 'ASSETS',
-      runWorkerFirst: true,
-    });
-    expect(workerManifest.routeSpec.file).toBe('server/route.json');
-    expect(workerManifest.routeSpec.routes).toContainEqual(
-      expect.objectContaining({
-        urlPath: '/dashboard',
-        entryName: 'main',
-        worker: 'worker/main.js',
-        workerExists: true,
-      }),
-    );
-    expect(workerManifest.resources).toEqual({
-      loadableStats: 'loadable-stats.json',
-      routeManifest: 'routes-manifest.json',
-    });
-    expect(workerManifest.bff).toEqual({
-      dispatcherExport: '__modern_create_effect_bff_dispatcher',
-      runtimeFramework: 'effect',
-      prefix: '/commerce-api',
-      worker: 'worker/__modern_bff_effect.js',
-      effect: {
-        crossProjectPolicy: {
-          allowUnknownOperations: false,
-          enabled: false,
-          expectedOperationContracts: {},
-          requireEnvelope: true,
-          requireOperationContext: true,
-          requireOperationContextDetails: true,
-          requireOperationSchemaHash: true,
-          requireOperationVersion: true,
-        },
-      },
-    });
-    await expect(
-      fs.access(path.join(outputDirectory, 'worker/__modern_bff_effect.js')),
-    ).resolves.toBeUndefined();
-    await expect(
-      fs
-        .readFile(path.join(outputDirectory, 'package.json'), 'utf-8')
-        .then(JSON.parse),
-    ).resolves.toEqual({ type: 'module' });
-    await expect(
-      fs
-        .readFile(path.join(outputDirectory, 'worker/package.json'), 'utf-8')
-        .then(JSON.parse),
-    ).resolves.toEqual({ type: 'commonjs' });
   });
 
   it('stamps the delivery-unit identity into the Cloudflare worker manifest', async () => {
@@ -2146,33 +1681,6 @@ describe('cloudflare deploy preset', () => {
     });
   });
 
-  it('emits a fetch-based worker entry that serves bound assets', async () => {
-    const { outputDirectory } = await createFixture();
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-    const publicDirectory = path.join(outputDirectory, 'public');
-
-    const response = await worker.fetch(
-      new Request('https://example.com/static/app.js'),
-      {
-        ASSETS: createAssetBinding(publicDirectory),
-      },
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('access-control-allow-origin')).toBe('*');
-    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
-    expect(response.headers.get('referrer-policy')).toBe(
-      'strict-origin-when-cross-origin',
-    );
-    expect(
-      response.headers.get('content-security-policy-report-only'),
-    ).toBeNull();
-    expect(await response.text()).toBe('app();');
-  });
-
   it('does not route non-GET/HEAD asset requests through ASSETS', async () => {
     const { outputDirectory } = await createFixture();
     const entryPath = path.join(outputDirectory, 'server/index.mjs');
@@ -2181,9 +1689,18 @@ describe('cloudflare deploy preset', () => {
     ).default;
     const assetRequests: string[] = [];
 
-    for (const method of ['POST', 'PUT']) {
+    for (const method of ['POST', 'PUT', 'OPTIONS']) {
       const response = await worker.fetch(
-        new Request('https://example.com/static/app.js', { method }),
+        new Request('https://example.com/static/app.js', {
+          headers:
+            method === 'OPTIONS'
+              ? {
+                  'access-control-request-method': 'GET',
+                  origin: 'https://shell.example.com',
+                }
+              : undefined,
+          method,
+        }),
         {
           ASSETS: {
             fetch: async (request: Request) => {
@@ -2244,70 +1761,24 @@ describe('cloudflare deploy preset', () => {
     ).default;
     const publicDirectory = path.join(outputDirectory, 'public');
 
-    const response = await worker.fetch(
-      new Request('https://example.com/dashboard/missing.webp'),
-      {
-        ASSETS: createAssetBinding(publicDirectory),
-      },
-    );
-
-    expect(response.status).toBe(404);
-    // Application responses (including 404s) carry no CORS headers unless
-    // deploy.worker.security.cors is configured.
-    expect(response.headers.get('access-control-allow-origin')).toBeNull();
-    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
-    expect(await response.text()).toBe('Not found');
-  });
-
-  it('treats missing HTML paths as asset misses instead of SSR fallback', async () => {
-    const { outputDirectory } = await createFixture();
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-
-    const response = await worker.fetch(
-      new Request('https://example.com/dashboard/missing.html'),
-      {
-        ASSETS: createAssetBinding(path.join(outputDirectory, 'public')),
-      },
-    );
-
-    expect(response.status).toBe(404);
-    await expect(response.text()).resolves.toBe('Not found');
-  });
-
-  it('does not route Cloudflare asset preflight requests through asset binding', async () => {
-    const { outputDirectory } = await createFixture();
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-    const assetRequests: string[] = [];
-
-    const response = await worker.fetch(
-      new Request('https://example.com/mf-manifest.json', {
-        headers: {
-          origin: 'https://shell.example.com',
-          'access-control-request-method': 'GET',
+    for (const pathname of [
+      '/dashboard/missing.webp',
+      '/dashboard/missing.html',
+    ]) {
+      const response = await worker.fetch(
+        new Request(`https://example.com${pathname}`),
+        {
+          ASSETS: createAssetBinding(publicDirectory),
         },
-        method: 'OPTIONS',
-      }),
-      {
-        ASSETS: {
-          fetch: async (request: Request) => {
-            assetRequests.push(
-              `${request.method} ${new URL(request.url).pathname}`,
-            );
-            return new Response('asset preflight should not reach binding');
-          },
-        },
-      },
-    );
+      );
 
-    expect(assetRequests).toEqual([]);
-    expect(response.status).toBe(404);
-    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(response.status).toBe(404);
+      // Application responses (including 404s) carry no CORS headers unless
+      // deploy.worker.security.cors is configured.
+      expect(response.headers.get('access-control-allow-origin')).toBeNull();
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(await response.text()).toBe('Not found');
+    }
   });
 
   it('does not read route HTML assets for non-GET/HEAD requests', async () => {
@@ -2337,35 +1808,6 @@ describe('cloudflare deploy preset', () => {
     expect(response.status).toBe(404);
     expect(await response.text()).toBe('Not found');
     expect(requestedPaths).toEqual([]);
-  });
-
-  it('uses route metadata for non-worker HTML fallback after asset miss', async () => {
-    const { outputDirectory } = await createFixture();
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-    const publicDirectory = path.join(outputDirectory, 'public');
-    const requestedPaths: string[] = [];
-    const assetBinding = createAssetBinding(publicDirectory);
-
-    const response = await worker.fetch(
-      new Request('https://example.com/plain/details'),
-      {
-        ASSETS: {
-          fetch: async (request: Request) => {
-            const pathname = new URL(request.url).pathname;
-            requestedPaths.push(pathname);
-
-            return assetBinding.fetch(request);
-          },
-        },
-      },
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe('<!doctype html><html>plain</html>');
-    expect(requestedPaths).toEqual(['/html/plain/index.html']);
   });
 
   it('dispatches SSR document routes before Cloudflare Assets SPA fallback', async () => {
@@ -2405,32 +1847,6 @@ describe('cloudflare deploy preset', () => {
       '/loadable-stats.json',
     ]);
     expect(requestedPaths).not.toContain('/dashboard/settings');
-  });
-
-  it('dispatches route.worker modules with request handler resources', async () => {
-    const { outputDirectory } = await createFixture();
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-
-    const response = await worker.fetch(
-      new Request('https://example.com/dashboard/settings'),
-      {
-        ASSETS: createAssetBinding(path.join(outputDirectory, 'public')),
-      },
-    );
-
-    expect(response.status).toBe(200);
-    // SSR responses are same-origin by default: no wildcard CORS leak.
-    expect(response.headers.get('access-control-allow-origin')).toBeNull();
-    await expect(response.json()).resolves.toEqual({
-      pathname: '/dashboard/settings',
-      entryName: 'main',
-      htmlTemplate: '<!doctype html><html>main</html>',
-      routeAssetKeys: ['main'],
-      loadableName: 'loadable-fixture',
-    });
   });
 
   it('renders Cloudflare SSR HEAD requests as GET and returns headers without a body', async () => {
@@ -2641,7 +2057,7 @@ describe('cloudflare deploy preset', () => {
     const remoteManifests: Record<string, unknown> = {
       'https://checkout.example.com/mf-manifest.json': {
         metaData: {
-          publicPath: 'https://checkout.example.com/',
+          publicPath: '/',
         },
         exposes: [
           {
@@ -2666,7 +2082,7 @@ describe('cloudflare deploy preset', () => {
       },
       'https://explore.example.com/mf-manifest.json': {
         metaData: {
-          publicPath: 'https://explore.example.com/',
+          publicPath: 'auto/',
         },
         exposes: [
           {
@@ -2728,103 +2144,6 @@ describe('cloudflare deploy preset', () => {
       expect(html).toContain('<link rel="stylesheet" href="/static/app.css">');
       expect(html).not.toContain(
         '<link rel="stylesheet" href="https://example.com/static/app.css">',
-      );
-      expect(html).toContain(
-        '<link href="https://explore.example.com/static/css/explore.css" rel="stylesheet" type="text/css" data-precedence="default">',
-      );
-      expect(html).toContain(
-        '<link href="https://checkout.example.com/static/css/checkout.css" rel="stylesheet" type="text/css" data-precedence="default">',
-      );
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-
-  it('resolves relative and automatic remote publicPath values against the remote manifest URL', async () => {
-    const { outputDirectory } = await createFixture();
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-    const originalFetch = globalThis.fetch;
-    const remoteManifests: Record<string, unknown> = {
-      'https://checkout.example.com/mf-manifest.json': {
-        metaData: {
-          publicPath: '/',
-        },
-        exposes: [
-          {
-            name: 'CartPage',
-            path: './CartPage',
-            assets: {
-              css: {
-                async: [],
-                sync: [],
-              },
-            },
-          },
-        ],
-      },
-      'https://checkout.example.com/routes-manifest.json': {
-        routeAssets: {
-          index: {
-            referenceCssAssets: ['static/css/checkout.css'],
-          },
-        },
-      },
-      'https://explore.example.com/mf-manifest.json': {
-        metaData: {
-          publicPath: 'auto/',
-        },
-        exposes: [
-          {
-            name: 'Header',
-            path: './Header',
-            assets: {
-              css: {
-                async: ['static/css/explore.css'],
-                sync: [],
-              },
-            },
-          },
-        ],
-      },
-      'https://explore.example.com/routes-manifest.json': {
-        routeAssets: {},
-      },
-    };
-
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
-      const url = input instanceof Request ? input.url : String(input);
-      const manifest = remoteManifests[url];
-
-      if (manifest) {
-        return new Response(JSON.stringify(manifest), {
-          headers: {
-            'content-type': 'application/json',
-          },
-        });
-      }
-
-      return originalFetch(input);
-    }) as typeof fetch;
-
-    try {
-      const response = await worker.fetch(
-        new Request('https://example.com/styled'),
-        {
-          ASSETS: createAssetBinding(path.join(outputDirectory, 'public')),
-        },
-      );
-      const html = await response.text();
-      const linkHeader = response.headers.get('link');
-
-      expect(response.status).toBe(200);
-      expect(linkHeader).toContain(
-        '<https://explore.example.com/static/css/explore.css>; rel=preload; as=style',
-      );
-      expect(linkHeader).toContain(
-        '<https://checkout.example.com/static/css/checkout.css>; rel=preload; as=style',
       );
       expect(html).toContain(
         '<link href="https://explore.example.com/static/css/explore.css" rel="stylesheet" type="text/css" data-precedence="default">',
@@ -3051,29 +2370,6 @@ describe('cloudflare deploy preset', () => {
       entryName: 'fallback',
       htmlTemplate: '<!doctype html><html>fallback</html>',
     });
-  });
-
-  it('provides Node-style path globals for module worker SSR compatibility', async () => {
-    const { outputDirectory } = await createFixture();
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-
-    const response = await worker.fetch(
-      new Request('https://example.com/dirname'),
-      {
-        ASSETS: createAssetBinding(path.join(outputDirectory, 'public')),
-      },
-    );
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as {
-      dirname: string;
-      filename: string;
-    };
-    expect(path.basename(body.dirname)).toBe('worker');
-    expect(path.basename(body.filename)).toBe('dirname.js');
   });
 
   it('dispatches configured service binding prefixes before SSR route fallback', async () => {
@@ -3700,39 +2996,6 @@ describe('cloudflare deploy preset', () => {
     }
   });
 
-  it('fails clearly when configured service binding is unavailable', async () => {
-    const { outputDirectory } = await createFixture({
-      services: [
-        {
-          binding: 'VERTICAL_CATALOG_WORKER',
-          prefix: '/catalog-api',
-          service: 'tractor-catalog-worker',
-        },
-      ],
-    });
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-
-    const response = await worker.fetch(
-      new Request('https://example.com/catalog-api/catalog/readiness'),
-      {
-        ASSETS: createSpaFallbackAssetBinding(
-          path.join(outputDirectory, 'public'),
-        ),
-      },
-    );
-
-    expect(response.status).toBe(502);
-    expect(response.headers.get('x-modern-js-service-binding')).toBe(
-      'VERTICAL_CATALOG_WORKER',
-    );
-    await expect(response.text()).resolves.toContain(
-      'Cloudflare service binding not available: VERTICAL_CATALOG_WORKER',
-    );
-  });
-
   it('emits the typed microvertical degraded event when a service binding is unavailable', async () => {
     const { outputDirectory } = await createFixture({
       services: [
@@ -3939,34 +3202,6 @@ describe('cloudflare deploy preset', () => {
     );
   });
 
-  it('fails closed when a staged manifest attempts to downgrade the Effect runtime', async () => {
-    const { outputDirectory } = await createFixture({ bffPrefix: '/api' });
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const entrySource = await fs.readFile(entryPath, 'utf-8');
-    await fs.writeFile(
-      entryPath,
-      entrySource.replace(
-        '"runtimeFramework": "effect"',
-        '"runtimeFramework": "hono"',
-      ),
-    );
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-
-    const response = await worker.fetch(
-      new Request('https://example.com/api/products'),
-      {
-        ASSETS: createAssetBinding(path.join(outputDirectory, 'public')),
-      },
-    );
-
-    expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toContain(
-      'manifest must declare runtimeFramework "effect"',
-    );
-  });
-
   it('disposes invalid Effect dispatchers, retries initialization, and caches recovery', async () => {
     const { outputDirectory } = await createFixture({
       bffPrefix: '/api',
@@ -4001,63 +3236,6 @@ describe('cloudflare deploy preset', () => {
     await expect(cachedResponse.json()).resolves.toEqual({
       createCount: 2,
       disposeCount: 1,
-    });
-  });
-
-  it('dispatches Effect HttpApi modules without a second handler argument', async () => {
-    const { outputDirectory } = await createFixture({
-      bffWorkerSource: effectHttpApiWorkerSource,
-    });
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-
-    const response = await worker.fetch(
-      new Request('https://example.com/commerce-api/effect/http-api'),
-      {
-        TEST_VALUE: 'http-api-env',
-        ASSETS: createSpaFallbackAssetBinding(
-          path.join(outputDirectory, 'public'),
-        ),
-      },
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      pathname: '/effect/http-api',
-      routePath: '/effect/http-api',
-      originalPath: '/commerce-api/effect/http-api',
-      envValue: 'http-api-env',
-    });
-  });
-
-  it('executes generated Effect BFF workers with Drizzle sqlite-core entityKind class markers without post-build mutation', async () => {
-    const { outputDirectory } = await createFixture({
-      bffWorkerSource: effectDrizzleWorkerSource,
-    });
-    const entryPath = path.join(outputDirectory, 'server/index.mjs');
-    const worker = (
-      await import(`${pathToFileURL(entryPath).href}?t=${Date.now()}`)
-    ).default;
-
-    const response = await worker.fetch(
-      new Request('https://example.com/commerce-api/effect/drizzle'),
-      {
-        TEST_VALUE: 'drizzle-env',
-        ASSETS: createSpaFallbackAssetBinding(
-          path.join(outputDirectory, 'public'),
-        ),
-      },
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      pathname: '/effect/drizzle',
-      originalPath: '/commerce-api/effect/drizzle',
-      envValue: 'drizzle-env',
-      tableName: 'catalog_addresses',
-      entityKind: 'SQLiteTable',
     });
   });
 

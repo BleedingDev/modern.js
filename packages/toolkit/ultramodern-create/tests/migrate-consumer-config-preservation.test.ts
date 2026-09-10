@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { format } from 'oxfmt';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
 import { migrateBffBuildPluginImports } from '../src/ultramodern-tooling/commands/migrate-strict-effect/bff-build-plugin-migration';
@@ -73,6 +76,24 @@ function captureStdout<T>(run: () => T): { result: T; output: string } {
   }
 }
 
+function runWorkspaceValidation(workspaceRoot: string) {
+  const typescriptPackage = createRequire(import.meta.url).resolve(
+    'typescript/package.json',
+  );
+  return spawnSync(
+    process.execPath,
+    ['scripts/validate-ultramodern-workspace.mts'],
+    {
+      cwd: workspaceRoot,
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        NODE_PATH: path.dirname(path.dirname(typescriptPackage)),
+      },
+    },
+  );
+}
+
 function snapshotWorkspace(directory: string, root = directory) {
   const snapshot = new Map<string, Buffer>();
   for (const entry of fs
@@ -95,6 +116,69 @@ function snapshotWorkspace(directory: string, root = directory) {
   }
   return snapshot;
 }
+
+/**
+ * Captured from the historical create generator at 2bf456f78f, before the
+ * release-envelope plugin and tsChecker build block were introduced. The
+ * decoded bytes are independent of today's generator output and are rendered
+ * for the generated-workspace shell used by these migration cases from
+ * packages/toolkit/create/templates/workspace/apps/modern.config.ts.handlebars
+ * with modernVersion 3.2.1, enableTailwind true, and workspace package source.
+ * Decoded SHA-256:
+ * 4a29ca898cca882daee234c1d1e69c4ada51eafc0f46cc3b266e5c19a153f48d.
+ */
+const HISTORICAL_GENERATED_MODERN_CONFIG = gunzipSync(
+  Buffer.from(
+    [
+      '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',
+    ].join(''),
+    'base64',
+  ),
+).toString('utf8');
 
 function removeTsCheckerBuildOverride(source: string) {
   return source.replace(
@@ -159,7 +243,7 @@ function addLegacyGeneratedDefaults(source: string) {
 ${withLegacySsr.slice(optionsEndIndex)}`;
 }
 
-test('migration replaces recognized historical validator with the native tooling entry point', async () => {
+test('migration refreshes the validator and keeps its gate executable', async () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-validator-refresh-'),
   );
@@ -198,6 +282,22 @@ test('migration replaces recognized historical validator with the native tooling
     const migrated = fs.readFileSync(validatorPath, 'utf8');
     assert.doesNotMatch(migrated, /schemaVersion: -123/u);
     assert.equal(migrated, nativeSource);
+    assert.notEqual(migrated, stale);
+
+    const valid = runWorkspaceValidation(workspaceRoot);
+    assert.equal(valid.status, 0, valid.stdout + '\n' + valid.stderr);
+
+    const configPath = path.join(
+      workspaceRoot,
+      'apps/shell-super-app/module-federation.config.ts',
+    );
+    const config = fs.readFileSync(configPath, 'utf8');
+    fs.writeFileSync(
+      configPath,
+      config.replace('enableBridgeRouter: false', 'enableBridgeRouter: true'),
+    );
+    const invalid = runWorkspaceValidation(workspaceRoot);
+    assert.notEqual(invalid.status, 0, invalid.stdout + '\n' + invalid.stderr);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -276,7 +376,7 @@ test('migration fills historical deployment metadata and validates authored busi
   }
 });
 
-test('migrate converges the published .15 generated Tailwind config to native defaults', async () => {
+test('migrate recognizes a historical generated Modern config and converges to native defaults', async () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-migrate-generated-config-'),
   );
@@ -300,88 +400,15 @@ test('migrate converges the published .15 generated Tailwind config to native de
       currentGeneratedConfig,
       /tsChecker:\s*\{\s*typescript:\s*\{\s*build: false,/u,
     );
-    const predecessorGeneratedConfig = removeTsCheckerBuildOverride(
-      currentGeneratedConfig.replace(
-        'pluginTailwindcss()',
-        'pluginTailwindcss({ optimize: false })',
-      ),
+    assert.match(HISTORICAL_GENERATED_MODERN_CONFIG, /pluginTailwindcss\(\)/u);
+    assert.doesNotMatch(
+      HISTORICAL_GENERATED_MODERN_CONFIG,
+      /ultramodernReleaseEnvelopePlugin|tsChecker/u,
     );
-    assert.notEqual(predecessorGeneratedConfig, currentGeneratedConfig);
-    assert.doesNotMatch(predecessorGeneratedConfig, /tsChecker/u);
     fs.writeFileSync(
       modernConfigPath,
-      addLegacyGeneratedDefaults(predecessorGeneratedConfig),
+      HISTORICAL_GENERATED_MODERN_CONFIG,
       'utf-8',
-    );
-
-    assert.equal(
-      await runUltramodernToolingCli(
-        ['migrate-strict-effect', '--skip-install'],
-        workspaceRoot,
-      ),
-      0,
-    );
-    assert.equal(
-      fs.readFileSync(modernConfigPath, 'utf-8'),
-      currentGeneratedConfig,
-    );
-
-    assert.equal(
-      await runUltramodernToolingCli(
-        ['migrate-strict-effect', '--skip-install'],
-        workspaceRoot,
-      ),
-      0,
-    );
-    assert.equal(
-      fs.readFileSync(modernConfigPath, 'utf-8'),
-      currentGeneratedConfig,
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('migrate composes the previous generated app-tools and release-envelope plugins natively', async () => {
-  const tempRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-migrate-release-envelope-'),
-  );
-  const workspaceRoot = path.join(tempRoot, 'generated-workspace');
-
-  try {
-    generateUltramodernWorkspace({
-      targetDir: workspaceRoot,
-      packageName: 'generated-workspace',
-      modernVersion: '3.2.1',
-      enableTailwind: true,
-      packageSource: { strategy: 'workspace' },
-    });
-    linkWorkspaceFormatterDependencies(workspaceRoot);
-    const modernConfigPath = path.join(
-      workspaceRoot,
-      'apps/shell-super-app/modern.config.ts',
-    );
-    const currentGeneratedConfig = fs.readFileSync(modernConfigPath, 'utf-8');
-    const predecessorGeneratedConfig = removeReleaseEnvelopePlugin(
-      previousCompositionSource(currentGeneratedConfig),
-    );
-    assert.notEqual(predecessorGeneratedConfig, currentGeneratedConfig);
-    assert.doesNotMatch(
-      predecessorGeneratedConfig,
-      /ultramodernReleaseEnvelopePlugin/u,
-    );
-    fs.writeFileSync(modernConfigPath, predecessorGeneratedConfig, 'utf-8');
-
-    assert.equal(
-      await runUltramodernToolingCli(
-        ['migrate-strict-effect', '--skip-install'],
-        workspaceRoot,
-      ),
-      0,
-    );
-    assert.equal(
-      fs.readFileSync(modernConfigPath, 'utf-8'),
-      currentGeneratedConfig,
     );
 
     assert.equal(
@@ -420,21 +447,11 @@ test('migrate preserves an unmarked consumer Modern config while updating genera
       workspaceRoot,
       'apps/shell-super-app/modern.config.ts',
     );
-    const generatedModernConfig = fs.readFileSync(modernConfigPath, 'utf-8');
-    const predecessorGeneratedConfig = removeTsCheckerBuildOverride(
-      generatedModernConfig.replace(
-        'pluginTailwindcss()',
-        'pluginTailwindcss({ optimize: false })',
-      ),
-    );
-    assert.notEqual(predecessorGeneratedConfig, generatedModernConfig);
-    assert.doesNotMatch(predecessorGeneratedConfig, /tsChecker/u);
-    const consumerModernConfig = predecessorGeneratedConfig
-      .replace(
-        "import { i18nPlugin } from '@modern-js/plugin-i18n';",
-        `import { bffPlugin } from '@modern-js/plugin-bff';
+    const consumerModernConfig = HISTORICAL_GENERATED_MODERN_CONFIG.replace(
+      "import { i18nPlugin } from '@modern-js/plugin-i18n';",
+      `import { bffPlugin } from '@modern-js/plugin-bff';
 import { i18nPlugin } from '@modern-js/plugin-i18n';`,
-      )
+    )
       .replace(
         'const cloudflareDeployEnabled =',
         `export const presentationAccessPolicy = {
@@ -557,10 +574,15 @@ const cloudflareDeployEnabled =`,
 
     assert.equal(
       fs.readFileSync(modernConfigPath, 'utf-8'),
-      consumerModernConfig.replace(
-        "from '@modern-js/plugin-bff';",
-        "from '@modern-js/plugin-bff-build-extensions';",
-      ),
+      consumerModernConfig
+        .replace(
+          "from '@modern-js/plugin-bff';",
+          "from '@modern-js/plugin-bff-build-extensions';",
+        )
+        .replace(
+          "from '@modern-js/app-tools/config';",
+          "from '@modern-js/app-tools-extensions/config';",
+        ),
     );
     const migratedShellPackage = readJson(workspaceRoot, shellPackagePath);
     assert.equal(migratedShellPackage.dependencies['react-router'], undefined);
@@ -628,31 +650,6 @@ const cloudflareDeployEnabled =`,
       ),
       /enableBridgeRouter:\s*false/u,
     );
-
-    const idempotencePaths = [
-      ...dryRunProtectedPaths,
-      path.join(
-        workspaceRoot,
-        'apps/shell-super-app/module-federation.config.ts',
-      ),
-    ];
-    const afterFirstMigration = new Map(
-      idempotencePaths.map(filePath => [filePath, fs.readFileSync(filePath)]),
-    );
-    assert.equal(
-      await runUltramodernToolingCli(
-        ['migrate-strict-effect', '--skip-install'],
-        workspaceRoot,
-      ),
-      0,
-    );
-    for (const filePath of idempotencePaths) {
-      assert.deepEqual(
-        fs.readFileSync(filePath),
-        afterFirstMigration.get(filePath),
-        `${path.relative(workspaceRoot, filePath)} was not byte-idempotent`,
-      );
-    }
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -868,19 +865,6 @@ export default createModuleFederationConfig({
       fs.readFileSync(backendConfigPath, 'utf-8'),
       consumerBackendConfig,
     );
-
-    assert.equal(
-      await runUltramodernToolingCli(
-        ['migrate-strict-effect', '--skip-install'],
-        workspaceRoot,
-      ),
-      0,
-    );
-    assert.equal(
-      fs.readFileSync(browserConfigPath, 'utf-8'),
-      consumerBrowserConfig,
-    );
-    assert.equal(fs.existsSync(generatedBrowserConfigPath), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

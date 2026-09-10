@@ -67,21 +67,11 @@ describe('routes-tanstack', () => {
     }
   });
 
-  test('injects TanStack SSR bootstrap (string + stream)', async () => {
-    const stringHtml = await fetchHtml(`http://localhost:${appPort}/string`);
-    expect(stringHtml.res.status).toBe(200);
-    expect(stringHtml.text).toContain('id="$tsr-stream-barrier"');
-    expect(stringHtml.text).toContain('$_TSR');
-
-    const streamHtml = await fetchHtml(`http://localhost:${appPort}/stream`);
-    expect(streamHtml.res.status).toBe(200);
-    expect(streamHtml.text).toContain('id="$tsr-stream-barrier"');
-    expect(streamHtml.text).toContain('$_TSR');
-  });
-
-  test('emits the TanStack SSR bootstrap before the entry script (string + stream)', async () => {
+  test('injects TanStack SSR bootstrap before the entry script (string + stream)', async () => {
     for (const route of ['string', 'stream'] as const) {
       const { text } = await fetchHtml(`http://localhost:${appPort}/${route}`);
+      expect(text).toContain('id="$tsr-stream-barrier"');
+      expect(text).toContain('$_TSR');
       const bootstrapIndex = text.indexOf('$_TSR');
       const entryIndex = text.search(
         new RegExp(`<script[^>]*src="/static/js/${route}\\.[a-f0-9]+\\.js"`),
@@ -94,18 +84,16 @@ describe('routes-tanstack', () => {
   });
 
   test('SSR renders loader data (string + stream)', async () => {
-    await page.goto(`http://localhost:${appPort}/string`, {
-      waitUntil: ['networkidle0'],
-    });
-    await expectPageTextContent(page, 'string-layout');
-    await expectPageTextContent(page, 'string-index:index');
-
-    await page.goto(`http://localhost:${appPort}/stream`, {
-      waitUntil: ['networkidle0'],
-    });
-    await expectPageTextContent(page, 'stream-layout');
-    await expectPageTextContent(page, 'stream-index:index');
-    expect(errors).toEqual([]);
+    for (const route of ['string', 'stream'] as const) {
+      const { res, text } = await fetchHtml(
+        `http://localhost:${appPort}/${route}`,
+      );
+      expect(res.status).toBe(200);
+      expect(text).toContain(`${route}-layout`);
+      expect(text).toMatch(
+        new RegExp(`id="index">${route}-index:(?:<!-- -->)?index`),
+      );
+    }
   });
 
   test('navigates and loads data on the client (string entry)', async () => {
@@ -148,9 +136,13 @@ describe('routes-tanstack', () => {
         waitUntil: ['networkidle0'],
       });
       await prefetchPage.waitForSelector('[data-testid="link-user"]');
+      expect(requestedUserChunk).toBe(false);
+      const userChunkRequest = prefetchPage.waitForRequest(
+        request => /string_user\/\(id\)\/page\.[^.]+\.js/.test(request.url()),
+        { timeout: 10_000 },
+      );
       await prefetchPage.hover('[data-testid="link-user"]');
-      await new Promise(resolve => setTimeout(resolve, 700));
-
+      await userChunkRequest;
       expect(requestedUserChunk).toBe(true);
       expect(prefetchErrors).toEqual([]);
     } finally {

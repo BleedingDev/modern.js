@@ -454,48 +454,6 @@ function createEnvelopeFixture(
   return { envelope, envelopePath, identity };
 }
 
-test('build commands use native workspace C0 scripts and one exact C1 package filter', async () => {
-  const { createBuildCommand, createWorkspaceBuildCommand } = await loadProof();
-
-  assert.deepEqual(createBuildCommand('@proof/catalog', 'node'), {
-    command: 'pnpm',
-    args: ['--filter', '@proof/catalog', 'run', 'build'],
-  });
-  assert.deepEqual(createBuildCommand('@proof/catalog', 'cloudflare'), {
-    command: 'pnpm',
-    args: ['--filter', '@proof/catalog', 'run', 'cloudflare:build'],
-  });
-  assert.deepEqual(createWorkspaceBuildCommand('node', '@proof/shell'), [
-    {
-      command: 'pnpm',
-      args: ['-r', '--filter', './verticals/*', 'run', 'build'],
-    },
-    {
-      command: 'pnpm',
-      args: ['--filter', '@proof/shell', 'run', 'build'],
-    },
-  ]);
-  assert.deepEqual(createWorkspaceBuildCommand('cloudflare', '@proof/shell'), [
-    {
-      command: 'pnpm',
-      args: ['-r', '--filter', './verticals/*', 'run', 'cloudflare:build'],
-    },
-    {
-      command: 'pnpm',
-      args: ['--filter', '@proof/shell', 'run', 'cloudflare:build'],
-    },
-  ]);
-  assert.throws(
-    () => createBuildCommand('@proof/catalog', 'all'),
-    /Unsupported build target/,
-  );
-  assert.throws(
-    () => createWorkspaceBuildCommand('all', '@proof/shell'),
-    /Unsupported build target/,
-  );
-  assert.throws(() => createWorkspaceBuildCommand('node', ''), /shell package/);
-});
-
 test('baseline build coverage requires vertical envelopes on target and shell output artifacts', async () => {
   const { assertBaselineBuildCoverage } = await loadProof();
   const root = fs.mkdtempSync(
@@ -693,33 +651,24 @@ test('comparison proves all changed surfaces rotate and siblings stay byte-ident
     digestCanonical(JSON.parse(JSON.stringify(result))),
     'canonical evidence digest must survive durable JSON serialization',
   );
-});
-
-test('comparison rejects every stale changed-MicroVertical surface', async () => {
-  const { compareTargetSnapshots } = await loadProof();
-
   for (const surface of [
     'uiClient',
     'ssr',
     'apiBackend',
     'backendFederation',
   ]) {
-    const fixture = createComparisonFixture();
-    fixture.changed.catalog.envelope.surfaces[surface].digest =
-      fixture.baseline.catalog.envelope.surfaces[surface].digest;
+    const staleFixture = createComparisonFixture();
+    staleFixture.changed.catalog.envelope.surfaces[surface].digest =
+      staleFixture.baseline.catalog.envelope.surfaces[surface].digest;
     assert.throws(
       () =>
         compareTargetSnapshots({
           target: 'node',
-          ...fixture,
+          ...staleFixture,
         }),
       new RegExp(`${surface} surface did not rotate`),
     );
   }
-});
-
-test('comparison rejects one-byte sibling drift and envelope drift', async () => {
-  const { compareTargetSnapshots } = await loadProof();
 
   const bytesFixture = createComparisonFixture();
   bytesFixture.changed.checkout.tree.entries[0].sha256 = 'different-byte';
@@ -912,34 +861,23 @@ test('final-envelope verification binds all four surfaces to real bytes and iden
   );
 });
 
-test('final-envelope verification accepts a neutral Node launcher outside the compiled SSR identity closure', async t => {
+test('final-envelope verification excludes neutral deployment launchers from the compiled SSR identity closure', async t => {
   const { readAndVerifyEnvelope } = await loadProof();
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'operational-independence-node-launcher-'),
-  );
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  createEnvelopeFixture(root, 'node', { neutralNodeLauncher: true });
+  for (const [target, options, suffix] of [
+    ['node', { neutralNodeLauncher: true }, 'node'],
+    ['cloudflare', { neutralCloudflareLauncher: true }, 'cloudflare'],
+  ]) {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), `operational-independence-${suffix}-launcher-`),
+    );
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    createEnvelopeFixture(root, target, options);
 
-  const evidence = readAndVerifyEnvelope(root, 'node');
+    const evidence = readAndVerifyEnvelope(root, target);
 
-  assert.equal(evidence.surfaces.ssr.artifacts.length, 2);
-  assert.deepEqual(evidence.surfaces.ssr.carrierPaths, ['server/ssr.js']);
-});
-
-test('final-envelope verification excludes the Cloudflare deployment launcher from the compiled identity closure', async t => {
-  const { readAndVerifyEnvelope } = await loadProof();
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'operational-independence-cloudflare-launcher-'),
-  );
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  createEnvelopeFixture(root, 'cloudflare', {
-    neutralCloudflareLauncher: true,
-  });
-
-  const evidence = readAndVerifyEnvelope(root, 'cloudflare');
-
-  assert.equal(evidence.surfaces.ssr.artifacts.length, 2);
-  assert.deepEqual(evidence.surfaces.ssr.carrierPaths, ['server/ssr.js']);
+    assert.equal(evidence.surfaces.ssr.artifacts.length, 2);
+    assert.deepEqual(evidence.surfaces.ssr.carrierPaths, ['server/ssr.js']);
+  }
 });
 
 test('final-envelope verification rejects prior identity carrier metadata even when all hashes are resealed', async t => {

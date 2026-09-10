@@ -23,7 +23,7 @@ describe('routes-tanstack-create-routes', () => {
   let browser: Browser;
   let page: Page;
   let releaseFixtureLock: ReleaseFixtureLock | undefined;
-  const errors: string[] = [];
+  const pageErrors: string[] = [];
 
   beforeAll(async () => {
     releaseFixtureLock = await acquireFixtureLock(appDir);
@@ -32,10 +32,8 @@ describe('routes-tanstack-create-routes', () => {
     app = await modernServe(appDir, appPort);
     browser = await puppeteer.launch(launchOptions as any);
     page = await browser.newPage();
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text());
-      }
+    page.on('pageerror', error => {
+      pageErrors.push(error instanceof Error ? error.message : String(error));
     });
   });
 
@@ -77,6 +75,9 @@ describe('routes-tanstack-create-routes', () => {
       waitUntil: ['networkidle0'],
     });
     await page.waitForSelector('[data-testid="link-modified"]');
+    const navigationCount = await page.evaluate(
+      () => performance.getEntriesByType('navigation').length,
+    );
     await Promise.all([
       page.click('[data-testid="link-modified"]'),
       page.waitForSelector('#page'),
@@ -84,11 +85,11 @@ describe('routes-tanstack-create-routes', () => {
 
     const pageText = await page.$eval('#page', el => el.textContent);
     expect(pageText).toBe('modified:missing');
-    const unexpectedErrors = errors.filter(
-      message =>
-        message !==
-        'Failed to load resource: the server responded with a status of 404 (Not Found)',
-    );
-    expect(unexpectedErrors).toEqual([]);
+    expect(
+      await page.evaluate(
+        () => performance.getEntriesByType('navigation').length,
+      ),
+    ).toBe(navigationCount);
+    expect(pageErrors).toEqual([]);
   });
 });

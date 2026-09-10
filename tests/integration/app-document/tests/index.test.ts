@@ -43,41 +43,28 @@ describe('test dev and build', () => {
 
         await page.setContent(
           fs.readFileSync(
-            path.join(appDir, 'dist', 'html/test/index.html'),
-            'utf-8',
-          ),
-        );
-        expect(
-          await page.$eval('#root', root => ({
-            childElements: root.childElementCount,
-            comments: [...root.childNodes]
-              .filter(node => node.nodeType === Node.COMMENT_NODE)
-              .map(node => node.nodeValue),
-          })),
-        ).toEqual({ childElements: 0, comments: ['<?- html ?>'] });
-
-        await page.setContent(
-          fs.readFileSync(
             path.join(appDir, 'dist', 'html/sub/index.html'),
             'utf-8',
           ),
         );
         const documentState = await page.evaluate(() => {
-          const logo = document.createElement('div');
-          logo.className = 'logo-spin';
-          const logoChild = document.createElement('div');
-          logo.append(logoChild);
-          document.body.append(logo);
           const script =
             document.querySelector<HTMLScriptElement>('#script-has-id');
-          const comments: string[] = [];
-          const walker = document.createTreeWalker(
-            document,
-            NodeFilter.SHOW_COMMENT,
+          const customStyleRule = Array.from(document.styleSheets).some(
+            sheet => {
+              try {
+                return Array.from(sheet.cssRules).some(rule => {
+                  const cssText = rule.cssText.replace(/\s+/gu, '');
+                  return (
+                    cssText.includes('.logo-spin>div:last-child') &&
+                    cssText.includes('margin-right:0')
+                  );
+                });
+              } catch {
+                return false;
+              }
+            },
           );
-          while (walker.nextNode()) {
-            comments.push(walker.currentNode.nodeValue ?? '');
-          }
 
           return {
             aliasRendered:
@@ -86,18 +73,13 @@ describe('test dev and build', () => {
                 ?.textContent?.includes('alias message: Alias module works!') ??
               false,
             bodyDirection: document.body.dir,
-            comments,
+            customStyleRule,
             headClass: document.head.className,
             iifeScript: {
               async: script?.async,
               defer: script?.defer,
             },
-            inlineCommentRendered:
-              document.documentElement.textContent?.includes(
-                '== COMMENT BY APP in inline ==',
-              ) ?? false,
             rootClass: document.querySelector('#root')?.className,
-            styleMargin: getComputedStyle(logoChild).marginRight,
             title: document.title,
             windowState: {
               abc: (window as any).abc,
@@ -110,13 +92,11 @@ describe('test dev and build', () => {
         expect(documentState).toMatchObject({
           aliasRendered: true,
           bodyDirection: 'ltr',
-          comments: expect.arrayContaining([' COMMENT BY APP ', '<?- html ?>']),
+          customStyleRule: true,
           documentLanguage: 'cn',
           headClass: 'head',
           iifeScript: { async: true, defer: true },
-          inlineCommentRendered: true,
           rootClass: 'root',
-          styleMargin: '0px',
           title: 'test-title',
           windowState: { abc: 'hjk', b: 22 },
         });

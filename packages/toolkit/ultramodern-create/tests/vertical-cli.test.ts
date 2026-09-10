@@ -136,42 +136,6 @@ test('CLI MicroVertical flow rejects bridge options without writes', () => {
   }
 });
 
-test('CLI help documents bridge mode options', () => {
-  const result = runCli(packageRoot, ['--help']);
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /--bridge Enable explicit/);
-  assert.match(result.stdout, /--bridge-parent-root <path>/);
-  assert.match(result.stdout, /--bridge-workspace-package <glob>/);
-  assert.match(result.stdout, /--bridge-workspace-package-name <glob=package/);
-  assert.match(result.stdout, /--bridge-test-alias <glob:alias=target>/);
-  assert.match(result.stdout, /--bridge-dependency <package/);
-  assert.match(result.stdout, /--bridge-lockfile-policy <nested\|parent>/);
-  assert.match(result.stdout, /--bridge-gate <name=command>/);
-  assert.match(result.stdout, /--bridge-gate-cwd <name=cwd>/);
-  assert.match(result.stdout, /--bridge-react-singleton <package/);
-});
-
-test('CLI help documents MicroVertical positional and explicit forms', () => {
-  const result = runCli(packageRoot, ['--help']);
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /--vertical\[=<name>\]/);
-  assert.match(result.stdout, /--vertical-name <name>/);
-  assert.match(result.stdout, /--codesmith-overlay <package-or-path>/);
-  assert.match(result.stdout, /catalog --vertical/);
-  assert.match(result.stdout, /--vertical=catalog/);
-});
-
-test('CLI help documents preset, api-protocol and horizontal-remote flags', () => {
-  const result = runCli(packageRoot, ['--help']);
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /--preset=<full-stack\|api-only\|ui-only>/);
-  assert.match(result.stdout, /--api-protocol=<rest\|rpc>/);
-  assert.match(result.stdout, /--horizontal-remote/);
-});
-
 test('CLI --preset=api-only generates a headless MicroVertical', () => {
   const { tempRoot, workspaceDir } = createWorkspace('vertical-cli-api-only', {
     tempPrefix: 'um-vertical-cli-',

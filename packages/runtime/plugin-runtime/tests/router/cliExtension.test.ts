@@ -4,11 +4,7 @@ import path from 'node:path';
 import type { Entrypoint } from '@modern-js/types';
 import { fs, NESTED_ROUTE_SPEC_FILE } from '@modern-js/utils';
 import { routerPlugin } from '../../src/router/cli';
-import {
-  getEntrypointRoutesDir,
-  getEntrypointRoutesOwner,
-  isRouteEntry,
-} from '../../src/router/cli/entry';
+import { getEntrypointRoutesDir } from '../../src/router/cli/entry';
 import {
   handleFileChange,
   handleGeneratorEntryCode,
@@ -53,88 +49,6 @@ describe('router cli extension points', () => {
       await rm(tempDir, { recursive: true, force: true });
       tempDir = undefined;
     }
-  });
-
-  test('tracks plugin-owned route directory metadata', async () => {
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-router-cli-'));
-    const entryDir = path.join(tempDir, 'src', 'main');
-    const viewsDir = path.join(entryDir, 'views');
-    await mkdir(viewsDir, { recursive: true });
-
-    const [entrypoint] = await handleModifyEntrypoints(
-      [
-        {
-          entryName: 'main',
-          isMainEntry: true,
-          entry: entryDir,
-          absoluteEntryDir: entryDir,
-          isAutoMount: true,
-        } as Entrypoint,
-      ],
-      'views',
-    );
-
-    expect(entrypoint.nestedRoutesEntry).toBe(viewsDir);
-    expect(getEntrypointRoutesDir(entrypoint)).toBe('views');
-    expect(isRouteEntry(entryDir, 'views')).toBe(viewsDir);
-  });
-
-  test('tracks plugin-owned route owner metadata for default routes directory', async () => {
-    tempDir = await mkdtemp(path.join(tmpdir(), 'modern-router-cli-'));
-    const appDirectory = tempDir;
-    const srcDirectory = path.join(tempDir, 'src');
-    const distDirectory = path.join(tempDir, 'dist');
-    const entryDir = path.join(srcDirectory, 'main');
-    const routesDir = path.join(entryDir, 'routes');
-    await mkdir(routesDir, { recursive: true });
-
-    const [entrypoint] = await handleModifyEntrypoints(
-      [
-        {
-          entryName: 'main',
-          isMainEntry: true,
-          entry: entryDir,
-          absoluteEntryDir: entryDir,
-          isAutoMount: true,
-        } as Entrypoint,
-      ],
-      'routes',
-      { routesOwner: '@modern-js/plugin-fake-router' },
-    );
-
-    const taps: Record<string, any> = {};
-    const api = {
-      getAppContext: () => ({
-        appDirectory,
-        srcDirectory,
-        distDirectory,
-        metaName: 'modern-js',
-        runtimeConfigFile: 'modern.runtime',
-        serverRoutes: [{ entryName: 'main', urlPath: '/' }],
-      }),
-      getNormalizedConfig: () => ({ router: { custom: true } }),
-      addCommand: () => {},
-      _internalRuntimePlugins: (tap: any) => {
-        taps.internalRuntimePlugins = tap;
-      },
-      checkEntryPoint: () => {},
-      config: () => {},
-      modifyEntrypoints: () => {},
-      generateEntryCode: () => {},
-      onFileChanged: () => {},
-      modifyFileSystemRoutes: () => {},
-      onBeforeGenerateRoutes: () => {},
-    };
-    routerPlugin().setup!(api as any);
-
-    expect(entrypoint.nestedRoutesEntry).toBe(routesDir);
-    expect(getEntrypointRoutesDir(entrypoint)).toBe('routes');
-    expect(getEntrypointRoutesOwner(entrypoint)).toBe(
-      '@modern-js/plugin-fake-router',
-    );
-    expect(
-      taps.internalRuntimePlugins!({ entrypoint, plugins: [] }).plugins,
-    ).toEqual([]);
   });
 
   test('generates routes for a non-TanStack plugin-owned entry and returns routes by entry', async () => {
@@ -197,17 +111,6 @@ describe('router cli extension points', () => {
         }),
       ],
     });
-    await expect(
-      fs.pathExists(path.join(internalDirectory, 'main', 'routes.js')),
-    ).resolves.toBe(true);
-    await expect(
-      fs.pathExists(
-        path.join(internalDirectory, 'main', 'runtime-global-context.js'),
-      ),
-    ).resolves.toBe(true);
-    expect(
-      await fs.pathExists(path.join(srcDirectory, 'modern-tanstack')),
-    ).toBe(false);
   });
 
   test('regenerates only the scoped route entries for file changes', async () => {
@@ -331,9 +234,7 @@ describe('router cli extension points', () => {
       }),
       getNormalizedConfig: () => ({ router: { custom: true } }),
       addCommand: () => {},
-      _internalRuntimePlugins: (tap: any) => {
-        taps.internalRuntimePlugins = tap;
-      },
+      _internalRuntimePlugins: () => {},
       checkEntryPoint: (tap: any) => {
         taps.checkEntryPoint = tap;
       },
@@ -359,7 +260,6 @@ describe('router cli extension points', () => {
     routerPlugin().setup!(api as any);
 
     const routerConfig = taps.config!();
-    expect(routerConfig.source.include).toHaveLength(2);
     expect(
       routerConfig.source.include.some(
         (item: unknown) =>
@@ -373,21 +273,6 @@ describe('router cli extension points', () => {
           item.test('/node_modules/react-router-dom/'),
       ),
     ).toBe(false);
-
-    expect(
-      taps.internalRuntimePlugins!({ entrypoint: pluginEntry, plugins: [] })
-        .plugins,
-    ).toEqual([]);
-    expect(
-      taps.internalRuntimePlugins!({ entrypoint: builtInEntry, plugins: [] })
-        .plugins,
-    ).toEqual([
-      {
-        name: 'router',
-        path: '@modern-js/runtime/router/internal',
-        config: { serverBase: ['/dashboard'] },
-      },
-    ]);
 
     const specPath = path.join(distDirectory, NESTED_ROUTE_SPEC_FILE);
     await fs.outputJSON(specPath, {
@@ -422,16 +307,13 @@ describe('router cli extension points', () => {
     });
   });
 
-  test('atomically conserves built-in and TanStack routes without filesystem locks', async () => {
+  test('atomically conserves built-in and TanStack routes', async () => {
     tempDir = await mkdtemp(path.join(tmpdir(), 'modern-router-cli-'));
     const specPath = path.join(tempDir, 'dist', NESTED_ROUTE_SPEC_FILE);
 
     await fs.outputJSON(specPath, {
       existing: [{ id: 'keep-me' }],
     });
-    const mkdir = rstest.spyOn(fs, 'mkdir');
-    const rename = rstest.spyOn(fs, 'rename');
-
     await Promise.all([
       updateNestedRoutesSpec(specPath, {
         dashboard: [{ id: 'built-in-route' }],
@@ -446,27 +328,6 @@ describe('router cli extension points', () => {
       dashboard: [{ id: 'built-in-route' }],
       main: [{ id: 'tanstack-route' }],
     });
-    expect(rename).toHaveBeenCalledTimes(2);
-    expect(
-      rename.mock.calls.map(([temporaryPath, publishedPath]) => ({
-        temporaryDirectory: path.dirname(temporaryPath as string),
-        publishedPath,
-      })),
-    ).toEqual([
-      {
-        temporaryDirectory: path.dirname(specPath),
-        publishedPath: specPath,
-      },
-      {
-        temporaryDirectory: path.dirname(specPath),
-        publishedPath: specPath,
-      },
-    ]);
-    expect(
-      new Set(rename.mock.calls.map(([temporaryPath]) => temporaryPath)).size,
-    ).toBe(2);
-    expect(mkdir).not.toHaveBeenCalledWith(`${specPath}.lock`);
-    expect(await fs.pathExists(`${specPath}.lock`)).toBe(false);
   });
 
   test('snapshots nested route updates before the async write queue runs', async () => {

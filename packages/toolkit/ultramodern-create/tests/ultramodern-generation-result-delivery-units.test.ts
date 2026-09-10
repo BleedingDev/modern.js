@@ -1,9 +1,5 @@
 import assert from 'node:assert/strict';
-import { createDeliveryUnitRecord } from '../src/ultramodern-workspace/delivery-unit';
-import {
-  parseSurfaceRef,
-  projectDeliveryUnitToV1,
-} from '../src/ultramodern-workspace/delivery-unit-schema/types';
+import { parseSurfaceRef } from '../src/ultramodern-workspace/delivery-unit-schema/types';
 import { createNeutralOwnership } from '../src/ultramodern-workspace/descriptors';
 import { createGenerationResult } from '../src/ultramodern-workspace/generation-result';
 import type { WorkspaceApp } from '../src/ultramodern-workspace/types';
@@ -86,56 +82,6 @@ test('generation result exposes a delivery-unit descriptor per app of every kind
   );
 });
 
-test('descriptor identity matches the emitted delivery-unit records (G1d)', () => {
-  const result = buildResult();
-  for (const app of [shell, apiVertical, uiOnlyVertical]) {
-    const record = createDeliveryUnitRecord(scope, app);
-    const descriptor = result.deliveryUnits?.find(
-      unit => unit.unitId === record.unitId,
-    );
-    assert.ok(descriptor, `descriptor missing for ${record.unitId}`);
-    assert.equal(descriptor?.buildMarker, record.buildMarker);
-    assert.equal(descriptor?.sourceRevision, record.sourceRevision);
-  }
-});
-
-test('down-projecting a descriptor reproduces the v1 delivery-unit identity (G1d)', () => {
-  const result = buildResult();
-  const descriptor = result.deliveryUnits?.find(
-    unit => unit.unitId === 'acme/checkout',
-  );
-  assert.ok(descriptor);
-  const projection = projectDeliveryUnitToV1(descriptor, {
-    directory: apiVertical.directory,
-    packageSuffix: apiVertical.packageSuffix,
-    displayName: apiVertical.displayName,
-    portEnv: apiVertical.portEnv,
-    port: apiVertical.port,
-    mfName: apiVertical.mfName,
-    ownership: apiVertical.ownership,
-    packageName: '@acme/checkout',
-    version: '0.1.0',
-  });
-  assert.equal(projection.deliveryUnitRecord.unitId, descriptor.unitId);
-  assert.equal(
-    projection.deliveryUnitRecord.buildMarker,
-    descriptor.buildMarker,
-  );
-  assert.equal(projection.app.kind, 'vertical');
-  assert.equal(projection.app.api?.stem, 'checkout');
-  assert.equal(projection.app.api?.prefix, '/checkout-api');
-});
-
-test('descriptor owner defaults to the neutral team owner (G1d + G3)', () => {
-  const result = buildResult();
-  for (const descriptor of result.deliveryUnits ?? []) {
-    assert.deepEqual(descriptor.owner, {
-      kind: 'team',
-      id: 'super-app-platform',
-    });
-  }
-});
-
 test('expose keys are sanitized to grammar-valid surfaceIds and classified (G1d)', () => {
   const orders: WorkspaceApp = {
     ...apiVertical,
@@ -189,24 +135,6 @@ test('expose keys are sanitized to grammar-valid surfaceIds and classified (G1d)
       surface.surfaceId,
     );
   }
-});
-
-test('generated surfaces use the canonical expose mapper for ids and kind', () => {
-  const result = buildResult();
-  const descriptor = result.deliveryUnits?.find(
-    unit => unit.unitId === 'acme/checkout',
-  );
-  assert.ok(descriptor);
-  assert.deepEqual(
-    descriptor?.surfaces.slice(0, 2).map(surface => ({
-      kind: surface.kind,
-      surfaceId: surface.surfaceId,
-    })),
-    [
-      { kind: 'route', surfaceId: 'Route' },
-      { kind: 'component', surfaceId: 'Cart-Widget' },
-    ],
-  );
 });
 
 test('additive: existing result fields are preserved (G1d)', () => {

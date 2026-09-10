@@ -4,6 +4,7 @@ import {
   type RstestConfig,
 } from '@rstest/core';
 export const testPreset = defineConfig({
+  passWithNoTests: false,
   coverage: {
     enabled: false,
   },

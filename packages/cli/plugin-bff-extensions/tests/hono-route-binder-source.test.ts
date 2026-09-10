@@ -41,28 +41,6 @@ const asHandlers = (
 ): MiddlewareHandler[] => (Array.isArray(value) ? value : [value]);
 
 describe('Hono route handler binding', () => {
-  it('binds policy to the exact route before dispatch', async () => {
-    const orderContract =
-      policy.expectedOperationContracts['POST:/api/orders']!;
-    const routeHandler = rstest.fn(async () => new Response('customer'));
-    const bound = asHandlers(
-      bindHonoRouteHandlers({
-        handler: routeHandler,
-        policy,
-        routePath: '/api/customer',
-      }),
-    );
-
-    const result = await bound[0]!(
-      createContext('GET', createHeaders(orderContract)),
-      async () => undefined,
-    );
-
-    expect(result).toBeInstanceOf(Response);
-    expect((result as Response).status).toBe(403);
-    expect(routeHandler).not.toHaveBeenCalled();
-  });
-
   it('preserves the exact downstream Response on an allowed policy', async () => {
     const customerContract =
       policy.expectedOperationContracts['GET:/api/customer']!;

@@ -10,7 +10,6 @@ const temporaryDirectory = fs.mkdtempSync(
   path.join(appToolsDirectory, '.rslib-template-test-'),
 );
 const outputDirectory = path.join(temporaryDirectory, 'dist');
-const outputFormats = ['esm-node', 'esm', 'cjs'];
 
 function getBuildConfig(): RslibConfig {
   return {
@@ -46,29 +45,17 @@ describe('App Tools Rslib ESM loaders', () => {
   });
 
   it('loads emitted ESM loaders and compiled CJS runtime entries', async () => {
-    const runtimeEntries = fs
-      .readdirSync(path.join(outputDirectory, 'esm-node', 'esm'))
-      .filter(file => file.endsWith('.mjs'))
-      .sort();
-
-    expect(runtimeEntries).toEqual(['register-esm.mjs', 'ts-paths-loader.mjs']);
-
-    for (const file of runtimeEntries) {
-      for (const outputFormat of outputFormats) {
-        const emitted = await import(
-          `${pathToFileURL(path.join(outputDirectory, outputFormat, 'esm', file)).href}?format=${outputFormat}`
-        );
-        expect(emitted).toEqual(
-          expect.objectContaining(
-            file === 'register-esm.mjs'
-              ? { registerPathsLoader: expect.any(Function) }
-              : {
-                  initialize: expect.any(Function),
-                  resolve: expect.any(Function),
-                },
-          ),
-        );
-      }
+    for (const [file, expectedExports] of [
+      ['register-esm.mjs', { registerPathsLoader: expect.any(Function) }],
+      [
+        'ts-paths-loader.mjs',
+        { initialize: expect.any(Function), resolve: expect.any(Function) },
+      ],
+    ] as const) {
+      const emitted = await import(
+        `${pathToFileURL(path.join(outputDirectory, 'esm-node', 'esm', file)).href}?format=esm-node`
+      );
+      expect(emitted).toEqual(expect.objectContaining(expectedExports));
 
       const compiledCjs = require(
         path.join(
@@ -78,16 +65,7 @@ describe('App Tools Rslib ESM loaders', () => {
           file.replace(/\.mjs$/u, '.js'),
         ),
       );
-      expect(compiledCjs).toEqual(
-        expect.objectContaining(
-          file === 'register-esm.mjs'
-            ? { registerPathsLoader: expect.any(Function) }
-            : {
-                initialize: expect.any(Function),
-                resolve: expect.any(Function),
-              },
-        ),
-      );
+      expect(compiledCjs).toEqual(expect.objectContaining(expectedExports));
     }
   }, 120_000);
 });

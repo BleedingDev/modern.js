@@ -4,11 +4,9 @@ import {
   buildOperationContractMap,
   createOperationContractHash,
   createOperationEntries,
-  createOperationSchemaHash,
   DEFAULT_OPERATION_VERSION,
   deriveOperationVersion,
   type OperationContractSource,
-  serializeOperationSchemas,
 } from '../../src/bff-policy/operationContracts';
 
 const createSchemaHandler = (schema: z.ZodType) => {
@@ -36,10 +34,6 @@ describe('operation contract utilities', () => {
 
     const entries = createOperationEntries(handlers);
     expect(entries.map(item => item.name)).toEqual(['alpha', 'beta']);
-
-    const hash1 = createOperationSchemaHash(entries, 'crm-producer');
-    const hash2 = createOperationSchemaHash(entries, 'crm-producer');
-    expect(hash1).toBe(hash2);
   });
 
   test('builds per-operation contracts keyed by route and operation id', () => {
@@ -198,11 +192,6 @@ describe('operation contract utilities', () => {
     const a = createOperationContractHash(handler, 'producer-a');
     const b = createOperationContractHash(handler, 'producer-b');
     expect(a).not.toBe(b);
-  });
-
-  test('serializeOperationSchemas returns undefined without schema metadata', () => {
-    expect(serializeOperationSchemas(() => undefined)).toBeUndefined();
-    expect(serializeOperationSchemas(undefined)).toBeUndefined();
   });
 
   test('buildOperationContractMap propagates the operation version', () => {

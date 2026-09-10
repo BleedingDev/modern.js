@@ -166,10 +166,10 @@ test('generated postinstall installs vendored Codex skills without formatting co
     fs.mkdirSync(path.join(workspaceDir, '.codex/skills/local-user-skill'), {
       recursive: true,
     });
+    const userSkill = Buffer.from('# Local user skill\n');
     fs.writeFileSync(
       path.join(workspaceDir, '.codex/skills/local-user-skill/SKILL.md'),
-      '# Local user skill\n',
-      'utf-8',
+      userSkill,
     );
     const { fakeBinDir } = createFakeGitAndLefthookBin(tempRoot, {
       failNetwork: true,
@@ -221,11 +221,12 @@ test('generated postinstall installs vendored Codex skills without formatting co
       ),
       true,
     );
-    assert.equal(
-      fs.existsSync(
+    assert.deepEqual(
+      fs.readFileSync(
         path.join(workspaceDir, '.codex/skills/local-user-skill/SKILL.md'),
       ),
-      true,
+      userSkill,
+      'postinstall must preserve user-owned skill bytes',
     );
     assert.equal(
       fs.readFileSync(
@@ -360,37 +361,6 @@ test('bootstrap-agent-skills --postinstall supports documented Codex skill opt-o
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
-  }
-});
-
-test('skills:check advises about missing clone-backed Codex skills', () => {
-  const { tempRoot, workspaceDir } = scaffoldWorkspace();
-
-  try {
-    const result = spawnSync(
-      process.execPath,
-      ['scripts/bootstrap-agent-skills.mts', '--check'],
-      {
-        cwd: workspaceDir,
-        encoding: 'utf-8',
-        env: withCreateBinEnv(),
-      },
-    );
-
-    // Clone-backed skill bodies may be missing after offline postinstall.
-    // Missing local bodies are advisory so CI can stay offline.
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(
-      result.stdout,
-      /Advisory: pinned Codex skills are not installed: .*mf.*run pnpm skills:install/,
-    );
-    assert.match(
-      result.stdout,
-      /Installed Codex skills: .*rsbuild-best-practices/,
-    );
-    assert.doesNotMatch(result.stderr, /clone-installed agent skills/u);
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
 

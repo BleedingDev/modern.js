@@ -4,6 +4,7 @@ import {
   resolveCrossProjectRequestObservation,
 } from '../../src/bff-policy/crossProjectPolicy';
 import { buildOperationContractMap } from '../../src/bff-policy/operationContracts';
+import { resolveCrossProjectPolicy } from '../../src/bff-policy/resolveCrossProjectPolicy';
 
 const NAMESPACE_ALLOWLIST_REQUIRES_VERIFIER_MESSAGE =
   'cross-project namespace allowlist requires verifyProducerIdentity';
@@ -136,6 +137,76 @@ describe('cross-project policy', () => {
       },
     );
 
+    expect(violation).toBeNull();
+  });
+
+  test('enforces resolver defaults at the policy boundary', () => {
+    const policy = resolveCrossProjectPolicy({
+      handlers: [
+        {
+          name: 'getCustomer',
+          httpMethod: 'GET',
+          routePath: '/api/customer',
+        },
+      ],
+      isCrossProjectServer: true,
+      requestId: 'crm.producer-a',
+    });
+
+    expect(policy).toBeDefined();
+    expect(evaluateCrossProjectPolicy({}, policy)).toMatchObject({
+      reason: 'missing_envelope',
+      status: 403,
+    });
+  });
+
+  test('enforces generated contracts over stale user entries at dispatch', () => {
+    const policy = resolveCrossProjectPolicy({
+      crossProjectPolicy: {
+        enabled: true,
+        expectedOperationContracts: {
+          'GET:/api/customer': {
+            schemaHash: 'stale-user-contract',
+            operationVersion: 99,
+          },
+        },
+      },
+      handlers: [
+        {
+          name: 'getCustomer',
+          httpMethod: 'GET',
+          routePath: '/api/customer',
+        },
+      ],
+      requestId: 'crm.producer-a',
+    });
+    const contract = policy?.expectedOperationContracts['GET:/api/customer'];
+    expect(contract).toBeDefined();
+    if (!policy || !contract) {
+      throw new Error('Expected generated dispatch contract');
+    }
+
+    const violation = evaluateCrossProjectPolicy(
+      {
+        'x-modernjs-bff-envelope': JSON.stringify({
+          requestId: contract.requestId,
+        }),
+        'x-operation-id': contract.operationId,
+        'x-modernjs-bff-operation-context': JSON.stringify({
+          requestId: contract.requestId,
+          operationId: contract.operationId,
+          method: contract.method,
+          routePath: contract.routePath,
+          schemaHash: contract.schemaHash,
+          operationVersion: contract.operationVersion,
+        }),
+      },
+      policy,
+      { method: 'GET', routePath: '/api/customer' },
+    );
+
+    expect(contract.schemaHash).not.toBe('stale-user-contract');
+    expect(contract.operationVersion).toBe(1);
     expect(violation).toBeNull();
   });
 
@@ -520,6 +591,110 @@ describe('cross-project policy', () => {
 
     expect(violation).toBeNull();
   });
+});
+
+describe('cross-project policy input validation', () => {
+  const validEnvelopeHeaders = {
+    'x-modernjs-bff-envelope': JSON.stringify({
+      requestId: 'crm.producer-a',
+    }),
+    'x-operation-id': 'crm.producer-a:GET:/api/customer',
+  };
+  const strictContractPolicy = {
+    enabled: true,
+    expectedOperationContracts: {
+      'GET:/api/customer': {
+        schemaHash: 'schema-1',
+        operationVersion: 1,
+      },
+    },
+  };
+  const detail = {
+    requestId: 'crm.producer-a',
+    operationId: 'crm.producer-a:GET:/api/customer',
+    method: 'GET',
+    routePath: '/api/customer',
+    schemaHash: 'schema-1',
+    operationVersion: 1,
+  };
+
+  const cases = [
+    {
+      name: 'rejects a non-object envelope',
+      headers: { 'x-modernjs-bff-envelope': '123' },
+      policy: { enabled: true },
+      reason: 'invalid_envelope',
+    },
+    {
+      name: 'rejects an envelope without requestId',
+      headers: { 'x-modernjs-bff-envelope': JSON.stringify({}) },
+      policy: { enabled: true },
+      reason: 'missing_request_id',
+    },
+    {
+      name: 'rejects non-JSON operation details',
+      headers: {
+        ...validEnvelopeHeaders,
+        'x-modernjs-bff-operation-context': 'not-json',
+      },
+      policy: { enabled: true },
+      reason: 'invalid_operation_context_details',
+    },
+    {
+      name: 'rejects non-object operation details',
+      headers: {
+        ...validEnvelopeHeaders,
+        'x-modernjs-bff-operation-context': JSON.stringify([]),
+      },
+      policy: { enabled: true },
+      reason: 'invalid_operation_context_details',
+    },
+    {
+      name: 'rejects operation details with another requestId',
+      headers: {
+        ...validEnvelopeHeaders,
+        'x-modernjs-bff-operation-context': JSON.stringify({
+          ...detail,
+          requestId: 'billing.producer-a',
+        }),
+      },
+      policy: strictContractPolicy,
+      reason: 'operation_context_details_request_id_mismatch',
+    },
+    {
+      name: 'rejects missing operation schema hash',
+      headers: {
+        ...validEnvelopeHeaders,
+        'x-modernjs-bff-operation-context': JSON.stringify({
+          ...detail,
+          schemaHash: undefined,
+        }),
+      },
+      policy: strictContractPolicy,
+      reason: 'missing_operation_schema_hash',
+    },
+    {
+      name: 'rejects missing operation version',
+      headers: {
+        ...validEnvelopeHeaders,
+        'x-modernjs-bff-operation-context': JSON.stringify({
+          ...detail,
+          operationVersion: undefined,
+        }),
+      },
+      policy: strictContractPolicy,
+      reason: 'missing_operation_version',
+    },
+  ] as const;
+
+  for (const policyCase of cases) {
+    test(policyCase.name, () => {
+      expect(
+        evaluateCrossProjectPolicy(policyCase.headers, policyCase.policy)
+          ?.reason,
+      ).toBe(policyCase.reason);
+    });
+  }
 });
 
 describe('cross-project policy producer identity binding', () => {

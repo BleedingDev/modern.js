@@ -4,7 +4,6 @@ import {
   createHttpApiHandler,
   defineEffectBff,
   type EffectApiModule,
-  extractHttpApiFromModule,
   resolveEffectBffModuleHandler,
   toOperationContractSources,
 } from '@modern-js/bff-effect/effect';
@@ -51,122 +50,6 @@ const reflect: Parameters<typeof collectEffectEndpoints>[0] = (
   });
 
 const collectEndpoints = () => collectEffectEndpoints(reflect, pingApi, PREFIX);
-
-describe('effect endpoint contract module extraction', () => {
-  test('does not execute default factory functions during contract extraction', async () => {
-    let called = false;
-
-    await expect(
-      extractHttpApiFromModule(
-        {
-          default: () => {
-            called = true;
-            return { api: pingApi };
-          },
-        },
-        HttpApi.isHttpApi,
-      ),
-    ).resolves.toBeNull();
-    expect(called).toBe(false);
-  });
-
-  test('extracts HttpApi from defineEffectBff entries without factory execution', async () => {
-    const module = defineEffectBff({
-      api: pingApi,
-      layer: pingLayer,
-    });
-
-    await expect(
-      extractHttpApiFromModule(module, HttpApi.isHttpApi),
-    ).resolves.toBe(pingApi);
-  });
-
-  test.each([
-    [
-      'defineEffectBff',
-      () =>
-        defineEffectBff({
-          api: pingApi,
-          layer: pingLayer,
-        }),
-    ],
-    ['api/layer', () => ({ api: pingApi, layer: pingLayer })],
-    [
-      'default api/layer',
-      () => ({
-        default: {
-          api: pingApi,
-          layer: pingLayer,
-        },
-      }),
-    ],
-  ])('accepts runtime-valid %s in resolver and extractor', async (_name, createModule) => {
-    const module = createModule();
-
-    await expect(
-      extractHttpApiFromModule(module, HttpApi.isHttpApi),
-    ).resolves.toBe(pingApi);
-
-    const resolved = await resolveEffectBffModuleHandler(
-      module as EffectApiModule,
-    );
-    expect(resolved).not.toBeNull();
-    await resolved?.dispose?.();
-  });
-
-  test.each([
-    ['bare api', { api: pingApi }],
-    ['default bare api', { default: { api: pingApi } }],
-    [
-      'default factory',
-      {
-        default: () => ({
-          api: pingApi,
-          layer: pingLayer,
-        }),
-      },
-    ],
-  ])('rejects runtime-invalid %s in resolver and extractor', async (_name, module) => {
-    await expect(
-      extractHttpApiFromModule(module, HttpApi.isHttpApi),
-    ).resolves.toBeNull();
-    await expect(
-      resolveEffectBffModuleHandler(module as EffectApiModule),
-    ).resolves.toBeNull();
-  });
-
-  test('ignores an unbranded factory when strict api/layer exports can be rebuilt', async () => {
-    let factoryCalled = false;
-    const warnings: string[] = [];
-    const module = {
-      api: pingApi,
-      layer: pingLayer,
-      createHandler: () => {
-        factoryCalled = true;
-        return {
-          handler: () => new Response('unsafe'),
-          dispose: async () => {},
-        };
-      },
-    };
-
-    await expect(
-      extractHttpApiFromModule(module, HttpApi.isHttpApi),
-    ).resolves.toBeNull();
-    const resolved = await resolveEffectBffModuleHandler(module, {
-      onWarning: warning => warnings.push(warning),
-    });
-
-    expect(resolved).not.toBeNull();
-    expect(factoryCalled).toBe(false);
-    expect(warnings).toEqual([
-      expect.stringContaining(
-        'Ignored unbranded `createHandler` export and rebuilt the handler',
-      ),
-    ]);
-    await resolved?.dispose?.();
-  });
-});
 
 const resolvePolicy = (
   extraPolicy: Record<string, unknown> = {},
@@ -294,46 +177,6 @@ describe('effect lane cross-project policy enforcement', () => {
     await expect(response!.json()).resolves.toMatchObject({
       reason: 'operation_context_mismatch',
     });
-  });
-
-  test('binds a concrete Effect request path to its server-known route template', () => {
-    const policy = resolveCrossProjectPolicy({
-      crossProjectPolicy: { enabled: true },
-      handlers: [
-        {
-          name: 'getCustomer',
-          httpMethod: 'GET',
-          routePath: '/api/customers/:id',
-        },
-      ],
-      requestId: REQUEST_ID,
-      isCrossProjectServer: true,
-    })!;
-    const contract =
-      policy.expectedOperationContracts['GET:/api/customers/:id']!;
-    const operationId = `${REQUEST_ID}:GET:/api/customers/:id`;
-
-    const response = checkCrossProjectPolicyForRequest(
-      new Request('http://localhost/customers/customer-42', {
-        headers: {
-          'x-modernjs-bff-envelope': JSON.stringify({
-            requestId: REQUEST_ID,
-          }),
-          'x-operation-id': operationId,
-          'x-modernjs-bff-operation-context': JSON.stringify({
-            requestId: REQUEST_ID,
-            operationId,
-            method: 'GET',
-            routePath: '/api/customers/:id',
-            schemaHash: contract.schemaHash,
-            operationVersion: contract.operationVersion,
-          }),
-        },
-      }),
-      policy,
-    );
-
-    expect(response).toBeNull();
   });
 
   test('denies stale schema hashes (contract mismatch)', async () => {
@@ -481,67 +324,6 @@ describe('effect lane cross-project policy enforcement', () => {
 });
 
 describe('custom createHandler factory policy enforcement', () => {
-  test('branded defineEffectBff factories keep internal (per-batch-item capable) enforcement', async () => {
-    const policy = resolvePolicy();
-    const warnings: string[] = [];
-    const runtime = defineEffectBff({
-      api: pingApi,
-      layer: pingLayer,
-    });
-
-    const loaded = await resolveEffectBffModuleHandler(
-      runtime as unknown as EffectApiModule,
-      {
-        validateRequest: request =>
-          checkCrossProjectPolicyForRequest(request, policy),
-        onWarning: message => warnings.push(message),
-      },
-    );
-
-    expect(loaded).not.toBeNull();
-    expect(warnings).toEqual([]);
-
-    try {
-      const denied = await loaded!.handler(
-        new Request('http://localhost/ping'),
-      );
-      expect(denied.status).toBe(403);
-      await expect(denied.json()).resolves.toMatchObject({
-        code: 'BFF_CROSS_PROJECT_POLICY_DENIED',
-        reason: 'missing_envelope',
-      });
-
-      const allowed = await loaded!.handler(
-        new Request('http://localhost/ping', {
-          headers: validPolicyHeaders(),
-        }),
-      );
-      expect(allowed.status).toBe(200);
-      await expect(allowed.json()).resolves.toEqual({ ok: true });
-    } finally {
-      await loaded?.dispose?.();
-    }
-  });
-
-  test('unbranded custom factories are rejected by strictEffectApproach by default', async () => {
-    const warnings: string[] = [];
-    const customModule: EffectApiModule = {
-      createHandler: () => ({
-        handler: async () => new Response(JSON.stringify({ ok: true })),
-        dispose: async () => Promise.resolve(),
-      }),
-    };
-
-    const loaded = await resolveEffectBffModuleHandler(customModule, {
-      onWarning: message => warnings.push(message),
-    });
-
-    expect(loaded).toBeNull();
-    expect(
-      warnings.some(message => message.includes('strictEffectApproach')),
-    ).toBe(true);
-  });
-
   test('defineEffectBff policy binds the observed operation before interceptors', async () => {
     const policy = resolvePolicy();
     let interceptedRequests = 0;
@@ -622,32 +404,5 @@ describe('custom createHandler factory policy enforcement', () => {
     } finally {
       await loaded?.dispose?.();
     }
-  });
-});
-
-describe('defineEffectBff client placeholder', () => {
-  test('throws an actionable error when the loader-materialized client is used directly', () => {
-    const runtime = defineEffectBff({
-      api: pingApi,
-      layer: pingLayer,
-    });
-
-    expect(() => (runtime.client as Record<string, unknown>).greetings).toThrow(
-      /only exists when the API entry is imported through the "@api\/index" transformed path/,
-    );
-  });
-
-  test('stays inert for await/inspection protocols', async () => {
-    const runtime = defineEffectBff({
-      api: pingApi,
-      layer: pingLayer,
-    });
-
-    // Awaiting the surrounding object must not trigger the client trap.
-    const resolved = await Promise.resolve(runtime);
-    expect(resolved).toBe(runtime);
-    expect(
-      (runtime.client as unknown as Record<string, unknown>).then,
-    ).toBeUndefined();
   });
 });

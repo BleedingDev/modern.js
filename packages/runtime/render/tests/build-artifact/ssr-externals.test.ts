@@ -5,88 +5,78 @@ import { pathToFileURL } from 'node:url';
 import React from 'react';
 
 const ssrArtifactPath = path.resolve(__dirname, '../../dist/esm/ssr.mjs');
-const hasArtifact = fs.existsSync(ssrArtifactPath);
 const renderPackagePath = path.resolve(__dirname, '../..');
 const rscArtifactPaths = ['rsc.mjs', 'rscWorker.mjs'].map(file =>
   path.join(renderPackagePath, 'dist/esm', file),
 );
 
 describe('ssr build artifact', () => {
-  test.skipIf(!hasArtifact)(
-    'renders through the published ESM SSR entry under a bundler runtime',
-    async () => {
-      const bundlerGlobal = globalThis as typeof globalThis & {
-        __webpack_require__?: { u: (chunkId: string | number) => string };
-      };
-      const previousBundlerRuntime = bundlerGlobal.__webpack_require__;
-      bundlerGlobal.__webpack_require__ = {
-        u: chunkId => String(chunkId),
-      };
+  test('renders through the published ESM SSR entry under a bundler runtime', async () => {
+    const bundlerGlobal = globalThis as typeof globalThis & {
+      __webpack_require__?: { u: (chunkId: string | number) => string };
+    };
+    const previousBundlerRuntime = bundlerGlobal.__webpack_require__;
+    bundlerGlobal.__webpack_require__ = {
+      u: chunkId => String(chunkId),
+    };
 
-      try {
-        const runtime = await import(pathToFileURL(ssrArtifactPath).href);
-        const stream = await runtime.renderSSRStream(
-          React.createElement('main', null, 'published SSR artifact'),
-          {
-            request: new Request('https://example.com/'),
-            rscRoot: React.createElement(
-              'main',
-              null,
-              'published SSR artifact',
-            ),
-          },
-        );
-        const html = await new Response(stream).text();
+    try {
+      const runtime = await import(pathToFileURL(ssrArtifactPath).href);
+      const stream = await runtime.renderSSRStream(
+        React.createElement('main', null, 'published SSR artifact'),
+        {
+          request: new Request('https://example.com/'),
+          rscRoot: React.createElement('main', null, 'published SSR artifact'),
+        },
+      );
+      const html = await new Response(stream).text();
 
-        expect(html).toContain('<main>published SSR artifact</main>');
-      } finally {
-        if (previousBundlerRuntime === undefined) {
-          delete bundlerGlobal.__webpack_require__;
-        } else {
-          bundlerGlobal.__webpack_require__ = previousBundlerRuntime;
-        }
+      expect(html).toContain('<main>published SSR artifact</main>');
+    } finally {
+      if (previousBundlerRuntime === undefined) {
+        delete bundlerGlobal.__webpack_require__;
+      } else {
+        bundlerGlobal.__webpack_require__ = previousBundlerRuntime;
       }
-    },
-  );
+    }
+  });
 });
 
 describe('RSC build artifacts', () => {
-  test.skipIf(!rscArtifactPaths.every(file => fs.existsSync(file)))(
-    'preserves the public API and native rendering with distinct Node and edge bindings',
-    () => {
-      const [nodeArtifact, workerArtifact] = rscArtifactPaths.map(file =>
-        fs.readFileSync(file, 'utf8'),
-      );
-      expect(nodeArtifact).toContain('react-server-dom-rspack/server.node');
-      expect(nodeArtifact).toContain('react-server-dom-rspack/client.node');
-      expect(nodeArtifact).not.toContain('react-server-dom-rspack/server.edge');
-      expect(workerArtifact).toContain('react-server-dom-rspack/server.edge');
-      expect(workerArtifact).toContain('react-server-dom-rspack/client.edge');
-      expect(workerArtifact).not.toMatch(
-        /react-server-dom-rspack\/(?:server|client)\.node/,
-      );
+  test('preserves the public API and native rendering with distinct Node and edge bindings', () => {
+    const [nodeArtifact, workerArtifact] = rscArtifactPaths.map(file =>
+      fs.readFileSync(file, 'utf8'),
+    );
+    expect(nodeArtifact).toContain('react-server-dom-rspack/server.node');
+    expect(nodeArtifact).toContain('react-server-dom-rspack/client.node');
+    expect(nodeArtifact).not.toContain('react-server-dom-rspack/server.edge');
+    expect(workerArtifact).toContain('react-server-dom-rspack/server.edge');
+    expect(workerArtifact).toContain('react-server-dom-rspack/client.edge');
+    expect(workerArtifact).not.toMatch(
+      /react-server-dom-rspack\/(?:server|client)\.node/,
+    );
 
-      const manifest = JSON.parse(
-        fs.readFileSync(path.join(renderPackagePath, 'package.json'), 'utf8'),
-      );
-      for (const entry of ['./rsc', './rsc-worker']) {
-        expect(
-          fs.existsSync(
-            path.join(renderPackagePath, manifest.exports[entry].types),
-          ),
-        ).toBe(true);
-      }
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(renderPackagePath, 'package.json'), 'utf8'),
+    );
+    for (const entry of ['./rsc', './rsc-worker']) {
+      expect(
+        fs.existsSync(
+          path.join(renderPackagePath, manifest.exports[entry].types),
+        ),
+      ).toBe(true);
+    }
 
-      // The real Flight packages require React's server condition and the
-      // manifest/loader contract normally supplied by the application bundler.
-      for (const artifactPath of rscArtifactPaths) {
-        const result = spawnSync(
-          process.execPath,
-          [
-            '--conditions=react-server',
-            '--input-type=module',
-            '-e',
-            `
+    // The real Flight packages require React's server condition and the
+    // manifest/loader contract normally supplied by the application bundler.
+    for (const artifactPath of rscArtifactPaths) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--conditions=react-server',
+          '--input-type=module',
+          '-e',
+          `
             import assert from 'node:assert/strict';
             import React from 'react';
             const modules = {
@@ -156,12 +146,11 @@ describe('RSC build artifacts', () => {
               assert.equal(delayedHtml.split('</body>').length, 2);
               assert.equal(delayedHtml.split('</html>').length, 2);
           `,
-          ],
-          { cwd: renderPackagePath, encoding: 'utf8', timeout: 10000 },
-        );
-        expect(result.error).toBeUndefined();
-        expect(result.status, result.stderr || result.stdout).toBe(0);
-      }
-    },
-  );
+        ],
+        { cwd: renderPackagePath, encoding: 'utf8', timeout: 10000 },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr || result.stdout).toBe(0);
+    }
+  });
 });

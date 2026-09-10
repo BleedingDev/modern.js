@@ -28,10 +28,6 @@ const readers = {
   sourceRevision: () => 'compiled-revision',
 };
 
-it('retains generation identity when the module is evaluated without a compiler', () => {
-  expect(resolveUltramodernBuildArtifact(artifact)).toEqual(artifact);
-});
-
 it('applies injected identity to every surface without mutating the artifact', () => {
   const resolved = resolveUltramodernBuildArtifact(artifact, readers);
   for (const record of [
@@ -52,6 +48,8 @@ it('applies injected identity to every surface without mutating the artifact', (
 });
 
 it('falls back only for missing compiler references and preserves each supplied value', () => {
+  expect(resolveUltramodernBuildArtifact(artifact)).toEqual(artifact);
+
   const result = resolveUltramodernBuildArtifact(artifact, {
     buildMarker: readers.buildMarker,
     sourceRevision: () => {

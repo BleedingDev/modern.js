@@ -8,12 +8,31 @@ import {
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
 
-test('shell-only commands reference emitted capabilities and adding a vertical enables deployment proofs', () => {
+function assertReferencedScriptsExist(workspaceDir: string) {
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(workspaceDir, 'package.json'), 'utf-8'),
+  ) as { scripts?: Record<string, string> };
+  for (const [scriptName, command] of Object.entries(
+    packageJson.scripts ?? {},
+  )) {
+    for (const match of command.matchAll(
+      /node \.\/(scripts\/[\s\S]*?)(?:\s|&|$)/gu,
+    )) {
+      const scriptPath = match[1].replace(/["']$/u, '');
+      assert.equal(
+        fs.existsSync(path.join(workspaceDir, scriptPath)),
+        true,
+        `${scriptName} references missing ${scriptPath}`,
+      );
+    }
+  }
+}
+
+test('generated command plans reference emitted deployment capabilities', () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-profile-coherence-'),
   );
   const workspaceDir = path.join(tempRoot, 'profile-workspace');
-
   try {
     generateUltramodernWorkspace({
       targetDir: workspaceDir,
@@ -22,49 +41,13 @@ test('shell-only commands reference emitted capabilities and adding a vertical e
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
-
-    const shellOnlyPackage = JSON.parse(
-      fs.readFileSync(path.join(workspaceDir, 'package.json'), 'utf-8'),
-    ) as { scripts?: Record<string, string> };
-    assert.equal(fs.existsSync(path.join(workspaceDir, 'zerops.yaml')), false);
-    assert.equal(
-      fs.existsSync(
-        path.join(workspaceDir, 'scripts/materialize-zerops-runtime.mjs'),
-      ),
-      false,
-    );
-    assert.equal(
-      fs.existsSync(path.join(workspaceDir, 'scripts/proof-workerd-ssr.mts')),
-      false,
-    );
-    assert.equal(shellOnlyPackage.scripts?.['zerops:materialize'], undefined);
-    assert.equal(shellOnlyPackage.scripts?.['cloudflare:ssr-proof'], undefined);
-    assert.doesNotMatch(
-      shellOnlyPackage.scripts?.['cloudflare:build'] ?? '',
-      /cloudflare:ssr-proof/u,
-    );
-
-    for (const [scriptName, command] of Object.entries(
-      shellOnlyPackage.scripts ?? {},
-    )) {
-      for (const match of command.matchAll(/node \.\/(scripts\/[^\s'"&]+)/gu)) {
-        assert.equal(
-          fs.existsSync(path.join(workspaceDir, match[1])),
-          true,
-          `${scriptName} references missing ${match[1]}`,
-        );
-      }
-    }
-
     addUltramodernVertical({
       workspaceRoot: workspaceDir,
       name: 'catalog',
       modernVersion: '3.2.1',
     });
 
-    const deliveryUnitPackage = JSON.parse(
-      fs.readFileSync(path.join(workspaceDir, 'package.json'), 'utf-8'),
-    ) as { scripts?: Record<string, string> };
+    assertReferencedScriptsExist(workspaceDir);
     assert.equal(fs.existsSync(path.join(workspaceDir, 'zerops.yaml')), true);
     assert.equal(
       fs.existsSync(
@@ -72,21 +55,16 @@ test('shell-only commands reference emitted capabilities and adding a vertical e
       ),
       true,
     );
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(workspaceDir, 'package.json'), 'utf-8'),
+    ) as { scripts?: Record<string, string> };
     assert.equal(
-      fs.existsSync(path.join(workspaceDir, 'scripts/proof-workerd-ssr.mts')),
-      true,
-    );
-    assert.equal(
-      deliveryUnitPackage.scripts?.['zerops:materialize'],
+      packageJson.scripts?.['zerops:materialize'],
       'node ./scripts/materialize-zerops-runtime.mjs',
     );
-    assert.equal(
-      deliveryUnitPackage.scripts?.['cloudflare:ssr-proof'],
-      'node ./scripts/proof-workerd-ssr.mts',
-    );
     assert.match(
-      deliveryUnitPackage.scripts?.['cloudflare:build'] ?? '',
-      /&& pnpm cloudflare:ssr-proof$/u,
+      packageJson.scripts?.['cloudflare:build'] ?? '',
+      /cloudflare:ssr-proof$/u,
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -98,7 +76,6 @@ test('workspace validation accepts explicitly disabled agent instruction files',
     path.join(os.tmpdir(), 'um-no-agent-instructions-'),
   );
   const workspaceDir = path.join(tempRoot, 'no-agent-workspace');
-
   try {
     generateUltramodernWorkspace({
       targetDir: workspaceDir,
@@ -108,7 +85,6 @@ test('workspace validation accepts explicitly disabled agent instruction files',
       generateAgentFiles: false,
       packageSource: { strategy: 'workspace' },
     });
-
     assert.equal(fs.existsSync(path.join(workspaceDir, 'AGENTS.md')), false);
     assert.equal(fs.existsSync(path.join(workspaceDir, 'CLAUDE.md')), false);
     const result = spawnSync(

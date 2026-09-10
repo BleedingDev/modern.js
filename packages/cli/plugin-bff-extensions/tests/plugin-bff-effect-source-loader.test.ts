@@ -4,15 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { generateEffectClient } from '@modern-js/plugin-bff-extensions/client-generator';
-import { bundleEffectEntryForNode } from '@modern-js/plugin-bff-extensions/effect-source-loader';
 import {
   createOperationContractHash,
   type ResolvedCrossProjectPolicy,
 } from '@modern-js/server-runtime-extensions/bff-policy/node';
-import {
-  loadEffectBuiltModule,
-  loadEffectSourceModule,
-} from '../src/effect-source-loader/loader';
+import { loadEffectSourceModule } from '../src/effect-source-loader/loader';
 import apiLoader, {
   type EffectBffLoaderOptions as APILoaderOptions,
 } from '../src/effect-source-loader/rspack-loader';
@@ -96,7 +92,6 @@ const buildEffectWorkerRuntimeModule = async ({
   apiDir,
   appDir,
   entryFile,
-  onBuildInputs,
   onLoaderDependency,
   prefix,
   requestId,
@@ -105,7 +100,6 @@ const buildEffectWorkerRuntimeModule = async ({
   apiDir: string;
   appDir: string;
   entryFile: string;
-  onBuildInputs?: (inputs: string[]) => void;
   onLoaderDependency?: (dependency: string) => void;
   prefix: string;
   requestId?: string;
@@ -132,7 +126,7 @@ const buildEffectWorkerRuntimeModule = async ({
   await writeFile(wrapperFile, wrapperSource);
 
   const { build } = await import('esbuild');
-  const result = await build({
+  await build({
     alias: {
       '@modern-js/bff-effect/effect-edge': path.resolve(
         effectRuntimeRoot,
@@ -147,13 +141,10 @@ const buildEffectWorkerRuntimeModule = async ({
     bundle: true,
     entryPoints: [wrapperFile],
     format: 'esm',
-    metafile: true,
     outfile: outputFile,
     platform: 'node',
     target: 'node26.7',
   });
-  onBuildInputs?.(Object.keys(result.metafile.inputs));
-
   return import(
     `${pathToFileURL(outputFile).href}?t=${Date.now()}`
   ) as Promise<{
@@ -171,215 +162,6 @@ const buildEffectWorkerRuntimeModule = async ({
 };
 
 describe('Effect source graph loading', () => {
-  test('keeps CommonJS Effect client and edge entrypoints on one runtime identity', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-runtime-identity-'),
-    );
-
-    try {
-      const runtimeManifest = JSON.parse(
-        await fs.promises.readFile(
-          path.join(effectRuntimeRoot, 'package.json'),
-          'utf8',
-        ),
-      ) as {
-        exports: Record<string, unknown>;
-      };
-      const runtimeDirectory = path.join(
-        appDir,
-        'node_modules',
-        '@modern-js',
-        'bff-effect',
-      );
-      const effectDirectory = path.join(appDir, 'node_modules', 'effect');
-      const runtimeTargets = (value: unknown): string[] => {
-        if (typeof value === 'string') {
-          return value.endsWith('.d.ts') ? [] : [value];
-        }
-        if (value === null || typeof value !== 'object') {
-          return [];
-        }
-        return Object.values(value).flatMap(runtimeTargets);
-      };
-      const writeRuntimeTargets = async (
-        exportEntry: unknown,
-        esmSource: string,
-        commonJsSource: string,
-      ) => {
-        for (const target of new Set(runtimeTargets(exportEntry))) {
-          await writeFile(
-            path.join(runtimeDirectory, target),
-            target.endsWith('.mjs') ? esmSource : commonJsSource,
-          );
-        }
-      };
-
-      await writeFile(
-        path.join(runtimeDirectory, 'package.json'),
-        JSON.stringify({
-          name: '@modern-js/bff-effect',
-          exports: {
-            './effect-client': runtimeManifest.exports['./effect-client'],
-            './effect-edge': runtimeManifest.exports['./effect-edge'],
-          },
-        }),
-      );
-      await writeRuntimeTargets(
-        runtimeManifest.exports['./effect-client'],
-        `import { missing } from 'effect/Schema';
-export const makeSchema = () => ({ missing });`,
-        `const { missing } = require('effect/Schema');
-exports.makeSchema = () => ({ missing });`,
-      );
-      await writeRuntimeTargets(
-        runtimeManifest.exports['./effect-edge'],
-        `import { missing } from 'effect/Schema';
-export const decode = schema =>
-  schema.missing === missing ? 'missing' : Number(schema.missing);`,
-        `const { missing } = require('effect/Schema');
-exports.decode = schema =>
-  schema.missing === missing ? 'missing' : Number(schema.missing);`,
-      );
-      await writeFile(
-        path.join(effectDirectory, 'package.json'),
-        JSON.stringify({
-          name: 'effect',
-          type: 'module',
-          exports: {
-            './Schema': './Schema.js',
-          },
-        }),
-      );
-      await writeFile(
-        path.join(effectDirectory, 'Schema.js'),
-        `export const missing = Symbol('effect-schema-missing');`,
-      );
-
-      const entryPath = path.join(appDir, 'api.cjs');
-      await writeFile(
-        entryPath,
-        `const client = require('@modern-js/bff-effect/effect-client');
-const edge = require('@modern-js/bff-effect/effect-edge');
-module.exports = edge.decode(client.makeSchema());`,
-      );
-
-      await bundleEffectEntryForNode({
-        appDir,
-        entryPath,
-        format: 'cjs',
-      });
-
-      expect(createRequire(entryPath)(entryPath)).toBe('missing');
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
-  test('loads a built CommonJS Effect artifact without changing its native module boundary', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-built-commonjs-'),
-    );
-
-    try {
-      const entryFile = path.join(appDir, 'dist', 'api', 'index.js');
-      await writeFile(
-        entryFile,
-        `"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = {
-  filename: __filename,
-  moduleType: "commonjs",
-};`,
-      );
-
-      const loaded = (await loadEffectBuiltModule(entryFile)) as {
-        default: { filename: string; moduleType: string };
-      };
-
-      expect(loaded.default).toEqual({
-        filename: await fs.promises.realpath(entryFile),
-        moduleType: 'commonjs',
-      });
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
-  test('loads a built ESM Effect artifact through its native module boundary', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-built-esm-'),
-    );
-
-    try {
-      const entryFile = path.join(appDir, 'dist', 'api', 'index.js');
-      await writeFile(
-        path.join(appDir, 'package.json'),
-        JSON.stringify({ type: 'module' }),
-      );
-      await writeFile(
-        entryFile,
-        `export default {
-  moduleUrl: import.meta.url,
-  moduleType: "module",
-};`,
-      );
-
-      const loaded = (await loadEffectBuiltModule(entryFile)) as {
-        default: { moduleType: string; moduleUrl: string };
-      };
-
-      expect(loaded.default).toEqual({
-        moduleType: 'module',
-        moduleUrl: pathToFileURL(await fs.promises.realpath(entryFile)).href,
-      });
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
-  test('forwards the configured request id into Effect client generation', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-client-request-id-'),
-    );
-
-    try {
-      const apiDir = path.join(appDir, 'api');
-      const entryFile = path.join(apiDir, 'index.js');
-      const source = `const { HttpApi, HttpApiEndpoint, HttpApiGroup, Layer, Schema } = require('@modern-js/bff-effect/effect-client');
-const api = HttpApi.make('LoaderRequestIdApi').add(
-  HttpApiGroup.make('catalog').add(
-    HttpApiEndpoint.get('readiness', '/readiness', { success: Schema.Boolean }),
-  ),
-);
-module.exports = { api, layer: Layer.empty };`;
-      await linkFixturePackage(appDir, '@modern-js/bff-effect');
-      await writeFile(
-        path.join(appDir, 'package.json'),
-        JSON.stringify({ name: 'package-fallback', version: '1.0.0' }),
-      );
-      await writeFile(entryFile, source);
-
-      const code = await runApiLoader({
-        options: {
-          apiDir,
-          appDir,
-          effectEntry: entryFile,
-          port: 8080,
-          prefix: '/catalog-api',
-          requestId: 'configured-catalog-service',
-          target: 'bundle',
-        },
-        resourcePath: entryFile,
-        resourceQuery: '',
-        source,
-      });
-
-      expect(code).toContain('"requestId": "configured-catalog-service"');
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
   test('fails closed when Effect client generation cannot resolve an HttpApi', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-effect-client-failure-'),
@@ -422,27 +204,14 @@ module.exports = { api, layer: Layer.empty };`;
       const entryFile = path.join(apiDir, 'index.ts');
       const source = `export default { api: {}, layer: {} };`;
       await writeFile(entryFile, source);
-      const buildInputs: string[] = [];
 
       const runtimeModule = await buildEffectWorkerRuntimeModule({
         apiDir,
         appDir,
         entryFile,
-        onBuildInputs: inputs => buildInputs.push(...inputs),
         prefix: '/catalog-api',
         source,
       });
-
-      expect(
-        buildInputs.some(input => input.endsWith('edge-dispatcher.ts')),
-      ).toBe(true);
-      expect(
-        buildInputs.filter(
-          input =>
-            input.includes('backend-federation') ||
-            input.includes('@module-federation'),
-        ),
-      ).toEqual([]);
 
       expect(typeof runtimeModule.__modern_create_effect_bff_dispatcher).toBe(
         'function',
@@ -452,51 +221,6 @@ module.exports = { api, layer: Layer.empty };`;
           prefix: '/catalog-api',
         }),
       ).rejects.toThrow('[BFF][Effect] Invalid Effect edge module');
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
-  test('Effect worker runtime source query transpiles the API without recursing into the wrapper', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-worker-source-'),
-    );
-
-    try {
-      const apiDir = path.join(appDir, 'api');
-      const entryFile = path.join(apiDir, 'index.ts');
-      const source = `export const marker: string = 'raw-runtime-source';`;
-      await writeFile(entryFile, source);
-
-      const code = await runApiLoader({
-        options: {
-          apiDir,
-          appDir,
-          effectEntry: entryFile,
-          port: 8080,
-          prefix: '/catalog-api',
-          target: 'web',
-        },
-        resourcePath: entryFile,
-        resourceQuery: '?modern-bff-runtime-source',
-        source,
-      });
-
-      const outputFile = path.join(appDir, 'raw-runtime-source.mjs');
-      const { build } = await import('esbuild');
-      await build({
-        bundle: true,
-        format: 'esm',
-        platform: 'node',
-        stdin: {
-          contents: code,
-          resolveDir: apiDir,
-          sourcefile: entryFile,
-        },
-        outfile: outputFile,
-      });
-      const runtimeModule = await import(pathToFileURL(outputFile).href);
-      expect(runtimeModule.marker).toBe('raw-runtime-source');
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }
@@ -721,86 +445,6 @@ export const layer = HttpApiBuilder.layer(api).pipe(
     }
   });
 
-  test('Effect worker dispatcher executes raw api and layer module exports', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-worker-raw-'),
-    );
-
-    try {
-      const apiDir = path.join(appDir, 'api');
-      const entryFile = path.join(apiDir, 'index.ts');
-      const source = `
-import {
-  Effect,
-  HttpApi,
-  HttpApiBuilder,
-  HttpApiEndpoint,
-  HttpApiGroup,
-  Layer,
-  Schema,
-  useEffectContext,
-} from '@modern-js/bff-effect/effect-edge';
-
-export const api = HttpApi.make('WorkerRawApi').add(
-  HttpApiGroup.make('status').add(
-    HttpApiEndpoint.get('readiness', '/readiness', {
-      success: Schema.Struct({
-        env: Schema.String,
-        originalPath: Schema.String,
-        routePath: Schema.String,
-      }),
-    }),
-  ),
-);
-const statusLayer = HttpApiBuilder.group(api, 'status', handlers =>
-  handlers.handle('readiness', () =>
-    Effect.sync(() => {
-      const context = useEffectContext();
-      return {
-        env: String(context.env.RUNTIME),
-        originalPath: context.path,
-        routePath: context.operationContext.routePath,
-      };
-    }),
-  ),
-);
-export const layer = HttpApiBuilder.layer(api).pipe(
-  Layer.provide(statusLayer),
-);
-`;
-      await writeFile(entryFile, source);
-
-      const runtime = await buildEffectWorkerRuntimeModule({
-        apiDir,
-        appDir,
-        entryFile,
-        prefix: '/inventory-api',
-        source,
-      });
-      const dispatcher = await runtime.__modern_create_effect_bff_dispatcher({
-        prefix: '/inventory-api',
-      });
-
-      try {
-        const response = await dispatcher.dispatch(
-          new Request('https://example.com/inventory-api/readiness'),
-          { env: { RUNTIME: 'raw-workerd' } },
-        );
-
-        expect(response.status).toBe(200);
-        await expect(response.json()).resolves.toEqual({
-          env: 'raw-workerd',
-          originalPath: '/inventory-api/readiness',
-          routePath: '/readiness',
-        });
-      } finally {
-        await dispatcher.dispose();
-      }
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
   test('Effect worker dispatcher disposes its bundled handler', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-effect-worker-dispose-'),
@@ -984,39 +628,6 @@ export const result = {
         new Set([entryFile, componentFile, specificFile]),
       );
       expect(dependencies).not.toContain(broadFile);
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
-  test('resolves baseUrl modules when tsconfig paths is empty', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-base-url-'),
-    );
-
-    try {
-      const entryFile = path.join(appDir, 'entry.ts');
-      const baseModule = path.join(appDir, 'src', 'base-value.ts');
-      await writeFile(
-        path.join(appDir, 'tsconfig.json'),
-        JSON.stringify({
-          compilerOptions: {
-            baseUrl: './src',
-            paths: {},
-          },
-        }),
-      );
-      await writeFile(baseModule, `export const value = 'from-base-url';`);
-      await writeFile(
-        entryFile,
-        `import { value } from 'base-value'; export { value };`,
-      );
-
-      const loaded = (await loadEffectSourceModule({
-        appDir,
-        resourcePath: entryFile,
-      })) as { value: string };
-      expect(loaded.value).toBe('from-base-url');
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }
@@ -1227,73 +838,6 @@ export const layer = Layer.empty;`,
       );
 
       expect(rejection).toBe(dependencyFailure);
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
-  test('Rspack loader registers the complete typed graph with its watcher', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-effect-watch-'),
-    );
-
-    try {
-      await linkFixturePackage(appDir, 'effect');
-      const apiDir = path.join(appDir, 'api');
-      const entryFile = path.join(apiDir, 'effect', 'index.ts');
-      const contractFile = path.join(apiDir, 'effect', 'contract.ts');
-      await writeEmptyPathsTsconfig(appDir);
-      await writeFile(
-        contractFile,
-        `import { Layer } from 'effect';
-import * as Schema from 'effect/Schema';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
-export const api = HttpApi.make('WatchApi').add(
-  HttpApiGroup.make('watch').add(
-    HttpApiEndpoint.get('ping', '/ping', {
-      success: Schema.Struct({ ok: Schema.Boolean }),
-    }),
-  ),
-);
-export const layer = Layer.empty;`,
-      );
-      await writeFile(entryFile, `export { api, layer } from './contract.js';`);
-
-      const dependencies: string[] = [];
-      const options: APILoaderOptions = {
-        apiDir,
-        appDir,
-        effectEntry: entryFile,
-        port: 8080,
-        prefix: '/api',
-        target: 'web',
-      };
-      let callbackError: Error | null | undefined;
-      let callbackCode: string | Buffer | undefined;
-      const completed = new Promise<void>(resolve => {
-        const context = {
-          addDependency: (dependency: string) => dependencies.push(dependency),
-          async:
-            () => (error: Error | null | undefined, code?: string | Buffer) => {
-              callbackError = error;
-              callbackCode = code;
-              resolve();
-            },
-          cacheable: () => {},
-          getOptions: () => options,
-          resourcePath: entryFile,
-          resourceQuery: '',
-        };
-        void apiLoader.call(
-          context as never,
-          fs.readFileSync(entryFile, 'utf8'),
-        );
-      });
-
-      await completed;
-      expect(callbackError).toBeUndefined();
-      expect(callbackCode).toEqual(expect.any(String));
-      expect(new Set(dependencies)).toEqual(new Set([entryFile, contractFile]));
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }

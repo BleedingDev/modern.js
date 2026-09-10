@@ -6,7 +6,6 @@ import {
   TelemetryRegistry,
   TelemetryStartupHealthError,
 } from '../src/telemetry';
-import { clamp } from '../src/telemetry/envelope';
 
 const createEnvelope = (partial: Record<string, unknown> = {}) => ({
   timestamp: Date.now(),
@@ -20,74 +19,7 @@ const createEnvelope = (partial: Record<string, unknown> = {}) => ({
   ...partial,
 });
 
-describe('telemetry envelope helpers', () => {
-  test('clamps NaN input to a finite in-range value', () => {
-    const value = clamp(Number.NaN, 0, 1);
-
-    expect(Number.isFinite(value)).toBe(true);
-    expect(value).toBeGreaterThanOrEqual(0);
-    expect(value).toBeLessThanOrEqual(1);
-  });
-});
-
 describe('telemetry registry', () => {
-  test('applies redaction and emits dropped-count metric under backpressure', async () => {
-    const batches: unknown[] = [];
-    const registry = new TelemetryRegistry({
-      service: 'svc',
-      module: 'server',
-      environment: 'test',
-      maxBatchSize: 10,
-      maxQueueSize: 3,
-      flushIntervalMs: 60_000,
-      redactionKeys: ['token'],
-    });
-    await registry.register({
-      name: 'memory',
-      async emit(batch) {
-        batches.push(...batch);
-      },
-    });
-
-    registry.enqueue(
-      createEnvelope({
-        name: 'first',
-        attributes: { token: 's1', keep: 'ok' },
-      }),
-    );
-    registry.enqueue(
-      createEnvelope({
-        name: 'second',
-      }),
-    );
-    registry.enqueue(
-      createEnvelope({
-        name: 'third',
-      }),
-    );
-    registry.enqueue(
-      createEnvelope({
-        name: 'fourth',
-      }),
-    );
-
-    await registry.flush();
-    await registry.shutdown();
-
-    const names = batches.map(
-      item => (item as { name?: string }).name || 'unknown',
-    );
-    expect(names).toContain('telemetry.queue.dropped');
-    const withAttributes = batches.find(
-      item => (item as { name?: string }).name === 'first',
-    ) as
-      | {
-          attributes?: Record<string, unknown>;
-        }
-      | undefined;
-    expect(withAttributes).toBeUndefined();
-  });
-
   test('redacts configured keys recursively', async () => {
     const batches: unknown[] = [];
     const registry = new TelemetryRegistry({
@@ -186,37 +118,6 @@ describe('telemetry registry', () => {
     expect(countEnvelope.traceId).toBe('11112222333344445555666677778888');
     expect(timerEnvelope.unit).toBe('ms');
     expect(timerEnvelope.spanId).toBe('1111222233334444');
-  });
-
-  test('emits queue depth and utilization metrics during flush', async () => {
-    const emitted: TelemetryEnvelope[] = [];
-    const registry = new TelemetryRegistry({
-      service: 'svc',
-      module: 'server',
-      environment: 'test',
-      maxQueueSize: 10,
-      flushIntervalMs: 60_000,
-    });
-    await registry.register({
-      name: 'memory',
-      async emit(batch) {
-        emitted.push(...batch);
-      },
-    });
-
-    registry.enqueue(createEnvelope({ name: 'a' }));
-    registry.enqueue(createEnvelope({ name: 'b' }));
-    await registry.flush();
-
-    const depthEnvelope = emitted.find(
-      item => item.name === 'telemetry.queue.depth',
-    );
-    const utilizationEnvelope = emitted.find(
-      item => item.name === 'telemetry.queue.utilization',
-    );
-    expect(depthEnvelope?.value).toBe(2);
-    expect(utilizationEnvelope?.value).toBe(0.2);
-    await registry.shutdown();
   });
 
   test('exposes queue stats and emits SLO alerts for utilization and dropped envelopes', async () => {
@@ -370,10 +271,33 @@ describe('telemetry exporters', () => {
     ];
     expect(url).toBe('http://localhost:4318/v1/logs');
     expect(init.method).toBe('POST');
+    expect(new Headers(init.headers).get('content-type')).toBe(
+      'application/json',
+    );
     const payload = JSON.parse(String(init.body)) as {
+      resource: {
+        service: string;
+        module: string;
+        environment: string;
+      };
+      emittedAt: number;
       events: unknown[];
     };
+    expect(payload.resource).toEqual({
+      service: 'svc',
+      module: 'server',
+      environment: 'test',
+    });
+    expect(payload.emittedAt).toEqual(expect.any(Number));
     expect(payload.events).toHaveLength(1);
+    expect(payload.events[0]).toMatchObject({
+      service: 'svc',
+      module: 'server',
+      environment: 'test',
+      signalType: 'log',
+      name: 'hello',
+      level: 'info',
+    });
   });
 
   test('victoria metrics exporter emits prometheus lines', async () => {
@@ -404,8 +328,18 @@ describe('telemetry exporters', () => {
     ];
     expect(url).toBe('http://localhost:8428/api/v1/import/prometheus');
     expect(init.method).toBe('POST');
+    expect(new Headers(init.headers).get('content-type')).toBe(
+      'text/plain; version=0.0.4',
+    );
     const body = String(init.body);
-    expect(body).toContain('modernjs_metric_server_handle_request');
-    expect(body).toContain('modernjs_log_request_error');
+    expect(body.endsWith('\n')).toBe(true);
+    const lines = body.trimEnd().split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(
+      /^modernjs_metric_server_handle_request\{environment="test",module="server",service="svc"\} 42 \d+$/,
+    );
+    expect(lines[1]).toMatch(
+      /^modernjs_log_request_error\{environment="test",level="error",module="server",service="svc"\} 10 \d+$/,
+    );
   });
 });

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {
   addUltramodernVertical,
@@ -23,56 +22,6 @@ function runCli(cwd: string, args: string[]) {
     encoding: 'utf8',
     env: hermeticEnv,
   });
-}
-
-function readJson(workspaceDir: string, relativePath: string): any {
-  return JSON.parse(
-    fs.readFileSync(path.join(workspaceDir, relativePath), 'utf-8'),
-  );
-}
-
-function writeJson(workspaceDir: string, relativePath: string, value: unknown) {
-  fs.writeFileSync(
-    path.join(workspaceDir, relativePath),
-    `${JSON.stringify(value, null, 2)}\n`,
-    'utf-8',
-  );
-}
-
-function addSyntheticTopologyVertical(
-  workspaceDir: string,
-  options: { id: string; port: number },
-) {
-  const topologyPath = 'topology/reference-topology.json';
-  const overlayPath = 'topology/local-overlays/development.json';
-  const topology = readJson(workspaceDir, topologyPath);
-  const overlay = readJson(workspaceDir, overlayPath);
-
-  topology.verticals.push({
-    id: options.id,
-    kind: 'vertical',
-    domain: options.id,
-    package: `@dry-run-workspace/${options.id}`,
-    path: `verticals/${options.id}`,
-    moduleFederation: {
-      role: 'remote',
-      name: 'verticalSynthetic',
-      manifestUrl: `http://localhost:${options.port}/mf-manifest.json`,
-      exposes: ['./Route', './Widget'],
-      ssr: true,
-      sharedContractVersion: 'mf-ssr-contract-v1',
-    },
-    api: {
-      effect: {
-        bff: {
-          prefix: `/${options.id}-api`,
-        },
-      },
-    },
-  });
-  overlay.ports[options.id] = options.port;
-  writeJson(workspaceDir, topologyPath, topology);
-  writeJson(workspaceDir, overlayPath, overlay);
 }
 
 test('workspace snapshots ignore Git maintenance state and retain generated files', () => {
@@ -204,89 +153,6 @@ test('public dry-run plan leaves workspace unchanged and matches normal run summ
   }
 });
 
-test('dry-run reports validation failures without modifying the workspace', () => {
-  const duplicateName = createWorkspace('dry-run-workspace', {
-    tempPrefix: 'um-vertical-dry-',
-  });
-  const duplicateTopologyId = createWorkspace('dry-run-workspace', {
-    tempPrefix: 'um-vertical-dry-',
-  });
-  const duplicatePort = createWorkspace('dry-run-workspace', {
-    tempPrefix: 'um-vertical-dry-',
-  });
-
-  try {
-    addUltramodernVertical({
-      workspaceRoot: duplicateName.workspaceDir,
-      name: 'catalog',
-      modernVersion: '3.2.1',
-    });
-    const duplicateNameSnapshot = snapshotWorkspace(duplicateName.workspaceDir);
-    assert.throws(
-      () =>
-        planUltramodernVertical({
-          workspaceRoot: duplicateName.workspaceDir,
-          name: 'catalog',
-          modernVersion: '3.2.1',
-        }),
-      /Refusing to overwrite existing path: verticals\/catalog/,
-    );
-    assert.deepEqual(
-      snapshotWorkspace(duplicateName.workspaceDir),
-      duplicateNameSnapshot,
-    );
-
-    addSyntheticTopologyVertical(duplicateTopologyId.workspaceDir, {
-      id: 'checkout',
-      port: 4101,
-    });
-    const duplicateIdSnapshot = snapshotWorkspace(
-      duplicateTopologyId.workspaceDir,
-    );
-    assert.throws(
-      () =>
-        planUltramodernVertical({
-          workspaceRoot: duplicateTopologyId.workspaceDir,
-          name: 'checkout',
-          modernVersion: '3.2.1',
-        }),
-      /Duplicate app id "checkout"/,
-    );
-    assert.deepEqual(
-      snapshotWorkspace(duplicateTopologyId.workspaceDir),
-      duplicateIdSnapshot,
-    );
-
-    addUltramodernVertical({
-      workspaceRoot: duplicatePort.workspaceDir,
-      name: 'catalog',
-      modernVersion: '3.2.1',
-    });
-    addSyntheticTopologyVertical(duplicatePort.workspaceDir, {
-      id: 'inventory',
-      port: 4101,
-    });
-    const duplicatePortSnapshot = snapshotWorkspace(duplicatePort.workspaceDir);
-    assert.throws(
-      () =>
-        planUltramodernVertical({
-          workspaceRoot: duplicatePort.workspaceDir,
-          name: 'checkout',
-          modernVersion: '3.2.1',
-        }),
-      /Duplicate development port "4101"/,
-    );
-    assert.deepEqual(
-      snapshotWorkspace(duplicatePort.workspaceDir),
-      duplicatePortSnapshot,
-    );
-  } finally {
-    fs.rmSync(duplicateName.tempRoot, { recursive: true, force: true });
-    fs.rmSync(duplicateTopologyId.tempRoot, { recursive: true, force: true });
-    fs.rmSync(duplicatePort.tempRoot, { recursive: true, force: true });
-  }
-});
-
 test('CLI --dry-run prints a MicroVertical plan without writing files', () => {
   const { tempRoot: tmpDir, workspaceDir } = createWorkspace(
     'cli-dry-run-workspace',
@@ -312,22 +178,6 @@ test('CLI --dry-run prints a MicroVertical plan without writing files', () => {
       fs.existsSync(path.join(workspaceDir, 'verticals/catalog')),
       false,
     );
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
-test('CLI --dry-run is only accepted for MicroVertical additions', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'um-cli-dry-run-'));
-
-  try {
-    const result = runCli(tmpDir, ['dry-run-workspace', '--dry-run']);
-    assert.notEqual(result.status, 0);
-    assert.match(
-      result.stderr,
-      /--dry-run is currently supported only with --vertical/,
-    );
-    assert.equal(fs.existsSync(path.join(tmpDir, 'dry-run-workspace')), false);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

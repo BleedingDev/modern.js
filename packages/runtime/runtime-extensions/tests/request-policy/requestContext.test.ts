@@ -41,50 +41,40 @@ describe('request context helpers', () => {
   });
 
   test('should keep operation context in snapshots without widening propagation headers', () => {
-    expect(
-      createRequestContextSnapshot({
-        locale: 'cs-CZ',
-        operationContext: {
-          operationId: 'shell:list',
-          routePath: '/effect/recommendations',
-          method: 'GET',
-          source: 'generated-client',
-          scope: {
-            workspace: 'demo',
-          },
-          sessionClaims: {
-            role: 'viewer',
-          },
-          traceparent:
-            '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
-        },
-      }),
-    ).toEqual({
-      headers: {
-        [BFF_LOCALE_HEADER]: 'cs-CZ',
-        [BFF_TRACEPARENT_HEADER]:
-          '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
-      },
+    const snapshot = createRequestContextSnapshot({
       locale: 'cs-CZ',
       operationContext: {
-        locale: 'cs-CZ',
-        method: 'GET',
         operationId: 'shell:list',
         routePath: '/effect/recommendations',
-        scope: {
-          workspace: 'demo',
-        },
-        sessionClaims: {
-          role: 'viewer',
-        },
+        method: 'GET',
         source: 'generated-client',
+        scope: { workspace: 'demo' },
+        sessionClaims: { role: 'viewer' },
+        traceparent: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
+      },
+    });
+
+    expect(snapshot.headers).toEqual({
+      [BFF_LOCALE_HEADER]: 'cs-CZ',
+      [BFF_TRACEPARENT_HEADER]:
+        '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
+    });
+    expect(snapshot).toMatchObject({
+      locale: 'cs-CZ',
+      traceparent: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
+      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      spanId: 'bbbbbbbbbbbbbbbb',
+      operationContext: {
+        operationId: 'shell:list',
+        routePath: '/effect/recommendations',
+        method: 'GET',
+        source: 'generated-client',
+        scope: { workspace: 'demo' },
+        sessionClaims: { role: 'viewer' },
         traceparent: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
         traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         spanId: 'bbbbbbbbbbbbbbbb',
       },
-      traceparent: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01',
-      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      spanId: 'bbbbbbbbbbbbbbbb',
     });
   });
 });

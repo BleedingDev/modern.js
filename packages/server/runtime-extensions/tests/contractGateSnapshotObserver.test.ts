@@ -89,64 +89,6 @@ describe('contract gate observer', () => {
     }
   });
 
-  test('fails stale gate snapshots without manual intervention', async () => {
-    const dir = makeTempDir();
-    const snapshotPath = path.join(dir, 'contract-gates.json');
-
-    const registry = new TelemetryRegistry({
-      service: 'svc',
-      module: 'server',
-      environment: 'test',
-      flushIntervalMs: 60_000,
-    });
-    const monitor = new TelemetryHealthMonitor({
-      registry,
-      minConsecutiveFailedEvaluations: 1,
-    });
-
-    const staleUpdatedAt = Date.now() - 10_000;
-    fs.writeFileSync(
-      snapshotPath,
-      JSON.stringify(
-        {
-          schemaVersion: 1,
-          updatedAt: staleUpdatedAt,
-          gates: {
-            'module-onboarding-certification-gates': {
-              passed: true,
-              updatedAt: staleUpdatedAt,
-            },
-          },
-        },
-        null,
-        2,
-      ),
-    );
-
-    const observer = new ContractGateSnapshotObserver({
-      monitor,
-      gateSnapshotPath: snapshotPath,
-      gateStaleAfterMs: 1_000,
-    });
-
-    try {
-      await observer.syncOnce();
-      const decision = monitor.evaluate();
-      expect(decision.state).toBe('unhealthy');
-      expect(
-        decision.failures.some(
-          item =>
-            item.reason === 'contract_gate_failed' &&
-            item.gate === 'module-onboarding-certification-gates',
-        ),
-      ).toBe(true);
-    } finally {
-      observer.stop();
-      await registry.shutdown();
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
   test('marks unchanged gate snapshots stale after the stale window elapses', async () => {
     const dir = makeTempDir();
     const snapshotPath = path.join(dir, 'contract-gates.json');

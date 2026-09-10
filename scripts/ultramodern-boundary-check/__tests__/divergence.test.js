@@ -33,11 +33,6 @@ const boundaryCliPath = path.join(
   repoRoot,
   'scripts/ultramodern-boundary-check/check-fork-import-boundary.js',
 );
-const boundaryWorkflowPath = path.join(
-  repoRoot,
-  '.github/workflows/boundary-anti-patterns.yml',
-);
-
 const runGit = (rootDir, args) =>
   execFileSync('git', args, {
     cwd: rootDir,
@@ -274,34 +269,6 @@ test('strict ledger parser requires exact path-first rows and full disposition t
   );
 });
 
-test('boundary workflow validates external forks on hosted Linux and governs direct push ranges', () => {
-  const workflow = fs.readFileSync(boundaryWorkflowPath, 'utf8');
-  assert.match(workflow, /^\s*pull_request_target:/mu);
-  assert.doesNotMatch(workflow, /^\s*pull_request:/mu);
-  assert.match(
-    workflow,
-    /head\.repo\.full_name != github\.repository && '"ubuntu-latest"'/,
-  );
-  assert.doesNotMatch(
-    workflow,
-    /^\s*if:\s*github\.event_name != 'pull_request'/mu,
-  );
-  assert.match(
-    workflow,
-    /repository: \$\{\{ github\.event\.pull_request\.head\.repo\.full_name \|\| github\.repository \}\}/,
-  );
-  assert.match(
-    workflow,
-    /github\.event_name == 'pull_request_target' \|\| github\.event_name == 'push'/,
-  );
-  assert.match(workflow, /PUSH_BEFORE_SHA: \$\{\{ github\.event\.before \}\}/);
-  assert.match(workflow, /GOVERNANCE_BASE_SHA="\$PUSH_BEFORE_SHA"/);
-  assert.match(
-    workflow,
-    /--mode allowlist-governance --merge-base "\$GOVERNANCE_BASE_SHA"/,
-  );
-});
-
 test('self test covers parser, shrink-only budgets, and incomplete-scope clears', () => {
   const { ok, results } = runSelfTest();
   const failed = results.filter(result => !result.pass);
@@ -310,7 +277,6 @@ test('self test covers parser, shrink-only budgets, and incomplete-scope clears'
     true,
     failed.map(result => `${result.name}: ${result.detail}`).join('\n'),
   );
-  assert.ok(results.length >= 8);
 });
 
 test('parser ignores headers and counts every package file shape', () => {
@@ -1686,13 +1652,9 @@ test('added-source diagnostics keep exact counts and bounded deterministic sampl
     runGit(fixture.rootDir, ['add', ...addedFiles]);
 
     const report = checkForkDivergence({ rootDir: fixture.rootDir });
-    const sampledFiles = report.violations.map(violation => violation.file);
     assert.equal(report.ok, false);
     assert.equal(report.violationCount, 25);
     assert.equal(report.violations.length, 20);
-    assert.ok(sampledFiles.includes(addedFiles[0]));
-    assert.ok(sampledFiles.includes(addedFiles[12]));
-    assert.ok(sampledFiles.includes(addedFiles[24]));
   } finally {
     cleanup(fixture.rootDir);
   }

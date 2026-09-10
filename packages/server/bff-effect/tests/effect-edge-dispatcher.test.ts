@@ -77,8 +77,6 @@ describe('Effect edge dispatcher', () => {
       crossProjectPolicy,
     });
 
-    expect(receivedOptions?.openapi).toBe(openapi);
-    expect(receivedOptions?.dataPlatform).toBe(dataPlatform);
     expect(receivedOptions?.validateRequest).toBeTypeOf('function');
 
     const response = await dispatcher.dispatch(

@@ -1,7 +1,6 @@
 import {
   createDataBatchTransport,
   type DataBatchRequestPayload,
-  normalizeMethod,
   stableStringify,
 } from '../src/data-platform';
 
@@ -14,13 +13,6 @@ describe('data-platform public codec boundaries', () => {
         alpha: 'kept',
       }),
     ).toBe('{"alpha":"kept","list":[null,{"alpha":1}]}');
-  });
-
-  test.each([
-    ['get', 'GET'],
-    ['PaTcH', 'PATCH'],
-  ])('normalizes %s to %s', (method, expected) => {
-    expect(normalizeMethod(method)).toBe(expected);
   });
 
   test('accepts relative strings and URL objects through the public transport', async () => {

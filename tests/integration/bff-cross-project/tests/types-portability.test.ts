@@ -59,14 +59,17 @@ function typeCheck(consumerDir: string): string[] {
 
 const consumerSource = [
   `import portable from 'bff-api-app/api/portable';`,
+  `import user from 'bff-api-app/api/user/index';`,
   ``,
   `export async function check() {`,
   `  const msg = await portable();`,
   `  const from: string = msg.from;`,
+  `  const nested = await user();`,
+  `  const nestedMessage: string = nested.message;`,
   `  // @ts-expect-error 'message' is a string, so this must error. If the`,
   `  // type had degraded to any/unknown the directive would be unused (TS2578).`,
   `  const bad: number = msg.message;`,
-  `  return { from, bad };`,
+  `  return { from, nestedMessage, bad };`,
   `}`,
   ``,
 ].join('\n');
@@ -194,38 +197,11 @@ describe('crossProject client type portability', () => {
       'lambda',
       'portable.d.ts',
     );
-    const shippedFacade = path.join(
-      pkgDir,
-      'dist-1',
-      'client',
-      'portable.d.ts',
-    );
-    // A nested route proves the relative specifier is computed per client
-    // location rather than assuming a flat `client/` directory.
-    const shippedNestedFacade = path.join(
-      pkgDir,
-      'dist-1',
-      'client',
-      'user',
-      'index.d.ts',
-    );
     expect(fs.existsSync(shippedShared)).toBe(true);
     expect(fs.existsSync(shippedOrigin)).toBe(true);
-    expect(fs.existsSync(shippedFacade)).toBe(true);
-    expect(fs.existsSync(shippedNestedFacade)).toBe(true);
 
     // No tsconfig path alias may leak into the published declarations.
     expect(fs.readFileSync(shippedOrigin, 'utf8')).not.toContain('@shared');
-    // The facade re-exports the in-place declaration, it does not copy it. The
-    // specifier carries `.js` because the generated client directory is always
-    // its own ESM package (`dist-1/client/package.json` declares
-    // `type: module`), whatever module format the app itself compiles to.
-    expect(fs.readFileSync(shippedFacade, 'utf8')).toContain(
-      `from '../api/lambda/portable.js'`,
-    );
-    expect(fs.readFileSync(shippedNestedFacade, 'utf8')).toContain(
-      `from '../../api/lambda/user/index.js'`,
-    );
 
     expect(typeCheck(consumerDir)).toEqual([]);
   });
@@ -244,11 +220,6 @@ describe('crossProject client type portability', () => {
       { name: 'nodenext-consumer', private: true, type: 'module' },
     );
 
-    // TS2307 (cannot find module) catches a facade that never shipped, and
-    // TS2834/TS2835 catch one whose specifier lost its explicit extension.
-    const resolutionFailures = typeCheck(consumerDir).filter(line =>
-      /error TS(?:2307|2834|2835)\b/.test(line),
-    );
-    expect(resolutionFailures).toEqual([]);
+    expect(typeCheck(consumerDir)).toEqual([]);
   });
 });

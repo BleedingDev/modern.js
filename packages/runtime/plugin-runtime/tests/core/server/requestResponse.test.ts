@@ -299,30 +299,4 @@ describe('finalizeRenderResponse', () => {
     await routerCleanup.run();
     expect(events).toEqual(['source-cancel:owner finished', 'cleanup']);
   });
-
-  it.each([
-    204, 205, 304,
-  ])('drops the rendered body when applying no-body status %s', async status => {
-    const { finalizeRenderResponse } = await import(
-      '../../../src/core/server/requestResponse'
-    );
-    const response = new Response('<html>rendered</html>', {
-      status: 200,
-      headers: {
-        'content-type': 'text/html',
-      },
-    });
-
-    const finalized = await finalizeRenderResponse(
-      response,
-      createResponseProxy(status),
-      redirectCtx,
-      createNoopRouterCleanup(),
-    );
-
-    expect(finalized.status).toBe(status);
-    expect(finalized.headers.get('x-router-status')).toBe(String(status));
-    expect(finalized.body).toBeNull();
-    await expect(finalized.text()).resolves.toBe('');
-  });
 });

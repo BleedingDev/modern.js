@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import React from 'react';
-import { Link, NavLink } from '../../src/runtime/prefetchLink';
+import { Link } from '../../src/runtime/prefetchLink';
 
 type CapturedOptions = {
   preload?: unknown;
@@ -27,30 +27,20 @@ describe('tanstack prefetch link adapter - preload mapping', () => {
     mockReturnProps = { href: '/settings' };
   });
 
-  it('defaults TanStack preload to viewport', () => {
-    render(<Link to="/settings">Settings</Link>);
-
-    expect(capturedOptions.map(o => o.preload)).toEqual(['viewport']);
-  });
-
-  it('preserves explicit preload', () => {
+  it.each([
+    { expected: 'intent', preload: 'intent' },
+    { expected: false, preload: false },
+  ])('preserves an explicit $expected preload override', ({
+    expected,
+    preload,
+  }) => {
     render(
-      <Link to="/settings" prefetch="render" preload="intent">
+      <Link to="/settings" prefetch="render" preload={preload}>
         Settings
       </Link>,
     );
 
-    expect(capturedOptions.map(o => o.preload)).toEqual(['intent']);
-  });
-
-  it('preserves explicit disabled preload', () => {
-    render(
-      <Link to="/settings" prefetch="render" preload={false}>
-        Settings
-      </Link>,
-    );
-
-    expect(capturedOptions.map(o => o.preload)).toEqual([false]);
+    expect(capturedOptions[0]?.preload).toBe(expected);
   });
 
   it('maps none prefetch to disabled TanStack preload', () => {
@@ -60,27 +50,17 @@ describe('tanstack prefetch link adapter - preload mapping', () => {
       </Link>,
     );
 
-    expect(capturedOptions.map(o => o.preload)).toEqual([false]);
+    expect(capturedOptions[0]?.preload).toBe(false);
   });
 
-  it.each([
-    'intent',
-    'render',
-    'viewport',
-  ] as const)('maps %s prefetch to TanStack preload', prefetch => {
+  it('forwards a supported prefetch mode to TanStack preload', () => {
     render(
-      <Link to="/settings" prefetch={prefetch}>
+      <Link to="/settings" prefetch="intent">
         Settings
       </Link>,
     );
 
-    expect(capturedOptions.map(o => o.preload)).toEqual([prefetch]);
-  });
-
-  it('defaults NavLink preload to viewport', () => {
-    render(<NavLink to="/settings">Settings</NavLink>);
-
-    expect(capturedOptions.map(o => o.preload)).toEqual(['viewport']);
+    expect(capturedOptions[0]?.preload).toBe('intent');
   });
 
   it.each([

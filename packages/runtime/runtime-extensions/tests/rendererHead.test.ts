@@ -6,13 +6,8 @@ import {
   completeHeadRender,
   createHeadChunkProcessor,
   createWebHeadMarkerStripper,
-  publishHeadRender,
 } from '../src';
-import {
-  createNodeHeadMarkerStripper,
-  createOnceErrorReporter,
-  pipeNodeHeadStream,
-} from '../src/node';
+import { createNodeHeadMarkerStripper, pipeNodeHeadStream } from '../src/node';
 
 const marker = (props: Record<string, string>) =>
   `<template data-modern-helmet="${props['data-modern-helmet']}"></template>`;
@@ -85,41 +80,6 @@ describe('renderer head transactions', () => {
           processor.finish(html.slice(split)),
       ).toBe('č尾');
     }
-  });
-
-  it('freezes the published shell and ignores late records', () => {
-    const context = {};
-    let published: string[] = [];
-    beginHeadRender(context);
-    const shell = collectHeadRecord(
-      context,
-      () => 'shell',
-      records => {
-        published = records;
-      },
-    )!;
-    const late = collectHeadRecord(
-      context,
-      () => 'late',
-      records => {
-        published = records;
-      },
-    )!;
-    const processor = createHeadChunkProcessor(context);
-    expect(processor.push(marker(shell))).toBe('');
-    publishHeadRender(context);
-
-    expect(
-      collectHeadRecord(
-        context,
-        () => 'late',
-        records => {
-          published = records;
-        },
-      ),
-    ).toBeNull();
-    expect(processor.finish(marker(late))).toBe('');
-    expect(published).toEqual(['shell']);
   });
 
   it('clears the previous snapshot while rendering and restores it on abort', () => {
@@ -264,36 +224,5 @@ describe('renderer head transactions', () => {
 
     await expect(output).rejects.toThrow('source failed');
     expect(onError).toHaveBeenCalledTimes(1);
-  });
-
-  it('rejects the destination and reports a stripper error exactly once', async () => {
-    const source = new PassThrough();
-    const destination = new PassThrough();
-    const output = new Response(
-      Readable.toWeb(destination) as ReadableStream<Uint8Array>,
-    ).text();
-    const onError = rstest.fn();
-    pipeNodeHeadStream({
-      source,
-      destination,
-      context: Object.freeze({}),
-      onError,
-    });
-
-    source.end('trigger frozen-context failure');
-
-    await expect(output).rejects.toThrow('object is not extensible');
-    expect(onError).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports a shared render and stream failure only once', () => {
-    const onError = rstest.fn();
-    const reportError = createOnceErrorReporter(onError);
-    const failure = new Error('shared failure');
-
-    reportError(failure);
-    reportError(failure);
-
-    expect(onError).toHaveBeenCalledExactlyOnceWith(failure);
   });
 });

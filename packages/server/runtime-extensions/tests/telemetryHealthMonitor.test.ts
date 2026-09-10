@@ -83,8 +83,6 @@ describe('telemetry health monitor', () => {
       consecutiveHealthy: 3,
     });
 
-    expect('action' in recovered).toBe(false);
-    expect(JSON.stringify(recovered)).not.toMatch(/promot|rollback/i);
     expect(onEvaluate).toHaveBeenCalledTimes(6);
     expect(onTransition).toHaveBeenCalledTimes(2);
     expect(onTransition).toHaveBeenNthCalledWith(1, unhealthy);

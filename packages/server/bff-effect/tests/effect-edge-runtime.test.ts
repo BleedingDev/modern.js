@@ -280,6 +280,24 @@ describe('effect edge runtime', () => {
       await edge.dispose();
     }
 
+    const disabledOpenApiEdge = await createEffectBffEdgeHandler({
+      module: {
+        api,
+        layer: HttpApiBuilder.layer(api).pipe(Layer.provide(groupLayer)),
+      },
+      prefix: '/api',
+      openapi: false,
+    });
+
+    try {
+      const disabledResponse = await disabledOpenApiEdge.handler(
+        new Request('http://localhost/api/openapi.json'),
+      );
+      expect(disabledResponse.status).toBe(404);
+    } finally {
+      await disabledOpenApiEdge.dispose();
+    }
+
     const strictEdge = await createEffectBffEdgeHandler({
       module: {
         api,
@@ -306,31 +324,6 @@ describe('effect edge runtime', () => {
     } finally {
       await strictEdge.dispose();
     }
-  });
-
-  test('edge-safe entry exposes scoped Effect context helpers', async () => {
-    const edgeRuntime = await import('../src/effect/edge');
-    expect(typeof edgeRuntime.useEffectContext).toBe('function');
-    expect(typeof edgeRuntime.useOperationContext).toBe('function');
-
-    const response = await edgeRuntime.dispatchEffectBffRequest(
-      () =>
-        new Response(
-          JSON.stringify({
-            path: edgeRuntime.useEffectContext().path,
-            method: edgeRuntime.useOperationContext().method,
-          }),
-          { headers: { 'content-type': 'application/json' } },
-        ),
-      new Request('http://localhost/api/ping'),
-      { prefix: '/api' },
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      path: '/api/ping',
-      method: 'GET',
-    });
   });
 
   test('isolates Effect context between interleaved edge requests', async () => {

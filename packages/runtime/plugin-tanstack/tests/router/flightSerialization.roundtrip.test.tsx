@@ -45,20 +45,21 @@ test('round-trips TanStack RSC flight values across supported value types', asyn
   const circular: Record<string, unknown> = { marker: 'circular' };
   circular.self = circular;
 
-  const mapValue = new Map<unknown, unknown>([
-    ['primitive', 1],
-    ['shared', shared],
-    [shared, circular],
-  ]);
-  mapValue.set('self', mapValue);
-
-  const setValue = new Set<unknown>(['set-item', shared, circular]);
-  setValue.add(setValue);
-
   const rscProxy = createRscProxy(() => ({ slot: 'server' }), {
     renderable: true,
     stream: createStream(),
   }) as React.ReactElement & Record<PropertyKey, unknown>;
+
+  const mapValue = new Map<unknown, unknown>([
+    ['primitive', 1],
+    ['shared', shared],
+    [shared, circular],
+    ['rscProxy', rscProxy],
+  ]);
+  mapValue.set('self', mapValue);
+
+  const setValue = new Set<unknown>(['set-item', shared, circular, rscProxy]);
+  setValue.add(setValue);
 
   const fixture: RoundTripFixture = {
     bigintValue: 9007199254740993n,
@@ -115,12 +116,14 @@ test('round-trips TanStack RSC flight values across supported value types', asyn
   expect(revived.mapValue.get('shared')).toBe(revived.sharedA);
   expect(revived.mapValue.get(revived.sharedA)).toBe(revived.circular);
   expect(revived.mapValue.get('self')).toBe(revived.mapValue);
+  expect(isValidElement(revived.mapValue.get('rscProxy'))).toBe(true);
 
   expect(revived.setValue).toBeInstanceOf(Set);
   expect(revived.setValue).not.toBe(setValue);
   expect(revived.setValue.has('set-item')).toBe(true);
   expect(revived.setValue.has(revived.sharedA)).toBe(true);
   expect(revived.setValue.has(revived.circular)).toBe(true);
+  expect([...revived.setValue].some(value => isValidElement(value))).toBe(true);
   expect(revived.setValue.has(revived.setValue)).toBe(true);
 
   expect(serialized.rscProxy).not.toBe(rscProxy);

@@ -20,6 +20,7 @@ const kWorkspaceSearchRoots = [
 ];
 const kWorkspacePackageLockPollInterval = 200;
 const kWorkspacePackageLockStaleAge = 10 * 60 * 1000;
+const kGlobPatternCharacters = ['*', '?', '[', '{'];
 // Readers (spawned modern builds) can legitimately run for several minutes;
 // only steamroll them when the owning process is gone or clearly abandoned.
 const kWorkspaceDistReaderStaleAge = 30 * 60 * 1000;
@@ -476,10 +477,23 @@ function resolvePackageDistEntry(packageDir, packageJson) {
   return path.join(packageDir, 'dist/cjs/index.js');
 }
 
+function hasGlobPattern(value) {
+  return kGlobPatternCharacters.some(character => value.includes(character));
+}
+
 function collectExportDistEntries(packageDir, exportValue, entries) {
   if (typeof exportValue === 'string') {
     if (exportValue.startsWith('./dist/') && !exportValue.includes('/types/')) {
-      entries.push(path.join(packageDir, exportValue));
+      const entryPath = path.join(packageDir, exportValue);
+      if (!hasGlobPattern(exportValue)) {
+        entries.push(entryPath);
+      } else {
+        const matches = fs
+          .globSync(entryPath)
+          .filter(match => fs.statSync(match).isFile())
+          .sort();
+        entries.push(...(matches.length > 0 ? matches : [entryPath]));
+      }
     }
     return;
   }
@@ -1224,6 +1238,7 @@ module.exports = {
   runContinuousTask,
   launchOptions,
   ensureWorkspacePackagesBuilt,
+  resolveRequiredPackageDistEntries,
   acquireWorkspaceDistWriteLock,
   createIsolatedTestApp,
 };

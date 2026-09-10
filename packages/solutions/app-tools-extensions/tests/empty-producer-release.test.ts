@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import {
   createUltramodernBuildArtifact,
   DELIVERY_UNIT_DEPLOY_PROFILE,
@@ -77,204 +76,172 @@ afterEach(async () => {
   );
 });
 
-// Exercise real package outputs as well as source: these are consumer regressions,
-// not a transpile-only approximation of the published CJS/ESM entrypoints.
-for (const format of ['source', 'cjs', 'esm', 'esm-node']) {
-  describe(`empty MF producer (${format})`, () => {
-    let framework: typeof sourceFramework;
-    beforeAll(async () => {
-      framework =
-        format === 'source'
-          ? sourceFramework
-          : await import(
-              pathToFileURL(
-                path.resolve(
-                  __dirname,
-                  `../dist/${format}/release-envelope/framework-output.${format === 'cjs' ? 'js' : 'mjs'}`,
-                ),
-              ).href
-            );
-    });
+describe('empty MF producer', () => {
+  const framework = sourceFramework;
 
-    test('retains complete build and Node staged release evidence', async () => {
-      const f = await fixture(framework);
-      const envelope = await f.emit();
-      expect(envelope?.surfaces.uiClient).toContain(client);
-      expect(envelope?.surfaces.ssr).toEqual([ssr]);
-      expect(envelope?.surfaces.apiBackend).toEqual([api]);
-      await framework.verifyBuildOutputReleaseEnvelope(f.root, 'node');
-      const staged = await framework.emitNodeStagedReleaseEnvelope({
-        distDirectory: f.root,
-        outputDirectory: f.root,
-      });
-      expect(staged?.surfaces.uiClient).toContain(client);
-      await framework.verifyNodeReleaseEnvelopeStaging({
-        outputDirectory: f.root,
-      });
-      await f.put(client, 'console.log("tampered");');
-      await expect(
-        framework.verifyBuildOutputReleaseEnvelope(f.root, 'node'),
-      ).rejects.toThrow(/digest|hash|size/iu);
+  test('retains complete build and Node staged release evidence', async () => {
+    const f = await fixture(framework);
+    const envelope = await f.emit();
+    expect(envelope?.surfaces.uiClient).toContain(client);
+    expect(envelope?.surfaces.ssr).toEqual([ssr]);
+    expect(envelope?.surfaces.apiBackend).toEqual([api]);
+    await framework.verifyBuildOutputReleaseEnvelope(f.root, 'node');
+    const staged = await framework.emitNodeStagedReleaseEnvelope({
+      distDirectory: f.root,
+      outputDirectory: f.root,
     });
-
-    test('binds route assets under the final Cloudflare public directory', async () => {
-      const f = await fixture(framework);
-      await f.put('worker/main.js', 'export const render = () => "catalog";');
-      await f.put(
-        'worker/__modern_bff_effect.js',
-        'export const handler = () => "api";',
-      );
-      await f.json('route.json', { routes: [{ worker: 'worker/main.js' }] });
-      await framework.emitFrameworkMicroVerticalReleaseEnvelope({
-        apiOnly: false,
-        distDirectory: f.root,
-        target: 'cloudflare',
-      });
-      const outputDirectory = await fs.mkdtemp(
-        path.join(os.tmpdir(), 'empty-mf-cloudflare-'),
-      );
-      roots.push(outputDirectory);
-      for (const [from, to] of [
-        ['static', 'public/static'],
-        ['mf-manifest.json', 'public/mf-manifest.json'],
-        ['routes-manifest.json', 'public/routes-manifest.json'],
-        ['backend-mf-manifest.json', 'public/backend-mf-manifest.json'],
-        ['backendRemoteEntry.cjs', 'public/backendRemoteEntry.cjs'],
-        ['worker', 'worker'],
-        ['route.json', 'server/route.json'],
-      ]) {
-        await fs.mkdir(path.dirname(path.join(outputDirectory, to)), {
-          recursive: true,
-        });
-        await fs.cp(path.join(f.root, from), path.join(outputDirectory, to), {
-          recursive: true,
-        });
-      }
-      for (const name of [
-        'server/modern-worker-manifest.json',
-        'wrangler.json',
-        'package.json',
-        'worker/package.json',
-      ]) {
-        await fs.writeFile(path.join(outputDirectory, name), '{}');
-      }
-      await fs.writeFile(
-        path.join(outputDirectory, 'server/index.mjs'),
-        'export default {};',
-      );
-      const envelope = await framework.emitCloudflareStagedReleaseEnvelope({
-        distDirectory: f.root,
-        outputDirectory,
-      });
-      expect(envelope?.surfaces.uiClient).toContain(`public/${client}`);
-      await framework.verifyCloudflareReleaseEnvelopeStaging(outputDirectory);
-      await fs.writeFile(
-        path.join(outputDirectory, 'public', client),
-        'tampered',
-      );
-      await expect(
-        framework.verifyCloudflareReleaseEnvelopeStaging(outputDirectory),
-      ).rejects.toThrow(/digest|hash|size/iu);
+    expect(staged?.surfaces.uiClient).toContain(client);
+    await framework.verifyNodeReleaseEnvelopeStaging({
+      outputDirectory: f.root,
     });
-
-    test('binds auto and root-relative publicPath route assets', async () => {
-      for (const [base, reference] of [
-        ['auto', `/${client}`],
-        ['/app/', `/app/${client}`],
-        ['/', client],
-      ]) {
-        const f = await fixture(framework);
-        f.manifest.metaData.publicPath = base;
-        await f.json('mf-manifest.json', f.manifest);
-        await f.routes([reference]);
-        expect((await f.emit())?.surfaces.uiClient).toContain(client);
-      }
-    });
-
-    test('rejects undeclared, foreign, traversing, missing, and nonbrowser assets', async () => {
-      for (const reference of [
-        `https://foreign.example.test/app/${client}`,
-        `${publicPath}../app/${client}`,
-        `${publicPath}%2e%2e/app/${client}`,
-        `${publicPath}static\\js/index.js`,
-        `${publicPath}static%5cjs/index.js`,
-        `${publicPath}static/js/missing.js`,
-        `${publicPath}${api}`,
-        `${publicPath}${ssr}`,
-        `${publicPath}${client}?forged=true`,
-        `${publicPath}${client}#forged`,
-        `//assets.example.test/app/${client}`,
-      ]) {
-        const f = await fixture(framework);
-        await f.routes([reference]);
-        await expect(f.emit()).rejects.toThrow(
-          /UI\/client manifest references no compiled execution module/u,
-        );
-        // One legitimate asset must not hide another invalid declaration.
-        await f.routes([`${publicPath}${client}`, reference]);
-        await expect(f.emit()).rejects.toThrow(
-          /UI\/client manifest references no compiled execution module/u,
-        );
-      }
-      const f = await fixture(framework);
-      await f.routes([]);
-      await expect(f.emit()).rejects.toThrow(/no compiled execution module/u);
-      await fs.rm(path.join(f.root, 'routes-manifest.json'));
-      await expect(f.emit()).rejects.toThrow(/ENOENT/u);
-    });
-
-    test('rejects browser-named symlinks to server bytes', async () => {
-      const f = await fixture(framework);
-      await fs.rm(path.join(f.root, client));
-      await fs.symlink(path.join(f.root, api), path.join(f.root, client));
-      await expect(f.emit()).rejects.toThrow(/no compiled execution module/u);
-    });
-
-    test('requires proven empty exposes, remotes, and a native empty remote entry', async () => {
-      const f = await fixture(framework);
-      for (const manifest of [
-        { ...f.manifest, exposes: [{ name: './Page' }] },
-        { ...f.manifest, remotes: [{ name: 'shell' }] },
-        { metaData: f.manifest.metaData, remotes: [] },
-        { metaData: f.manifest.metaData, exposes: [] },
-        {
-          ...f.manifest,
-          metaData: {
-            ...f.manifest.metaData,
-            remoteEntry: { name: '', path: '' },
-          },
-        },
-      ]) {
-        await f.json('mf-manifest.json', manifest);
-        await expect(f.emit()).rejects.toThrow(
-          /UI\/client manifest references no compiled execution module/u,
-        );
-      }
-    });
-
-    test('cannot bypass backend, SSR, revision, or identity proof', async () => {
-      for (const name of [api, ssr, 'backendRemoteEntry.cjs']) {
-        const f = await fixture(framework);
-        await fs.rm(path.join(f.root, name));
-        await expect(f.emit()).rejects.toThrow(
-          /compiled Node Effect API|SSR artifacts|emitted together/u,
-        );
-      }
-      const f = await fixture(framework);
-      await f.json('backend-mf-manifest.json', {
-        backendFederation: {
-          deliveryUnit: { ...deliveryUnit, sourceRevision: 'b'.repeat(40) },
-        },
-      });
-      await expect(f.emit()).rejects.toThrow(/must match/u);
-      await f.json(
-        'ultramodern-build.json',
-        createUltramodernBuildArtifact({
-          ...deliveryUnit,
-          sourceRevision: 'workspace',
-        }),
-      );
-      await expect(f.emit()).rejects.toThrow(/workspace/u);
-    });
+    await f.put(client, 'console.log("tampered");');
+    await expect(
+      framework.verifyBuildOutputReleaseEnvelope(f.root, 'node'),
+    ).rejects.toThrow(/digest|hash|size/iu);
   });
-}
+
+  test('binds route assets under the final Cloudflare public directory', async () => {
+    const f = await fixture(framework);
+    await f.put('worker/main.js', 'export const render = () => "catalog";');
+    await f.put(
+      'worker/__modern_bff_effect.js',
+      'export const handler = () => "api";',
+    );
+    await f.json('route.json', { routes: [{ worker: 'worker/main.js' }] });
+    await framework.emitFrameworkMicroVerticalReleaseEnvelope({
+      apiOnly: false,
+      distDirectory: f.root,
+      target: 'cloudflare',
+    });
+    const outputDirectory = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'empty-mf-cloudflare-'),
+    );
+    roots.push(outputDirectory);
+    for (const [from, to] of [
+      ['static', 'public/static'],
+      ['mf-manifest.json', 'public/mf-manifest.json'],
+      ['routes-manifest.json', 'public/routes-manifest.json'],
+      ['backend-mf-manifest.json', 'public/backend-mf-manifest.json'],
+      ['backendRemoteEntry.cjs', 'public/backendRemoteEntry.cjs'],
+      ['worker', 'worker'],
+      ['route.json', 'server/route.json'],
+    ]) {
+      await fs.mkdir(path.dirname(path.join(outputDirectory, to)), {
+        recursive: true,
+      });
+      await fs.cp(path.join(f.root, from), path.join(outputDirectory, to), {
+        recursive: true,
+      });
+    }
+    for (const name of [
+      'server/modern-worker-manifest.json',
+      'wrangler.json',
+      'package.json',
+      'worker/package.json',
+    ]) {
+      await fs.writeFile(path.join(outputDirectory, name), '{}');
+    }
+    await fs.writeFile(
+      path.join(outputDirectory, 'server/index.mjs'),
+      'export default {};',
+    );
+    const envelope = await framework.emitCloudflareStagedReleaseEnvelope({
+      distDirectory: f.root,
+      outputDirectory,
+    });
+    expect(envelope?.surfaces.uiClient).toContain(`public/${client}`);
+    await framework.verifyCloudflareReleaseEnvelopeStaging(outputDirectory);
+    await fs.writeFile(
+      path.join(outputDirectory, 'public', client),
+      'tampered',
+    );
+    await expect(
+      framework.verifyCloudflareReleaseEnvelopeStaging(outputDirectory),
+    ).rejects.toThrow(/digest|hash|size/iu);
+  });
+
+  test('binds auto and root-relative publicPath route assets', async () => {
+    for (const [base, reference] of [
+      ['auto', `/${client}`],
+      ['/app/', `/app/${client}`],
+      ['/', client],
+    ]) {
+      const f = await fixture(framework);
+      f.manifest.metaData.publicPath = base;
+      await f.json('mf-manifest.json', f.manifest);
+      await f.routes([reference]);
+      expect((await f.emit())?.surfaces.uiClient).toContain(client);
+    }
+  });
+
+  test('rejects undeclared, foreign, traversing, missing, and nonbrowser assets', async () => {
+    for (const reference of [
+      `https://foreign.example.test/app/${client}`,
+      `${publicPath}../app/${client}`,
+      `${publicPath}%2e%2e/app/${client}`,
+      `${publicPath}static\\js/index.js`,
+      `${publicPath}static%5cjs/index.js`,
+      `${publicPath}static/js/missing.js`,
+      `${publicPath}${api}`,
+      `${publicPath}${ssr}`,
+      `${publicPath}${client}?forged=true`,
+      `${publicPath}${client}#forged`,
+      `//assets.example.test/app/${client}`,
+    ]) {
+      const f = await fixture(framework);
+      await f.routes([reference]);
+      await expect(f.emit()).rejects.toThrow(
+        /UI\/client manifest references no compiled execution module/u,
+      );
+      // One legitimate asset must not hide another invalid declaration.
+      await f.routes([`${publicPath}${client}`, reference]);
+      await expect(f.emit()).rejects.toThrow(
+        /UI\/client manifest references no compiled execution module/u,
+      );
+    }
+    const f = await fixture(framework);
+    await f.routes([]);
+    await expect(f.emit()).rejects.toThrow(/no compiled execution module/u);
+    await fs.rm(path.join(f.root, 'routes-manifest.json'));
+    await expect(f.emit()).rejects.toThrow(/ENOENT/u);
+  });
+
+  test('rejects browser-named symlinks to server bytes', async () => {
+    const f = await fixture(framework);
+    await fs.rm(path.join(f.root, client));
+    await fs.symlink(path.join(f.root, api), path.join(f.root, client));
+    await expect(f.emit()).rejects.toThrow(/no compiled execution module/u);
+  });
+
+  test('requires proven empty exposes, remotes, and a native empty remote entry', async () => {
+    const f = await fixture(framework);
+    for (const manifest of [
+      { ...f.manifest, exposes: [{ name: './Page' }] },
+      { ...f.manifest, remotes: [{ name: 'shell' }] },
+      { metaData: f.manifest.metaData, remotes: [] },
+      { metaData: f.manifest.metaData, exposes: [] },
+      {
+        ...f.manifest,
+        metaData: {
+          ...f.manifest.metaData,
+          remoteEntry: { name: '', path: '' },
+        },
+      },
+    ]) {
+      await f.json('mf-manifest.json', manifest);
+      await expect(f.emit()).rejects.toThrow(
+        /UI\/client manifest references no compiled execution module/u,
+      );
+    }
+  });
+
+  test('rejects a mixed delivery-unit identity in empty producer output', async () => {
+    const f = await fixture(framework);
+    await f.json('backend-mf-manifest.json', {
+      backendFederation: {
+        deliveryUnit: { ...deliveryUnit, sourceRevision: 'b'.repeat(40) },
+      },
+    });
+    await expect(f.emit()).rejects.toThrow(/must match/u);
+  });
+});

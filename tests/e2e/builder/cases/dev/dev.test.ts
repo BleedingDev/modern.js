@@ -131,7 +131,7 @@ test('hmr should work when setting dev.port & serverOptions.dev.client', async (
     });
 
     await page.goto(getHrefByEntryName('main', builder.port));
-    expect(builder.port).toBeGreaterThan(0);
+    expect(builder.port).toBe(port);
 
     const locator = page.locator('#test');
     await expect(locator).toHaveText('Hello Builder!');
@@ -176,61 +176,6 @@ test('dev.https', async () => {
     expect(message.toLowerCase()).toMatch(
       /(devcert|certificate|https|openssl|self-signed)/,
     );
-  } finally {
-    await builder?.server.close();
-  }
-});
-
-test('tools.devServer', async ({ page }) => {
-  let reloadFn: undefined | (() => void);
-  let setupCalled = false;
-
-  let builder: Awaited<ReturnType<typeof dev>> | undefined;
-  try {
-    const port = await getRandomPort();
-    // Only tested to verify hook behavior, not all devServer options.
-    builder = await dev({
-      cwd: join(fixtures, 'basic'),
-      entry: {
-        main: join(join(fixtures, 'basic'), 'src/index.ts'),
-      },
-      builderConfig: {
-        dev: {
-          port,
-        },
-        tools: {
-          devServer: {
-            setupMiddlewares: [
-              (_middlewares, server) => {
-                setupCalled = true;
-                reloadFn = () => {
-                  server.sockWrite('content-changed');
-                };
-              },
-            ],
-            before: [
-              (_req, _res, next) => {
-                next();
-              },
-            ],
-          },
-        },
-        server: {
-          port,
-        },
-      },
-    });
-
-    await page.goto(getHrefByEntryName('main', builder.port));
-
-    const locator = page.locator('#test');
-    await expect(locator).toHaveText('Hello Builder!');
-
-    if (setupCalled && reloadFn) {
-      reloadFn();
-      await page.reload();
-      await expect(locator).toHaveText('Hello Builder!');
-    }
   } finally {
     await builder?.server.close();
   }

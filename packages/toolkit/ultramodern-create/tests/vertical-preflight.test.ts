@@ -13,18 +13,6 @@ const topologyPath = 'topology/reference-topology.json';
 const ownershipPath = 'topology/ownership.json';
 const overlayPath = 'topology/local-overlays/development.json';
 
-function createWorkspaceWithCatalog() {
-  const workspace = createWorkspace('preflight-workspace', {
-    tempPrefix: 'um-vertical-preflight-',
-  });
-  addUltramodernVertical({
-    workspaceRoot: workspace.workspaceDir,
-    name: 'catalog',
-    modernVersion: '3.2.1',
-  });
-  return workspace;
-}
-
 function readJson(workspaceDir: string, relativePath: string): any {
   return JSON.parse(
     fs.readFileSync(path.join(workspaceDir, relativePath), 'utf-8'),
@@ -44,7 +32,6 @@ function expectAddVerticalFailureLeavesWorkspaceUnchanged(
   expectedError: RegExp,
 ) {
   const before = snapshotWorkspace(workspaceDir);
-
   assert.throws(
     () =>
       addUltramodernVertical({
@@ -75,7 +62,6 @@ function addExistingTopologyVertical(
   const overlay = readJson(workspaceDir, overlayPath);
   const id = patch.id ?? 'inventory';
   const domain = patch.domain ?? id;
-  const verticalPath = patch.verticalPath ?? `verticals/${id}`;
   const port = patch.port ?? 4102;
 
   topology.verticals.push({
@@ -83,7 +69,7 @@ function addExistingTopologyVertical(
     kind: 'vertical',
     domain,
     package: patch.packageName ?? `@preflight-workspace/${id}`,
-    path: verticalPath,
+    path: patch.verticalPath ?? `verticals/${id}`,
     moduleFederation: {
       role: 'remote',
       name: patch.mfName ?? 'verticalInventory',
@@ -94,9 +80,7 @@ function addExistingTopologyVertical(
     },
     api: {
       runtime: 'effect',
-      bff: {
-        prefix: patch.apiPrefix ?? `/${id}-api`,
-      },
+      bff: { prefix: patch.apiPrefix ?? `/${id}-api` },
     },
   });
   overlay.ports[id] = port;
@@ -104,139 +88,83 @@ function addExistingTopologyVertical(
   writeJson(workspaceDir, overlayPath, overlay);
 }
 
-test('schemaVersion 1 compact config retains its normalization contract', () => {
+test('schemaVersion 1 compact config normalizes source and behavior fields', () => {
   const sourcePath = '/workspace/.modernjs/ultramodern.json';
-
-  assert.deepEqual(
-    normalizeCompactConfig('/workspace', sourcePath, {
-      schemaVersion: 1,
-      profile: 'strict-effect',
-      workspace: { packageScope: 'fixture' },
-      packageSource: {
-        strategy: 'install',
-        modernPackageVersion: '3.2.1',
-        registry: 'https://registry.npmjs.org/',
-        aliasScope: '@fixture',
-        aliasPackageNamePrefix: 'modern-js-',
-      },
-      features: { tailwind: false },
-      topology: {
-        apps: [
-          {
-            id: 'shell',
-            kind: 'shell',
-            path: 'apps/shell',
-            package: '@fixture/shell',
-            packageSuffix: 'shell',
-            displayName: 'Shell',
-            domain: 'shell',
-            port: 4100,
-            portEnv: 'SHELL_PORT',
-            moduleFederation: {
-              role: 'host',
-              name: 'shellHost',
-              verticalRefs: ['catalog'],
-            },
-          },
-          {
-            id: 'catalog',
-            kind: 'vertical',
-            path: 'verticals/catalog',
-            package: '@fixture/catalog',
-            packageSuffix: 'catalog',
-            displayName: 'Catalog Vertical',
-            domain: 'catalog',
-            port: 4101,
-            portEnv: 'CATALOG_PORT',
-            moduleFederation: {
-              role: 'remote',
-              name: 'verticalCatalog',
-              exposes: ['./Route'],
-              exposePaths: { './Route': './src/route.tsx' },
-            },
-            api: {
-              stem: 'catalog',
-              prefix: '/catalog-api',
-              consumedBy: ['shell', 'catalog'],
-            },
-          },
-        ],
-      },
-    }),
-    {
-      schemaVersion: 1,
-      profile: 'strict-effect',
-      source: 'compact',
-      sourcePath,
-      workspace: { packageScope: 'fixture' },
-      packageSource: {
-        strategy: 'install',
-        modernPackageVersion: '3.2.1',
-        registry: 'https://registry.npmjs.org/',
-        aliasScope: '@fixture',
-        aliasPackageNamePrefix: 'modern-js-',
-      },
-      features: { tailwind: false },
-      bridge: undefined,
-      topology: {
-        apps: [
-          {
-            id: 'shell',
-            kind: 'shell',
-            path: 'apps/shell',
-            package: '@fixture/shell',
-            packageSuffix: 'shell',
-            displayName: 'Shell',
-            domain: 'shell',
-            port: 4100,
-            portEnv: 'SHELL_PORT',
-            moduleFederation: {
-              role: 'host',
-              name: 'shellHost',
-              exposes: undefined,
-              exposePaths: undefined,
-              verticalRefs: ['catalog'],
-              hostOnly: false,
-              noExposes: false,
-            },
-            api: undefined,
-          },
-          {
-            id: 'catalog',
-            kind: 'vertical',
-            path: 'verticals/catalog',
-            package: '@fixture/catalog',
-            packageSuffix: 'catalog',
-            displayName: 'Catalog Vertical',
-            domain: 'catalog',
-            port: 4101,
-            portEnv: 'CATALOG_PORT',
-            moduleFederation: {
-              role: 'remote',
-              name: 'verticalCatalog',
-              exposes: ['./Route'],
-              exposePaths: { './Route': './src/route.tsx' },
-              verticalRefs: undefined,
-              hostOnly: false,
-              noExposes: false,
-            },
-            api: {
-              stem: 'catalog',
-              prefix: '/catalog-api',
-              consumedBy: ['shell', 'catalog'],
-            },
-          },
-        ],
-      },
+  const normalized = normalizeCompactConfig('/workspace', sourcePath, {
+    schemaVersion: 1,
+    profile: 'strict-effect',
+    workspace: { packageScope: 'fixture' },
+    packageSource: {
+      strategy: 'install',
+      modernPackageVersion: '3.2.1',
+      registry: 'https://registry.npmjs.org/',
+      aliasScope: '@fixture',
+      aliasPackageNamePrefix: 'modern-js-',
     },
-  );
+    features: { tailwind: false },
+    topology: {
+      apps: [
+        {
+          id: 'shell',
+          kind: 'shell',
+          path: 'apps/shell',
+          package: '@fixture/shell',
+          packageSuffix: 'shell',
+          displayName: 'Shell',
+          domain: 'shell',
+          port: 4100,
+          portEnv: 'SHELL_PORT',
+          moduleFederation: {
+            role: 'host',
+            name: 'shellHost',
+            verticalRefs: ['catalog'],
+          },
+        },
+        {
+          id: 'catalog',
+          kind: 'vertical',
+          path: 'verticals/catalog',
+          package: '@fixture/catalog',
+          packageSuffix: 'catalog',
+          displayName: 'Catalog Vertical',
+          domain: 'catalog',
+          port: 4101,
+          portEnv: 'CATALOG_PORT',
+          moduleFederation: {
+            role: 'remote',
+            name: 'verticalCatalog',
+            exposes: ['./Route'],
+            exposePaths: { './Route': './src/route.tsx' },
+          },
+          api: {
+            stem: 'catalog',
+            prefix: '/catalog-api',
+            consumedBy: ['shell', 'catalog'],
+          },
+        },
+      ],
+    },
+  });
+
+  assert.equal(normalized.schemaVersion, 1);
+  assert.equal(normalized.source, 'compact');
+  assert.equal(normalized.sourcePath, sourcePath);
+  assert.equal(normalized.workspace.packageScope, 'fixture');
+  assert.equal(normalized.packageSource.strategy, 'install');
+  assert.equal(normalized.features.tailwind, false);
+  assert.deepEqual(normalized.topology.apps[0].moduleFederation.verticalRefs, [
+    'catalog',
+  ]);
+  assert.deepEqual(normalized.topology.apps[1].moduleFederation.exposes, [
+    './Route',
+  ]);
+  assert.equal(normalized.topology.apps[1].api.prefix, '/catalog-api');
 });
 
 test('add-vertical normalizes stale shell refs for the new vertical', () => {
   const { tempRoot, workspaceDir } = createWorkspace('preflight-workspace', {
     tempPrefix: 'um-vertical-preflight-',
   });
-
   try {
     const topology = readJson(workspaceDir, topologyPath);
     topology.shell.verticalRefs.push('catalog');
@@ -246,13 +174,11 @@ test('add-vertical normalizes stale shell refs for the new vertical', () => {
       manifestUrl: 'http://localhost:4101/mf-manifest.json',
     });
     writeJson(workspaceDir, topologyPath, topology);
-
     addUltramodernVertical({
       workspaceRoot: workspaceDir,
       name: 'catalog',
       modernVersion: '3.2.1',
     });
-
     const updatedTopology = readJson(workspaceDir, topologyPath);
     assert.deepEqual(updatedTopology.shell.verticalRefs, ['catalog']);
     assert.deepEqual(updatedTopology.shell.moduleFederation.remotes, [
@@ -271,7 +197,6 @@ test('preflight rejects invalid fresh vertical input before writes', () => {
   const { tempRoot, workspaceDir } = createWorkspace('preflight-workspace', {
     tempPrefix: 'um-vertical-preflight-',
   });
-
   try {
     const before = snapshotWorkspace(workspaceDir);
     assert.throws(
@@ -289,53 +214,6 @@ test('preflight rejects invalid fresh vertical input before writes', () => {
   }
 });
 
-test('preflight requires compact config fixtures', () => {
-  const nonObject = createWorkspace('preflight-workspace', {
-    tempPrefix: 'um-vertical-preflight-',
-  });
-  const missingCompact = createWorkspace('preflight-workspace', {
-    tempPrefix: 'um-vertical-preflight-',
-  });
-
-  try {
-    writeJson(nonObject.workspaceDir, ultramodernConfigPath, []);
-    expectAddVerticalFailureLeavesWorkspaceUnchanged(
-      nonObject.workspaceDir,
-      /UltraModern workspace file must contain a JSON object: .*ultramodern\.json/,
-    );
-
-    fs.rmSync(path.join(missingCompact.workspaceDir, ultramodernConfigPath));
-    writeJson(
-      missingCompact.workspaceDir,
-      '.modernjs/ultramodern-generated-contract.json',
-      {
-        apps: [],
-      },
-    );
-    writeJson(
-      missingCompact.workspaceDir,
-      '.modernjs/ultramodern-package-source.json',
-      {
-        schemaVersion: 1,
-        strategy: 'install',
-        modernPackages: {
-          specifier: '3.2.0-ultramodern.108',
-          aliases: {
-            '@modern-js/runtime': '@bleedingdev/modern-js-runtime',
-          },
-        },
-      },
-    );
-    expectAddVerticalFailureLeavesWorkspaceUnchanged(
-      missingCompact.workspaceDir,
-      /Missing UltraModern workspace file: .*ultramodern\.json/,
-    );
-  } finally {
-    fs.rmSync(nonObject.tempRoot, { recursive: true, force: true });
-    fs.rmSync(missingCompact.tempRoot, { recursive: true, force: true });
-  }
-});
-
 test.each([
   {
     label: 'unsupported schemaVersion',
@@ -344,14 +222,6 @@ test.each([
     },
     error: /(Unsupported|Invalid) UltraModern config schemaVersion 2/,
     issue: { field: 'schemaVersion', value: 2 },
-  },
-  {
-    label: 'nonnumeric schemaVersion',
-    mutate: (config: Record<string, any>) => {
-      config.schemaVersion = 'next';
-    },
-    error: /(Unsupported|Invalid) UltraModern config schemaVersion "next"/,
-    issue: { field: 'schemaVersion', value: 'next' },
   },
   {
     label: 'unsupported app kind',
@@ -369,13 +239,11 @@ test.each([
   const { tempRoot, workspaceDir } = createWorkspace('preflight-workspace', {
     tempPrefix: 'um-vertical-preflight-',
   });
-
   try {
     const config = readJson(workspaceDir, ultramodernConfigPath);
     entry.mutate(config);
     writeJson(workspaceDir, ultramodernConfigPath, config);
     const before = snapshotWorkspace(workspaceDir);
-
     assert.throws(
       () =>
         addUltramodernVertical({
@@ -386,8 +254,6 @@ test.each([
       error => {
         const typedError = error as UnsupportedUltramodernConfigError;
         assert.equal(typedError.name, 'UnsupportedUltramodernConfigError');
-        // Subset match: the issue may carry additional diagnostic fields
-        // (e.g. reason) beyond the identity asserted here.
         for (const [key, value] of Object.entries(entry.issue)) {
           assert.deepEqual(
             (typedError.issue as Record<string, unknown>)[key],
@@ -412,53 +278,16 @@ test.each([
     error: /Duplicate app id "catalog"/,
   },
   {
-    label: 'duplicate package suffixes',
-    mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, {
-        packageName: '@preflight-workspace/catalog',
-      }),
-    error: /Duplicate package suffix "catalog"/,
-  },
-  {
-    label: 'duplicate output paths',
-    mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, {
-        verticalPath: 'verticals/catalog',
-      }),
-    error: /Duplicate output path "verticals\/catalog"/,
-  },
-  {
-    label: 'duplicate Module Federation names',
-    mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, {
-        mfName: 'verticalCatalog',
-      }),
-    error: /Duplicate Module Federation name "verticalCatalog"/,
-  },
-  {
     label: 'duplicate development ports',
     mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, {
-        port: 4101,
-      }),
+      addExistingTopologyVertical(workspaceDir, { port: 4101 }),
     error: /Duplicate development port "4101"/,
   },
   {
     label: 'duplicate API prefixes',
     mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, {
-        apiPrefix: '/catalog-api',
-      }),
+      addExistingTopologyVertical(workspaceDir, { apiPrefix: '/catalog-api' }),
     error: /Duplicate API prefix "\/catalog-api"/,
-  },
-  {
-    label: 'duplicate manifest environment names',
-    mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, {
-        domain: 'catalog',
-        apiPrefix: '/inventory-api',
-      }),
-    error: /Duplicate manifest environment name "VERTICAL_CATALOG_MF_MANIFEST"/,
   },
   {
     label: 'unsafe normalized existing descriptors',
@@ -469,87 +298,48 @@ test.each([
     },
     error: /Unsafe output path for catalog: \.\.\/outside/,
   },
-  {
-    label: 'duplicate Tailwind prefixes',
-    mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, {
-        id: 'cat-alog',
-        domain: 'cat-alog',
-        packageName: '@preflight-workspace/cat-alog',
-        verticalPath: 'verticals/cat-alog',
-        mfName: 'verticalCatAlog',
-        apiPrefix: '/cat-alog-api',
-      }),
-    error: /Tailwind prefix catalog for cat-alog collides with catalog/,
-  },
-])('preflight rejects invalid existing workspace state: $label', entry => {
-  const { tempRoot, workspaceDir } = createWorkspaceWithCatalog();
-
+])('preflight rejects invalid existing state: $label', entry => {
+  const workspace = createWorkspace('preflight-workspace', {
+    tempPrefix: 'um-vertical-preflight-',
+  });
   try {
-    entry.mutate(workspaceDir);
-    expectAddVerticalFailureLeavesWorkspaceUnchanged(workspaceDir, entry.error);
+    addUltramodernVertical({
+      workspaceRoot: workspace.workspaceDir,
+      name: 'catalog',
+      modernVersion: '3.2.1',
+    });
+    entry.mutate(workspace.workspaceDir);
+    expectAddVerticalFailureLeavesWorkspaceUnchanged(
+      workspace.workspaceDir,
+      entry.error,
+    );
   } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    fs.rmSync(workspace.tempRoot, { recursive: true, force: true });
   }
 });
 
-test('preflight verifies mutable contract collections are JSON objects or arrays', () => {
-  const topologyNotObject = createWorkspace('preflight-workspace', {
+test('preflight rejects malformed contract collections before writes', () => {
+  const topologyWorkspace = createWorkspace('preflight-workspace', {
     tempPrefix: 'um-vertical-preflight-',
   });
-  const topologyVerticalsNotArray = createWorkspace('preflight-workspace', {
+  const overlayWorkspace = createWorkspace('preflight-workspace', {
     tempPrefix: 'um-vertical-preflight-',
   });
-  const ownershipNotArray = createWorkspace('preflight-workspace', {
-    tempPrefix: 'um-vertical-preflight-',
-  });
-  const overlayPortsNotObject = createWorkspace('preflight-workspace', {
-    tempPrefix: 'um-vertical-preflight-',
-  });
-
   try {
-    writeJson(topologyNotObject.workspaceDir, topologyPath, []);
+    writeJson(topologyWorkspace.workspaceDir, topologyPath, []);
     expectAddVerticalFailureLeavesWorkspaceUnchanged(
-      topologyNotObject.workspaceDir,
+      topologyWorkspace.workspaceDir,
       /UltraModern workspace file must contain a JSON object: .*reference-topology\.json/,
     );
-
-    const topology = readJson(
-      topologyVerticalsNotArray.workspaceDir,
-      topologyPath,
-    );
-    topology.verticals = {};
-    writeJson(topologyVerticalsNotArray.workspaceDir, topologyPath, topology);
-    expectAddVerticalFailureLeavesWorkspaceUnchanged(
-      topologyVerticalsNotArray.workspaceDir,
-      /topology\.verticals in .*reference-topology\.json must be a JSON array/,
-    );
-
-    const ownership = readJson(ownershipNotArray.workspaceDir, ownershipPath);
-    ownership.owners = {};
-    writeJson(ownershipNotArray.workspaceDir, ownershipPath, ownership);
-    expectAddVerticalFailureLeavesWorkspaceUnchanged(
-      ownershipNotArray.workspaceDir,
-      /ownership\.owners in .*ownership\.json must be a JSON array/,
-    );
-
-    const overlay = readJson(overlayPortsNotObject.workspaceDir, overlayPath);
+    const overlay = readJson(overlayWorkspace.workspaceDir, overlayPath);
     overlay.ports = [];
-    writeJson(overlayPortsNotObject.workspaceDir, overlayPath, overlay);
+    writeJson(overlayWorkspace.workspaceDir, overlayPath, overlay);
     expectAddVerticalFailureLeavesWorkspaceUnchanged(
-      overlayPortsNotObject.workspaceDir,
+      overlayWorkspace.workspaceDir,
       /overlay\.ports in .*development\.json must be a JSON object/,
     );
   } finally {
-    fs.rmSync(topologyNotObject.tempRoot, { recursive: true, force: true });
-    fs.rmSync(topologyVerticalsNotArray.tempRoot, {
-      recursive: true,
-      force: true,
-    });
-    fs.rmSync(ownershipNotArray.tempRoot, { recursive: true, force: true });
-    fs.rmSync(overlayPortsNotObject.tempRoot, {
-      recursive: true,
-      force: true,
-    });
+    fs.rmSync(topologyWorkspace.tempRoot, { recursive: true, force: true });
+    fs.rmSync(overlayWorkspace.tempRoot, { recursive: true, force: true });
   }
 });

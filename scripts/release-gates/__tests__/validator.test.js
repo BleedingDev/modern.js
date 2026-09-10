@@ -7,7 +7,6 @@ const assert = require('node:assert/strict');
 const {
   runGateCommands,
   validateEvidence,
-  validateGateSnapshotFile,
   validateProfileShape,
   writeGateSnapshot,
 } = require('../validator');
@@ -18,24 +17,6 @@ const makeTempDir = () =>
 const removeDir = directory => {
   fs.rmSync(directory, { recursive: true, force: true });
 };
-
-test('validateProfileShape accepts valid schema', () => {
-  const profile = {
-    schemaVersion: 1,
-    evidence: {
-      requiredFiles: ['architecture-evidence.md'],
-      requiredMetadataFields: ['author'],
-    },
-    gateCommands: [
-      {
-        command: process.execPath,
-        args: ['--version'],
-      },
-    ],
-  };
-
-  assert.doesNotThrow(() => validateProfileShape(profile));
-});
 
 test('validateProfileShape rejects shell-string gate commands', () => {
   const profile = {
@@ -53,24 +34,24 @@ test('validateProfileShape rejects shell-string gate commands', () => {
   );
 });
 
-test('validateEvidence checks metadata and reviewer count', () => {
+test('validateEvidence checks receipt metadata without reviewer prose certification', () => {
   const dir = makeTempDir();
   try {
     fs.writeFileSync(
       path.join(dir, 'architecture-evidence.md'),
-      'author: test\ntimestamp: now\nticket_id: id\ncommit_sha: sha\nworkflow_run_url: local\n',
+      'commit_sha: sha\nworkflow_run_url: local\n',
     );
     fs.writeFileSync(
       path.join(dir, 'validation-evidence.md'),
-      'author: test\ntimestamp: now\nticket_id: id\ncommit_sha: sha\nworkflow_run_url: local\n',
+      'commit_sha: sha\nworkflow_run_url: local\n',
     );
     fs.writeFileSync(
       path.join(dir, 'test-evidence.md'),
-      'author: test\ntimestamp: now\nticket_id: id\ncommit_sha: sha\nworkflow_run_url: local\n',
+      'commit_sha: sha\nworkflow_run_url: local\n',
     );
     fs.writeFileSync(
       path.join(dir, 'review-evidence.md'),
-      'author: test\ntimestamp: now\nticket_id: id\ncommit_sha: sha\nworkflow_run_url: local\nreviewer_1: alpha\nreviewer_2: beta\n',
+      'commit_sha: sha\nworkflow_run_url: local\n',
     );
 
     const report = validateEvidence({
@@ -81,13 +62,7 @@ test('validateEvidence checks metadata and reviewer count', () => {
         'test-evidence.md',
         'review-evidence.md',
       ],
-      requiredMetadataFields: [
-        'author',
-        'timestamp',
-        'ticket_id',
-        'commit_sha',
-        'workflow_run_url',
-      ],
+      requiredMetadataFields: ['commit_sha', 'workflow_run_url'],
       minimumReviewers: 2,
       allowMissingEvidence: false,
       allowLocalEvidenceMetadata: true,
@@ -106,9 +81,6 @@ test('validateEvidence rejects dirty commit metadata when CI evidence is require
     fs.writeFileSync(
       path.join(dir, 'architecture-evidence.md'),
       [
-        'author: test',
-        'timestamp: now',
-        'ticket_id: id',
         'commit_sha: 123abc-dirty',
         'workflow_run_url: https://github.com/BleedingDev/ultramodern.js/actions/runs/123456789',
         '',
@@ -120,14 +92,7 @@ test('validateEvidence rejects dirty commit metadata when CI evidence is require
         validateEvidence({
           evidenceDir: dir,
           requiredFiles: ['architecture-evidence.md'],
-          requiredMetadataFields: [
-            'author',
-            'timestamp',
-            'ticket_id',
-            'commit_sha',
-            'workflow_run_url',
-          ],
-          minimumReviewers: 0,
+          requiredMetadataFields: ['commit_sha', 'workflow_run_url'],
           allowMissingEvidence: false,
           requireCiBackedMetadata: true,
         }),
@@ -144,9 +109,6 @@ test('validateEvidence rejects local workflow URLs when CI evidence is required'
     fs.writeFileSync(
       path.join(dir, 'architecture-evidence.md'),
       [
-        'author: test',
-        'timestamp: now',
-        'ticket_id: id',
         'commit_sha: 123abc',
         'workflow_run_url: local://release-gates/manual-fixture',
         '',
@@ -158,14 +120,7 @@ test('validateEvidence rejects local workflow URLs when CI evidence is required'
         validateEvidence({
           evidenceDir: dir,
           requiredFiles: ['architecture-evidence.md'],
-          requiredMetadataFields: [
-            'author',
-            'timestamp',
-            'ticket_id',
-            'commit_sha',
-            'workflow_run_url',
-          ],
-          minimumReviewers: 0,
+          requiredMetadataFields: ['commit_sha', 'workflow_run_url'],
           allowMissingEvidence: false,
           requireCiBackedMetadata: true,
         }),
@@ -181,7 +136,7 @@ test('validateEvidence rejects placeholder metadata values', () => {
   try {
     fs.writeFileSync(
       path.join(dir, 'architecture-evidence.md'),
-      'author: test\ntimestamp: now\nticket_id: id\ncommit_sha: TBD\nworkflow_run_url: local://manual\n',
+      'commit_sha: TBD\nworkflow_run_url: local://manual\n',
     );
 
     assert.throws(
@@ -189,14 +144,7 @@ test('validateEvidence rejects placeholder metadata values', () => {
         validateEvidence({
           evidenceDir: dir,
           requiredFiles: ['architecture-evidence.md'],
-          requiredMetadataFields: [
-            'author',
-            'timestamp',
-            'ticket_id',
-            'commit_sha',
-            'workflow_run_url',
-          ],
-          minimumReviewers: 2,
+          requiredMetadataFields: ['commit_sha', 'workflow_run_url'],
           allowMissingEvidence: false,
         }),
       /placeholder value/,
@@ -239,8 +187,8 @@ test('writeGateSnapshot persists and merges gate records', () => {
       snapshotPath,
       gateName: 'module-onboarding-certification-gates',
       passed: false,
-      reason: 'reviewer evidence missing',
-      summary: { error: 'reviewer evidence missing' },
+      reason: 'gate command failed',
+      summary: { error: 'gate command failed' },
       profilePath: 'scripts/release-gates/module-certification-profile.json',
       timestamp: 1700000001000,
     });
@@ -259,40 +207,7 @@ test('writeGateSnapshot persists and merges gate records', () => {
     );
     assert.match(
       snapshot.gates['module-onboarding-certification-gates'].reason,
-      /reviewer evidence missing/,
-    );
-  } finally {
-    removeDir(dir);
-  }
-});
-
-test('validateGateSnapshotFile validates shape and required gate names', () => {
-  const dir = makeTempDir();
-  try {
-    const snapshotPath = path.join(dir, 'contract-gates.json');
-    writeGateSnapshot({
-      snapshotPath,
-      gateName: 'release-candidate-contract-gates',
-      passed: true,
-      summary: { validatedEvidenceFiles: 4 },
-      profilePath: 'scripts/release-gates/rc-contract-profile.json',
-      timestamp: 1700000000000,
-    });
-
-    const report = validateGateSnapshotFile({
-      snapshotPath,
-      requiredGateNames: ['release-candidate-contract-gates'],
-    });
-    assert.equal(report.gateCount, 1);
-    assert.deepEqual(report.gates, ['release-candidate-contract-gates']);
-
-    assert.throws(
-      () =>
-        validateGateSnapshotFile({
-          snapshotPath,
-          requiredGateNames: ['module-onboarding-certification-gates'],
-        }),
-      /missing required gate/,
+      /gate command failed/,
     );
   } finally {
     removeDir(dir);

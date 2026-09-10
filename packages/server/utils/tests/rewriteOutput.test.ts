@@ -95,16 +95,11 @@ describe('rewriteOutputSpecifiers', () => {
     const outputFile = path.join(distDir, 'api/plain.js');
     await fs.outputFile(outputFile, emitted);
     await fs.outputFile(`${outputFile}.map`, '{"version":3,"mappings":""}');
-    const before = await fs.stat(outputFile);
+    const before = await fs.readFile(outputFile, 'utf8');
 
     await rewriteOutputSpecifiers(appDir, distDir, appDir, paths);
 
-    const after = await fs.stat(outputFile);
-    expect(after).toMatchObject({
-      ino: before.ino,
-      mtimeMs: before.mtimeMs,
-      size: before.size,
-    });
+    await expect(fs.readFile(outputFile, 'utf8')).resolves.toBe(before);
     expect(await fs.pathExists(`${outputFile}.map`)).toBe(true);
   });
 

@@ -89,28 +89,11 @@ function artifactDir(outDir, name) {
 
 function certificationCommands(profile, outDir) {
   const rstestArgs = ['exec', 'rstest', 'run', '-c', 'rstest.config.mts'];
-  const smoke = [
-    command(
-      'superapp-portfolio-smoke',
-      'pnpm',
-      [...rstestArgs, 'integration/superapp-portfolio/tests/index.test.ts'],
-      { cwd: path.join(repoRoot, 'tests') },
-    ),
-    command(
-      'superapp-portfolio-security',
-      'pnpm',
-      [...rstestArgs, 'integration/superapp-portfolio/tests/security.test.ts'],
-      {
-        cwd: path.join(repoRoot, 'tests'),
-        env: {
-          SUPERAPP_PORTFOLIO_SECURITY: '1',
-          SUPERAPP_PORTFOLIO_SECURITY_ARTIFACT_DIR: artifactDir(
-            outDir,
-            'portfolio-security',
-          ),
-        },
-      },
-    ),
+  // Keep the profile option as a compatibility label for existing callers,
+  // but run one real generated-app acceptance path for every profile. The
+  // former portfolio smoke/security/stress/chaos/nightly selections either
+  // exercised deleted suites or only asserted fixture-authored metadata.
+  return [
     command(
       'superapp-mf-certification',
       'pnpm',
@@ -127,112 +110,10 @@ function certificationCommands(profile, outDir) {
             'mf-certification',
           ),
         },
+        profile,
       },
     ),
   ];
-
-  const release = [
-    ...smoke,
-    command(
-      'superapp-browser-matrix-smoke',
-      'pnpm',
-      [
-        ...rstestArgs,
-        'integration/superapp-browser-matrix/tests/playwrightMatrix.test.ts',
-      ],
-      {
-        cwd: path.join(repoRoot, 'tests'),
-        env: {
-          SUPERAPP_BROWSER_MATRIX_ARTIFACT_DIR: artifactDir(
-            outDir,
-            'browser-matrix-smoke',
-          ),
-        },
-        profile: 'release',
-      },
-    ),
-    command(
-      'superapp-portfolio-stress',
-      'pnpm',
-      [...rstestArgs, 'integration/superapp-portfolio/tests/stress.test.ts'],
-      {
-        cwd: path.join(repoRoot, 'tests'),
-        env: {
-          SUPERAPP_PORTFOLIO_STRESS: '1',
-          SUPERAPP_PORTFOLIO_STRESS_CYCLES: '6',
-          SUPERAPP_PORTFOLIO_STRESS_ARTIFACT_DIR: artifactDir(
-            outDir,
-            'portfolio-stress',
-          ),
-        },
-        profile: 'release',
-      },
-    ),
-    command(
-      'superapp-pilot-chaos',
-      'pnpm',
-      [
-        ...rstestArgs,
-        'integration/superapp-portfolio/tests/pilot-chaos.test.ts',
-      ],
-      {
-        cwd: path.join(repoRoot, 'tests'),
-        env: {
-          SUPERAPP_PILOT_CHAOS: '1',
-          SUPERAPP_PILOT_CHAOS_ARTIFACT_DIR: artifactDir(outDir, 'pilot-chaos'),
-        },
-        profile: 'release',
-      },
-    ),
-  ];
-
-  const nightly = [
-    ...release,
-    command(
-      'superapp-browser-matrix-full',
-      'pnpm',
-      [
-        ...rstestArgs,
-        'integration/superapp-browser-matrix/tests/playwrightMatrix.test.ts',
-      ],
-      {
-        cwd: path.join(repoRoot, 'tests'),
-        env: {
-          SUPERAPP_BROWSER_MATRIX: '1',
-          SUPERAPP_BROWSER_MATRIX_ARTIFACT_DIR: artifactDir(
-            outDir,
-            'browser-matrix-full',
-          ),
-        },
-        profile: 'nightly',
-      },
-    ),
-    command(
-      'superapp-portfolio-nightly',
-      'pnpm',
-      [...rstestArgs, 'integration/superapp-portfolio/tests/nightly.test.ts'],
-      {
-        cwd: path.join(repoRoot, 'tests'),
-        env: {
-          SUPERAPP_PORTFOLIO_NIGHTLY: '1',
-          SUPERAPP_PORTFOLIO_NIGHTLY_CYCLES: '30',
-          SUPERAPP_PORTFOLIO_NIGHTLY_ARTIFACT_DIR: artifactDir(
-            outDir,
-            'portfolio-nightly',
-          ),
-        },
-        profile: 'nightly',
-      },
-    ),
-  ];
-
-  if (profile === 'smoke') {
-    return smoke;
-  }
-  if (profile === 'release') {
-    return release;
-  }
-  return nightly;
 }
 
 function runCommands(commands, options) {
@@ -264,10 +145,16 @@ function cleanupWorktree(worktreeDir) {
   runGit(['worktree', 'remove', '--force', worktreeDir]);
 }
 
-function runUpstreamDrift(options) {
+function runMergeConflictCheck(options) {
   const startedAt = Date.now();
-  const worktreeDir = path.join(options.outDir, 'upstream-drift-worktree');
+  const worktreeDir = path.join(
+    options.outDir,
+    'merge-conflict-check-worktree',
+  );
   const result = {
+    check: 'merge-conflict-detection',
+    description:
+      'Fetches the configured upstream ref and checks whether a textual merge is conflict-free; it does not build or run the merged source.',
     status: 'skipped',
     base: options.driftBase,
     remote: options.driftRemote,
@@ -279,7 +166,7 @@ function runUpstreamDrift(options) {
   };
 
   if (options.skipUpstreamDrift) {
-    result.reason = 'skip-upstream-drift';
+    result.reason = 'skip-merge-conflict-check';
     return result;
   }
 
@@ -346,20 +233,98 @@ function runUpstreamDrift(options) {
   }
 }
 
-function writeSummary(options, commands, commandResults, upstreamDrift) {
+function createQualification(
+  options,
+  commands,
+  commandResults,
+  mergeConflictCheck,
+) {
+  const failedCommandCount = commandResults.filter(
+    item => item.exitCode !== 0,
+  ).length;
+  const executedCommandCount = commandResults.filter(
+    item => item.status !== 'planned',
+  ).length;
+  const skippedCommandCount = Math.max(
+    commands.length - executedCommandCount,
+    0,
+  );
+  const reasons = [];
+
+  if (options.dryRun) {
+    reasons.push('dry-run');
+  }
+  if (options.driftOnly) {
+    reasons.push('merge-conflict-check-only');
+  }
+  if (commands.length === 0 && !options.driftOnly) {
+    reasons.push('no-certification-command');
+  }
+  if (!options.dryRun && executedCommandCount < commands.length) {
+    reasons.push('required-command-not-executed');
+  }
+  if (failedCommandCount > 0) {
+    reasons.push('certification-command-failed');
+  }
+  if (
+    ['failed', 'conflict', 'gate-failed'].includes(mergeConflictCheck.status)
+  ) {
+    reasons.push('merge-conflict-check-failed');
+  }
+
+  return {
+    qualified: reasons.length === 0,
+    status: reasons.length === 0 ? 'qualified' : 'unqualified',
+    commandCount: commands.length,
+    executedCommandCount,
+    skippedCommandCount,
+    failedCommandCount,
+    reasons,
+  };
+}
+
+function writeSummary(options, commands, commandResults, mergeConflictCheck) {
   fs.mkdirSync(options.outDir, { recursive: true });
+  const failedCommandCount = commandResults.filter(
+    item => item.exitCode !== 0,
+  ).length;
+  const hasMergeConflictCheckFailure = [
+    'failed',
+    'conflict',
+    'gate-failed',
+  ].includes(mergeConflictCheck.status);
+  const status =
+    hasMergeConflictCheckFailure || failedCommandCount > 0
+      ? 'failed'
+      : options.dryRun
+        ? 'planned'
+        : options.driftOnly
+          ? 'skipped'
+          : 'passed';
+  const qualification = createQualification(
+    options,
+    commands,
+    commandResults,
+    mergeConflictCheck,
+  );
   const summary = {
     schemaVersion: 1,
     suite: 'superapp-certification',
     generatedAt: new Date().toISOString(),
     profile: options.profile,
+    status,
+    qualified: qualification.qualified,
+    qualification,
     dryRun: options.dryRun,
     driftOnly: options.driftOnly,
     commandCount: commands.length,
-    failedCommandCount: commandResults.filter(item => item.exitCode !== 0)
-      .length,
+    skippedCommandCount: qualification.skippedCommandCount,
+    failedCommandCount,
     commands: commandResults,
-    upstreamDrift,
+    // Keep the historical field so the readiness report can continue to
+    // project this evidence, while the payload identifies its real scope.
+    upstreamDrift: mergeConflictCheck,
+    mergeConflictCheck,
   };
   const summaryPath = path.join(options.outDir, 'summary.json');
   writeJsonFile(summaryPath, summary, { atomic: false });
@@ -369,23 +334,25 @@ function writeSummary(options, commands, commandResults, upstreamDrift) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const commands = certificationCommands(options.profile, options.outDir);
-  const commandResults = options.driftOnly
+  const commands = options.driftOnly
     ? []
-    : runCommands(commands, options);
-  const upstreamDrift = runUpstreamDrift(options);
+    : certificationCommands(options.profile, options.outDir);
+  const commandResults = runCommands(commands, options);
+  const mergeConflictCheck = runMergeConflictCheck(options);
   const summary = writeSummary(
     options,
     commands,
     commandResults,
-    upstreamDrift,
+    mergeConflictCheck,
   );
   const hasCommandFailure = summary.failedCommandCount > 0;
-  const hasDriftFailure = ['failed', 'conflict', 'gate-failed'].includes(
-    upstreamDrift.status,
-  );
+  const hasMergeConflictCheckFailure = [
+    'failed',
+    'conflict',
+    'gate-failed',
+  ].includes(mergeConflictCheck.status);
 
-  if (hasCommandFailure || hasDriftFailure) {
+  if (hasCommandFailure || hasMergeConflictCheckFailure) {
     process.exitCode = 1;
   }
 }

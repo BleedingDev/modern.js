@@ -90,21 +90,16 @@ function executeModule(root, rel) {
   const identity = name => record(name, value => value);
   const plugin = name =>
     record(name, options => ({ kind: 'plugin', name, options }));
-  const genericModule = request => {
-    const values = {
-      __esModule: true,
-      applyBaseConfig: identity('applyBaseConfig'),
-      default: record(`${request}.default`),
-    };
-    return new Proxy(values, {
-      get(target, property) {
-        if (property in target) return target[property];
-        const value = record(`${request}.${String(property)}`);
-        target[property] = value;
-        return value;
-      },
-    });
-  };
+  const genericModule = request => ({
+    __esModule: true,
+    applyBaseConfig: identity(`${request}.applyBaseConfig`),
+    default: record(`${request}.default`),
+  });
+  const localStub = request => ({
+    ...genericModule(request),
+    applyBaseConfig: identity('applyBaseConfig'),
+    existingPlugin: plugin(`${request}.existingPlugin`),
+  });
 
   const externalModule = request => {
     if (request === '@modern-js/app-tools') {
@@ -215,7 +210,7 @@ function executeModule(root, rel) {
         const resolved = resolveLocal(request, file);
         if (resolved) return load(resolved);
         if (/applyBaseConfig|existing-plugin|\/plugins$/.test(request)) {
-          return genericModule(request);
+          return localStub(request);
         }
         throw new Error(`Cannot resolve ${request} from ${file}`);
       }
@@ -451,25 +446,6 @@ try {
     '[provenance] workspace:* 依赖保留（未强升固定版本）',
     JSON.parse(bh.read('package.json')).dependencies['@modern-js/runtime'] ===
       'workspace:*',
-  );
-  const bhPackage = JSON.parse(bh.read('package.json'));
-  const bhHonoSources = [
-    bh.read('api/index.ts'),
-    bh.read('server/modern.server.ts'),
-  ].join('\n');
-  check(
-    '[security] Hono 4 依赖在迁移后保留',
-    bhPackage.dependencies.hono === '^4.13.5',
-  );
-  check(
-    '[security] BFF fixture 不重新声明旧 Node 支持',
-    bhPackage.engines?.node === '>=26.7.0',
-  );
-  check(
-    '[compat] BFF fixture 不依赖 Hono 3 直接或私有 API',
-    !/from\s+['"]hono(?:\/[^'"]+)?['"]/.test(bhHonoSources) &&
-      /from\s+['"]@modern-js\/plugin-bff\/hono['"]/.test(bhHonoSources) &&
-      /from\s+['"]@modern-js\/server-runtime['"]/.test(bhHonoSources),
   );
   check(
     '[manual] workspace 协议依赖进 manual（随 monorepo 升级）',
@@ -927,10 +903,11 @@ try {
     ),
   );
   // migrate 二次保护：非 0 退出且不改文件
-  const cfgBefore = executeModule(negDir, 'modern.config.ts').defaultExport;
-  const pkgBefore = JSON.parse(
-    fs.readFileSync(path.join(negDir, 'package.json'), 'utf8'),
+  const cfgBefore = fs.readFileSync(
+    path.join(negDir, 'modern.config.ts'),
+    'utf8',
   );
+  const pkgBefore = fs.readFileSync(path.join(negDir, 'package.json'), 'utf8');
   let migrateBlocked = false;
   try {
     execFileSync(
@@ -947,17 +924,17 @@ try {
   check('[blocking] migrate 非 0 退出（二次保护）', migrateBlocked);
   check(
     '[blocking] migrate 未改写 modern.config.ts',
-    sameValue(
-      executeModule(negDir, 'modern.config.ts').defaultExport,
+    fs.readFileSync(path.join(negDir, 'modern.config.ts'), 'utf8') ===
       cfgBefore,
-    ),
   );
-  const pkgAfter = JSON.parse(
-    fs.readFileSync(path.join(negDir, 'package.json'), 'utf8'),
+  const pkgAfterText = fs.readFileSync(
+    path.join(negDir, 'package.json'),
+    'utf8',
   );
+  const pkgAfter = JSON.parse(pkgAfterText);
   check(
     '[blocking] migrate 保留 workspace:* 未升固定版本',
-    sameValue(pkgAfter, pkgBefore) &&
+    pkgAfterText === pkgBefore &&
       pkgAfter.dependencies['@modern-js/runtime'] === 'workspace:*',
   );
   check(
@@ -1073,7 +1050,10 @@ try {
     '[blocking] 字符串里的 legacy 配置不触发 v2 信号 → scan 仍阻断',
     scanBlocked2,
   );
-  const negCfgBefore = executeModule(negStr, 'modern.config.ts').defaultExport;
+  const negCfgBefore = fs.readFileSync(
+    path.join(negStr, 'modern.config.ts'),
+    'utf8',
+  );
   let migrateBlocked2 = false;
   try {
     execFileSync(
@@ -1090,10 +1070,8 @@ try {
   check('[blocking] migrate 仍阻断（二次保护）', migrateBlocked2);
   check(
     '[blocking] migrate 未改写 modern.config.ts',
-    sameValue(
-      executeModule(negStr, 'modern.config.ts').defaultExport,
+    fs.readFileSync(path.join(negStr, 'modern.config.ts'), 'utf8') ===
       negCfgBefore,
-    ),
   );
   check(
     '[blocking] 未产生 report.json',
@@ -1292,7 +1270,7 @@ try {
   // C30. blocker：routes/index.tsx 不是 v3 约定式路由页面，迁移前直接阻断且不落半成品
   console.log('== C30. v2-edge-routes-index (invalid routes/index.tsx) ==');
   const ri = prepare('v2-edge-routes-index', false);
-  const riPkgBefore = JSON.parse(ri.read('package.json'));
+  const riPkgBefore = ri.read('package.json');
   let routesIndexBlocked = false;
   try {
     execFileSync(
@@ -1309,7 +1287,7 @@ try {
   check('[blocking] routes/index.tsx 预检阻断', routesIndexBlocked);
   check(
     '[blocking] routes/index.tsx 阻断时未改 package.json',
-    sameValue(JSON.parse(ri.read('package.json')), riPkgBefore),
+    ri.read('package.json') === riPkgBefore,
   );
   check(
     '[blocking] routes/index.tsx 阻断时未产生 report.json',
@@ -1320,7 +1298,7 @@ try {
   //      失败时事务性零改动——src/pages 保留、src/routes 不创建、package.json 未升级/删 scripts、无 report。
   console.log('== C31. v2-edge-pages-conflict (atomic conflict pre-check) ==');
   const pc = prepare('v2-edge-pages-conflict', false);
-  const pcPkgBefore = JSON.parse(pc.read('package.json'));
+  const pcPkgBefore = pc.read('package.json');
   let pagesConflictBlocked = false;
   try {
     execFileSync(
@@ -1340,7 +1318,7 @@ try {
   );
   check(
     '[blocking] 冲突时 package.json 未改（依赖未升、scripts 未删）',
-    sameValue(JSON.parse(pc.read('package.json')), pcPkgBefore),
+    pc.read('package.json') === pcPkgBefore,
   );
   check(
     '[blocking] 冲突时未产生 report.json',

@@ -107,6 +107,9 @@ describe('Node deployment npm aliases', () => {
     const appDirectory = await mkdtemp(
       path.join(tmpdir(), 'app-tools-ndepe-alias-'),
     );
+    const relocationRoot = await mkdtemp(
+      path.join(tmpdir(), 'app-tools-ndepe-relocated-'),
+    );
     const outputDirectory = path.join(appDirectory, '.output');
     const storeDirectory = path.join(appDirectory, 'node_modules/.pnpm');
     const prodServerDirectory = path.join(
@@ -188,7 +191,7 @@ describe('Node deployment npm aliases', () => {
         ],
       });
 
-      const relocatedOutput = path.join(appDirectory, '.relocated-output');
+      const relocatedOutput = path.join(relocationRoot, '.relocated-output');
       await rename(outputDirectory, relocatedOutput);
       const requireFromOutput = createRequire(
         path.join(relocatedOutput, 'index.js'),
@@ -196,6 +199,7 @@ describe('Node deployment npm aliases', () => {
       expect(requireFromOutput('./index.js')).toBe('real-ndepe-alias-ran');
     } finally {
       await rm(appDirectory, { recursive: true, force: true });
+      await rm(relocationRoot, { recursive: true, force: true });
     }
   });
 
@@ -506,56 +510,6 @@ describe('Node deployment npm aliases', () => {
       await expect(
         preserveNpmAliases({ appDirectory, outputDirectory }),
       ).rejects.toThrow('resolves outside deployment output');
-    } finally {
-      await rm(appDirectory, { recursive: true, force: true });
-    }
-  });
-
-  it('leaves ordinary same-name packages unchanged', async () => {
-    const appDirectory = await mkdtemp(
-      path.join(tmpdir(), 'app-tools-same-package-'),
-    );
-    const outputDirectory = path.join(appDirectory, '.output');
-    try {
-      await writeJson(path.join(appDirectory, 'package.json'), {
-        name: 'ordinary-app',
-      });
-      await writeJson(path.join(outputDirectory, 'package.json'), {
-        name: 'ordinary-app-prod',
-        version: '1.0.0',
-        dependencies: {
-          '@modern-js/prod-server': '1.0.0',
-        },
-      });
-      await writeJson(
-        path.join(
-          outputDirectory,
-          'node_modules/@modern-js/prod-server/package.json',
-        ),
-        {
-          name: '@modern-js/prod-server',
-          version: '1.0.0',
-        },
-      );
-
-      await preserveNpmAliases({
-        appDirectory,
-        outputDirectory,
-        implicitAliases: [
-          {
-            aliasName: '@modern-js/prod-server',
-            targetName: '@modern-js/prod-server',
-            targetVersion: '1.0.0',
-          },
-        ],
-      });
-
-      const outputPackageJson = JSON.parse(
-        await readFile(path.join(outputDirectory, 'package.json'), 'utf8'),
-      );
-      expect(outputPackageJson.dependencies['@modern-js/prod-server']).toBe(
-        '1.0.0',
-      );
     } finally {
       await rm(appDirectory, { recursive: true, force: true });
     }

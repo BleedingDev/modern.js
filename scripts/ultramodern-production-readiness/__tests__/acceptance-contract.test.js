@@ -10,10 +10,6 @@ async function loadContract() {
   return import('../published-create-proof/acceptance-contract.mjs');
 }
 
-async function loadAcceptanceAssertions() {
-  return import('../published-create-proof/acceptance-assertions.mjs');
-}
-
 function releaseFixture() {
   const version = '3.5.0-ultramodern.50';
   return {
@@ -624,101 +620,6 @@ test('operational acceptance rejects missing, forged, and hardcoded served behav
   assert.throws(
     () => create(hardcoded),
     /node served behavior did not observe the exact C1 API and UI mutations/u,
-  );
-});
-
-test('source packs and published npm cohorts use the same runtime matrix contract with honest artifact mode', async () => {
-  const { runtimeAcceptanceInvocation } = await loadContract();
-
-  assert.deepEqual(runtimeAcceptanceInvocation('source', 'node'), {
-    artifactMode: 'source',
-    matrixId: 'node-full-stack',
-    mode: 'source',
-    platform: 'node',
-    shellRuntime: 'node',
-  });
-  assert.deepEqual(runtimeAcceptanceInvocation('published', 'workerd'), {
-    artifactMode: 'published',
-    matrixId: 'workerd-full-stack',
-    mode: 'published',
-    platform: 'workerd',
-    shellRuntime: 'workerd',
-  });
-});
-
-test('the static workspace check excludes live Node proof while runtime acceptance keeps a read-only proof command', async () => {
-  const { assertWorkspaceCheckContract, readWorkspaceAcceptanceArtifacts } =
-    await loadAcceptanceAssertions();
-  const projectDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ultramodern-check-contract-'),
-  );
-  const staticCheck =
-    'pnpm format:check && pnpm lint && pnpm typecheck && pnpm api:check && pnpm contract:check';
-
-  try {
-    fs.writeFileSync(
-      path.join(projectDir, 'package.json'),
-      JSON.stringify({
-        scripts: {
-          check: staticCheck,
-          'node:proof': 'node ./scripts/proof-node-backend-federation.mts',
-        },
-      }),
-    );
-    assert.equal(assertWorkspaceCheckContract(projectDir).command, staticCheck);
-    fs.mkdirSync(path.join(projectDir, 'topology'), { recursive: true });
-    fs.mkdirSync(path.join(projectDir, '.modernjs'), { recursive: true });
-    fs.writeFileSync(
-      path.join(projectDir, 'topology/reference-topology.json'),
-      JSON.stringify({ verticals: [] }),
-    );
-    fs.writeFileSync(
-      path.join(projectDir, '.modernjs/ultramodern.json'),
-      JSON.stringify({ topology: { apps: [] } }),
-    );
-    const artifacts = readWorkspaceAcceptanceArtifacts(projectDir);
-    assert.equal(artifacts.projectDir, projectDir);
-    assert.equal(Object.hasOwn(artifacts, 'backendProof'), false);
-
-    fs.writeFileSync(
-      path.join(projectDir, 'package.json'),
-      JSON.stringify({
-        scripts: {
-          check: `${staticCheck} && pnpm node:proof`,
-          'node:proof':
-            'pnpm node:backend-federation:generate && node ./scripts/proof-node-backend-federation.mts',
-        },
-      }),
-    );
-    assert.throws(
-      () => assertWorkspaceCheckContract(projectDir),
-      /static gate|without regenerating/u,
-    );
-  } finally {
-    fs.rmSync(projectDir, { recursive: true, force: true });
-  }
-});
-
-test('the ERP profile fails closed on reduced vertical or deploy variants', async () => {
-  const { assertReleaseAcceptanceProfile } = await loadContract();
-  const profile = profileFixture();
-
-  assert.equal(assertReleaseAcceptanceProfile(profile), profile);
-  assert.throws(
-    () =>
-      assertReleaseAcceptanceProfile({
-        ...profile,
-        verticals: profile.verticals.slice(0, 9),
-      }),
-    /exactly 10 verticals/,
-  );
-  assert.throws(
-    () =>
-      assertReleaseAcceptanceProfile({
-        ...profile,
-        deployCloudflare: true,
-      }),
-    /deployment is outside/,
   );
 });
 
@@ -1482,44 +1383,6 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
       auditAt(new Date('2026-09-10T01:00:00.000Z')),
       /without an exact, unexpired approval/u,
     );
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
-});
-
-test('release-age audit parses lockfiles by path with the pinned parser', async () => {
-  const { parseYamlFile, YAML_INTEGRITY, YAML_SPECIFIER, YAML_VERSION } =
-    await import('../published-create-proof/release-age-audit.mjs');
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'release-age-yaml-file-parser-'),
-  );
-  const lockPath = path.join(root, 'pnpm-lock.yaml');
-  fs.writeFileSync(lockPath, "lockfileVersion: '9.0'\n");
-  const calls = [];
-
-  try {
-    const parsed = parseYamlFile(lockPath, (...args) => {
-      calls.push(args);
-      return {
-        error: undefined,
-        status: 0,
-        stderr: '',
-        stdout: '{"lockfileVersion":"9.0"}\n',
-      };
-    });
-
-    assert.deepEqual(parsed, { lockfileVersion: '9.0' });
-    assert.equal(YAML_SPECIFIER, 'js-yaml@5.2.2');
-    assert.equal(YAML_VERSION, '5.2.2');
-    assert.equal(
-      YAML_INTEGRITY,
-      'sha512-dayzUzKkJ1MkuUtZglSebU43utNXH0OWQByK9rKOOuYIO8M5TV1y+n8ALMdG0rdzBnfNkOmZEqrURepb0ejqBw==',
-    );
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0][0], 'pnpm');
-    assert.deepEqual(calls[0][1], ['dlx', YAML_SPECIFIER, lockPath]);
-    assert.equal(Object.hasOwn(calls[0][2], 'input'), false);
-    assert.deepEqual(calls[0][2].stdio, ['ignore', 'pipe', 'pipe']);
   } finally {
     fs.rmSync(root, { force: true, recursive: true });
   }

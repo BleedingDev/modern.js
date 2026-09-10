@@ -61,9 +61,9 @@ const userPayload: UserPayload = {
 };
 
 describe('effect-client view helpers', () => {
-  test('mask recursively selects nested objects and arrays', () => {
-    const selected = mask(
-      userPayload,
+  test('mask recursively selects nested objects and arrays from a promised result', async () => {
+    const selected = await runEffectView(
+      Promise.resolve(userPayload),
       view<UserPayload>()({
         id: true,
         profile: {
@@ -133,23 +133,6 @@ describe('effect-client view helpers', () => {
 
     expect(selected).toEqual({
       id: '42',
-    });
-  });
-
-  test('runEffectView masks a promised result', async () => {
-    const selected = await runEffectView(
-      Promise.resolve(userPayload),
-      view<UserPayload>()({
-        profile: {
-          email: true,
-        },
-      }),
-    );
-
-    expect(selected).toEqual({
-      profile: {
-        email: 'ada@example.com',
-      },
     });
   });
 });

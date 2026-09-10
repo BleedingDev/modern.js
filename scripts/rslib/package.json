@@ -6,7 +6,8 @@
   "types": "./dist/types/index.d.ts",
   "scripts": {
     "dev": "rslib build --watch",
-    "build": "rslib build"
+    "build": "rslib build",
+    "test": "rstest run -c rstest.config.mts"
   },
   "exports": {
     ".": {

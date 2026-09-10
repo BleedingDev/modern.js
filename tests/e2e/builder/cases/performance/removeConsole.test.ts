@@ -12,6 +12,11 @@ const expectConsoleType = async (
   const messages: string[] = [];
   page.on('console', message => messages.push(message.text()));
   await page.goto(getHrefByEntryName('main', builder.port));
+  await page.waitForFunction(() =>
+    performance
+      .getEntriesByType('resource')
+      .some(entry => /\.js(?:$|\?)/u.test(entry.name)),
+  );
 
   Object.entries(consoleType).forEach(([key, value]) => {
     expect(messages.includes(`test-console-${key}`)).toEqual(value);

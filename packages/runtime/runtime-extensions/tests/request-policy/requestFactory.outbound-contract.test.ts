@@ -43,7 +43,6 @@ type OutboundScenario = {
   operationContext?: OperationContext;
   expectedUrl: string;
   expectedBody?: string;
-  expectedHeaderKeys: string[];
   expectedStaticHeaders: HeaderMap;
   assertDynamicHeaders?: (headers: HeaderMap) => void;
 };
@@ -80,9 +79,6 @@ const assertRequestInit = (scenario: OutboundScenario, init: RequestInit) => {
 
   expect(init.method).toBe(scenario.method);
   expect(init.body).toBe(scenario.expectedBody);
-  expect(Object.keys(headers).sort()).toEqual(
-    [...scenario.expectedHeaderKeys].sort(),
-  );
   for (const [key, value] of Object.entries(scenario.expectedStaticHeaders)) {
     expect(headers[key]).toBe(value);
   }
@@ -105,7 +101,6 @@ const outboundScenarios: OutboundScenario[] = [
       },
     },
     expectedUrl: REQUEST_PATH,
-    expectedHeaderKeys: ['Content-Type', 'accept'],
     expectedStaticHeaders: {
       'Content-Type': 'text/plain',
       accept: ACCEPT_HEADER,
@@ -126,7 +121,6 @@ const outboundScenarios: OutboundScenario[] = [
     },
     expectedUrl: REQUEST_PATH,
     expectedBody: 'keep-me',
-    expectedHeaderKeys: ['Content-Type', 'accept'],
     expectedStaticHeaders: {
       'Content-Type': 'text/plain',
       accept: ACCEPT_HEADER,
@@ -146,7 +140,6 @@ const outboundScenarios: OutboundScenario[] = [
       },
     },
     expectedUrl: SERVER_URL,
-    expectedHeaderKeys: ['Content-Type', 'accept', 'traceparent'],
     expectedStaticHeaders: {
       'Content-Type': 'text/plain',
       accept: ACCEPT_HEADER,
@@ -168,7 +161,6 @@ const outboundScenarios: OutboundScenario[] = [
     },
     expectedUrl: SERVER_URL,
     expectedBody: 'keep-me',
-    expectedHeaderKeys: ['Content-Type', 'accept', 'traceparent'],
     expectedStaticHeaders: {
       'Content-Type': 'text/plain',
       accept: ACCEPT_HEADER,
@@ -196,7 +188,6 @@ const outboundScenarios: OutboundScenario[] = [
     },
     expectedUrl: SERVER_URL,
     expectedBody: 'keep-me',
-    expectedHeaderKeys: ['Content-Type', 'accept', 'x-tenant-id'],
     expectedStaticHeaders: {
       'Content-Type': 'text/plain',
       accept: ACCEPT_HEADER,
@@ -235,14 +226,6 @@ const outboundScenarios: OutboundScenario[] = [
     },
     expectedUrl: PRODUCER_URL,
     expectedBody: 'keep-me',
-    expectedHeaderKeys: [
-      'Content-Type',
-      'accept',
-      'traceparent',
-      BFF_ENVELOPE_HEADER,
-      BFF_OPERATION_CONTEXT_HEADER,
-      BFF_OPERATION_CONTEXT_DETAIL_HEADER,
-    ],
     expectedStaticHeaders: {
       'Content-Type': 'text/plain',
       accept: ACCEPT_HEADER,
@@ -370,9 +353,10 @@ describe('requestFactory outbound request contract', () => {
     expect(headers['x-private-incoming']).toBeUndefined();
   });
 
-  test('uploader forwards only allowlisted and server-derived identity headers', async () => {
+  test('uploader forwards policy, allowlisted, and server-derived headers', async () => {
     const requestId = 'producer-uploader-identity';
     const { request, requestFactory } = createHarness('server', {
+      origin: CONSUMER_ORIGIN,
       'x-tenant-id': 'tenant-server',
       'x-subject-id': 'subject-server',
       'x-forwarded-feature': 'feature-server',
@@ -383,14 +367,27 @@ describe('requestFactory outbound request contract', () => {
       request: request as unknown as typeof fetch,
       requestId,
       allowedHeaders: ['x-forwarded-feature'],
-      operationContract: { enabled: false },
-      requireEnvelope: false,
+      operationContract: {
+        enabled: true,
+        requireSchemaHash: true,
+        requireOperationVersion: true,
+      },
+      requireEnvelope: true,
+      allowCrossOriginEnvelope: true,
       setDomain: () => 'https://producer.example',
     });
 
     const upload = requestFactory.createUploader({
       path: REQUEST_PATH,
       requestId,
+      operationContext: {
+        operationId: 'upload-widget',
+        routePath: REQUEST_PATH,
+        method: 'POST',
+        schemaHash: 'sha256:upload-widget',
+        operationVersion: 1,
+        traceparent: OPERATION_TRACEPARENT,
+      },
     });
 
     await upload({
@@ -400,6 +397,17 @@ describe('requestFactory outbound request contract', () => {
     });
 
     expect(request).toHaveBeenCalledTimes(1);
+    const [, init] = request.mock.calls[0];
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+    const form = init.body as FormData;
+    const uploaded = form.get('file');
+    expect(uploaded).toBeInstanceOf(File);
+    expect(uploaded).toMatchObject({
+      name: 'widget.txt',
+      type: 'text/plain',
+    });
+    expect(await (uploaded as File).text()).toBe('widget');
     const headers = request.mock.calls[0][1]?.headers as HeaderMap;
     expect(headers).toMatchObject({
       'x-tenant-id': 'tenant-server',
@@ -407,11 +415,35 @@ describe('requestFactory outbound request contract', () => {
       'x-forwarded-feature': 'feature-server',
     });
     expect(headers['x-private-incoming']).toBeUndefined();
+    const envelope = JSON.parse(headers[BFF_ENVELOPE_HEADER]);
+    expect(envelope).toMatchObject({
+      requestId,
+      target: 'server',
+      sourceOrigin: CONSUMER_ORIGIN,
+      targetOrigin: 'https://producer.example',
+    });
+    expect(headers[BFF_OPERATION_CONTEXT_HEADER]).toBe(
+      `${requestId}:upload-widget`,
+    );
+    const operationContext = JSON.parse(
+      headers[BFF_OPERATION_CONTEXT_DETAIL_HEADER],
+    );
+    expect(operationContext).toMatchObject({
+      requestId,
+      operationId: `${requestId}:upload-widget`,
+      routePath: REQUEST_PATH,
+      method: 'POST',
+      schemaHash: 'sha256:upload-widget',
+      operationVersion: 1,
+      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      spanId: 'bbbbbbbbbbbbbbbb',
+    });
   });
 
   test('forwards allowlisted and resolved headers without casing assumptions', async () => {
     const resolveHeaders = rs.fn(() => ({
       AUTHORIZATION: 'Bearer resolved',
+      'x-injected': 'must-not-forward',
     }));
     const { request, requestFactory } = createHarness('server', {
       Authorization: 'Bearer incoming',
@@ -441,6 +473,7 @@ describe('requestFactory outbound request contract', () => {
     expect(headers).toMatchObject({
       authorization: 'Bearer resolved',
     });
+    expect(headers['x-injected']).toBeUndefined();
     expect(
       Object.keys(headers).filter(key => key.toLowerCase() === 'authorization'),
     ).toEqual(['authorization']);

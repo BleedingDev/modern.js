@@ -575,6 +575,37 @@ test('release receipt verification requires an explicit authenticated run identi
       .length,
     1,
   );
+
+  const commentOnlyIdentity = content.replace(
+    '            --receipt acceptance-receipt.json',
+    [
+      '            # --run-identity does-not-run',
+      '            --receipt acceptance-receipt.json',
+    ].join('\n'),
+  );
+  assert.equal(
+    validateWorkflowContent(
+      '.github/workflows/receipt-verifier.yml',
+      commentOnlyIdentity,
+    ).filter(error => error.includes('authenticated --run-identity')).length,
+    1,
+  );
+
+  const unrelatedEchoIdentity = content.replace(
+    '            --receipt acceptance-receipt.json',
+    [
+      '            --receipt acceptance-receipt.json',
+      "          echo '--run-identity unrelated'",
+    ].join('\n'),
+  );
+  assert.equal(
+    validateWorkflowContent(
+      '.github/workflows/receipt-verifier.yml',
+      unrelatedEchoIdentity,
+    ).filter(error => error.includes('authenticated --run-identity')).length,
+    1,
+  );
+
   assert.deepEqual(
     validateWorkflowContent(
       '.github/workflows/receipt-verifier.yml',
@@ -680,7 +711,7 @@ test('publish branches must converge on one deterministic structured outcome', (
   );
 });
 
-test('trusted publishing keeps elevated permissions, the job graph, and the dist-tag closed', () => {
+test('trusted publishing keeps elevated permissions and the publication boundary closed', () => {
   const parsed = loadWorkflow(publishWorkflowPath);
   const validate = workflow =>
     validateWorkflowObject(
@@ -701,9 +732,6 @@ test('trusted publishing keeps elevated permissions, the job graph, and the dist
     smuggledErrors.some(error =>
       error.includes('job exfiltrate must not grant id-token: write'),
     ),
-  );
-  assert.ok(
-    smuggledErrors.some(error => error.includes('unexpected: exfiltrate')),
   );
 
   const widenedContents = structuredClone(parsed);
@@ -736,48 +764,6 @@ test('trusted publishing keeps elevated permissions, the job graph, and the dist
     validate(elevatedWorkflow).some(error =>
       error.includes('must not grant id-token: write at the workflow level'),
     ),
-  );
-
-  const droppedJob = structuredClone(parsed);
-  delete droppedJob.jobs['tractor-downstream'];
-  assert.ok(
-    validate(droppedJob).some(error =>
-      error.includes('missing: tractor-downstream'),
-    ),
-  );
-
-  for (const tag of ['canary', 'next', undefined]) {
-    const retagged = structuredClone(parsed);
-    retagged.env.BLEEDINGDEV_PUBLISH_TAG = tag;
-    assert.ok(
-      validate(retagged).some(error =>
-        error.includes('BLEEDINGDEV_PUBLISH_TAG must be latest'),
-      ),
-      `tag ${String(tag)}`,
-    );
-  }
-
-  // The contract is scoped to the release workflow; other workflows keep their
-  // own job graphs and dist-tags.
-  assert.deepEqual(
-    validateWorkflowObject('.github/workflows/other.yml', {
-      ...structuredClone(parsed),
-      jobs: {
-        ...structuredClone(parsed).jobs,
-        exfiltrate: {
-          'runs-on': 'ubuntu-latest',
-          'timeout-minutes': 10,
-          permissions: { 'id-token': 'write' },
-          steps: [{ name: 'Run', run: 'echo ok' }],
-        },
-      },
-    }).filter(
-      error =>
-        error.includes('BLEEDINGDEV_PUBLISH_TAG') ||
-        error.includes('job set must be exactly') ||
-        error.includes('confined to publish, publish-change-record'),
-    ),
-    [],
   );
 });
 

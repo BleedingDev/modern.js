@@ -53,6 +53,28 @@ describe('router-ssr-i18n-localised-urls navigation and API exclusions', () => {
     }
   });
 
+  test('redirects an unprefixed canonical English path to /en/about', async () => {
+    await expectLocalizedRedirect(
+      appPort,
+      '/about',
+      { 'Accept-Language': 'en-US,en;q=0.9' },
+      '/en/about',
+    );
+  });
+
+  test('redirects an unprefixed canonical path to the detected Czech URL', async () => {
+    await expectLocalizedRedirect(
+      appPort,
+      '/about',
+      { 'Accept-Language': 'cs-CZ,cs;q=0.9' },
+      '/cs/o-nas',
+    );
+  });
+
+  test('canonicalizes a prefixed canonical path to its localized Czech path', async () => {
+    await expectLocalizedRedirect(appPort, '/cs/about', {}, '/cs/o-nas');
+  });
+
   test('switches a hydrated product page to the localized Czech URL', async () => {
     await gotoWithSSRRetry(
       page,
@@ -106,5 +128,25 @@ async function expectText(page: Page, selector: string, expected: string) {
     { timeout: 30000 },
     selector,
     expected,
+  );
+}
+
+async function expectLocalizedRedirect(
+  appPort: number,
+  pathname: string,
+  headers: HeadersInit,
+  expectedPathname: string,
+) {
+  const response = await fetch(`${host}:${appPort}${pathname}`, {
+    redirect: 'manual',
+    headers,
+  });
+
+  expect(response.status).toBeGreaterThanOrEqual(300);
+  expect(response.status).toBeLessThan(400);
+  const location = response.headers.get('location');
+  expect(location).toBeTruthy();
+  expect(new URL(location!, `${host}:${appPort}`).pathname).toBe(
+    expectedPathname,
   );
 }

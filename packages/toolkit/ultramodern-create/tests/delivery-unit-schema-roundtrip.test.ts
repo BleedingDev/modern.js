@@ -38,10 +38,7 @@ import type {
   DeliveryUnitDescriptor,
   V1ProjectionContext,
 } from '../src/ultramodern-workspace/delivery-unit-schema/types';
-import {
-  parseSurfaceRef,
-  projectDeliveryUnitToV1,
-} from '../src/ultramodern-workspace/delivery-unit-schema/types';
+import { projectDeliveryUnitToV1 } from '../src/ultramodern-workspace/delivery-unit-schema/types';
 import type { V1UpProjectionContext } from '../src/ultramodern-workspace/delivery-unit-schema/up-projection';
 import {
   assertV1Representable,
@@ -181,73 +178,12 @@ function roundTrip(app: WorkspaceApp) {
 /* v1 -> canonical -> v1                                                       */
 /* -------------------------------------------------------------------------- */
 
-test('v1 -> canonical -> v1 round-trips the shell field-for-field', () => {
-  const { record, descriptor, projected } = roundTrip(shellHost);
-
-  assert.equal(descriptor.kind, 'shell');
-  assert.deepEqual(descriptor.surfaces, []);
-  assert.deepEqual(projected.app, v1ProjectedView(shellHost));
-  assert.deepEqual(projected.deliveryUnitRecord, record);
-  assert.equal(projected.app.api, undefined);
-});
-
-test('v1 -> canonical -> v1 round-trips a full-stack vertical field-for-field', () => {
-  const { record, projected } = roundTrip(fullStackVertical);
-
-  assert.deepEqual(projected.app, v1ProjectedView(fullStackVertical));
-  assert.deepEqual(projected.deliveryUnitRecord, record);
-
-  // The projected fields, spelled out against the ORIGINAL app.
-  assert.equal(projected.app.id, fullStackVertical.id);
-  assert.equal(projected.app.kind, 'vertical');
-  assert.equal(projected.app.directory, fullStackVertical.directory);
-  assert.equal(projected.app.port, fullStackVertical.port);
-  assert.equal(projected.app.mfName, fullStackVertical.mfName);
-  assert.deepEqual(projected.app.ownership, fullStackVertical.ownership);
-  assert.equal(projected.app.api?.stem, fullStackVertical.api?.stem);
-  assert.equal(projected.app.api?.prefix, fullStackVertical.api?.prefix);
-
-  // The enumerated loss set (SPEC section 5), asserted rather than implied.
-  assert.equal(projected.app.exposes, undefined);
-  assert.equal(projected.app.domain, undefined);
-  assert.deepEqual(projected.app.api?.consumedBy, []);
-});
-
-test('v1 -> canonical -> v1 round-trips an api-bearing vertical with consumedBy', () => {
-  assert.ok((apiOnlyVertical.api?.consumedBy.length ?? 0) > 0);
-
-  const { record, descriptor, projected } = roundTrip(apiOnlyVertical);
-
-  assert.deepEqual(descriptor.surfaces, [
-    {
-      kind: 'api',
-      surfaceId: 'pricing',
-      protocol: 'rest',
-      locations: [{ platform: 'http', address: '/pricing-api' }],
-    },
-  ]);
-  assert.deepEqual(projected.app, v1ProjectedView(apiOnlyVertical));
-  assert.deepEqual(projected.deliveryUnitRecord, record);
-  // consumedBy is an emergent v1 graph fact: dropped up, re-zeroed down.
-  assert.deepEqual(projected.app.api?.consumedBy, []);
-});
-
-test('v1 -> canonical -> v1 round-trips a vertical without api', () => {
-  const { record, descriptor, projected } = roundTrip(noApiVertical);
-
-  assert.equal(
-    descriptor.surfaces.some(surface => surface.kind === 'api'),
-    false,
-  );
-  assert.equal(projected.app.api, undefined);
-  assert.deepEqual(projected.app, v1ProjectedView(noApiVertical));
-  assert.deepEqual(projected.deliveryUnitRecord, record);
-});
-
-test('round-trip keeps buildMarker/sourceRevision/unitId untouched (marker preservation)', () => {
+test('v1 -> canonical -> v1 preserves fixture projections and identity', () => {
   for (const [name, app] of fixtures) {
     const { record, descriptor, projected } = roundTrip(app);
 
+    assert.deepEqual(projected.app, v1ProjectedView(app), name);
+    assert.deepEqual(projected.deliveryUnitRecord, record, name);
     assert.equal(descriptor.buildMarker, record.buildMarker, name);
     assert.equal(descriptor.sourceRevision, record.sourceRevision, name);
     assert.equal(descriptor.unitId, record.unitId, name);
@@ -259,6 +195,31 @@ test('round-trip keeps buildMarker/sourceRevision/unitId untouched (marker prese
     );
     assert.equal(projected.deliveryUnitRecord.unitId, record.unitId, name);
     assert.equal(projected.deliveryUnitRecord.appId, record.appId, name);
+
+    if (name === 'shell') {
+      assert.equal(descriptor.kind, 'shell');
+      assert.deepEqual(descriptor.surfaces, []);
+      assert.equal(projected.app.api, undefined);
+    }
+    if (name === 'api-bearing vertical') {
+      assert.ok((app.api?.consumedBy.length ?? 0) > 0);
+      assert.deepEqual(descriptor.surfaces, [
+        {
+          kind: 'api',
+          surfaceId: 'pricing',
+          protocol: 'rest',
+          locations: [{ platform: 'http', address: '/pricing-api' }],
+        },
+      ]);
+      assert.deepEqual(projected.app.api?.consumedBy, []);
+    }
+    if (name === 'vertical without api') {
+      assert.equal(
+        descriptor.surfaces.some(surface => surface.kind === 'api'),
+        false,
+      );
+      assert.equal(projected.app.api, undefined);
+    }
   }
 });
 
@@ -305,16 +266,6 @@ test('up-projection maps v1 vocabulary onto canonical surfaces', () => {
       locations: [{ platform: 'http', address: '/checkout-api' }],
     },
   ]);
-});
-
-test('up-projected surface ids are SurfaceRef-valid', () => {
-  for (const [name, app] of fixtures) {
-    const { descriptor } = roundTrip(app);
-    for (const surface of descriptor.surfaces) {
-      const ref = `${descriptor.unitId}#${surface.surfaceId}`;
-      assert.equal(parseSurfaceRef(ref).ok, true, `${name}: ${ref}`);
-    }
-  }
 });
 
 test('up-projection api protocol defaults to rest and honours context override', () => {
@@ -491,19 +442,22 @@ const externallyPublished: DeliveryUnitDescriptor = {
   surfaces: [],
 };
 
-test('horizontal-remote is unrepresentable in v1 (typed, not silent)', () => {
-  assert.deepEqual(checkV1Representable(horizontalRemote), {
+test.each([
+  ['horizontal-remote kind', horizontalRemote, 'horizontal-remote-kind'],
+  ['external publication zone', externallyPublished, 'external-zone'],
+] as const)('$0 is unrepresentable in v1 (typed, not silent)', (_name, descriptor, reason) => {
+  assert.deepEqual(checkV1Representable(descriptor), {
     representable: false,
     code: 'unrepresentable-in-v1',
-    reason: 'horizontal-remote-kind',
+    reason,
   });
 
   assert.throws(
-    () => assertV1Representable(horizontalRemote),
+    () => assertV1Representable(descriptor),
     (error: unknown) =>
       error instanceof V1UnrepresentableError &&
       error.code === 'unrepresentable-in-v1' &&
-      error.reason === 'horizontal-remote-kind',
+      error.reason === reason,
   );
 });
 
@@ -620,22 +574,6 @@ test('extended-v1 preserves horizontal kind and RPC protocol', () => {
   );
 });
 
-test('external publication zone is unrepresentable in v1 (typed, not silent)', () => {
-  assert.deepEqual(checkV1Representable(externallyPublished), {
-    representable: false,
-    code: 'unrepresentable-in-v1',
-    reason: 'external-zone',
-  });
-
-  assert.throws(
-    () => assertV1Representable(externallyPublished),
-    (error: unknown) =>
-      error instanceof V1UnrepresentableError &&
-      error.code === 'unrepresentable-in-v1' &&
-      error.reason === 'external-zone',
-  );
-});
-
 test('the guard exhaustively detects every construct the v1 shape cannot carry', () => {
   const base = (
     overrides: Partial<DeliveryUnitDescriptor>,
@@ -735,32 +673,5 @@ test('the guard exhaustively detects every construct the v1 shape cannot carry',
         error.reason === reason,
       reason,
     );
-  }
-});
-
-test('up-projected descriptors are representable exactly when the app has no exposes', () => {
-  for (const [name, app] of fixtures) {
-    const { descriptor, check } = roundTrip(app);
-    assert.notEqual(descriptor.kind, 'horizontal-remote', name);
-    assert.deepEqual(descriptor.publicationZone, { zone: 'coordinated' }, name);
-
-    const hasExposes = Object.keys(app.exposes ?? {}).length > 0;
-    if (hasExposes) {
-      // v1 cannot carry component/route surfaces back (its down-projection
-      // reconstructs no exposes): the documented loss is detected, not silent.
-      assert.deepEqual(
-        check,
-        {
-          representable: false,
-          code: 'unrepresentable-in-v1',
-          reason: 'component-or-route-surface',
-        },
-        name,
-      );
-      assert.throws(() => assertV1Representable(descriptor), name);
-    } else {
-      assert.deepEqual(check, { representable: true }, name);
-      assert.doesNotThrow(() => assertV1Representable(descriptor), name);
-    }
   }
 });

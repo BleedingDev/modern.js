@@ -44,12 +44,14 @@ describe('G22 consumeSurface — mandatory degraded consumption', () => {
       },
     }));
 
-    let seen: SurfaceConsumptionFailure | undefined;
-    const value = await consumeSurface<string>({
-      ref: 'acme/checkout#cart',
-      env: 'prod',
+    const consume = createSurfaceConsumer({
       provider,
+      env: 'prod',
       appName: 'crm-shell',
+    });
+    let seen: SurfaceConsumptionFailure | undefined;
+    const value = await consume<string>({
+      ref: 'acme/checkout#cart',
       classification: 'noncritical',
       load: () => 'live',
       degraded: failure => {
@@ -158,22 +160,6 @@ describe('G22 consumeSurface — mandatory degraded consumption', () => {
     expect(b).toBe('B-live');
   });
 
-  test('createSurfaceConsumer binds provider/env/app and still requires degraded', async () => {
-    const consume = createSurfaceConsumer({
-      provider: providerOf(() => ({ ok: true, unit: okRecord() })),
-      env: 'prod',
-      appName: 'shell',
-    });
-
-    const value = await consume<string>({
-      ref: 'acme/checkout#cart',
-      load: ({ resolved }) => `live:${resolved.buildMarker}`,
-      degraded: () => 'fallback',
-    });
-
-    expect(value).toBe('live:bm-1');
-  });
-
   test('a malformed string ref degrades without calling the provider', async () => {
     let resolved = false;
     const provider = providerOf(() => {
@@ -202,7 +188,12 @@ describe('G22 consumeSurface — mandatory degraded consumption', () => {
     expect(seen?.discoveryError?.code).toBe('unknown-surface');
   });
 
-  test('unclassified consumption defaults to critical and rejects after the degraded handler ran', async () => {
+  test.each([
+    { classification: undefined, name: 'default' },
+    { classification: 'critical' as const, name: 'explicit' },
+  ])('$name critical consumption rejects after the degraded handler ran', async ({
+    classification,
+  }) => {
     const provider = providerOf(() => ({
       ok: false,
       error: {
@@ -218,7 +209,7 @@ describe('G22 consumeSurface — mandatory degraded consumption', () => {
       env: 'prod',
       provider,
       appName: 'shell',
-      // no classification → defaults to 'critical'
+      classification,
       load: () => 'live',
       degraded: () => {
         degradedRan = true;
@@ -235,29 +226,6 @@ describe('G22 consumeSurface — mandatory degraded consumption', () => {
     expect((rejection as { code?: string } | undefined)?.code).toBe(
       'unknown-unit',
     );
-  });
-
-  test('explicit critical classification rejects with the typed error', async () => {
-    const provider = providerOf(() => ({
-      ok: false,
-      error: {
-        code: 'provider-unavailable',
-        ref: 'acme/checkout#cart',
-        message: 'offline',
-      },
-    }));
-
-    await expect(
-      consumeSurface<string>({
-        ref: 'acme/checkout#cart',
-        env: 'prod',
-        provider,
-        appName: 'shell',
-        classification: 'critical',
-        load: () => 'live',
-        degraded: () => 'fallback-ui',
-      }),
-    ).rejects.toMatchObject({ code: 'provider-unavailable' });
   });
 
   test('noncritical: a throwing degraded handler is contained and resolves undefined', async () => {

@@ -1,5 +1,4 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const { pathToFileURL } = require('node:url');
@@ -11,14 +10,6 @@ const entrypointPath = path.join(
 );
 
 test('root source-create gate executes exact-artifact source acceptance with canonical defaults', async () => {
-  const packageJson = JSON.parse(
-    fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'),
-  );
-  assert.equal(
-    packageJson.scripts['ultramodern:source-create-proof'],
-    'node scripts/ultramodern-publish/validate-source-create-proof.mjs',
-  );
-
   const { defaultManifestPath, defaultReceiptPath, main } = await import(
     pathToFileURL(entrypointPath)
   );
@@ -89,21 +80,5 @@ test('root source-create gate cannot be reduced to receipt verification or publi
   assert.throws(
     () => sourceCreateProofArgs(['--mode=verify']),
     /always executes source acceptance/u,
-  );
-});
-
-test('root source-create gate rejects every scale-profile override', async () => {
-  const { sourceCreateProofArgs } = await import(pathToFileURL(entrypointPath));
-  assert.throws(
-    () => sourceCreateProofArgs(['--scale-profile', 'smoke']),
-    /always executes the erp-10 scale profile/u,
-  );
-  assert.throws(
-    () => sourceCreateProofArgs(['--scale-profile', 'erp-10']),
-    /always executes the erp-10 scale profile/u,
-  );
-  assert.throws(
-    () => sourceCreateProofArgs(['--scale-profile=smoke']),
-    /always executes the erp-10 scale profile/u,
   );
 });

@@ -5,9 +5,8 @@ export default withTestPreset({
   testEnvironment: 'node',
   globals: true,
   include: [
-    'integration/routes-tanstack-mf/tests/tanstack-mf-contract.test.ts',
-    'integration/routes-tanstack-create-routes/tests/create-routes-contract.test.ts',
-    'integration/superapp-portfolio/tests/index.test.ts',
+    'integration/bff-cross-project/tests/effect-only-data-platform.test.ts',
+    'integration/routes-tanstack-mf/tests/cloudflare-worker-contract.test.ts',
   ],
   testTimeout: 1000 * 60 * 5,
   hookTimeout: 1000 * 60 * 5,

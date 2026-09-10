@@ -14,17 +14,13 @@ describe('serializeJson', () => {
     getRandomValues.mockRestore();
   });
 
-  it('serializes JSON while escaping script-unsafe characters', async () => {
+  it('serializes JSON safely and preserves the undefined literal contract', async () => {
     const { serializeJson } = await import('../../src/node/serialize');
+    const payload = { value: '</script>\u2028\u2029' };
+    const serialized = serializeJson(payload);
 
-    expect(serializeJson({ value: '</script>\u2028\u2029' })).toBe(
-      '{"value":"\\u003C\\u002Fscript\\u003E\\u2028\\u2029"}',
-    );
-  });
-
-  it('preserves the undefined literal contract', async () => {
-    const { serializeJson } = await import('../../src/node/serialize');
-
+    expect(serialized).not.toContain('</script>');
+    expect(JSON.parse(serialized)).toEqual(payload);
     expect(serializeJson(undefined)).toBe('undefined');
   });
 });

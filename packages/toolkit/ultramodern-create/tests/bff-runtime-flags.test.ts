@@ -56,92 +56,39 @@ test('--bff keeps the default strict Effect approach workspace scaffold', () => 
   });
 });
 
-test('--bff-runtime effect selects the default Effect runtime explicitly', () => {
-  withTempDir(tmpDir => {
-    const createResult = runCli(tmpDir, [
-      'bff-effect-smoke',
-      '--bff-runtime',
-      'effect',
-    ]);
-    assert.equal(createResult.status, 0, createResult.stderr);
+const invalidRuntimeFlagCases = [
+  {
+    name: 'rejects an unsupported runtime',
+    project: 'bff-invalid-smoke',
+    args: ['--bff-runtime', 'unknown-runtime'],
+    error: /Unsupported BFF runtime "unknown-runtime"/u,
+  },
+  {
+    name: 'requires a runtime value',
+    project: 'bff-missing-smoke',
+    args: ['--bff-runtime'],
+    error: /--bff-runtime requires a value \(supported: effect\)/u,
+  },
+  {
+    name: 'rejects a value for the boolean BFF flag',
+    project: 'bff-value-smoke',
+    args: ['--bff=hono'],
+    error: /--bff does not accept a value/u,
+  },
+] as const;
 
-    const workspaceDir = path.join(tmpDir, 'bff-effect-smoke');
-    const verticalResult = runCli(workspaceDir, [
-      'catalog',
-      '--vertical',
-      '--bff-runtime',
-      'effect',
-    ]);
-    assert.equal(verticalResult.status, 0, verticalResult.stderr);
-    assert.equal(
-      fs.existsSync(path.join(workspaceDir, 'verticals/catalog/shared/api.ts')),
-      true,
-    );
-  });
-});
-
-test('--bff-runtime rejects unsupported runtimes before writing anything', () => {
+test.each(invalidRuntimeFlagCases)('$name before writing anything', entry => {
   withTempDir(tmpDir => {
-    for (const runtime of ['hono', 'unknown-runtime']) {
-      const result = runCli(tmpDir, [
-        'bff-invalid-smoke',
-        '--bff-runtime',
-        runtime,
-      ]);
-      assert.notEqual(result.status, 0);
-      assert.match(
-        result.stderr,
-        new RegExp(`Unsupported BFF runtime "${runtime}"`, 'u'),
-      );
-      assert.match(result.stderr, /supported: effect/);
-      assert.equal(
-        fs.existsSync(path.join(tmpDir, 'bff-invalid-smoke')),
-        false,
-        'an unsupported runtime must not leave a project directory behind',
-      );
+    const result = runCli(tmpDir, [entry.project, ...entry.args]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, entry.error);
+    if (entry.name === 'rejects an unsupported runtime') {
+      assert.match(result.stderr, /supported: effect/u);
     }
-  });
-});
-
-test('--bff-runtime= form is parsed and validated', () => {
-  withTempDir(tmpDir => {
-    const result = runCli(tmpDir, [
-      'bff-equals-smoke',
-      '--bff-runtime=unknown-runtime',
-    ]);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /Unsupported BFF runtime "unknown-runtime"/);
-    assert.equal(fs.existsSync(path.join(tmpDir, 'bff-equals-smoke')), false);
-  });
-});
-
-test('--bff-runtime requires a value', () => {
-  withTempDir(tmpDir => {
-    const result = runCli(tmpDir, ['bff-missing-smoke', '--bff-runtime']);
-    assert.notEqual(result.status, 0);
-    assert.match(
-      result.stderr,
-      /--bff-runtime requires a value \(supported: effect\)/,
+    assert.equal(
+      fs.existsSync(path.join(tmpDir, entry.project)),
+      false,
+      'invalid flags must not leave a project directory behind',
     );
-    assert.equal(fs.existsSync(path.join(tmpDir, 'bff-missing-smoke')), false);
-  });
-});
-
-test('--bff does not accept a value', () => {
-  withTempDir(tmpDir => {
-    const result = runCli(tmpDir, ['bff-value-smoke', '--bff=hono']);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /--bff does not accept a value/);
-    assert.equal(fs.existsSync(path.join(tmpDir, 'bff-value-smoke')), false);
-  });
-});
-
-test('--help documents the BFF flag surface', () => {
-  withTempDir(tmpDir => {
-    const result = runCli(tmpDir, ['--help']);
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /--bff /);
-    assert.match(result.stdout, /--bff-runtime /);
-    assert.match(result.stdout, /supported: effect/);
   });
 });

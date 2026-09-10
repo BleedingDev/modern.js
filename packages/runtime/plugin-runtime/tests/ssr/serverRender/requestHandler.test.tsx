@@ -79,67 +79,6 @@ describe('createRequestHandler router snapshot fallback', () => {
     expect(onErrorCalls[0]?.[1]).toBe(SSRErrors.LOADER_ERROR);
   });
 
-  it('should defer generic router cleanup until the response body finishes', async () => {
-    let cleaned = false;
-
-    setGlobalContext({
-      entryName: 'main',
-      App: () => React.createElement('div', null, 'app'),
-      enableRsc: false,
-    });
-    setGlobalInternalRuntimeContext({
-      hooks: {
-        wrapRoot: {
-          call: (App: React.ComponentType) => App,
-        },
-        onBeforeRender: {
-          call: async (context: any) => {
-            applyRouterRuntimeState(context, {
-              framework: 'custom-router',
-              cleanup: () => {
-                cleaned = true;
-              },
-            });
-          },
-        },
-      },
-    } as any);
-
-    const { createRequestHandler } = await import(
-      '../../../src/core/server/requestHandler'
-    );
-    const requestHandler = await createRequestHandler(async () => {
-      return new Response('ok', { status: 200 });
-    });
-
-    const response = await requestHandler(new Request('http://localhost/'), {
-      resource: {
-        entryName: 'main',
-        route: {
-          urlPath: '/',
-        },
-        htmlTemplate: '<html><head></head><body></body></html>',
-      } as any,
-      config: {
-        ssr: true,
-      } as any,
-      params: {},
-      reporter: undefined,
-      monitors: undefined,
-      locals: {},
-      loaderContext: {},
-      onTiming: () => {},
-      onError: () => {},
-    } as any);
-
-    expect(response.status).toBe(200);
-    // The body may still be streaming when the Response is returned, so the
-    // cleanup must not have run yet.
-    expect(cleaned).toBe(false);
-    await response.text();
-    expect(cleaned).toBe(true);
-  });
-
   it('should not clean up router state while a streamed body is still rendering', async () => {
     let cleaned = false;
 

@@ -4,13 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createOperationContractHash } from '@modern-js/server-runtime-extensions/bff-policy/node';
 import { build } from 'esbuild';
-import * as clientGeneratorSurface from '../src/client-generator';
-import {
-  generateEffectClient,
-  resolveEffectEntryFile,
-} from '../src/client-generator';
-import * as sourceLoaderSurface from '../src/effect-source-loader';
-import { generateEffectWorkerRuntimeWrapper } from '../src/effect-source-loader';
+import { generateEffectClient } from '../src/client-generator';
 
 const fixtureRequire = createRequire(import.meta.url);
 
@@ -105,43 +99,6 @@ async function executeGeneratedClient(code: string) {
 }
 
 describe('Effect client generation', () => {
-  test('keeps the two substantive Node tooling surfaces explicit', () => {
-    expect(Object.keys(clientGeneratorSurface).sort()).toEqual([
-      'bundleBuiltEffectEntryForNode',
-      'generateEffectClient',
-      'generateEffectClientCode',
-      'resolveEffectEntryFile',
-      'resolveEffectEntryPaths',
-    ]);
-    expect(Object.keys(sourceLoaderSurface).sort()).toEqual([
-      'bundleEffectEntryForNode',
-      'bundleEffectWorkerRuntimeSource',
-      'generateEffectClientCode',
-      'generateEffectWorkerRuntimeWrapper',
-      'resolveEffectEntryFile',
-    ]);
-  });
-
-  test('normalizes a missing Effect entry to undefined', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-bff-effect-entry-'),
-    );
-    const apiDir = path.join(appDir, 'api');
-
-    try {
-      await fs.promises.mkdir(apiDir, { recursive: true });
-      expect(resolveEffectEntryFile({ apiDir, appDir })).toBeUndefined();
-
-      const entry = path.join(apiDir, 'index.ts');
-      await fs.promises.writeFile(entry, 'export const value = true;');
-      expect(resolveEffectEntryFile({ apiDir, appDir })).toBe(
-        entry.replaceAll(path.sep, '/'),
-      );
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
   test('generates exact public compatibility imports, endpoint types, and operation contracts', async () => {
     const { apiDir, appDir, resourcePath } = await createFixtureApp();
 
@@ -190,40 +147,6 @@ describe('Effect client generation', () => {
         request: { name: 'Ada' },
         descriptor: { schemaHash: expectedHash },
       });
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
-  test('worker generation stays isolated and merges generated contracts last', async () => {
-    const { apiDir, appDir, resourcePath } = await createFixtureApp();
-
-    try {
-      const dependencies: string[] = [];
-      const wrapper = await generateEffectWorkerRuntimeWrapper(
-        { addDependency: dependency => dependencies.push(dependency) },
-        {
-          apiDir,
-          appDir,
-          port: 8080,
-          prefix: '/api',
-          requestId: 'catalog-service',
-        },
-        resourcePath,
-      );
-
-      expect(wrapper).toContain(`from '@modern-js/bff-effect/effect-edge'`);
-      expect(wrapper).toContain(
-        JSON.stringify(`${resourcePath}?modern-bff-runtime-source`),
-      );
-      expect(wrapper).toContain(
-        'createEffectBffEdgeDispatcherFactory(effectBffModule, ',
-      );
-      expect(wrapper).not.toContain('__mergeGeneratedOperationContracts');
-      expect(wrapper).toContain('"GET:/api/ping"');
-      expect(
-        dependencies.map(dependency => path.normalize(dependency)),
-      ).toContain(path.join(appDir, 'package.json'));
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }
