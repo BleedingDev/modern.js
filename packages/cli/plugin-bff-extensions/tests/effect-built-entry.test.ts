@@ -6,7 +6,7 @@ import { describe, expect, test } from '@rstest/core';
 import {
   bundleBuiltEffectEntryForNode,
   resolveEffectEntryPaths,
-} from '../src/client-generator/built-entry';
+} from '../src/effect-source-loader/built-entry';
 
 function makeTempDir(prefix: string) {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));

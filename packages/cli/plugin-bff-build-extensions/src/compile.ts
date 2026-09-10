@@ -24,7 +24,7 @@ export function registerBffCompilation(api: CLIPluginAPI<AppTools>) {
     await transformServerGlobalVars([...context.outputDirectories], globals);
     if (api.getAppContext().bffRuntimeFramework !== 'effect') return;
     const { bundleBuiltEffectEntryForNode } = await import(
-      '@modern-js/plugin-bff-extensions/client-generator'
+      '@modern-js/plugin-bff-extensions/effect-source-loader'
     );
     await bundleBuiltEffectEntryForNode({
       appDir: context.appDirectory,

@@ -92,7 +92,6 @@ export {
 } from './edge-context';
 export type {
   EffectApiClientFromApi,
-  EffectApiPromiseClientFromApi,
   EffectBffDefinition,
   EffectBffHandlerFactory,
   EffectBffOpenApiConfig,

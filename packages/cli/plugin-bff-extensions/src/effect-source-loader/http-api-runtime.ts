@@ -4,7 +4,7 @@ import {
   type HttpApiReflect,
 } from '@modern-js/bff-effect/effect';
 import { compatibleRequire, upath as path } from '@modern-js/utils';
-import { loadEffectSourceModule } from '../effect-source-loader/loader';
+import { loadEffectSourceModule } from './loader';
 
 type HttpApiRuntime = {
   isHttpApi: (value: unknown) => boolean;

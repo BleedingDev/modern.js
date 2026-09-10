@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { generateEffectClient } from '@modern-js/plugin-bff-extensions/client-generator';
+import { resolveEffectOperationContracts } from '@modern-js/plugin-bff-extensions/effect-source-loader';
 import {
   createOperationContractHash,
   type ResolvedCrossProjectPolicy,
@@ -112,10 +112,9 @@ const buildEffectWorkerRuntimeModule = async ({
       apiDir,
       appDir,
       effectEntry: entryFile,
-      port: 8080,
+
       prefix,
       requestId,
-      target: 'web',
     },
     resourcePath: entryFile,
     resourceQuery: '?modern-bff-runtime',
@@ -162,7 +161,7 @@ const buildEffectWorkerRuntimeModule = async ({
 };
 
 describe('Effect source graph loading', () => {
-  test('fails closed when Effect client generation cannot resolve an HttpApi', async () => {
+  test('rejects server-entry imports instead of generating a client', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-effect-client-failure-'),
     );
@@ -180,15 +179,16 @@ describe('Effect source graph loading', () => {
             apiDir,
             appDir,
             effectEntry: entryFile,
-            port: 8080,
+
             prefix: '/api',
-            target: 'web',
           },
           resourcePath: entryFile,
           resourceQuery: '',
           source,
         }),
-      ).rejects.toThrow(`Failed to generate Effect client for ${entryFile}`);
+      ).rejects.toThrow(
+        'Import the shared HttpApi contract and use HttpApiClient.make',
+      );
     } finally {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }
@@ -746,7 +746,7 @@ exports.default = { kind: contract.kind };`,
     }
   });
 
-  test('codegen compiles a typed relative ESM contract without a JavaScript twin', async () => {
+  test('server contract collection loads a typed relative ESM contract without a JavaScript twin', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-effect-codegen-'),
     );
@@ -784,24 +784,17 @@ export const layer = Layer.empty;`,
       );
 
       const dependencies: string[] = [];
-      const artifacts = await generateEffectClient({
+      const artifacts = await resolveEffectOperationContracts({
         appDir,
-        apiDir,
         resourcePath: entryFile,
         prefix: '/api',
-        port: 8080,
         onDependency: dependency => dependencies.push(dependency),
       });
 
-      expect(artifacts?.endpoints).toEqual([
-        {
-          apiId: 'TypedSourceGraphApi',
-          endpointName: 'ping',
-          groupName: 'greetings',
-          method: 'GET',
-          routePath: '/api/ping',
-        },
-      ]);
+      expect(artifacts?.['GET:/api/ping']).toMatchObject({
+        method: 'GET',
+        routePath: '/api/ping',
+      });
       expect(new Set(dependencies)).toEqual(
         new Set([path.resolve(entryFile), path.resolve(contractFile)]),
       );
@@ -811,7 +804,7 @@ export const layer = Layer.empty;`,
     }
   });
 
-  test('preserves dependency registration rejections from generated client codegen', async () => {
+  test('preserves dependency registration rejections from server contract collection', async () => {
     const appDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'modern-plugin-bff-effect-codegen-rejection-'),
     );
@@ -823,12 +816,10 @@ export const layer = Layer.empty;`,
       await writeEmptyPathsTsconfig(appDir);
       await writeFile(entryFile, `export const api = null;`);
 
-      const rejection = await generateEffectClient({
+      const rejection = await resolveEffectOperationContracts({
         appDir,
-        apiDir,
         resourcePath: entryFile,
         prefix: '/api',
-        port: 8080,
         onDependency: () => {
           throw dependencyFailure;
         },

@@ -1,13 +1,11 @@
 import { createRequire } from 'node:module';
 import * as dataPlatform from '@modern-js/bff-effect/data-platform';
 import * as effectClient from '@modern-js/bff-effect/effect-client';
-import * as effectClientRuntime from '@modern-js/bff-effect/effect-client-runtime';
 import * as effectEdgeDispatcher from '@modern-js/bff-effect/effect-edge';
 
 import * as compatibleDataPlatform from '../src/data-platform/codec';
 import * as compatibleEffectEdgeDispatcher from '../src/effect/edge-dispatcher';
 import * as compatibleEffectClient from '../src/effect-client';
-import * as compatibleEffectClientRuntime from '../src/effect-client/runtime';
 
 describe('canonical Effect runtime package identity', () => {
   test('preserves the implementation function identity through public exports', () => {
@@ -16,9 +14,6 @@ describe('canonical Effect runtime package identity', () => {
     );
     expect(compatibleEffectClient.makeEffectHttpApiClient).toBe(
       effectClient.makeEffectHttpApiClient,
-    );
-    expect(compatibleEffectClientRuntime.createGeneratedEffectClient).toBe(
-      effectClientRuntime.createGeneratedEffectClient,
     );
     expect(compatibleEffectEdgeDispatcher.createEffectBffEdgeDispatcher).toBe(
       effectEdgeDispatcher.createEffectBffEdgeDispatcher,

@@ -93,6 +93,38 @@ const PingApi = HttpApi.make('PingApi').add(
 
 const clientEffect = makeEffectHttpApiClient(PingApi);
 
+const InventoryApi = HttpApi.make('Inventory').add(
+  HttpApiGroup.make('items').add(
+    HttpApiEndpoint.post('create', '/items/:id', {
+      params: { id: Schema.String },
+      query: { count: Schema.FiniteFromString },
+      payload: Schema.Struct({ title: Schema.String }),
+      success: Schema.Struct({ id: Schema.String, count: Schema.Number }),
+    }),
+  ),
+);
+const inventory = makeEffectHttpApiClient(InventoryApi);
+Effect.gen(function* () {
+  const client = yield* inventory;
+  const request = { params: { id: '42' }, query: { count: 3 }, payload: { title: 'native' } };
+  const result = yield* client.items.create(request);
+  const id: string = result.id;
+  const count: number = result.count;
+  // @ts-expect-error response fields are inferred from the contract
+  const wrongResult: string = result.count;
+  // @ts-expect-error payload fields are inferred from the contract
+  client.items.create({ ...request, payload: { title: 123 } });
+  // @ts-expect-error required payload cannot be omitted
+  client.items.create({ params: { id: '42' }, query: { count: 3 } });
+  // @ts-expect-error transformed query input uses its decoded number type
+  client.items.create({ ...request, query: { count: '3' } });
+  // @ts-expect-error path parameters retain their contract types
+  client.items.create({ ...request, params: { id: 42 } });
+  // @ts-expect-error undeclared endpoints are not present
+  client.items.destroy({});
+});
+
+
 type IsAny<T> = 0 extends 1 & T ? true : false;
 type IsNever<T> = IsAny<T> extends true
   ? false
@@ -139,6 +171,8 @@ const runtime: EffectBffDefinition<typeof api, EffectRuntimeLayer> &
   layer,
 });
 
+// @ts-expect-error a server definition does not pretend to contain a client
+runtime.client;
 void runtime;
 `,
       );

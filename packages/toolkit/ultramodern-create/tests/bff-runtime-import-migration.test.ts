@@ -85,11 +85,7 @@ test('native Hono imports stay native and the retired Hono alias resolves to res
 });
 
 test('single-owner client and data module declarations preserve surrounding source exactly', () => {
-  for (const endpoint of [
-    'effect-client',
-    'effect-client-runtime',
-    'data-platform',
-  ]) {
+  for (const endpoint of ['effect-client', 'data-platform']) {
     const source = `/* preserved */ export * from "@modern-js/plugin-bff/${endpoint}";\nconst text = '@modern-js/plugin-bff/${endpoint}';\n`;
     assert.equal(
       migrateBffRuntimeSource(source).source,
@@ -301,4 +297,19 @@ test('rollback restores staged source and manifests if a late write fails', () =
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test.each([
+  '@modern-js/plugin-bff/effect-client-runtime',
+  '@modern-js/bff-effect/effect-client-runtime',
+  '@modern-js/plugin-bff-extensions/client-generator',
+])('rejects removed client generation module %s without rewriting the consumer', module => {
+  assert.throws(
+    () => migrateBffRuntimeSource(`import * as client from '${module}';`),
+    /shared HttpApi contract and use HttpApiClient.make/,
+  );
+  assert.throws(
+    () => migrateBffRuntimeSource(`const client = import('${module}');`),
+    /explicit owner migration/,
+  );
 });

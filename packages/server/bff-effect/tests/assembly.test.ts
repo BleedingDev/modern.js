@@ -46,7 +46,7 @@ describe('Effect BFF runtime assembly', () => {
     expect(runtime.api).toBe(api);
     expect(Layer.isLayer(runtime.layer)).toBe(true);
     expect(isValidatorAwareHandlerFactory(runtime.createHandler)).toBe(true);
-    expect(() => runtime.client.status).toThrow(/@api\/index/);
+    expect(runtime).not.toHaveProperty('client');
   });
 
   test.each([

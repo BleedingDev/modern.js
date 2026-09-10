@@ -7,7 +7,7 @@ import clientGenerator, {
 } from '../src/utils/clientGenerator';
 
 describe('clientGenerator', () => {
-  it('adds the generated API export to package.json', async () => {
+  it('does not advertise API exports when no client artifacts are generated', async () => {
     const appDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bff-client-gen-'));
     const lambdaDir = path.join(appDir, 'api', 'lambda');
 
@@ -34,7 +34,7 @@ describe('clientGenerator', () => {
       });
 
       const packageJson = await fs.readJSON(path.join(appDir, 'package.json'));
-      expect(packageJson.exports).toHaveProperty('./api/*');
+      expect(packageJson.exports).not.toHaveProperty('./api/*');
     } finally {
       await fs.remove(appDir);
     }

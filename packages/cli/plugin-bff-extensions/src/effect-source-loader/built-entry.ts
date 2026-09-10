@@ -41,9 +41,7 @@ export async function bundleBuiltEffectEntryForNode(options: {
       }`,
     );
   }
-  const { bundleEffectEntryForNode } = await import(
-    '../effect-source-loader/loader'
-  );
+  const { bundleEffectEntryForNode } = await import('./loader');
   return bundleEffectEntryForNode({
     appDir,
     entryPath: builtEntry,

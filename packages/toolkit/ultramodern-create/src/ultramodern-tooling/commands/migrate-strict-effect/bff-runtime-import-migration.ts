@@ -16,10 +16,14 @@ const effect = '@modern-js/bff-effect';
 const lower = '@modern-js/plugin-bff-extensions';
 const direct = new Map([
   [`${native}/effect-client`, `${effect}/effect-client`],
-  [`${native}/effect-client-runtime`, `${effect}/effect-client-runtime`],
   [`${native}/data-platform`, `${effect}/data-platform`],
   [`${native}/effect-edge/dispatcher`, `${effect}/effect-edge`],
   [`${native}/hono-server`, `${native}/server`],
+]);
+const removedClientModules = new Set([
+  `${native}/effect-client-runtime`,
+  `${effect}/effect-client-runtime`,
+  `${lower}/client-generator`,
 ]);
 const aggregate = new Set([
   `${native}/server`,
@@ -37,7 +41,7 @@ register(
   `
   CreateEffectOperationContextOptions createEffectBffEdgeHandler createEffectBffTestHandler
   createEffectOperationContext createHttpApiHandler defineEffectBff defineEffectRpcBff
-  dispatchEffectBffRequest EffectApiClientFromApi EffectApiPromiseClientFromApi
+  dispatchEffectBffRequest EffectApiClientFromApi
   EffectBffDefinition EffectBffHandlerFactory EffectBffOpenApiConfig EffectBffRuntime
   EffectContext EffectDataPlatformBatchOptions EffectDataPlatformSelectionValidationOptions
   EffectDataPlatformValidationOptions EffectRequestValidator EffectRpcBffDefinition
@@ -308,6 +312,11 @@ export function migrateBffRuntimeSource(source: string, file = 'source.ts') {
       continue;
     const declaration = statement as any;
     const module = declaration.source?.value;
+    if (removedClientModules.has(module))
+      conflict(
+        file,
+        `${module} was removed; import a shared HttpApi contract and use HttpApiClient.make`,
+      );
     if (!direct.has(module) && !aggregate.has(module)) continue;
     staticSources.add(declaration.source.start);
     const replacement = direct.get(module);
@@ -486,7 +495,12 @@ export function migrateBffRuntimeSource(source: string, file = 'source.ts') {
   const retiredReference = (node: any): string | undefined => {
     const value = stringExpression(node);
     if (!value) return undefined;
-    if (direct.has(value) || aggregate.has(value)) return value;
+    if (
+      direct.has(value) ||
+      aggregate.has(value) ||
+      removedClientModules.has(value)
+    )
+      return value;
     if (!value.includes(unknownString) || !value.includes(native))
       return undefined;
     const pattern = new RegExp(
@@ -496,8 +510,8 @@ export function migrateBffRuntimeSource(source: string, file = 'source.ts') {
         .join('[\\s\\S]*')}$`,
       'u',
     );
-    return [...direct.keys(), ...aggregate].find(module =>
-      pattern.test(module),
+    return [...direct.keys(), ...aggregate, ...removedClientModules].find(
+      module => pattern.test(module),
     );
   };
   const inspect = (value: unknown) => {

@@ -79,12 +79,12 @@ export const bffPlugin = (): CliPlugin<AppTools> => ({
     registerBffCompilation(api);
     registerBffClientArtifacts(api, metadata);
     registerBffGeneratedEntries(api, metadata);
-    api.modifyBundlerChain(async (chain, { isServer, CHAIN_ID }) => {
+    api.modifyBundlerChain(async (chain, { CHAIN_ID }) => {
       if (api.getAppContext().bffRuntimeFramework !== 'effect') return;
-      const { appDirectory, apiDirectory, port } = api.getAppContext();
+      const { appDirectory, apiDirectory } = api.getAppContext();
       const bff = api.getNormalizedConfig().bff;
       const { resolveEffectEntryFile } = await import(
-        '@modern-js/plugin-bff-extensions/client-generator'
+        '@modern-js/plugin-bff-extensions/effect-source-loader'
       );
       const entry = resolveEffectEntryFile({
         appDir: appDirectory,
@@ -117,12 +117,7 @@ export const bffPlugin = (): CliPlugin<AppTools> => ({
           prefix: Array.isArray(bff?.prefix)
             ? bff.prefix[0]
             : bff?.prefix || '/api',
-          port,
-          target: isServer ? 'server' : 'client',
           requestId: bff?.requestId,
-          requestCreator: bff?.requestCreator || BFF_REQUEST_RUNTIME,
-          httpMethodDecider: bff?.httpMethodDecider,
-          effectDataPlatformBatch: bff?.effect?.dataPlatform?.batch,
         });
     });
   },

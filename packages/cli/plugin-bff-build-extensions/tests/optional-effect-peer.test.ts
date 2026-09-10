@@ -15,7 +15,7 @@ rstest.mock('effect', () => {
 rstest.mock('@effect/opentelemetry', () => {
   throw new Error('optional Effect telemetry was loaded by Hono');
 });
-rstest.mock('@modern-js/plugin-bff-extensions/client-generator', () => {
+rstest.mock('@modern-js/plugin-bff-extensions/effect-source-loader', () => {
   throw new Error('Effect codegen was loaded by Hono');
 });
 

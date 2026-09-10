@@ -68,10 +68,7 @@ const sourceLoaders = {
     target: './src/effect-source-loader/index.ts',
     load: () => import('../src/effect-source-loader'),
   },
-  './client-generator': {
-    target: './src/client-generator/index.ts',
-    load: () => import('../src/client-generator'),
-  },
+
   './backend-federation': {
     target: './src/backend-federation/index.ts',
     load: () => import('../src/backend-federation'),
