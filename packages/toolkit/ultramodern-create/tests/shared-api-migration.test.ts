@@ -11,6 +11,7 @@ import {
   generateUltramodernWorkspace,
 } from '../src/ultramodern-workspace';
 import { linkBuiltCodeTools } from './helpers/built-code-tools';
+import { linkWorkspaceFormatterDependencies } from './helpers/workspace-kit';
 
 const source = {
   strategy: 'workspace' as const,
@@ -153,6 +154,7 @@ test('owning migration restores missing shared infrastructure without regenerati
     enableTailwind: true,
     packageSource: { strategy: 'workspace' },
   });
+  linkWorkspaceFormatterDependencies(workspace);
   addUltramodernVertical({
     workspaceRoot: workspace,
     name: 'catalog',
@@ -250,6 +252,7 @@ test('a previous generated API workspace upgrades atomically to native package i
     enableTailwind: true,
     packageSource: { strategy: 'workspace' },
   });
+  linkWorkspaceFormatterDependencies(workspace);
   addUltramodernVertical({
     workspaceRoot: workspace,
     name: 'inventory',

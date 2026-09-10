@@ -1270,9 +1270,9 @@ pins, complete scope and stored budgets; import-boundary review remains separate
 
 ### Native template configuration delivery (2026-09-10)
 
-| File | Owner | Reason | Disposition |
+| Upstream-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/toolkit/create/template/biome.json.handlebars` (audited identity: `packages/toolkit/create/template/biome.json`) | bleedingdev | Preserve the exact native Biome 1.9.4 configuration as a template rendered by the existing create and Sandpack template mechanisms. Its template filename prevents repository tooling from interpreting consumer configuration as repository configuration. | `inline-patch` |
+| `packages/toolkit/create/template/biome.json.handlebars` | bleedingdev | Preserve the exact native Biome 1.9.4 configuration from audited identity `packages/toolkit/create/template/biome.json` as a template rendered by the existing create and Sandpack template mechanisms. Its template filename prevents repository tooling from interpreting consumer configuration as repository configuration. | `inline-patch` |
 | `packages/toolkit/create/src/index.ts` | bleedingdev | Match the existing subproject exclusion to the configuration's template filename, preserving the native rule that subprojects inherit root tooling. | `inline-patch` |
 
 ### Disabled-RSC ownership reconciliation (2026-09-10)

@@ -19,7 +19,10 @@ import {
 } from '../src/ultramodern-workspace';
 import { createWorkspaceRootPackageScripts } from '../src/ultramodern-workspace/workspace-script-plan';
 import { linkBuiltCodeTools } from './helpers/built-code-tools';
-import { snapshotWorkspace } from './helpers/workspace-kit';
+import {
+  linkWorkspaceFormatterDependencies,
+  snapshotWorkspace,
+} from './helpers/workspace-kit';
 
 const packageRoot = path.resolve(__dirname, '..');
 const builtCliPath = path.join(packageRoot, 'dist/esm-node/index.js');
@@ -1927,6 +1930,7 @@ test('migrate converges a legacy shell-only workspace to a validator-clean state
       enableTailwind: true,
       packageSource: { strategy: 'workspace' },
     });
+    linkWorkspaceFormatterDependencies(workspaceDir);
 
     // Fresh shell-only workspace already satisfies the (backend-surface-gated)
     // contract self-check.
