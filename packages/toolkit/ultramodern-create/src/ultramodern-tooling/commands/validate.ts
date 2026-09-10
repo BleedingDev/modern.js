@@ -55,7 +55,11 @@ export function runValidate(context: CommandContext) {
     // Business routes and assertions are consumer inputs, independently
     // exercised by the runtime proof. Framework deployment fields retain
     // their canonical expectations.
-    for (const key of ['distributedSsrProofRoutes', 'jsonSmokeChecks']) {
+    for (const key of [
+      'routes',
+      'distributedSsrProofRoutes',
+      'jsonSmokeChecks',
+    ]) {
       if (declared && Object.hasOwn(declared, key)) {
         app.deploy.cloudflare[key] = declared[key];
       }
