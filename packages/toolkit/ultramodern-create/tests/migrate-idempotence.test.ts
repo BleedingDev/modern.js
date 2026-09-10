@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { yaml } from '@modern-js/utils';
+import { parseUltramodernReleaseCohort } from '../src/ultramodern-release-cohort';
 import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
 import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
 import {
   runPnpmLockfileRefresh,
   runStagedTargetChecks,
 } from '../src/ultramodern-tooling/commands/migrate-strict-effect/install';
+import { runWorkspaceTransaction } from '../src/ultramodern-workspace/add-vertical/transaction';
 import { MODULE_FEDERATION_VERSION } from '../src/ultramodern-workspace/versions';
 import { writeNodeCommandFixture } from './helpers/node-command-fixture';
 import { createWorkspace } from './helpers/workspace-kit';
@@ -472,6 +474,117 @@ snapshots: {}
     } else {
       process.env.ULTRAMODERN_TEST_PNPM_LOG = previousInvocationLog;
     }
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('staged lock refresh retains only approved authenticated source selectors and restores target policy on every exit', async () => {
+  const tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'um-source-age-transition-'),
+  );
+  const workspaceRoot = path.join(tempRoot, 'workspace');
+  fs.mkdirSync(workspaceRoot);
+  const policyPath = path.join(workspaceRoot, 'pnpm-workspace.yaml');
+  const observedPath = path.join(tempRoot, 'observed-policy.yaml');
+  const previousPath = process.env.PATH;
+  const previousLog = process.env.ULTRAMODERN_TEST_PNPM_LOG;
+  const oldSelector = '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.4';
+  const targetSelector = '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.5';
+  const originalPolicy = `minimumReleaseAgeExclude: ['${oldSelector}', 'consumer@1.2.3', '@bleedingdev/*']\n`;
+  const targetPolicy = `# Consumer policy bytes\r\nminimumReleaseAgeStrict: true\r\nminimumReleaseAgeExclude: ['${targetSelector}', 'reviewed@2.3.4']\r\n`;
+  const source = {
+    cohort: parseUltramodernReleaseCohort({
+      schema: 'bleedingdev.ultramodern.release-cohort',
+      schemaVersion: 1,
+      source: {
+        commit: 'authenticated-source-fixture',
+        repository: 'BleedingDev/ultramodern.js',
+      },
+      release: { version: '3.9.0-ultramodern.4', tag: 'latest' },
+      aliases: {
+        '@modern-js/runtime': '@bleedingdev/modern-js-runtime',
+        '@modern-js/bff-effect': '@bleedingdev/modern-js-bff-effect',
+      },
+      packages: [
+        {
+          sourceName: '@modern-js/bff-effect',
+          targetName: '@bleedingdev/modern-js-bff-effect',
+          version: '3.9.0-ultramodern.4',
+        },
+        {
+          sourceName: '@modern-js/runtime',
+          targetName: '@bleedingdev/modern-js-runtime',
+          version: '3.9.0-ultramodern.4',
+        },
+      ],
+    }),
+    policy: originalPolicy,
+  };
+  const context = { invocationCwd: workspaceRoot, workspaceRoot };
+  try {
+    for (const exitCode of [0, 23]) {
+      const fixture = installFakePnpm(tempRoot, undefined, {
+        exitCode,
+        beforeExit: `fs.copyFileSync('pnpm-workspace.yaml', ${JSON.stringify(observedPath)});`,
+      });
+      process.env.PATH = `${fixture.binDir}${path.delimiter}${previousPath ?? ''}`;
+      process.env.ULTRAMODERN_TEST_PNPM_LOG = fixture.invocationLog;
+      fs.writeFileSync(policyPath, targetPolicy);
+      assert.equal(runPnpmLockfileRefresh(context, source), exitCode);
+      assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
+      const observed = yaml.load(
+        fs.readFileSync(observedPath, 'utf8'),
+      ) as Record<string, unknown>;
+      assert.deepEqual(
+        observed.minimumReleaseAgeExclude,
+        [oldSelector, targetSelector, 'reviewed@2.3.4'].sort(),
+      );
+      assert.equal(observed.minimumReleaseAgeStrict, true);
+    }
+    process.env.PATH = '';
+    if (process.platform === 'win32')
+      assert.notEqual(runPnpmLockfileRefresh(context, source), 0);
+    else
+      assert.throws(() => runPnpmLockfileRefresh(context, source), /ENOENT/u);
+    assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
+    const fixture = installFakePnpm(tempRoot, undefined, {
+      beforeExit: `fs.copyFileSync('pnpm-workspace.yaml', ${JSON.stringify(observedPath)});`,
+    });
+    process.env.PATH = `${fixture.binDir}${path.delimiter}${previousPath ?? ''}`;
+    fs.writeFileSync(policyPath, originalPolicy);
+    assert.equal(
+      await runWorkspaceTransaction(
+        workspaceRoot,
+        stage => {
+          fs.writeFileSync(
+            path.join(stage, 'pnpm-workspace.yaml'),
+            targetPolicy,
+          );
+          return runPnpmLockfileRefresh(
+            { workspaceRoot: stage, invocationCwd: stage },
+            source,
+          );
+        },
+        { commitWhen: status => status === 0 },
+      ),
+      0,
+    );
+    assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
+    assert.ok(fs.existsSync(path.join(workspaceRoot, 'pnpm-lock.yaml')));
+    installFakePnpm(tempRoot, undefined, {
+      beforeExit:
+        "fs.appendFileSync('pnpm-workspace.yaml', 'consumerMutation: true\\n');",
+    });
+    assert.throws(
+      () => runPnpmLockfileRefresh(context, source),
+      /changed the temporary release-age policy/,
+    );
+    assert.equal(fs.readFileSync(policyPath, 'utf8'), targetPolicy);
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousLog === undefined) delete process.env.ULTRAMODERN_TEST_PNPM_LOG;
+    else process.env.ULTRAMODERN_TEST_PNPM_LOG = previousLog;
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });

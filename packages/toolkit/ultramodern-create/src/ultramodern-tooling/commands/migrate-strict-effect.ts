@@ -673,6 +673,14 @@ function migrateStrictEffect(
   installedSource: UltramodernReleaseCohort | undefined,
   classify: (plan: SameContractPlan) => void,
 ) {
+  const sourcePolicyPath = path.join(io.workspaceRoot, 'pnpm-workspace.yaml');
+  const sourcePolicy =
+    installedSource && fs.existsSync(sourcePolicyPath)
+      ? {
+          cohort: installedSource,
+          policy: fs.readFileSync(sourcePolicyPath, 'utf8'),
+        }
+      : undefined;
   const compactPath = path.join(io.workspaceRoot, '.modernjs/ultramodern.json');
   let raw: Record<string, any>;
   if (fs.existsSync(compactPath)) {
@@ -758,7 +766,7 @@ function migrateStrictEffect(
     for (const write of updatePlan.writes)
       io.write(path.join(io.workspaceRoot, write.path), write.content);
     if (skipInstall) return result(0);
-    const status = runPnpmLockfileRefresh(context);
+    const status = runPnpmLockfileRefresh(context, sourcePolicy);
     if (status !== 0) return result(status);
     if (
       !hasCoherentCohortLock(
@@ -1106,7 +1114,7 @@ function migrateStrictEffect(
   if (!skipInstall) {
     // The outer publisher owns this private stage. Preserve the consumer lock
     // as resolver input; neither failed install nor target checks touch live files.
-    const status = runPnpmLockfileRefresh(context);
+    const status = runPnpmLockfileRefresh(context, sourcePolicy);
     if (status !== 0) return result(status);
     return validateGeneratedPnpmLockReleaseAgePolicy(
       io.workspaceRoot,
