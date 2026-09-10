@@ -9,7 +9,6 @@ import {
   createUltramodernConfig,
 } from './contracts';
 import { createDeliveryUnitRecord } from './delivery-unit';
-import { remoteComponentOutputPath } from './demo-components';
 import {
   appEmitsBrowserUi,
   appHasApi,
@@ -276,7 +275,12 @@ export function createWorkspaceValidationContract(
     deliveryUnit: createDeliveryUnitRecord(scope, remote),
     exposes: Object.keys(remote.exposes ?? {}),
     componentPaths: Object.keys(remote.exposes ?? {})
-      .map(expose => remoteComponentOutputPath(remote, expose))
+      .map(expose => {
+        const source = remote.exposes?.[expose];
+        return source
+          ? `${remote.directory}/${source.replace(/^\.\//u, '')}`
+          : undefined;
+      })
       .filter((componentPath): componentPath is string =>
         Boolean(componentPath),
       ),

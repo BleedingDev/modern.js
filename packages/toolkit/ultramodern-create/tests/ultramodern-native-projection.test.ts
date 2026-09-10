@@ -296,6 +296,32 @@ test.each([
         ? { horizontalRemote: true }
         : { preset: shape }),
     });
+    if (shape === 'full-stack') {
+      const sourcePath = 'src/components/catalog-widget.tsx';
+      const authoredPath = 'src/components/authored-widget.tsx';
+      fs.copyFileSync(
+        path.join(workspaceRoot, 'verticals/catalog', sourcePath),
+        path.join(workspaceRoot, 'verticals/catalog', authoredPath),
+      );
+      const configPath = path.join(workspaceRoot, '.modernjs/ultramodern.json');
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      config.topology.apps.find(
+        (app: { id: string }) => app.id === 'catalog',
+      ).moduleFederation.exposePaths = {
+        './Widget': `./${authoredPath}`,
+      };
+      fs.writeFileSync(configPath, JSON.stringify(config));
+      for (const relative of [
+        'module-federation.config.ts',
+        'tsconfig.mf-types.json',
+      ]) {
+        const file = path.join(workspaceRoot, 'verticals/catalog', relative);
+        fs.writeFileSync(
+          file,
+          fs.readFileSync(file, 'utf8').replaceAll(sourcePath, authoredPath),
+        );
+      }
+    }
     expect(runValidate({ workspaceRoot, invocationCwd: workspaceRoot })).toBe(
       0,
     );
