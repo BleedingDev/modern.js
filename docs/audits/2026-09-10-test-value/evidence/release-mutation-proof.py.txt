@@ -1,0 +1,24 @@
+"""Read-only, two-test mutation demonstration. Run with python3 -S."""
+from pathlib import Path
+import subprocess
+
+root = Path('/tmp/ultramodern-test-audit-20260910')
+output = Path('/tmp/ultramodern-audit/release-mutation-proof.txt')
+loader = Path('/tmp/ultramodern-audit/release-mutation-proof.loader.mjs')
+focused = [
+    '--test',
+    '--test-name-pattern=proves native localized navigation|fails when hydration replaces',
+    'scripts/ultramodern-production-readiness/__tests__/browser-smoke.test.js',
+]
+records = []
+for label, command in [
+    ('BASELINE', ['node', *focused]),
+    ('MUTANT', ['node', '--no-warnings', '--experimental-loader', str(loader), *focused]),
+]:
+    result = subprocess.run(command, cwd=root, text=True, capture_output=True, timeout=30)
+    records.append(f'{label}\nCOMMAND: {command!r}\n{result.stdout}{result.stderr}\nEXIT: {result.returncode}\n')
+    if result.returncode:
+        output.write_text('\n'.join(records))
+        raise SystemExit(result.returncode)
+output.write_text('\n'.join(records))
+print(output.read_text())

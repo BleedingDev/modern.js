@@ -1,0 +1,8 @@
+dev.https passes when dev throws: HTTPS is completely broken
+tools.devServer passes when setupMiddlewares and before are never called; page reload calls: 0
+PLAYWRIGHT_WORKERS=50% => 50
+PLAYWRIGHT_WORKERS=25% => 25
+PLAYWRIGHT_WORKERS=2 => 2
+preload fixture exists: false
+preload package exists: false
+preload route output exists: false

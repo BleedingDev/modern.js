@@ -1,0 +1,30 @@
+BASELINE
+COMMAND: ['node', '--test', '--test-name-pattern=proves native localized navigation|fails when hydration replaces', 'scripts/ultramodern-production-readiness/__tests__/browser-smoke.test.js']
+✔ fails when hydration replaces server-rendered remote nodes (9.89725ms)
+✔ proves native localized navigation updates the route, html language, and translated DOM (1.470625ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 59.219917
+
+EXIT: 0
+
+MUTANT
+COMMAND: ['node', '--no-warnings', '--experimental-loader', '/tmp/ultramodern-audit/release-mutation-proof.loader.mjs', '--test', '--test-name-pattern=proves native localized navigation|fails when hydration replaces', 'scripts/ultramodern-production-readiness/__tests__/browser-smoke.test.js']
+✔ fails when hydration replaces server-rendered remote nodes (12.22475ms)
+✔ proves native localized navigation updates the route, html language, and translated DOM (1.731708ms)
+AUDIT_MUTATION_APPLIED: three callbacks throw immediately: hydration probe installation, hydration probe reading, localized-navigation continuity installation
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80.000542
+
+EXIT: 0

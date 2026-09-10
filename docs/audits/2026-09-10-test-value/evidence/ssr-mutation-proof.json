@@ -1,0 +1,66 @@
+{
+  "snapshotCommit": "4092c606b0704f2e7119c4a16d1d9ef149d28034",
+  "nodeVersion": "v26.8.1",
+  "runtimePath": "/Users/satan/workspace/bleedingdev/projects/modernjs/code/modernjs/node_modules/.pnpm/@module-federation+runtime@2.9.0/node_modules/@module-federation/runtime/dist/index.cjs",
+  "recovery": {
+    "mutation": "Replace the entire UltraModern manifest recovery plugin with a no-op plugin; reuse the unchanged child fixture and exact upstream runtime 2.9.0",
+    "scenarios": [
+      {
+        "mode": "recover",
+        "down": {
+          "status": 503,
+          "html": "<main data-mf-status=\"degraded\" data-mf-error=\"RUNTIME-003\">remote unavailable</main>"
+        },
+        "up": {
+          "status": 200,
+          "html": "<main data-mf-status=\"ready\"><section data-remote=\"inventory\">inventory live</section></main>"
+        },
+        "observations": {
+          "shellReady": true,
+          "down503": true,
+          "downTypedMarkup": true,
+          "remoteReady": true,
+          "up200": true,
+          "upLive": true,
+          "samePid": true,
+          "alive": true,
+          "stderrRuntime003": true
+        },
+        "allScenarioOraclesSurvived": true
+      },
+      {
+        "mode": "invalid",
+        "status": 500,
+        "html": "<main data-mf-status=\"degraded\" data-mf-error=\"RUNTIME-013\">remote unavailable</main>",
+        "observations": {
+          "remoteReady": true,
+          "status500": true,
+          "typedMarkup": true,
+          "alive": true,
+          "stderrRuntime013": true
+        },
+        "allScenarioOraclesSurvived": true
+      }
+    ]
+  },
+  "boundaryDebugger": {
+    "mutation": "Remove the complete !mounted SSR guard in memory, transpile with installed esbuild, render with installed React 19.2.8",
+    "cases": [
+      {
+        "controlMode": "hidden",
+        "originalHtml": "<main>app</main>",
+        "mutantHtml": "<main>app</main>",
+        "expectedHtml": "<main>app</main>",
+        "currentOracleSurvived": true
+      },
+      {
+        "controlMode": "visible",
+        "originalHtml": "<main>app</main>",
+        "mutantHtml": "<main>app</main><label style=\"align-items:center;background:rgba(255, 255, 255, 0.96);border:1px solid rgba(0, 0, 0, 0.1);border-radius:10px;box-shadow:0 10px 28px rgba(0, 0, 0, 0.14);color:#111827;display:flex;font:600 13px/1.2 system-ui, sans-serif;gap:8px;left:max(12px, env(safe-area-inset-left));max-width:calc(100vw - 24px);padding:9px 11px;position:fixed;top:max(12px, env(safe-area-inset-top));z-index:2147483000\"><input type=\"checkbox\"/><span>show team boundaries</span></label>",
+        "expectedHtml": "<main>app</main>",
+        "currentOracleSurvived": false
+      }
+    ]
+  },
+  "limit": "Focused replay of the exact scenario observations, not execution of the rstest runner; no repository files modified."
+}

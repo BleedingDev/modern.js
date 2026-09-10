@@ -1,0 +1,41 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+
+const repo = path.resolve(process.argv[2] ?? '/tmp/ultramodern-test-audit-20260910');
+const { validateWorkflowContent } = await import(pathToFileURL(path.join(repo, 'scripts/security/validate-github-workflows.mjs')));
+const require = createRequire(path.join(repo, 'package.json'));
+const { validateEvidence } = require('./scripts/release-gates/validator');
+const source = `name: Example
+on: {push: {}}
+permissions: {contents: read}
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          node scripts/ultramodern-publish/run-release-acceptance.mjs --verify-receipt --manifest manifest.json --receipt receipt.json
+`;
+const results = {
+  repo,
+  missingRunIdentity: {
+    source,
+    errors: validateWorkflowContent('.github/workflows/example.yml', source),
+  },
+  commentOnlyRunIdentity: {
+    source: source + '          # --run-identity does-not-run\n',
+    errors: validateWorkflowContent('.github/workflows/example.yml', source + '          # --run-identity does-not-run\n'),
+  },
+};
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'governance-reviewer-proof-'));
+try {
+  const content = 'author: audit\nreviewer_1:\nreviewer_1:\n';
+  fs.writeFileSync(path.join(temp, 'review-evidence.md'), content);
+  const report = validateEvidence({ evidenceDir: temp, requiredFiles: ['review-evidence.md'], requiredMetadataFields: ['author'], minimumReviewers: 2, allowMissingEvidence: false, requireCiBackedMetadata: true });
+  results.blankDuplicateReviewers = { content, minimumReviewers: 2, requireCiBackedMetadata: true, validatedFiles: report.validatedFiles, skippedFiles: report.skippedFiles };
+} finally {
+  fs.rmSync(temp, { recursive: true, force: true });
+}
+console.log(JSON.stringify(results, null, 2));

@@ -1,0 +1,22 @@
+export async function load(url, context, nextLoad) {
+  const result = await nextLoad(url, context);
+  if (!url.endsWith('/browser-smoke/browser-validate.mjs')) return result;
+  let source = String(result.source);
+  for (const marker of [
+    'page.evaluate(selector => {',
+    'page.evaluate(() => {',
+    'page.evaluate(operation => {',
+  ]) {
+    if (source.split(marker).length !== 2) {
+      throw new Error(`Unexpected mutation count for ${marker}`);
+    }
+    source = source.replace(
+      marker,
+      `${marker} throw new Error('AUDIT_MUTATION: broken browser callback');`,
+    );
+  }
+  console.error(
+    'AUDIT_MUTATION_APPLIED: three callbacks throw immediately: hydration probe installation, hydration probe reading, localized-navigation continuity installation',
+  );
+  return { ...result, source };
+}

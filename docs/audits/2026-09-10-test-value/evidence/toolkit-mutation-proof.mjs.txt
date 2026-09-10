@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+// Read-only proof: source strings are mutated in memory; the checkout is untouched.
+// Usage: node toolkit-mutation-proof.mjs [audited-checkout]
+const checkout = path.resolve(
+  process.argv[2] ?? '/tmp/ultramodern-test-audit-20260910',
+);
+const { ultramodernSandpackFiles: files } = await import(
+  pathToFileURL(
+    path.join(checkout, 'packages/toolkit/ultramodern-sandpack-profile/src/index.ts'),
+  ).href
+);
+
+// These are the exact ten capability regexes from profile.test.ts:96-105.
+const probes = [
+  ['modern.config.ts', [/tanstackRouterPlugin\(\)/u, /i18nPlugin\(/u, /pluginTailwindcss\(\)/u]],
+  ['src/modern.runtime.ts', [/framework: 'tanstack'/u, /supportedLngs: \['en', 'cs'\]/u]],
+  ['src/routes/layout.tsx', [/@modern-js\/plugin-tanstack\/runtime/u, /prefetch="render"/u]],
+  ['src/routes/page.tsx', [/Effect\.runSync/u, /useModernI18n/u]],
+  ['src/routes/index.css', [/@import 'tailwindcss'/u]],
+];
+
+const results = [];
+for (const [filename, patterns] of probes) {
+  const original = files['/' + filename] ?? files[filename];
+  assert.equal(typeof original, 'string', filename);
+  // JS/TS lines become comments. CSS becomes invalid/comment-prefixed CSS.
+  // Either way, the embedded capabilities no longer execute.
+  const disabled = original.split('\n').map(line => '// ' + line).join('\n');
+  for (const pattern of patterns) {
+    assert.match(original, pattern, 'Original fixture should satisfy ' + pattern);
+    assert.match(disabled, pattern, 'Disabled fixture still satisfies ' + pattern);
+    results.push({ filename, pattern: String(pattern), originalPasses: true, disabledPasses: true });
+  }
+}
+console.log(JSON.stringify({
+  probe: 'comment-out-every-capability-source',
+  checkout,
+  regexAssertionsStillPassing: results.length,
+  filesWithAllExecutableLinesDisabled: probes.length,
+  repositoryFilesChanged: 0,
+  qualification: 'In-memory replay of the ten exact capability assertions; not a rerun of the entire profile test file.',
+  results,
+}, null, 2));

@@ -1,0 +1,147 @@
+// Read-only audit probes for snapshot 4092c606b0704f2e7119c4a16d1d9ef149d28034.
+// Run: node /tmp/ultramodern-audit/ssr-mutation-proof.cjs
+// No tracked file is edited. A temporary no-op module is removed in finally.
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const http = require('node:http');
+const { fork } = require('node:child_process');
+const { createRequire } = require('node:module');
+
+const snapshot = '/tmp/ultramodern-test-audit-20260910';
+const installedRepo = '/Users/satan/workspace/bleedingdev/projects/modernjs/code/modernjs';
+const runtimePath = path.join(installedRepo, 'node_modules/.pnpm/@module-federation+runtime@2.9.0/node_modules/@module-federation/runtime/dist/index.cjs');
+const fixture = path.join(snapshot, 'packages/runtime/plugin-runtime/tests/module-federation/fixtures/manifest-recovery-node-child.cjs');
+
+function waitForMessage(child) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('message timeout')), 10000);
+    child.once('message', message => { clearTimeout(timer); resolve(message); });
+    child.once('error', reject);
+    child.once('exit', code => { clearTimeout(timer); reject(new Error(`child exited: ${code}`)); });
+  });
+}
+
+async function reservePort() {
+  const server = http.createServer();
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  await new Promise(resolve => server.close(resolve));
+  return port;
+}
+
+async function checkRecoveryWithNoop(pluginPath, mode) {
+  const port = await reservePort();
+  const child = fork(fixture, [runtimePath, pluginPath, String(port)], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+  let stderr = '';
+  child.stderr.on('data', data => { stderr += data; });
+  const timeout = setTimeout(() => child.kill(), 20000);
+  try {
+    const ready = await waitForMessage(child);
+    const url = `http://127.0.0.1:${ready.port}`;
+    if (mode === 'recover') {
+      let response = await fetch(url);
+      const down = { status: response.status, html: await response.text() };
+      const healthy = waitForMessage(child);
+      child.send('remote-healthy');
+      const healthyReady = await healthy;
+      response = await fetch(url);
+      const up = { status: response.status, html: await response.text() };
+      const observations = {
+        shellReady: ready.type === 'shell-ready',
+        down503: down.status === 503,
+        downTypedMarkup: /data-mf-status="degraded" data-mf-error="RUNTIME-003"/.test(down.html),
+        remoteReady: healthyReady.type === 'remote-ready' && healthyReady.mode === 'healthy',
+        up200: up.status === 200,
+        upLive: /inventory live/.test(up.html),
+        samePid: child.pid === ready.pid,
+        alive: child.exitCode === null,
+        stderrRuntime003: /RUNTIME-003/.test(stderr),
+      };
+      return { mode, down, up, observations, allScenarioOraclesSurvived: Object.values(observations).every(Boolean) };
+    }
+    const invalid = waitForMessage(child);
+    child.send('remote-invalid');
+    const invalidReady = await invalid;
+    const response = await fetch(url);
+    const html = await response.text();
+    const observations = {
+      remoteReady: invalidReady.type === 'remote-ready' && invalidReady.mode === 'invalid',
+      status500: response.status === 500,
+      typedMarkup: /data-mf-status="degraded" data-mf-error="RUNTIME-013"/.test(html),
+      alive: child.exitCode === null,
+      stderrRuntime013: /RUNTIME-013/.test(stderr),
+    };
+    return { mode, status: response.status, html, observations, allScenarioOraclesSurvived: Object.values(observations).every(Boolean) };
+  } finally {
+    clearTimeout(timeout);
+    if (child.exitCode === null) {
+      const exited = new Promise(resolve => child.once('exit', resolve));
+      child.send('stop');
+      const fallback = setTimeout(() => child.kill(), 5000);
+      await exited;
+      clearTimeout(fallback);
+    }
+  }
+}
+
+function checkSsrGuard() {
+  const req = createRequire(path.join(installedRepo, 'packages/runtime/plugin-runtime/package.json'));
+  const { transformSync } = req('esbuild');
+  const React = req('react');
+  const { renderToString } = req('react-dom/server');
+  const filename = path.join(snapshot, 'packages/runtime/plugin-runtime/src/boundary-debugger/index.tsx');
+  const original = fs.readFileSync(filename, 'utf8');
+  const guard = '  if (!mounted) {\n    return null;\n  }';
+  if (original.split(guard).length !== 2) throw new Error('SSR guard is not unique');
+  const mutant = original.replace(guard, '');
+  function render(source, controlMode) {
+    const code = transformSync(source, { loader: 'tsx', format: 'cjs', jsx: 'automatic' }).code;
+    const module = { exports: {} };
+    new Function('require', 'module', 'exports', code)(req, module, module.exports);
+    let WrappedApp;
+    module.exports.default({
+      controlMode,
+      enabledByDefault: true,
+      legacySelector: '[data-mf-remote]',
+      metadata: { appId: 'shell', boundaries: [{ appId: 'catalog', mfName: 'catalog' }], schemaVersion: 1 },
+    }).setup({ wrapRoot(factory) { WrappedApp = factory(() => React.createElement('main', null, 'app')); } });
+    return renderToString(React.createElement(WrappedApp));
+  }
+  return ['hidden', 'visible'].map(controlMode => {
+    const originalHtml = render(original, controlMode);
+    const mutantHtml = render(mutant, controlMode);
+    return {
+      controlMode,
+      originalHtml,
+      mutantHtml,
+      expectedHtml: '<main>app</main>',
+      currentOracleSurvived: mutantHtml === '<main>app</main>',
+    };
+  });
+}
+
+(async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ssr-audit-noop-'));
+  const pluginPath = path.join(directory, 'noop.cjs');
+  fs.writeFileSync(pluginPath, 'exports.default = () => ({ name: "audit-noop-without-recovery" });');
+  try {
+    const result = {
+      snapshotCommit: '4092c606b0704f2e7119c4a16d1d9ef149d28034',
+      nodeVersion: process.version,
+      runtimePath,
+      recovery: {
+        mutation: 'Replace the entire UltraModern manifest recovery plugin with a no-op plugin; reuse the unchanged child fixture and exact upstream runtime 2.9.0',
+        scenarios: [await checkRecoveryWithNoop(pluginPath, 'recover'), await checkRecoveryWithNoop(pluginPath, 'invalid')],
+      },
+      boundaryDebugger: {
+        mutation: 'Remove the complete !mounted SSR guard in memory, transpile with installed esbuild, render with installed React 19.2.8',
+        cases: checkSsrGuard(),
+      },
+      limit: 'Focused replay of the exact scenario observations, not execution of the rstest runner; no repository files modified.',
+    };
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+})().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,0 +1,70 @@
+{
+  "probe": "comment-out-every-capability-source",
+  "checkout": "/tmp/ultramodern-test-audit-20260910",
+  "regexAssertionsStillPassing": 10,
+  "filesWithAllExecutableLinesDisabled": 5,
+  "repositoryFilesChanged": 0,
+  "qualification": "In-memory replay of the ten exact capability assertions; not a rerun of the entire profile test file.",
+  "results": [
+    {
+      "filename": "modern.config.ts",
+      "pattern": "/tanstackRouterPlugin\\(\\)/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "modern.config.ts",
+      "pattern": "/i18nPlugin\\(/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "modern.config.ts",
+      "pattern": "/pluginTailwindcss\\(\\)/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "src/modern.runtime.ts",
+      "pattern": "/framework: 'tanstack'/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "src/modern.runtime.ts",
+      "pattern": "/supportedLngs: \\['en', 'cs'\\]/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "src/routes/layout.tsx",
+      "pattern": "/@modern-js\\/plugin-tanstack\\/runtime/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "src/routes/layout.tsx",
+      "pattern": "/prefetch=\"render\"/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "src/routes/page.tsx",
+      "pattern": "/Effect\\.runSync/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "src/routes/page.tsx",
+      "pattern": "/useModernI18n/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    },
+    {
+      "filename": "src/routes/index.css",
+      "pattern": "/@import 'tailwindcss'/u",
+      "originalPasses": true,
+      "disabledPasses": true
+    }
+  ]
+}

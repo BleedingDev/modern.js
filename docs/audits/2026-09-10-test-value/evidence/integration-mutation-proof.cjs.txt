@@ -1,0 +1,55 @@
+// Run from the audited repository root with Node. This executes the actual
+// changed test bodies under deliberately broken dependency stubs. It does not
+// build, launch, mutate, or replace any framework/application code.
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const src = fs.readFileSync('tests/e2e/builder/cases/dev/dev.test.ts', 'utf8');
+const https = src.slice(src.indexOf("test('dev.https'"), src.indexOf("test('tools.devServer'"));
+const toolsCase = src.slice(src.indexOf("test('tools.devServer'"));
+const stripTypes = s => s
+  .replace(/let builder: Awaited<ReturnType<typeof dev>> \| undefined;/g, 'let builder;')
+  .replace(/let reloadFn: undefined \| \(\(\) => void\);/g, 'let reloadFn;')
+  .replace(/\(error as Error\)/g, 'error');
+const cases = [];
+const expect = value => ({
+  toBeTruthy: () => assert.ok(value),
+  toMatch: regex => assert.match(value, regex),
+  toHaveText: async expected => assert.equal(value.text, expected),
+});
+const ctx = {
+  test: (name, fn) => cases.push({name, fn}),
+  expect,
+  join: (...p) => p.join('/'),
+  fixtures: '/unused',
+  getRandomPort: async () => 31000,
+  dev: async () => { throw new Error('HTTPS is completely broken'); },
+};
+vm.createContext(ctx);
+vm.runInContext(stripTypes(https + toolsCase), ctx);
+
+(async () => {
+  await cases[0].fn();
+  console.log('dev.https passes when dev throws: HTTPS is completely broken');
+  ctx.dev = async () => ({port: 31000, server: {close: async () => {}}});
+  ctx.getHrefByEntryName = () => 'unused';
+  let reloadCalls = 0;
+  await cases[1].fn({page: {
+    goto: async () => {},
+    locator: () => ({text: 'Hello Builder!'}),
+    reload: async () => { reloadCalls++; },
+  }});
+  console.log('tools.devServer passes when setupMiddlewares and before are never called; page reload calls:', reloadCalls);
+
+  const config = fs.readFileSync('tests/e2e/builder/playwright.config.ts', 'utf8');
+  const getWorkersCode = config.slice(config.indexOf('const getWorkers'), config.indexOf('const isCI'));
+  for (const value of ['50%', '25%', '2']) {
+    const workerCtx = {process: {env: {PLAYWRIGHT_WORKERS: value}}};
+    vm.createContext(workerCtx);
+    console.log('PLAYWRIGHT_WORKERS=' + value, '=>', vm.runInContext(getWorkersCode + '\ngetWorkers()', workerCtx));
+  }
+  const preloadDir = 'tests/integration/ssr/fixtures/preload';
+  console.log('preload fixture exists:', fs.existsSync(preloadDir));
+  console.log('preload package exists:', fs.existsSync(preloadDir + '/package.json'));
+  console.log('preload route output exists:', fs.existsSync(preloadDir + '/dist/route.json'));
+})().catch(error => {console.error(error); process.exitCode = 1;});

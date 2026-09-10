@@ -1,0 +1,35 @@
+{
+  "evidence": {
+    "evidenceDir": "/var/folders/l5/j97t559s5ljgmjc_ylqn1jmh0000gn/T/ultramodern-audit-proof-PrKtGt",
+    "validatedFiles": [
+      "review-evidence.md"
+    ],
+    "skippedFiles": []
+  },
+  "evidenceMeaning": "Accepted stale timestamp, non-commit value, duplicate reviewer and syntactic run URL without running tests.",
+  "skippedGate": {
+    "exitCode": 0,
+    "stdout": "[release-gates] Gate snapshot updated (release-candidate-contract-gates=false) at /var/folders/l5/j97t559s5ljgmjc_ylqn1jmh0000gn/T/ultramodern-audit-proof-PrKtGt/snapshot.json\n[release-gates] RC contract gate validation completed without qualification (9 gate commands were skipped):\n{\n  \"profile\": \"/tmp/ultramodern-test-audit-20260910/scripts/release-gates/rc-contract-profile.json\",\n  \"evidenceDir\": \"/tmp/ultramodern-test-audit-20260910/docs/super-app-rfc-adr/evidence/release-candidate/current\",\n  \"validatedEvidenceFiles\": 4,\n  \"skippedEvidenceFiles\": 0,\n  \"executedCommands\": 0,\n  \"skippedCommands\": 9\n}",
+    "stderr": "",
+    "snapshot": {
+      "schemaVersion": 1,
+      "updatedAt": 1789034627632,
+      "gates": {
+        "release-candidate-contract-gates": {
+          "passed": false,
+          "reason": "9 gate commands were skipped",
+          "updatedAt": 1789034627632,
+          "profilePath": "/tmp/ultramodern-test-audit-20260910/scripts/release-gates/rc-contract-profile.json",
+          "summary": {
+            "profile": "/tmp/ultramodern-test-audit-20260910/scripts/release-gates/rc-contract-profile.json",
+            "evidenceDir": "/tmp/ultramodern-test-audit-20260910/docs/super-app-rfc-adr/evidence/release-candidate/current",
+            "validatedEvidenceFiles": 4,
+            "skippedEvidenceFiles": 0,
+            "executedCommands": 0,
+            "skippedCommands": 9
+          }
+        }
+      }
+    }
+  }
+}

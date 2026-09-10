@@ -1,0 +1,22 @@
+{
+  "repo": "/tmp/ultramodern-test-audit-20260910",
+  "missingRunIdentity": {
+    "source": "name: Example\non: {push: {}}\npermissions: {contents: read}\njobs:\n  proof:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          node scripts/ultramodern-publish/run-release-acceptance.mjs --verify-receipt --manifest manifest.json --receipt receipt.json\n",
+    "errors": [
+      ".github/workflows/example.yml job proof receipt verification must pass an authenticated --run-identity"
+    ]
+  },
+  "commentOnlyRunIdentity": {
+    "source": "name: Example\non: {push: {}}\npermissions: {contents: read}\njobs:\n  proof:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          node scripts/ultramodern-publish/run-release-acceptance.mjs --verify-receipt --manifest manifest.json --receipt receipt.json\n          # --run-identity does-not-run\n",
+    "errors": []
+  },
+  "blankDuplicateReviewers": {
+    "content": "author: audit\nreviewer_1:\nreviewer_1:\n",
+    "minimumReviewers": 2,
+    "requireCiBackedMetadata": true,
+    "validatedFiles": [
+      "review-evidence.md"
+    ],
+    "skippedFiles": []
+  }
+}
