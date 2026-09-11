@@ -6,8 +6,10 @@ import {
   normalizeWorkspaceInputs,
   readUltramodernConfig,
   readUltramodernWorkspaceInputs,
+  workspaceAppsFromToolingConfig,
 } from '../src/ultramodern-tooling/config';
 import { shellApp } from '../src/ultramodern-workspace/descriptors';
+import { createPackagedWorkspaceValidationScript } from '../src/ultramodern-workspace/workspace-scripts';
 
 function inputs() {
   return {
@@ -96,47 +98,93 @@ test('disk read exposes raw fields and leaves the existing config reader compati
   }
 });
 
-test('derives federated surface paths from the Module Federation config', () => {
+function federationSurfaceWorkspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ultramodern-expose-'));
   const vertical = path.join(root, 'verticals/party-registry');
   const surface = path.join(vertical, 'src/federation/page-contacts.tsx');
-  try {
-    fs.mkdirSync(path.dirname(surface), { recursive: true });
-    fs.writeFileSync(surface, 'export default function PageContacts() {}\n');
-    fs.mkdirSync(path.join(root, '.modernjs'), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, '.modernjs/ultramodern.json'),
-      JSON.stringify({
-        schemaVersion: 1,
-        workspace: { packageScope: '@app' },
-        topology: {
-          apps: [
-            {
-              id: shellApp.id,
-              kind: 'shell',
-              path: 'apps/shell-super-app',
-              moduleFederation: { verticalRefs: ['party-registry'] },
-            },
-            {
-              id: 'party-registry',
-              kind: 'vertical',
-              path: 'verticals/party-registry',
-              moduleFederation: { exposes: ['./PageContacts'] },
-            },
-          ],
-        },
-      }),
-    );
-    fs.writeFileSync(
-      path.join(vertical, 'module-federation.config.ts'),
-      `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
+  fs.mkdirSync(path.dirname(surface), { recursive: true });
+  fs.writeFileSync(surface, 'export default function PageContacts() {}\n');
+  fs.mkdirSync(path.join(root, '.modernjs'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, '.modernjs/ultramodern.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      workspace: { packageScope: '@app' },
+      topology: {
+        apps: [
+          {
+            id: shellApp.id,
+            kind: 'shell',
+            path: 'apps/shell-super-app',
+            moduleFederation: { verticalRefs: ['party-registry'] },
+          },
+          {
+            id: 'party-registry',
+            kind: 'vertical',
+            path: 'verticals/party-registry',
+            moduleFederation: { exposes: ['./PageContacts'] },
+          },
+        ],
+      },
+    }),
+  );
+  fs.writeFileSync(
+    path.join(vertical, 'module-federation.config.ts'),
+    `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
 export default createModuleFederationConfig({
   name: 'verticalPartyRegistry',
   exposes: { './PageContacts': './src/federation/page-contacts.tsx' },
 });
 `,
+  );
+  return { root, surface };
+}
+
+test('the generated validator expects the surface the expose map declares', () => {
+  const { root } = federationSurfaceWorkspace();
+  try {
+    // Remotes derived without a workspace root still carry the generator's
+    // `src/components` guess; the emitted validator must not inherit it.
+    const remotes = workspaceAppsFromToolingConfig(
+      readUltramodernConfig(root),
+    ).filter(app => app.kind === 'vertical');
+    assert.equal(
+      remotes[0]?.exposes?.['./PageContacts'],
+      './src/components/page-contacts.tsx',
     );
 
+    const script = createPackagedWorkspaceValidationScript(
+      '@app',
+      false,
+      remotes,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      root,
+    );
+    assert.equal(
+      script.includes(
+        'verticals/party-registry/src/federation/page-contacts.tsx',
+      ),
+      true,
+    );
+    assert.equal(
+      script.includes(
+        'verticals/party-registry/src/components/page-contacts.tsx',
+      ),
+      false,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('derives federated surface paths from the Module Federation config', () => {
+  const { root, surface } = federationSurfaceWorkspace();
+  try {
     const expose = () =>
       readUltramodernWorkspaceInputs(root).verticals[0]?.exposes?.[
         './PageContacts'

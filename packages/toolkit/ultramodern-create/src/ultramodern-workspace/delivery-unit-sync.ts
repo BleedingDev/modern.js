@@ -93,7 +93,7 @@ nothing.
   const scope = config.workspace.packageScope;
   // Delivery-unit identity applies to ALL unit kinds (G29): shell, UI-only
   // verticals, and API-bearing verticals each carry a record.
-  const workspaceApps = workspaceAppsFromToolingConfig(config);
+  const workspaceApps = workspaceAppsFromToolingConfig(config, workspaceRoot);
 
   const written: string[] = [];
   const unchanged: string[] = [];

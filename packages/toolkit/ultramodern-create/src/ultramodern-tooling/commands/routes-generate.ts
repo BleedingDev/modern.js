@@ -19,6 +19,7 @@ const resolveRoutesGenerateTargets = (
 
   const targets = workspaceAppsFromToolingConfig(
     readUltramodernConfig(context.workspaceRoot),
+    context.workspaceRoot,
   )
     .filter(app => !appId || app.id === appId)
     .map(app => ({
