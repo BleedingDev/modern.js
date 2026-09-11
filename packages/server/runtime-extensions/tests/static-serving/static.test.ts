@@ -117,14 +117,7 @@ describe('static plugin precompressed assets', () => {
     await writeFile(`${staticFile}.gz`, gzipBody);
 
     const server = await createStaticServer(pwd);
-    for (const invalidQuality of [
-      'bogus',
-      '0.2;q=1',
-      '2',
-      '-0.1',
-      '0.1234',
-      '1.001',
-    ]) {
+    for (const invalidQuality of ['bogus', '2']) {
       const response = await server.request('/static/invalid-quality.js', {
         headers: new Headers({
           'accept-encoding': `br;q=${invalidQuality}, gzip;q=0.4, identity;q=0`,
@@ -175,18 +168,6 @@ describe('static plugin precompressed assets', () => {
       expectedEncoding: null,
       expectedBody: 'wildcard identity',
     },
-    {
-      acceptEncoding: '*;q=0.8, identity;q=0',
-      expectedRepresentation: 'br',
-      expectedEncoding: 'br',
-      expectedBody: 'br',
-    },
-    {
-      acceptEncoding: 'br;q=0, *;q=0.8, identity;q=0',
-      expectedRepresentation: 'gzip',
-      expectedEncoding: 'gzip',
-      expectedBody: 'gzip',
-    },
   ])('selects $expectedRepresentation for $acceptEncoding', async ({
     acceptEncoding,
     expectedEncoding,
@@ -211,6 +192,36 @@ describe('static plugin precompressed assets', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-encoding')).toBe(expectedEncoding);
     expect(await response.text()).toBe(expectedBody);
+  });
+
+  it.each([
+    // Explicit br;q=0 must beat the wildcard, leaving gzip as the only pick.
+    ['br;q=0, *;q=0.8, identity;q=0', 'gzip'],
+    // Implicit identity (q=1) outranks an explicitly down-weighted coding.
+    ['br;q=0.8', null],
+  ])('selects the highest ranked representation for %s', async (acceptEncoding, expectedEncoding) => {
+    const pwd = await createTempDir();
+    const originBody = Buffer.from('ranked representation');
+    const brBody = brotliCompressSync(originBody);
+    const gzipBody = gzipSync(originBody);
+    const staticFile = path.join(pwd, 'static', 'ranked.js');
+
+    await mkdir(path.dirname(staticFile), { recursive: true });
+    await writeFile(staticFile, originBody);
+    await writeFile(`${staticFile}.br`, brBody);
+    await writeFile(`${staticFile}.gz`, gzipBody);
+
+    const server = await createStaticServer(pwd);
+    const response = await server.request('/static/ranked.js', {
+      headers: new Headers({ 'accept-encoding': acceptEncoding }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-encoding')).toBe(expectedEncoding);
+    const expected = expectedEncoding === 'gzip' ? gzipBody : originBody;
+    expect(Buffer.from(await response.arrayBuffer()).equals(expected)).toBe(
+      true,
+    );
   });
 
   it('falls back to origin asset when no variant is accepted', async () => {

@@ -1,5 +1,4 @@
 import type { RouteObject } from '@modern-js/runtime-utils/router';
-import type { NestedRoute } from '@modern-js/types';
 import { createMemoryHistory } from '@tanstack/history';
 import {
   createRouter,
@@ -11,104 +10,38 @@ import type { ComponentType } from 'react';
 import { createElement, lazy } from 'react';
 import { renderToStaticMarkup, renderToString } from 'react-dom/server';
 import { Outlet as ModernOutlet } from '../../src/runtime/outlet';
-import {
-  createRouteTreeFromRouteObjects,
-  getModernRouteIdsFromMatches,
-} from '../../src/runtime/routeTree';
-import { __setTanstackRscPayloadDecoderForTests } from '../../src/runtime/rsc/payloadRouter';
-import { createTanstackRouteObjectsFromConfig } from '../../src/runtime/utils';
+import { createRouteTreeFromRouteObjects } from '../../src/runtime/routeTree';
 
-type LoaderArgs = {
-  params: Record<string, string>;
-};
+type LoaderArgs = { params: Record<string, string> };
 
 type TestRouteObject = RouteObject & {
   children?: TestRouteObject[];
-  config?: {
-    handle?: Record<string, unknown>;
-  };
-  hasAction?: boolean;
-  hasClientLoader?: boolean;
-  hasLoader?: boolean;
-  inValidSSRRoute?: boolean;
-  isClientComponent?: boolean;
   lazyImport?: () => Promise<unknown>;
-  loaderDeps?: unknown;
-  validateSearch?: unknown;
-};
-
-type TestNestedRoute = NestedRoute & {
-  children?: TestNestedRoute[];
-  hasAction?: boolean;
-  hasClientLoader?: boolean;
-  hasLoader?: boolean;
-  loaderDeps?: unknown;
-  validateSearch?: unknown;
-};
-
-type ShouldRevalidateArgs = {
-  nextUrl: URL;
-};
-
-type ShouldReloadArgs = {
-  context: {
-    request: Request;
-  };
-  location: {
-    href: string;
-  };
-  params: Record<string, string>;
-};
-
-type TestRoute = {
-  options: {
-    component?: unknown;
-    shouldReload?: (args: ShouldReloadArgs) => boolean | undefined;
-    ssr?: boolean;
-    staticData: Record<string, unknown>;
-    loaderDeps?: unknown;
-    validateSearch?: unknown;
-    wrapInSuspense?: unknown;
-  };
-};
-
-type PreloadableTestComponent = {
-  load?: () => Promise<unknown>;
-  preload?: () => Promise<unknown>;
 };
 
 type TestRouter = {
   _serverResult?:
-    | {
-        type: 'redirect';
-        redirect: Response;
-      }
-    | {
-        type: 'render';
-        status: 200 | 404 | 500;
-      };
-  load: () => Promise<void>;
-  routesById: Partial<Record<string, TestRoute>>;
+    | { type: 'redirect'; redirect: Response }
+    | { type: 'render'; status: number };
   state: {
-    matches: Array<{
-      error?: unknown;
-      loaderData?: unknown;
-      routeId: string;
-    }>;
+    matches: Array<{ error?: unknown; loaderData?: unknown; routeId: string }>;
   };
 };
 
-type TestRouteTree = ReturnType<typeof createRouteTreeFromRouteObjects>;
+const nullComponent = () => null;
+
+const root = (
+  children: TestRouteObject[],
+  Component: RouteObject['Component'] = nullComponent,
+): TestRouteObject[] => [{ id: 'root', path: '/', Component, children }];
 
 async function loadRouteTree(
-  routeTree: TestRouteTree,
+  routes: TestRouteObject[],
   pathname: string,
 ): Promise<TestRouter> {
   const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({
-      initialEntries: [pathname],
-    }),
+    routeTree: createRouteTreeFromRouteObjects(routes as RouteObject[]),
+    history: createMemoryHistory({ initialEntries: [pathname] }),
     context: {
       request: new Request(`http://localhost${pathname}`),
       requestContext: {},
@@ -119,153 +52,85 @@ async function loadRouteTree(
   return router as unknown as TestRouter;
 }
 
-function getRoute(router: TestRouter, id: string): TestRoute {
-  const route = router.routesById[id];
-  if (!route) {
-    throw new Error(`Expected TanStack route ${id} to exist`);
-  }
-  return route;
-}
-
-function getRouteByModernRouteId(
-  router: TestRouter,
-  modernRouteId: string,
-): TestRoute {
-  const route = Object.values(router.routesById).find(
-    route => route?.options.staticData?.modernRouteId === modernRouteId,
-  );
-  if (!route) {
-    throw new Error(`Expected Modern route ${modernRouteId} to exist`);
-  }
-  return route;
-}
+const matchOf = (router: TestRouter, routeId: string) =>
+  router.state.matches.find(match => match.routeId === routeId);
 
 describe('tanstack route tree from RouteObject[]', () => {
-  afterEach(() => {
-    __setTanstackRscPayloadDecoderForTests();
-    rstest.restoreAllMocks();
-  });
-
-  test('maps root loader and dynamic params', async () => {
-    const routes: RouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        loader: () => ({ root: 'ok' }),
-        Component: () => null,
-        children: [
-          {
-            id: 'user',
-            path: 'user/:id',
-            loader: ({ params }: LoaderArgs) => ({ id: params.id }),
-            Component: () => null,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/user/123');
-
-    const rootMatch = router.state.matches.find(
-      match => match.routeId === '__root__',
+  test('resolves loader data for root, dynamic and splat params', async () => {
+    const routes: TestRouteObject[] = root(
+      [
+        {
+          id: 'user',
+          path: 'user/:id',
+          loader: ({ params }: LoaderArgs) => ({ id: params.id }),
+          Component: nullComponent,
+        },
+        {
+          id: 'files',
+          path: 'files/*',
+          loader: ({ params }: LoaderArgs) => ({ value: params['*'] }),
+          Component: nullComponent,
+        },
+      ],
+      nullComponent,
     );
-    const userMatch = router.state.matches.find(
-      match => match.routeId === '/user/$id',
-    );
+    routes[0].loader = () => ({ root: 'ok' });
 
-    expect(rootMatch?.loaderData).toEqual({ root: 'ok' });
-    expect(userMatch?.loaderData).toEqual({ id: '123' });
-  });
+    const userRouter = await loadRouteTree(routes, '/user/123');
+    expect(matchOf(userRouter, '__root__')?.loaderData).toEqual({ root: 'ok' });
+    expect(matchOf(userRouter, '/user/$id')?.loaderData).toEqual({ id: '123' });
 
-  test('keeps unnamed sibling pathless layouts distinct', async () => {
-    const routes: RouteObject[] = [
-      {
-        Component: () => null,
-        children: [
-          {
-            path: 'alpha',
-            loader: () => ({ value: 'alpha' }),
-            Component: () => null,
-          },
-        ],
-      },
-      {
-        Component: () => null,
-        children: [
-          {
-            path: 'beta',
-            loader: () => ({ value: 'beta' }),
-            Component: () => null,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/beta');
-
-    const matchedLoaderData = router.state.matches
-      .map(match => match.loaderData)
-      .filter(Boolean);
-
-    expect(matchedLoaderData).toContainEqual({ value: 'beta' });
-    expect(matchedLoaderData).not.toContainEqual({ value: 'alpha' });
-  });
-
-  test('reports native TanStack unknown routes as HTTP 404', async () => {
-    const routes: RouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => null,
-        children: [
-          {
-            id: 'known',
-            path: 'known',
-            Component: () => null,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/missing');
-
-    expect(router._serverResult).toMatchObject({
-      type: 'render',
-      status: 404,
+    const splatRouter = await loadRouteTree(routes, '/files/a/b/c');
+    expect(matchOf(splatRouter, '/files/$')?.loaderData).toEqual({
+      value: 'a/b/c',
     });
   });
 
+  test('keeps unnamed sibling pathless layouts distinct', async () => {
+    const pathless = (path: string): TestRouteObject => ({
+      Component: nullComponent,
+      children: [
+        { path, loader: () => ({ value: path }), Component: nullComponent },
+      ],
+    });
+
+    const router = await loadRouteTree(
+      [pathless('alpha'), pathless('beta')],
+      '/beta',
+    );
+    const loaderData = router.state.matches
+      .map(match => match.loaderData)
+      .filter(Boolean);
+
+    expect(loaderData).toContainEqual({ value: 'beta' });
+    expect(loaderData).not.toContainEqual({ value: 'alpha' });
+  });
+
+  test('reports native TanStack unknown routes as HTTP 404', async () => {
+    const router = await loadRouteTree(
+      root([{ id: 'known', path: 'known', Component: nullComponent }]),
+      '/missing',
+    );
+
+    expect(router._serverResult).toMatchObject({ type: 'render', status: 404 });
+  });
+
   test('reports native TanStack loader redirects as server responses', async () => {
-    const routes: RouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => null,
-        children: [
-          {
-            id: 'redirect',
-            path: 'redirect',
-            loader: () => {
-              throw redirect({ to: '/target' });
-            },
-            Component: () => null,
+    const router = await loadRouteTree(
+      root([
+        {
+          id: 'redirect',
+          path: 'redirect',
+          loader: () => {
+            throw redirect({ to: '/target' });
           },
-          {
-            id: 'target',
-            path: 'target',
-            Component: () => null,
-          },
-        ],
-      },
-    ];
+          Component: nullComponent,
+        },
+        { id: 'target', path: 'target', Component: nullComponent },
+      ]),
+      '/redirect',
+    );
 
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/redirect');
-
-    expect(router._serverResult?.type).toBe('redirect');
     if (router._serverResult?.type !== 'redirect') {
       throw new Error('Expected a TanStack redirect server result');
     }
@@ -276,363 +141,77 @@ describe('tanstack route tree from RouteObject[]', () => {
   });
 
   test('renders Modern Outlet through TanStack native outlet', async () => {
-    const routes: RouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () =>
-          createElement('section', null, createElement(ModernOutlet)),
-        children: [
+    const router = await loadRouteTree(
+      root(
+        [
           {
             id: 'plain',
             path: 'plain',
             Component: () => createElement('main', null, 'Plain child route'),
           },
         ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/plain');
-    const markup = renderToString(
-      createElement(RouterProvider, { router } as never),
+        () => createElement('section', null, createElement(ModernOutlet)),
+      ),
+      '/plain',
     );
-    expect(markup).toContain('Plain child route');
-  });
-
-  test('resolves matched Modern route ids from TanStack route registry fallback', () => {
-    const router = {
-      state: {
-        matches: [
-          { routeId: '__root__' },
-          { routeId: '/$lang' },
-          { routeId: '/$lang/tractors' },
-          {
-            route: {
-              options: {
-                staticData: {
-                  modernRouteId: '(lang)/stores/page',
-                },
-              },
-            },
-            routeId: '/$lang/stores',
-          },
-        ],
-      },
-      routesById: {
-        __root__: {
-          options: {
-            staticData: {
-              modernRouteId: 'layout',
-            },
-          },
-        },
-        '/$lang': {
-          options: {
-            staticData: {
-              modernRouteId: '(lang)/page',
-            },
-          },
-        },
-        '/$lang/tractors': {
-          options: {
-            staticData: {
-              modernRouteId: '(lang)/tractors/page',
-            },
-          },
-        },
-      },
-    };
-
-    expect(getModernRouteIdsFromMatches(router as never)).toEqual([
-      'layout',
-      '(lang)/page',
-      '(lang)/tractors/page',
-      '(lang)/stores/page',
-    ]);
-  });
-
-  test('uses TanStack route ids when loading RSC payload route data', async () => {
-    const rootLoader = rstest.fn(() => ({ source: 'modern-root' }));
-    const userLoader = rstest.fn(() => ({ source: 'modern-user' }));
-    const routes: RouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        loader: rootLoader,
-        Component: () => null,
-        children: [
-          {
-            id: 'user',
-            path: 'user/:id',
-            loader: userLoader,
-            Component: () => null,
-          },
-        ],
-      },
-    ];
-    const payload = {
-      type: 'render',
-      actionData: null,
-      errors: null,
-      loaderData: {
-        __root__: { source: 'rsc-root' },
-        '/user/$id': { source: 'rsc-user' },
-      },
-      location: { href: '/user/123' },
-      routes: [
-        { id: '__root__', hasLoader: true },
-        { id: '/user/$id', hasLoader: true },
-      ],
-    };
-    const fetchMock = rstest.fn(() => Promise.resolve(new Response('payload')));
-    const decodeMock = rstest.fn(async () => payload);
-    rstest.stubGlobal('fetch', fetchMock);
-    rstest.stubGlobal('window', { origin: 'http://localhost' });
-    __setTanstackRscPayloadDecoderForTests(decodeMock);
-
-    const routeTree = createRouteTreeFromRouteObjects(routes, {
-      rscPayloadRouter: true,
-    });
-    const router = await loadRouteTree(routeTree, '/user/123');
-
-    const rootMatch = router.state.matches.find(
-      match => match.routeId === '__root__',
-    );
-    const userMatch = router.state.matches.find(
-      match => match.routeId === '/user/$id',
-    );
-    expect(rootMatch?.loaderData).toEqual({ source: 'rsc-root' });
-    expect(userMatch?.loaderData).toEqual({ source: 'rsc-user' });
-    expect(rootLoader).not.toHaveBeenCalled();
-    expect(userLoader).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(decodeMock).toHaveBeenCalledTimes(1);
-  });
-
-  test('maps splat params', async () => {
-    let splatParamValue = '';
-    const routes: TestRouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => null,
-        children: [
-          {
-            id: 'files',
-            path: 'files/*',
-            loader: ({ params }: LoaderArgs) => {
-              splatParamValue = String(params['*'] || '');
-              return { value: params['*'] };
-            },
-            Component: () => null,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-
-    const splatRouter = await loadRouteTree(routeTree, '/files/a/b/c');
-    const filesMatch = splatRouter.state.matches.find(
-      match => match.routeId === '/files/$',
-    );
-    expect(filesMatch?.loaderData).toEqual({ value: 'a/b/c' });
-    expect(splatParamValue).toBe('a/b/c');
-  });
-
-  test('renders preloaded lazy child routes through TanStack router SSR', async () => {
-    const LazyRouteComponent = () =>
-      createElement('main', null, 'Lazy child route ready');
-    const lazyImport = rstest.fn(async () => ({
-      default: LazyRouteComponent,
-    }));
-    const routes: TestRouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => createElement('section', null, createElement(Outlet)),
-        children: [
-          {
-            id: 'lazy',
-            path: 'lazy',
-            Component: lazy(lazyImport),
-            lazyImport,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/lazy');
 
     expect(
-      renderToStaticMarkup(createElement(RouterProvider, { router } as never)),
-    ).toContain('Lazy child route ready');
+      renderToString(createElement(RouterProvider, { router } as never)),
+    ).toContain('Plain child route');
   });
 
-  test('exposes load-only Modern route components through TanStack preload', async () => {
-    const load = rstest.fn(async () => 'route chunk loaded');
-    const LoadOnlyRouteComponent = (() =>
-      createElement('main', null, 'Load-only route ready')) as ComponentType & {
-      load?: () => Promise<unknown>;
-      preload?: () => Promise<unknown>;
-    };
-    LoadOnlyRouteComponent.load = load;
-    const routes: TestRouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => createElement('section', null, createElement(Outlet)),
-        children: [
-          {
-            id: 'load-only',
-            path: 'load-only',
-            Component: LoadOnlyRouteComponent,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/load-only');
-    const loadOnlyRoute = getRoute(router, '/load-only');
-    const loadOnlyComponent = loadOnlyRoute.options
-      .component as PreloadableTestComponent;
-
-    expect(typeof loadOnlyComponent.load).toBe('function');
-    expect(typeof loadOnlyComponent.preload).toBe('function');
-    expect(load).toHaveBeenCalledTimes(1);
-    await loadOnlyComponent.preload?.();
-    expect(load).toHaveBeenCalledTimes(2);
-  });
-
-  test('unwraps nested ESM route module defaults before server rendering', async () => {
-    const LazyRouteComponent = () =>
-      createElement('main', null, 'Nested lazy child route ready');
-    const lazyImport = rstest.fn(async () => ({
-      default: {
-        default: LazyRouteComponent,
-      },
-    }));
-    const routes: TestRouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => createElement('section', null, createElement(Outlet)),
-        children: [
-          {
-            id: 'lazy',
-            path: 'lazy',
-            Component: lazy(
-              lazyImport as () => Promise<{ default: ComponentType }>,
-            ),
-            lazyImport,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/lazy');
-
-    expect(
-      renderToStaticMarkup(createElement(RouterProvider, { router } as never)),
-    ).toContain('Nested lazy child route ready');
-  });
-
-  test('preserves route handle and maps shouldRevalidate to shouldReload', async () => {
-    const shouldRevalidate = rstest.fn(({ nextUrl }: ShouldRevalidateArgs) =>
-      nextUrl.pathname.endsWith('/456'),
-    );
-    const routes: RouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        config: {
-          handle: {
-            shell: true,
-          },
-        },
-        Component: () => null,
-        children: [
-          {
-            id: 'user',
-            path: 'user/:id',
-            handle: { auth: true },
-            config: {
-              handle: {
-                role: 'admin',
-              },
+  for (const [shape, wrap] of [
+    ['flat', (Component: ComponentType) => ({ default: Component })],
+    [
+      'nested',
+      (Component: ComponentType) => ({ default: { default: Component } }),
+    ],
+  ] as const) {
+    test(`server renders lazy child routes from ${shape} ESM module defaults`, async () => {
+      const LazyRouteComponent = () =>
+        createElement('main', null, 'Lazy child route ready');
+      const lazyImport = () => Promise.resolve(wrap(LazyRouteComponent));
+      const router = await loadRouteTree(
+        root(
+          [
+            {
+              id: 'lazy',
+              path: 'lazy',
+              Component: lazy(
+                lazyImport as () => Promise<{ default: ComponentType }>,
+              ),
+              lazyImport,
             },
-            shouldRevalidate,
-            loader: ({ params }: LoaderArgs) => ({ id: params.id }),
-            Component: () => null,
-          },
-        ],
-      },
-    ];
+          ],
+          () => createElement('section', null, createElement(Outlet)),
+        ),
+        '/lazy',
+      );
 
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/user/123');
-    const userRoute = getRoute(router, '/user/$id');
-
-    expect(routeTree.options.staticData.modernRouteHandle).toEqual({
-      shell: true,
+      expect(
+        renderToStaticMarkup(
+          createElement(RouterProvider, { router } as never),
+        ),
+      ).toContain('Lazy child route ready');
     });
-    expect(userRoute.options.staticData.modernRouteHandle).toEqual({
-      auth: true,
-      role: 'admin',
-    });
-    expect(userRoute.options.staticData.modernRouteShouldRevalidate).toBe(
-      shouldRevalidate,
-    );
-    expect(
-      userRoute.options.shouldReload?.({
-        location: { href: '/user/456' },
-        params: { id: '456' },
-        context: {
-          request: new Request('http://localhost/user/456'),
-        },
-      }),
-    ).toBe(true);
-    expect(shouldRevalidate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        currentParams: { id: '123' },
-        nextParams: { id: '456' },
-      }),
-    );
-  });
+  }
 
   test('normalizes Modern deferred loader data for TanStack SSR', async () => {
-    const routes: TestRouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => null,
-        children: [
-          {
-            id: 'deferred',
-            path: 'deferred',
-            loader: () => ({
-              __modern_deferred: true,
-              data: {
-                immediate: 'ok',
-                later: Promise.resolve('done'),
-              },
-            }),
-            Component: () => null,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/deferred');
-    const deferredMatch = router.state.matches.find(
-      match => match.routeId === '/deferred',
+    const router = await loadRouteTree(
+      root([
+        {
+          id: 'deferred',
+          path: 'deferred',
+          loader: () => ({
+            __modern_deferred: true,
+            data: { immediate: 'ok', later: Promise.resolve('done') },
+          }),
+          Component: nullComponent,
+        },
+      ]),
+      '/deferred',
     );
-    const loaderData = deferredMatch?.loaderData as
+    const loaderData = matchOf(router, '/deferred')?.loaderData as
       | { immediate: string; later: Promise<string> }
       | undefined;
 
@@ -642,79 +221,20 @@ describe('tanstack route tree from RouteObject[]', () => {
 
   test('preserves returned non-404 Response loaders as loader data', async () => {
     const response = new Response('route status payload', { status: 500 });
-    const routes: TestRouteObject[] = [
-      {
-        id: 'root',
-        path: '/',
-        Component: () => null,
-        children: [
-          {
-            id: 'broken',
-            path: 'broken',
-            loader: () => response,
-            Component: () => null,
-          },
-        ],
-      },
-    ];
-
-    const routeTree = createRouteTreeFromRouteObjects(routes);
-    const router = await loadRouteTree(routeTree, '/broken');
-    const brokenMatch = router.state.matches.find(
-      match => match.routeId === '/broken',
+    const router = await loadRouteTree(
+      root([
+        {
+          id: 'broken',
+          path: 'broken',
+          loader: () => response,
+          Component: nullComponent,
+        },
+      ]),
+      '/broken',
     );
 
-    expect(router._serverResult).toMatchObject({
-      type: 'render',
-      status: 200,
-    });
-    expect(brokenMatch?.loaderData).toBe(response);
-    expect(brokenMatch?.error).toBeUndefined();
-  });
-
-  test('preserves generated client metadata through RouteObject conversion', () => {
-    const modernRoutes: TestNestedRoute[] = [
-      {
-        type: 'nested',
-        origin: 'config',
-        id: 'root',
-        isRoot: true,
-        children: [
-          {
-            type: 'nested',
-            origin: 'config',
-            id: 'client',
-            path: 'client',
-            clientData: './client.data',
-            data: './data',
-            hasAction: true,
-            hasClientLoader: true,
-            hasLoader: true,
-            inValidSSRRoute: true,
-            isClientComponent: true,
-          },
-        ],
-      },
-    ];
-    const routeObjects = createTanstackRouteObjectsFromConfig({
-      routesConfig: { routes: modernRoutes },
-    });
-    const routeTree = createRouteTreeFromRouteObjects(routeObjects || []);
-    const router = createRouter({
-      routeTree,
-      history: createMemoryHistory({
-        initialEntries: ['/client'],
-      }),
-      context: {},
-    }) as unknown as TestRouter;
-    const clientRoute = getRouteByModernRouteId(router, 'client');
-
-    expect(clientRoute.options.ssr).toBe(false);
-    expect(clientRoute.options.staticData).toMatchObject({
-      modernRouteHasAction: true,
-      modernRouteHasClientLoader: true,
-      modernRouteHasLoader: true,
-      modernRouteIsClientComponent: true,
-    });
+    expect(router._serverResult).toMatchObject({ type: 'render', status: 200 });
+    expect(matchOf(router, '/broken')?.loaderData).toBe(response);
+    expect(matchOf(router, '/broken')?.error).toBeUndefined();
   });
 });

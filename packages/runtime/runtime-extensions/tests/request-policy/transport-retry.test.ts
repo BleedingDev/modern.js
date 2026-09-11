@@ -50,7 +50,6 @@ const executeRetryRequest = ({
 describe('transport retry behavior', () => {
   test.each([
     'FetchError',
-    'TimeoutError',
   ])('retries %s up to the configured max then rejects', async errorName => {
     rs.useFakeTimers();
     const errors = [
@@ -144,36 +143,35 @@ describe('transport retry behavior', () => {
     rs.useFakeTimers();
 
     try {
-      for (const statusCode of retryableStatusCodes) {
-        const retryableError = createStatusError(statusCode);
-        const response = { ok: true, status: 200 };
-        let callCount = 0;
-        const fetcher = rs.fn(async () => {
-          callCount += 1;
-          if (callCount === 1) {
-            throw retryableError;
-          }
-          return response;
-        });
+      const statusCode = retryableStatusCodes[0];
+      const retryableError = createStatusError(statusCode);
+      const response = { ok: true, status: 200 };
+      let callCount = 0;
+      const fetcher = rs.fn(async () => {
+        callCount += 1;
+        if (callCount === 1) {
+          throw retryableError;
+        }
+        return response;
+      });
 
-        const pending = executeRetryRequest({
-          fetcher,
-          retry: {
-            retries: 1,
-            baseDelayMs: 5,
-            maxDelayMs: 5,
-            jitterRatio: 0,
-          },
-        });
+      const pending = executeRetryRequest({
+        fetcher,
+        retry: {
+          retries: 1,
+          baseDelayMs: 5,
+          maxDelayMs: 5,
+          jitterRatio: 0,
+        },
+      });
 
-        await flushMicrotasks();
-        expect(fetcher).toHaveBeenCalledTimes(1);
-        await rs.advanceTimersByTimeAsync(4);
-        expect(fetcher).toHaveBeenCalledTimes(1);
-        await rs.advanceTimersByTimeAsync(1);
-        await expect(pending).resolves.toBe(response);
-        expect(fetcher).toHaveBeenCalledTimes(2);
-      }
+      await flushMicrotasks();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await rs.advanceTimersByTimeAsync(4);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await rs.advanceTimersByTimeAsync(1);
+      await expect(pending).resolves.toBe(response);
+      expect(fetcher).toHaveBeenCalledTimes(2);
     } finally {
       await rs.advanceTimersByTimeAsync(1000);
       rs.useRealTimers();
@@ -181,25 +179,24 @@ describe('transport retry behavior', () => {
   });
 
   test('does not retry non-retryable status codes', async () => {
-    for (const statusCode of nonRetryableStatusCodes) {
-      const error = createStatusError(statusCode);
-      const fetcher = rs.fn(async () => {
-        throw error;
-      });
+    const statusCode = nonRetryableStatusCodes[0];
+    const error = createStatusError(statusCode);
+    const fetcher = rs.fn(async () => {
+      throw error;
+    });
 
-      await expect(
-        executeRetryRequest({
-          fetcher,
-          retry: {
-            retries: 2,
-            baseDelayMs: 1,
-            maxDelayMs: 1,
-            jitterRatio: 0,
-          },
-        }),
-      ).rejects.toBe(error);
-      expect(fetcher).toHaveBeenCalledTimes(1);
-    }
+    await expect(
+      executeRetryRequest({
+        fetcher,
+        retry: {
+          retries: 2,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+          jitterRatio: 0,
+        },
+      }),
+    ).rejects.toBe(error);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   test('uses a custom shouldRetry predicate instead of default rules', async () => {

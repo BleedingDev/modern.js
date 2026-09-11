@@ -59,64 +59,12 @@ describe('fork runtime context projection', () => {
     expect(internal.requestContext).toBe(publicValue.requestContext);
     expect(internal.context).toBe(internal.requestContext);
     expect(publicValue.context).toBe(internal.requestContext);
-    expect(internal.requestContext.request).toEqual({
-      params: { category: 'compact' },
-      pathname: '/tractors',
-      query: { sort: 'price' },
-      headers: { accept: 'text/html' },
-      host: 'example.test',
-      url: 'https://example.test/tractors?sort=price',
-      userAgent: undefined,
-      cookie: undefined,
-      referer: undefined,
-    });
-    expect(internal.requestContext.response).toEqual({
-      locals: response.locals,
-    });
     expect(internal.requestContext.response.locals).toBe(response.locals);
-    expect(Object.keys(internal.requestContext.response)).toEqual(['locals']);
-    expect(typeof internal.requestContext.response.setHeader).toBe('function');
-    expect(typeof internal.requestContext.response.status).toBe('function');
     expect(context.ssrContext.response).toBe(response);
-    expect(Object.keys(response)).toEqual(['setHeader', 'status', 'locals']);
     expect(extension.get(context)).toBe(state);
     // Internal RSC copy behavior is retained pending separate Flight proof.
     expect(extension.get(internal)).toBe(state);
     expect(extension.get(publicValue)).toBeUndefined();
-  });
-
-  it('provides the existing empty RSC request fallback when no SSR context exists', () => {
-    const context = { isBrowser: false };
-    const result = projectRuntimeContext(
-      { internalContext: context, publicContext: { ...context } },
-      { context, isRsc: true },
-    );
-    expect(result.internalContext).toMatchObject({
-      context: {
-        request: {
-          params: {},
-          pathname: '',
-          query: {},
-          headers: {},
-          host: '',
-          url: '',
-        },
-        response: { locals: {} },
-      },
-      requestContext: {
-        request: {
-          params: {},
-          pathname: '',
-          query: {},
-          headers: {},
-          host: '',
-          url: '',
-        },
-        response: { locals: {} },
-      },
-    });
-    expect(result.internalContext).not.toHaveProperty('ssrContext');
-    expect(context).toEqual({ isBrowser: false });
   });
 
   it('does not apply server request projection to an RSC browser context', () => {

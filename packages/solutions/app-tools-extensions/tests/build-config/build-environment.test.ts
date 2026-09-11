@@ -93,12 +93,12 @@ function writeCompiler(compilerPath: string, mode: number): void {
   chmodSync(compilerPath, mode);
 }
 
-function createTestCompiler(options?: { omit?: LifecycleHookName }) {
+function createTestCompiler() {
   const handlers = Object.fromEntries(
     LIFECYCLE_HOOK_NAMES.map(name => [name, [] as Array<() => void>]),
   ) as Record<LifecycleHookName, Array<() => void>>;
   const hooks = Object.fromEntries(
-    LIFECYCLE_HOOK_NAMES.filter(name => name !== options?.omit).map(name => [
+    LIFECYCLE_HOOK_NAMES.map(name => [
       name,
       {
         tap: (
@@ -204,46 +204,42 @@ test('rejects overlapping leases for conflicting values', async () => {
   });
 });
 
-test('keeps a one-shot lease through done and restores after afterDone', async () => {
-  const name = 'ULTRAMODERN_CONFIG_AFTER_DONE_LEASE_TEST';
+test('holds a lease through watch-mode rebuilds and a one-shot done cycle, restoring on close', async () => {
+  const name = 'ULTRAMODERN_CONFIG_HOOK_LIFECYCLE_TEST';
 
   await withEnvironment(name, 'original', async () => {
-    const config = await withBuildConfigEnvironment(
+    // Watch mode: repeated done/afterDone/failed cycles must not release the
+    // lease early — only watchClose ends it.
+    const watchConfig = await withBuildConfigEnvironment(
       name,
       'leased',
       (rspackConfig: TestRspackConfig) => rspackConfig,
     )({ plugins: [] });
-    const compiler = createTestCompiler();
+    const watchCompiler = createTestCompiler();
+    getLeasePlugin(watchConfig).apply(watchCompiler.compiler);
 
-    getLeasePlugin(config).apply(compiler.compiler);
-    compiler.call('run');
-    compiler.call('done');
+    watchCompiler.call('watchRun');
+    watchCompiler.call('done');
+    watchCompiler.call('afterDone');
+    watchCompiler.call('failed');
     assert.equal(process.env[name], 'leased');
-
-    compiler.call('afterDone');
+    watchCompiler.call('watchClose');
     assert.equal(process.env[name], 'original');
-  });
-});
 
-test('retains a watch lease across rebuild completion and failure', async () => {
-  const name = 'ULTRAMODERN_CONFIG_WATCH_LEASE_TEST';
-
-  await withEnvironment(name, 'original', async () => {
-    const config = await withBuildConfigEnvironment(
+    // One-shot mode: the lease is acquired for `run` and released as soon as
+    // `afterDone` fires, without needing a watchClose.
+    const oneShotConfig = await withBuildConfigEnvironment(
       name,
       'leased',
       (rspackConfig: TestRspackConfig) => rspackConfig,
     )({ plugins: [] });
-    const compiler = createTestCompiler();
+    const oneShotCompiler = createTestCompiler();
+    getLeasePlugin(oneShotConfig).apply(oneShotCompiler.compiler);
 
-    getLeasePlugin(config).apply(compiler.compiler);
-    compiler.call('watchRun');
-    compiler.call('done');
-    compiler.call('afterDone');
-    compiler.call('failed');
+    oneShotCompiler.call('run');
+    oneShotCompiler.call('done');
     assert.equal(process.env[name], 'leased');
-
-    compiler.call('watchClose');
+    oneShotCompiler.call('afterDone');
     assert.equal(process.env[name], 'original');
   });
 });
@@ -299,23 +295,6 @@ test('fails closed and restores the original value after ownership drift', async
     );
     assert.equal(process.env[name], 'original');
   });
-});
-
-test('prefers an explicit Effect TS-Go compiler path', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'app-tools-effect-tsgo-bin-'));
-  const compilerPath = join(directory, 'effect-tsgo');
-
-  try {
-    writeCompiler(compilerPath, 0o700);
-    await withEnvironment('EFFECT_TSGO_BIN', `  ${compilerPath}  `, () => {
-      assert.equal(
-        resolveEffectTsgoCompiler({ from: import.meta.url }),
-        compilerPath,
-      );
-    });
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
 });
 
 test('repairs Unix execute bits and preserves Windows package paths without mutation', async () => {

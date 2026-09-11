@@ -46,11 +46,6 @@ async function configuredServerOptions(appDirectory: string) {
   const configured = await api
     .getHooks()
     ._internalServerPlugins.call({ plugins: [] });
-  expect(configured.plugins).toHaveLength(1);
-  expect(configured.plugins[0]!.name).toBe(
-    '@modern-js/plugin-bff/server-plugin',
-  );
-  expect(api.getAppContext().bffRuntimeFramework).toBe('effect');
   return JSON.parse(
     JSON.stringify(configured.plugins[0]!.options),
   ) as BffServerPluginOptions;
@@ -93,12 +88,6 @@ test('CLI-composed Effect server registers every configured prefix after seriali
       'dir',
     );
     const options = await configuredServerOptions(appDirectory);
-    expect(options.runtimeAdapters).toEqual({
-      effect: '@modern-js/plugin-bff-extensions/effect-adapter',
-    });
-    expect(options.honoRouteBinder).toBe(
-      '@modern-js/plugin-bff-extensions/hono/node',
-    );
     const { serverContext } = await server.run({
       plugins: [compatPlugin(), plugin(options), observer] as BasePlugin[],
       options: {

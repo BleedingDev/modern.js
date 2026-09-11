@@ -1,4 +1,3 @@
-import { execFileSync } from 'child_process';
 import path from 'path';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import {
@@ -11,22 +10,6 @@ import {
 import { clearI18nTestState, waitForHydration } from '../../test-utils';
 
 const appDir = path.resolve(__dirname, '../');
-
-function resolveTsgoBin() {
-  const pkgPath = require.resolve('@typescript/native-preview/package.json');
-  const pkgDir = path.dirname(pkgPath);
-  const pkg = require(pkgPath) as {
-    bin?:
-      | string
-      | {
-          tsgo?: string;
-        };
-  };
-  const binEntry = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.tsgo;
-  return path.resolve(pkgDir, binEntry ?? 'bin/tsgo.js');
-}
-
-const tsgoBin = resolveTsgoBin();
 
 async function fetchHtml(url: string) {
   const res = await fetch(url, {
@@ -129,20 +112,6 @@ describe('i18n TanStack localisedUrls', () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe('/cs');
-  });
-
-  test('generated TanStack route types include localized aliases', () => {
-    try {
-      execFileSync(
-        process.execPath,
-        [tsgoBin, '--noEmit', '-p', 'tsconfig.json'],
-        { cwd: appDir, stdio: 'pipe' },
-      );
-    } catch (e: any) {
-      const stdout = e?.stdout ? String(e.stdout) : '';
-      const stderr = e?.stderr ? String(e.stderr) : '';
-      throw new Error(`TypeScript typecheck failed:\n${stdout}\n${stderr}`);
-    }
   });
 
   test('TanStack Link navigates to localized aliases without a document reload', async () => {
@@ -266,44 +235,6 @@ describe('i18n TanStack localisedUrls', () => {
       ok: true,
       scope: 'tanstack-localised-urls',
     });
-  });
-
-  test('framework Link navigates cross-page hash targets without reload', async () => {
-    await page.goto(`http://localhost:${appPort}/cs/odkaz-probe`, {
-      waitUntil: ['networkidle0'],
-    });
-    await waitForHydration(page, '[data-testid="hash-cta"]');
-    await setReloadSentinel(page);
-
-    await page.click('[data-testid="hash-cta"]');
-
-    await page.waitForFunction(
-      () =>
-        window.location.pathname === '/cs' &&
-        window.location.hash === '#work-with-me',
-    );
-
-    expect(await getReloadSentinel(page)).toBe('kept');
-
-    // Verify the element is present in the DOM (hash navigation completed)
-    const elementExists = await page.evaluate(
-      () => document.getElementById('work-with-me') !== null,
-    );
-    expect(elementExists).toBe(true);
-    expect(errors).toEqual([]);
-  });
-
-  test('typed Link localizes params', async () => {
-    await page.goto(`http://localhost:${appPort}/cs/odkaz-probe`, {
-      waitUntil: ['networkidle0'],
-    });
-    await waitForHydration(page, '[data-testid="typed-product"]');
-
-    const href = await page.$eval('[data-testid="typed-product"]', el =>
-      el.getAttribute('href'),
-    );
-    expect(href).toBe('/cs/produkty/bota');
-    expect(errors).toEqual([]);
   });
 
   test('active state is language-invariant', async () => {

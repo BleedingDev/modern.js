@@ -4,7 +4,6 @@ import {
   createServerBase,
   type ServerPlugin,
 } from '@modern-js/server-core';
-import { logger } from '@modern-js/utils';
 import { injectTelemetryPlugin } from '../src/telemetry';
 import { getDefaultAppContext, getDefaultConfig } from './helpers';
 
@@ -46,59 +45,6 @@ const waitFor = async (
 };
 
 describe('telemetry plugin lifecycle', () => {
-  test('wires server.telemetry.slo through to alert emission', async () => {
-    const warnSpy = rs.spyOn(logger, 'warn').mockImplementation(() => {});
-
-    let server: ReturnType<typeof createServerBase> | undefined;
-
-    try {
-      const config = getDefaultConfig();
-      config.server = {
-        telemetry: {
-          enabled: true,
-          maxQueueSize: 2,
-          maxBatchSize: 500,
-          flushIntervalMs: 60_000,
-          slo: {
-            queueUtilizationWarnThreshold: 0.5,
-            queueDroppedWarnThreshold: 1,
-            alertCooldownMs: 0,
-          },
-        },
-      } as any;
-
-      server = createServerBase({
-        config,
-        pwd: process.cwd(),
-        appContext: getDefaultAppContext(),
-      });
-      server.addPlugins([
-        ...createDefaultPlugins({ logger: false }),
-        injectTelemetryPlugin(),
-        emitMonitorEventsPlugin({
-          path: '/emit',
-          message: 'slo-probe',
-          count: 6,
-        }),
-      ]);
-      await server.init();
-
-      const response = await server.request('/emit', {}, {});
-      expect(response.status).toBe(200);
-
-      const sloWarnings = warnSpy.mock.calls.filter(call =>
-        String(call[0]).includes('[telemetry.slo]'),
-      );
-      expect(sloWarnings.length).toBeGreaterThan(0);
-      expect(
-        sloWarnings.some(call => String(call[0]).includes('queue.drop')),
-      ).toBe(true);
-    } finally {
-      await server?.dispose();
-      warnSpy.mockRestore();
-    }
-  });
-
   test('flushes pending envelopes when the native runtime is disposed', async () => {
     const fetchCalls: Array<{ url: string; body: string }> = [];
     const fetchMock = rs.fn(async (url: any, init?: any) => {

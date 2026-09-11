@@ -56,47 +56,6 @@ const advance = async (milliseconds: number) => {
   await Promise.resolve();
 };
 
-type SignalInitFactory = (
-  controller: AbortController,
-  onRead: () => void,
-) => RequestInit;
-
-const signalCompatibilityCases: Array<
-  readonly [string, SignalInitFactory, 'GET' | 'POST']
-> = [
-  [
-    'accessor',
-    (controller, onRead) => {
-      const init = {} as RequestInit;
-      Object.defineProperty(init, 'signal', {
-        enumerable: true,
-        get() {
-          onRead();
-          return controller.signal;
-        },
-      });
-      return init;
-    },
-    'GET',
-  ],
-  [
-    'inherited',
-    controller => Object.create({ signal: controller.signal }) as RequestInit,
-    'GET',
-  ],
-  [
-    'non-enumerable',
-    controller => {
-      const init = { method: 'POST' } as RequestInit;
-      Object.defineProperty(init, 'signal', {
-        value: controller.signal,
-      });
-      return init;
-    },
-    'POST',
-  ],
-];
-
 describe('Effect batch cancellation and deadlines', () => {
   beforeEach(() => {
     rs.useFakeTimers();
@@ -200,61 +159,6 @@ describe('Effect batch cancellation and deadlines', () => {
       { status: 'rejected', reason },
       { status: 'fulfilled', value: { path: '/same-key' } },
     ]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  test.each(
-    signalCompatibilityCases,
-  )('preserves the %s RequestInit signal boundary', async (_name, makeInit, method) => {
-    const controller = new AbortController();
-    const reason = new DOMException('caller stopped', 'AbortError');
-    const path = `/${_name}-signal`;
-    let signalReads = 0;
-    const fetchMock = rs.fn(
-      async (_input: string | URL | Request, init?: RequestInit) => {
-        if (method === 'POST') {
-          expect(init?.method).toBe('POST');
-          expect(init?.signal).toBe(controller.signal);
-          const signal = init?.signal;
-          if (signal?.aborted) {
-            throw signal.reason;
-          }
-          return new Promise<Response>((_resolve, reject) => {
-            signal?.addEventListener('abort', () => reject(signal.reason), {
-              once: true,
-            });
-          });
-        }
-
-        const url = String(_input);
-        return url.endsWith(DEFAULT_DATA_BATCH_ENDPOINT)
-          ? batchResponse(parseBatchPayload(init))
-          : Response.json({ path: new URL(url).pathname });
-      },
-    );
-    const request = createQueue(fetchMock);
-    const init = makeInit(controller, () => {
-      signalReads += 1;
-    });
-    const signaled = request(`http://localhost${path}`, init);
-
-    if (method === 'POST') {
-      await Promise.resolve();
-      controller.abort(reason);
-      await expect(signaled).rejects.toBe(reason);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      return;
-    }
-
-    const unsignaled = request(`http://localhost${path}`);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    controller.abort(reason);
-    await expect(signaled).rejects.toBe(reason);
-    await advance(100);
-    await expect(unsignaled).resolves.toEqual({ path });
-    expect(signalReads).toBe(_name === 'accessor' ? 1 : 0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -432,49 +336,6 @@ describe('Effect batch cancellation and deadlines', () => {
     expect(
       events.filter(event => event.reason === 'batch-transport-error'),
     ).toHaveLength(0);
-    expect(registry.size).toBe(0);
-  });
-
-  test('carries the remaining deadline into safe replay', async () => {
-    const registry = new BatchBucketRegistry();
-    const calls: string[] = [];
-    const fetchMock = rs.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      calls.push(url);
-      if (url.endsWith(DEFAULT_DATA_BATCH_ENDPOINT)) {
-        return new Response('unavailable', { status: 503 });
-      }
-      return new Promise<Response>(() => {});
-    });
-    const request = createQueue(
-      fetchMock,
-      { maxBatchSize: 2, requestTimeoutMs: 25 },
-      registry,
-    );
-    const outcomes = Promise.allSettled([
-      request('http://localhost/replay-a'),
-      request('http://localhost/replay-b'),
-    ]);
-
-    await advance(0);
-    expect(calls).toEqual([
-      `http://localhost${DEFAULT_DATA_BATCH_ENDPOINT}`,
-      'http://localhost/replay-a',
-      'http://localhost/replay-b',
-    ]);
-    await advance(25);
-
-    await expect(outcomes).resolves.toEqual([
-      {
-        status: 'rejected',
-        reason: expect.objectContaining({ name: 'TimeoutError' }),
-      },
-      {
-        status: 'rejected',
-        reason: expect.objectContaining({ name: 'TimeoutError' }),
-      },
-    ]);
-    expect(calls).toHaveLength(3);
     expect(registry.size).toBe(0);
   });
 

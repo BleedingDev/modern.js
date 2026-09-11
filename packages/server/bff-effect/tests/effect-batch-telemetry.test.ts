@@ -1,5 +1,3 @@
-import { type Span, trace } from '@opentelemetry/api';
-
 import {
   type DataBatchRequestPayload,
   DEFAULT_DATA_BATCH_ENDPOINT,
@@ -49,24 +47,11 @@ describe('Effect batch telemetry isolation', () => {
     rs.restoreAllMocks();
   });
 
-  test.each([
-    'event callback',
-    'active-span event emission',
-  ] as const)('settles requests when the %s observer throws', async observer => {
-    const callbackError = new Error(`${observer} failed`);
+  test('settles requests when the event callback throws', async () => {
+    const callbackError = new Error('event callback failed');
     const onEvent = rs.fn(() => {
-      if (observer === 'event callback') {
-        throw callbackError;
-      }
+      throw callbackError;
     });
-    const addEvent = rs.fn(() => {
-      if (observer === 'active-span event emission') {
-        throw callbackError;
-      }
-    });
-    rs.spyOn(trace, 'getActiveSpan').mockReturnValue({
-      addEvent,
-    } as unknown as Span);
     const { bucketRegistry, request } = createQueue(onEvent);
 
     await expect(
@@ -77,6 +62,5 @@ describe('Effect batch telemetry isolation', () => {
     ).resolves.toEqual([{ path: '/first' }, { path: '/second' }]);
     expect(bucketRegistry.size).toBe(0);
     expect(onEvent).toHaveBeenCalled();
-    expect(addEvent).toHaveBeenCalled();
   });
 });

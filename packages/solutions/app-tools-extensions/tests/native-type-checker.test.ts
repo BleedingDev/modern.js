@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { rspack } from '@rsbuild/core';
 import { UltramodernNativeTypeChecker } from '../src/native-type-checker';
 
 const require = createRequire(import.meta.url);
@@ -91,3 +92,77 @@ test('ordinary project checks emit nothing and surface compiler startup failures
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('the rspack plugin reports type errors as build errors and registers referenced type-only inputs', async () => {
+  const root = fs.realpathSync.native(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'native-plugin-check-')),
+  );
+  const compilerOptions = {
+    composite: true,
+    declaration: true,
+    emitDeclarationOnly: true,
+    noEmit: false,
+    types: [],
+  };
+  for (const [relative, value] of Object.entries({
+    'lib/index.ts': 'export interface Value { name: number }',
+    'lib/tsconfig.json': JSON.stringify({
+      compilerOptions,
+      files: ['index.ts'],
+    }),
+    'app/index.ts':
+      "import type { Value } from '../lib'; export const item: Value = { name: 'ok' };",
+    'app/tsconfig.json': JSON.stringify({
+      compilerOptions,
+      files: ['index.ts'],
+      references: [{ path: '../lib' }],
+    }),
+  })) {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, value);
+  }
+  const build = rspack({
+    context: root,
+    mode: 'development',
+    devtool: false,
+    entry: './app/index.ts',
+    output: { path: path.join(root, 'dist') },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          loader: 'builtin:swc-loader',
+          options: { jsc: { parser: { syntax: 'typescript' } } },
+        },
+      ],
+    },
+    plugins: [
+      new UltramodernNativeTypeChecker({
+        build: true,
+        configFile: path.join(root, 'app/tsconfig.json'),
+        compiler: () => compiler,
+      }),
+    ],
+  });
+  try {
+    const stats = await new Promise<any>((resolve, reject) =>
+      build.run((error, result) => (error ? reject(error) : resolve(result))),
+    );
+    expect(stats.toString({ all: false, errors: true })).toContain('TS2322');
+    // Type-only inputs are outside the module graph; watch rebuilds only if they are registered.
+    expect(
+      stats.compilation.fileDependencies.has(path.join(root, 'lib/index.ts')),
+    ).toBe(true);
+    expect(
+      stats.compilation.fileDependencies.has(
+        path.join(root, 'app/tsconfig.json'),
+      ),
+    ).toBe(true);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      build.close(error => (error ? reject(error) : resolve())),
+    );
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}, 30000);

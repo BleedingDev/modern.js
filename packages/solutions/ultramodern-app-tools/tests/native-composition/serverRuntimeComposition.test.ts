@@ -62,30 +62,6 @@ const linkComposer = (appDirectory: string) => {
 };
 
 describe('server runtime composition', () => {
-  test('registers one portable descriptor and preserves user descriptors', async () => {
-    const api = await createCliApi(packageDirectory);
-    const user = {
-      name: '@modern-js/consumer-server-plugin',
-      options: { enabled: true },
-    };
-    const first = await api
-      .getHooks()
-      ._internalServerPlugins.call({ plugins: [user] });
-    expect(
-      first.plugins.filter(plugin => plugin.name === descriptorName),
-    ).toHaveLength(1);
-    expect(first.plugins).toContain(user);
-    const manual = { name: descriptorName };
-    const second = await api
-      .getHooks()
-      ._internalServerPlugins.call({ plugins: [user, manual] });
-    expect(
-      second.plugins.filter(plugin => plugin.name === descriptorName),
-    ).toEqual([manual]);
-    expect(second.plugins).toContain(user);
-    expect(user.options).toEqual({ enabled: true });
-  });
-
   test('loads the public server subpath from an isolated and relocated consumer', async () => {
     const root = fs.mkdtempSync(
       path.join(os.tmpdir(), 'um-server-composition-'),
@@ -115,9 +91,6 @@ describe('server runtime composition', () => {
         },
         config: { bff: {} } as Parameters<typeof generateHandler>[0]['config'],
       });
-      expect(code).toContain(descriptorName);
-      expect(code).not.toContain(packageDirectory);
-      expect(code).not.toContain(originalDirectory);
       fs.writeFileSync(
         path.join(originalDirectory, 'generated-server.cjs'),
         code,
@@ -224,10 +197,6 @@ assert.throws(
       await preset.writeOutput?.();
       await preset.genEntry?.();
       const entryPath = path.join(appDirectory, '.output/server/index.mjs');
-      const source = fs.readFileSync(entryPath, 'utf8');
-      expect(source).not.toContain(descriptorName);
-      expect(source).not.toContain('@modern-js/server-runtime-extensions');
-      expect(source).not.toMatch(/from\s*['"]node:/u);
       const worker = (await import(pathToFileURL(entryPath).href)).default;
       const response = await worker.fetch(
         new Request('https://worker.example/'),

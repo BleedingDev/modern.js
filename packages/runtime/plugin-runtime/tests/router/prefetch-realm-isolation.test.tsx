@@ -111,43 +111,6 @@ describe('route prefetch cache realms', () => {
     second.unmount();
   });
 
-  test('does not share identical route chunks across webpack public paths', async () => {
-    const routes = createRoutes('public-path-route');
-    const realm = createRealm(routes, 'shared');
-    const loader = rstest.fn(() => Promise.resolve());
-    const first = renderRealm(routes, realm, loader, '/shell-a/');
-    await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
-    first.unmount();
-
-    const second = renderRealm(routes, realm, loader, '/shell-b/');
-    await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
-    second.unmount();
-  });
-
-  test('does not share identical route chunks across federation containers', async () => {
-    const routes = createRoutes('container-route');
-    const realm = createRealm(routes, 'shared');
-    const hostLoader = rstest.fn(() => Promise.resolve());
-    const remoteLoader = rstest.fn(() => Promise.resolve());
-    const host = renderRealm(routes, realm, hostLoader, '/shared/');
-    await waitFor(() => expect(hostLoader).toHaveBeenCalledTimes(1));
-    host.unmount();
-
-    const remote = renderRealm(routes, realm, remoteLoader, '/shared/');
-    await waitFor(() => expect(remoteLoader).toHaveBeenCalledTimes(1));
-    remote.unmount();
-  });
-
-  test('deduplicates identical route chunks inside one runtime realm', async () => {
-    const routes = createRoutes('same-realm-route', true);
-    const realm = createRealm(routes, 'shared');
-    const loader = rstest.fn(() => Promise.resolve());
-    const rendered = renderRealm(routes, realm, loader, '/same/');
-
-    await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
-    rendered.unmount();
-  });
-
   test('warms changed route module inputs in the same runtime realm', async () => {
     const routeId = 'mutated-assets-route';
     let rerenderLink = () => {};

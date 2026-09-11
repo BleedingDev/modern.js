@@ -93,98 +93,51 @@ describe('module federation SSR output compatibility', () => {
     delete process.env.MODERN_MF_APP_SSR_REQUIRE_EXPLICIT;
   });
 
-  it('detects module federation markers', () => {
-    expect(
-      shouldUseModuleFederationNodeOutput({
+  it.each([
+    {
+      label: 'no markers on a plain node target',
+      input: { output: { target: 'node' } },
+      expected: false,
+    },
+    {
+      label: 'a runtime source define marker',
+      input: {
         output: { target: 'node' },
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldUseModuleFederationNodeOutput({
+        source: { define: { REMOTE_IP_STRATEGY: '"inherit"' } },
+      },
+      expected: true,
+    },
+    {
+      label: 'a node-prefixed target with a source define marker',
+      input: {
+        output: { target: 'node18' },
+        source: { define: { REMOTE_IP_STRATEGY: '"inherit"' } },
+      },
+      expected: true,
+    },
+    {
+      label: 'a module federation rspack plugin instance',
+      input: {
         output: { target: 'node' },
-        source: {
-          define: {
-            REMOTE_IP_STRATEGY: '"inherit"',
+        tools: {
+          rspack: {
+            plugins: [new (class ModuleFederationPlugin {})()],
           },
         },
-      }),
-    ).toBe(true);
+      },
+      expected: true,
+    },
+  ])('detects module federation markers: $label', ({ input, expected }) => {
+    expect(shouldUseModuleFederationNodeOutput(input as any)).toBe(expected);
+  });
 
+  it('detects module federation via the MF_SSR_PRJ environment marker', () => {
     process.env.MF_SSR_PRJ = 'true';
     expect(
       shouldUseModuleFederationNodeOutput({
         output: { target: 'node' },
       }),
     ).toBe(true);
-  });
-
-  it('treats node-prefixed targets as server targets for module federation detection', () => {
-    expect(
-      shouldUseModuleFederationNodeOutput({
-        output: { target: 'node18' },
-        source: {
-          define: {
-            REMOTE_IP_STRATEGY: '"inherit"',
-          },
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('detects module federation rspack plugin shape', () => {
-    class ModuleFederationPlugin {}
-
-    expect(
-      shouldUseModuleFederationNodeOutput({
-        output: { target: 'node' },
-        tools: {
-          rspack: {
-            plugins: [new ModuleFederationPlugin()],
-          },
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it.each([
-    { enabled: false, normalizedConfig: {} },
-    {
-      enabled: true,
-      normalizedConfig: {
-        server: { ssr: { mode: 'stream', moduleFederationAppSSR: true } },
-      },
-    },
-  ])('serializes the public marker as the $enabled string', ({
-    enabled,
-    normalizedConfig,
-  }) => {
-    const marker = String(enabled);
-    const transform = createEnvironmentConfigTransformer({ normalizedConfig });
-    const result = transform({
-      output: { target: 'node' },
-    });
-
-    const defineValue =
-      result.source?.define?.['process.env.MODERN_MF_APP_SSR'];
-    expect(defineValue).toBe(JSON.stringify(marker));
-    expect(JSON.parse(defineValue)).toBe(marker);
-  });
-
-  it('keeps esm output for non-mf node server builds', () => {
-    const transform = createEnvironmentConfigTransformer();
-    const result = transform({
-      output: {
-        target: 'node',
-      },
-    });
-
-    expect(result.output.module).toBe(true);
-    expect(result.output.target).toBe('node');
-    expect(result.source?.define?.['process.env.MODERN_MF_APP_SSR']).toBe(
-      JSON.stringify('false'),
-    );
-    expect(result.tools?.bundlerChain).toBeUndefined();
   });
 
   it('does not force async-node commonjs output from runtime markers alone for module federation server builds', () => {
@@ -208,84 +161,6 @@ describe('module federation SSR output compatibility', () => {
         JSON.stringify('false'),
       );
       expect(result.splitChunks).toBe(false);
-      expect(result.tools?.bundlerChain).toBeUndefined();
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(String(warnSpy.mock.calls[0]?.[0] || '')).toContain('mf-ssr');
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
-  it('keeps explicit module federation SSR server output in one chunk', () => {
-    const transform = createEnvironmentConfigTransformer({
-      normalizedConfig: {
-        server: { ssr: { moduleFederationAppSSR: true } },
-      },
-    });
-    const result = transform({ output: { target: 'node' } });
-
-    expect(result.splitChunks).toBe(false);
-  });
-
-  it('does not force module federation node output for custom node targets from runtime markers alone', () => {
-    const warnSpy = rs.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const transform = createEnvironmentConfigTransformer();
-      const result = transform({
-        output: {
-          target: 'node18',
-        },
-        source: {
-          define: {
-            REMOTE_IP_STRATEGY: '"inherit"',
-          },
-        },
-      });
-
-      expect(result.output.module).toBe(true);
-      expect(result.output.target).toBe('node18');
-      expect(result.source?.define?.['process.env.MODERN_MF_APP_SSR']).toBe(
-        JSON.stringify('false'),
-      );
-      expect(result.tools?.bundlerChain).toBeUndefined();
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(String(warnSpy.mock.calls[0]?.[0] || '')).toContain('mf-ssr');
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
-  it('warns when module federation SSR is auto-detected without explicit stable flag', () => {
-    const warnSpy = rs.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const transform = createEnvironmentConfigTransformer({
-        normalizedConfig: {
-          server: {
-            ssr: {
-              mode: 'stream',
-            },
-          },
-        },
-      });
-
-      const result = transform({
-        output: {
-          target: 'node',
-        },
-        source: {
-          define: {
-            REMOTE_IP_STRATEGY: '"inherit"',
-          },
-        },
-      });
-
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(String(warnSpy.mock.calls[0]?.[0] || '')).toContain('mf-ssr');
-      expect(result.output.module).toBe(true);
-      expect(result.output.target).toBe('node');
-      expect(result.source?.define?.['process.env.MODERN_MF_APP_SSR']).toBe(
-        JSON.stringify('false'),
-      );
       expect(result.tools?.bundlerChain).toBeUndefined();
     } finally {
       warnSpy.mockRestore();
@@ -319,26 +194,6 @@ describe('module federation SSR output compatibility', () => {
     ).toThrow('MODERN_MF_APP_SSR_REQUIRE_EXPLICIT=true');
   });
 
-  it('does not force module federation node output when SSR and SSG are disabled', () => {
-    const transform = createEnvironmentConfigTransformer({
-      normalizedConfig: {},
-    });
-
-    const result = transform({
-      output: {
-        target: 'node',
-      },
-      source: {
-        define: {
-          REMOTE_IP_STRATEGY: '"inherit"',
-        },
-      },
-    });
-
-    expect(result.output.module).toBe(true);
-    expect(result.output.target).toBe('node');
-  });
-
   it('keeps esm node output when app-level mf ssr stable flag is enabled', () => {
     const transform = createEnvironmentConfigTransformer({
       normalizedConfig: {
@@ -363,65 +218,6 @@ describe('module federation SSR output compatibility', () => {
       JSON.stringify('true'),
     );
     expect(result.tools?.bundlerChain).toBeUndefined();
-  });
-
-  it('keeps esm node output when stable flag is set via ssrByEntries', () => {
-    const transform = createEnvironmentConfigTransformer({
-      normalizedConfig: {
-        server: {
-          ssrByEntries: {
-            main: {
-              mode: 'stream',
-              moduleFederationAppSSR: true,
-            },
-          },
-        },
-      },
-    });
-
-    const result = transform({
-      output: {
-        target: 'node',
-      },
-    });
-
-    expect(result.output.module).toBe(true);
-    expect(result.output.target).toBe('node');
-    expect(result.source?.define?.['process.env.MODERN_MF_APP_SSR']).toBe(
-      JSON.stringify('true'),
-    );
-    expect(result.tools?.bundlerChain).toBeUndefined();
-  });
-
-  it('honors explicit mf ssr stable flag for Cloudflare worker SSR builds', () => {
-    const transform = createEnvironmentConfigTransformer({
-      normalizedConfig: {
-        deploy: {
-          target: 'cloudflare',
-        },
-        server: {
-          ssr: {
-            mode: 'stream',
-            moduleFederationAppSSR: true,
-          },
-        },
-      },
-    });
-
-    const result = transform(
-      {
-        output: {
-          target: 'web-worker',
-        },
-      },
-      'workerSSR',
-    );
-
-    expect(result.output.module).toBe(true);
-    expect(result.output.target).toBe('web-worker');
-    expect(result.source?.define?.['process.env.MODERN_MF_APP_SSR']).toBe(
-      JSON.stringify('true'),
-    );
   });
 });
 

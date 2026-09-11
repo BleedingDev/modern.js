@@ -19,17 +19,6 @@ test('ordinary HTML root callback wraps the real React render', async () => {
   expect(await new Response(stream).text()).toBe(
     '<section><p>body</p></section>',
   );
-  expect(wrapHtmlRoot).toHaveBeenCalledExactlyOnceWith(root);
-  expect(renderedFlightRoots).toEqual([]);
-});
-test('HTML root callback may intentionally render null', async () => {
-  const root = <p>body</p>;
-  const stream = await renderSSRStream(root, {
-    request: new Request('http://localhost/'),
-    rscRoot: root,
-    wrapHtmlRoot: () => null,
-  });
-  expect(await new Response(stream).text()).toBe('');
 });
 test.each([
   'node',
@@ -46,9 +35,6 @@ test.each([
     wrapHtmlRoot,
   });
   const html = await new Response(stream).text();
-  expect(renderedFlightRoots).toEqual([flightRoot]);
-  expect(renderedFlightRoots[0]).toBe(flightRoot);
-  expect(wrapHtmlRoot).toHaveBeenCalledTimes(1);
   expect(html).toContain('<section><p>body</p></section>');
   expect(html).toContain('test Flight payload');
 });

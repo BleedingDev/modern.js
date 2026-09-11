@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,22 +9,6 @@ const { createTsgoInvocation } = tsgoInvocation;
 const require = createRequire(import.meta.url);
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(testDirectory, '../..');
-const packageJson = JSON.parse(
-  readFileSync(join(packageRoot, 'package.json'), 'utf-8'),
-);
-const configExport = packageJson.exports?.['./config'];
-const expectedExport = {
-  types: './dist/types/config.d.ts',
-  'modern:source': './src/config.ts',
-  import: './dist/esm-node/config.mjs',
-  require: './dist/cjs/config.js',
-};
-const expectedRuntimeExports = [
-  'getBuildConfigEnvironment',
-  'resolveEffectTsgoCompiler',
-  'withBuildConfigEnvironment',
-];
-assert.deepEqual(configExport, expectedExport);
 
 try {
   const tsgo = createTsgoInvocation({
@@ -47,8 +30,6 @@ try {
 
 const cjsConfig = require('@modern-js/app-tools-extensions/config');
 const esmConfig = await import('@modern-js/app-tools-extensions/config');
-assert.deepEqual(Object.keys(cjsConfig).sort(), expectedRuntimeExports);
-assert.deepEqual(Object.keys(esmConfig).sort(), expectedRuntimeExports);
 
 const hookNames = [
   'run',

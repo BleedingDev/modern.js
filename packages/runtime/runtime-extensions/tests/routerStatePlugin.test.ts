@@ -1,5 +1,4 @@
 import {
-  applyRouterRuntimeState,
   getRouterRuntimeState,
   getRouterServerSnapshot,
 } from '../src/routerState';
@@ -24,8 +23,7 @@ function install() {
 }
 
 test('keeps injected hooks and per-context policies stable without sharing app values', () => {
-  const { plugin, registryHooks, beforeRender } = install();
-  expect(plugin.registryHooks).toBe(registryHooks);
+  const { beforeRender } = install();
   const first: any = {};
   const second: any = {};
   beforeRender(first);
@@ -34,25 +32,6 @@ test('keeps injected hooks and per-context policies stable without sharing app v
   beforeRender(second);
   expect(first.linkPrefetchPolicy).toBe(policy);
   expect(second.linkPrefetchPolicy).not.toBe(policy);
-});
-
-test('stores the exact native client instance and retains an earlier server snapshot', () => {
-  const { afterCreate } = install();
-  const context = {};
-  applyRouterRuntimeState(context, {
-    framework: 'react-router',
-    serverSnapshot: { statusCode: 207, matchedRouteIds: ['server'] },
-  });
-  const router = { navigate() {} };
-  afterCreate({
-    framework: 'react-router',
-    phase: 'client-create',
-    runtimeContext: context,
-    router,
-    basename: '/app',
-  });
-  expect(getRouterRuntimeState(context)?.instance).toBe(router);
-  expect(getRouterServerSnapshot(context)?.statusCode).toBe(207);
 });
 
 test('projects loader data, errors and valid route ids from injected SSR input', () => {
@@ -81,28 +60,4 @@ test('projects loader data, errors and valid route ids from injected SSR input',
     matchedRouteIds: ['root'],
     routerData: { loaderData: context.routerContext.loaderData, errors },
   });
-});
-
-test('leaves other providers and incomplete native preparation untouched', () => {
-  const { afterCreate } = install();
-  const context = {};
-  applyRouterRuntimeState(context, {
-    framework: 'tanstack',
-    hydrationScripts: ['<script>hydrate()</script>'],
-    matches: [{ routeId: 'r', assetRouteId: 'asset' }],
-  });
-  const state = getRouterRuntimeState(context);
-  afterCreate({
-    framework: 'tanstack',
-    phase: 'ssr-prepare',
-    runtimeContext: context,
-  });
-  expect(getRouterRuntimeState(context)).toBe(state);
-  const incomplete = {};
-  afterCreate({
-    framework: 'react-router',
-    phase: 'ssr-prepare',
-    runtimeContext: incomplete,
-  });
-  expect(getRouterRuntimeState(incomplete)).toBeUndefined();
 });

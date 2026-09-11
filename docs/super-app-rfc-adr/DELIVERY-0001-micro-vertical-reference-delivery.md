@@ -100,10 +100,6 @@ Required handoff surfaces:
 - remote trust metadata,
 - compatibility digest.
 
-Canonical example:
-
-- [tests/integration/routes-tanstack-mf/tests/tanstack-mf-contract.test.ts](/Users/satan/side/experiments/modernjs/tests/integration/routes-tanstack-mf/tests/tanstack-mf-contract.test.ts)
-
 ### 3.3 Split Into an Independent Service When
 
 Promote data/workflow logic out of the shell or remote when:

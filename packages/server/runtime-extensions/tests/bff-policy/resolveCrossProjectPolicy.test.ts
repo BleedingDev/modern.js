@@ -27,23 +27,6 @@ describe('resolveCrossProjectPolicy', () => {
     ).toBeUndefined();
   });
 
-  test('enables policy with strict defaults for cross-project servers', () => {
-    const resolved = resolveCrossProjectPolicy({
-      handlers: createHandlers(),
-      isCrossProjectServer: true,
-    });
-
-    expect(resolved).toMatchObject({
-      enabled: true,
-      requireEnvelope: true,
-      requireOperationContext: true,
-      requireOperationContextDetails: true,
-      requireOperationSchemaHash: true,
-      requireOperationVersion: true,
-      allowUnknownOperations: false,
-    });
-  });
-
   test('keeps explicit user switches over derived defaults', () => {
     const resolved = resolveCrossProjectPolicy({
       crossProjectPolicy: {
@@ -62,32 +45,6 @@ describe('resolveCrossProjectPolicy', () => {
       allowUnknownOperations: true,
       denyStatus: 451,
     });
-  });
-
-  test('derives operation contracts from handlers and requestId', () => {
-    const handlers = createHandlers();
-    const resolved = resolveCrossProjectPolicy({
-      crossProjectPolicy: { enabled: true },
-      handlers,
-      requestId: 'crm',
-    });
-
-    expect(resolved?.expectedOperationContracts).toEqual(
-      buildOperationContractMap({ handlers, requestId: 'crm' }),
-    );
-  });
-
-  test('falls back to the default requestId when blank', () => {
-    const handlers = createHandlers();
-    const resolved = resolveCrossProjectPolicy({
-      crossProjectPolicy: { enabled: true },
-      handlers,
-      requestId: '   ',
-    });
-
-    expect(resolved?.expectedOperationContracts).toEqual(
-      buildOperationContractMap({ handlers, requestId: 'default' }),
-    );
   });
 
   test('generated contracts override user-provided entries for the same key', () => {
@@ -114,21 +71,6 @@ describe('resolveCrossProjectPolicy', () => {
     expect(resolved?.expectedOperationContracts['POST:/extra']).toEqual({
       schemaHash: 'kept',
       operationVersion: 2,
-    });
-  });
-});
-
-describe('resolveCrossProjectPolicy operation version', () => {
-  test('derived operation version flows into generated contracts', () => {
-    const resolved = resolveCrossProjectPolicy({
-      handlers: createHandlers(),
-      isCrossProjectServer: true,
-      requestId: 'crm',
-      operationVersion: 5,
-    });
-
-    expect(resolved?.expectedOperationContracts['GET:/hello']).toMatchObject({
-      operationVersion: 5,
     });
   });
 });

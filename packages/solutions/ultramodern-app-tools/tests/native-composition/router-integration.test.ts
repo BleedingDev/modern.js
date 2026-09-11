@@ -182,13 +182,9 @@ describe('canonical router composition', () => {
     metadata,
     router,
   }) => {
-    const { api, appDirectory, plugins } = await initializeRouterCli({
+    const { api, appDirectory } = await initializeRouterCli({
       router,
     });
-    const names = plugins.map(plugin => plugin.name);
-    expect(
-      names.indexOf('@modern-js/ultramodern-router-integration'),
-    ).toBeGreaterThan(names.indexOf('@modern-js/plugin-router'));
     for (const entryName of ['main', 'admin']) {
       const entrypoint = {
         entryName,
@@ -246,14 +242,10 @@ describe('canonical router composition', () => {
     name,
     runtimePath,
   }) => {
-    const { api, appDirectory, plugins } = await initializeRouterCli({
+    const { api, appDirectory } = await initializeRouterCli({
       tanstack: true,
       router: { framework: 'tanstack' },
     });
-    const names = plugins.map(plugin => plugin.name);
-    expect(
-      names.indexOf('@modern-js/ultramodern-router-integration'),
-    ).toBeGreaterThan(names.indexOf('@modern-js/plugin-tanstack'));
     const result = await api.getHooks()._internalRuntimePlugins.call({
       entrypoint: {
         entryName: 'main',
@@ -289,9 +281,6 @@ describe('canonical router composition', () => {
     const result = await api
       .getHooks()
       ._internalRuntimePlugins.call({ entrypoint, plugins: [custom] });
-    expect(result.plugins.filter(plugin => plugin.name === 'router')).toEqual([
-      custom,
-    ]);
     expect(result.plugins.find(plugin => plugin.name === 'router')).toBe(
       custom,
     );

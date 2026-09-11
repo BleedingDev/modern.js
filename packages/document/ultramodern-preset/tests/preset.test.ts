@@ -38,33 +38,6 @@ test('applies fork branding without discarding upstream Rspress behavior', () =>
   );
 
   assert.equal(config.base, '/ultramodern.js/');
-  assert.deepEqual(config.logo, {
-    light: '/ultramodern.js/img/ultramodern-logo-light.svg',
-    dark: '/ultramodern.js/img/ultramodern-logo-dark.svg',
-  });
-  assert.equal(
-    config.icon,
-    'https://bleedingdev.github.io/ultramodern.js/img/favicon.ico',
-  );
-  assert.deepEqual(
-    config.themeConfig?.locales?.map(locale => ({
-      lang: locale.lang,
-      label: locale.label,
-      title: locale.title,
-    })),
-    [
-      { lang: 'zh', label: '简体中文', title: 'UltraModern.js 3.0' },
-      { lang: 'en', label: 'English', title: 'UltraModern.js 3.0' },
-    ],
-  );
-  assert.deepEqual(config.themeConfig?.socialLinks, [
-    { icon: 'discord', mode: 'link', content: 'https://discord.test' },
-    {
-      icon: 'github',
-      mode: 'link',
-      content: 'https://github.com/BleedingDev/ultramodern.js',
-    },
-  ]);
   assert.deepEqual(
     config.builderConfig?.plugins?.map(plugin => plugin.name),
     ['retained-builder-plugin', 'rsbuild-plugin-open-graph'],

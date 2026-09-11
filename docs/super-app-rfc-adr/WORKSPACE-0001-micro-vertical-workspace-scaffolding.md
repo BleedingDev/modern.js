@@ -205,10 +205,9 @@ A generated Micro Vertical workspace is scaffold-ready only when these checks ha
 | Surface | Required proof |
 | --- | --- |
 | Shell + remote route composition | `pnpm --dir tests exec rstest run integration/routes-tanstack-mf/test/index.test.ts` |
-| MF manifest and shared tree-shaking metadata | `tests/integration/routes-tanstack-mf/tests/tanstack-mf-contract.test.ts` |
+| MF manifest and shared tree-shaking metadata | `tests/integration/routes-tanstack-mf/test/index.test.ts` (`publishes the live MF manifest ABI used by native remotes`) |
 | Effect service propagation | `tests/integration/bff-runtime-parity` and `tests/integration/bff-cross-project` |
 | Template manifest and supply-chain policy | `packages/toolkit/ultramodern-create/src/index.ts` manifest validation and `.modernjs/mv-template-manifest.json` output |
-| Release gate compatibility | `pnpm run validate:bun-smoke` |
 
 The minimal topology smoke path is `pnpm run validate:mv-topology-smoke`.
 Graph handoff metadata for plan/subagent orchestration lives at

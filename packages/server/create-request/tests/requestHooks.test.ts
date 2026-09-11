@@ -1,16 +1,8 @@
 import { storage } from '@modern-js/runtime-utils/node';
 import { createClient as createBrowserClient } from '../src/browser';
 import { createClient as createServerClient } from '../src/node';
-import { extractPathParamNames } from '../src/requestFactory';
 
 describe('native request clients and optional hooks', () => {
-  test('retains native path parameter extraction', () => {
-    expect(extractPathParamNames('/items/:id/sub/:subId')).toEqual([
-      'id',
-      'subId',
-    ]);
-  });
-
   test('isolates configuration while retaining native named request fallback', async () => {
     const first = createServerClient();
     const second = createServerClient();

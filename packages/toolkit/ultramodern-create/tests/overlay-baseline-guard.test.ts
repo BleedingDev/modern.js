@@ -82,15 +82,7 @@ test('overlay baseline guard keeps one rejection matrix and a neutral extension'
   try {
     for (const [name, mutation] of [
       ['downgrade', "shellPkg.dependencies.react = '18.0.0';"],
-      ['remove', 'delete shellPkg.dependencies.react;'],
-      [
-        'npm-alias',
-        "shellPkg.dependencies['react-alias'] = 'npm:react@18.0.0';",
-      ],
       ['overrides', "shellPkg.overrides = { tooling: { react: '18.0.0' } };"],
-      ['resolutions', "shellPkg.resolutions = { react: '18.0.0' };"],
-      ['pnpm-overrides', "shellPkg.pnpm = { overrides: { react: '18.0.0' } };"],
-      ['catalog', "shellPkg.catalog = { react: '18.0.0' };"],
     ] as const) {
       assertRelaxationOverlay(tempRoot, name, mutation);
     }

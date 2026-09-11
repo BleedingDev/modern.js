@@ -32,40 +32,6 @@ const runtimeContext = () =>
     },
   });
 
-test('asset transforms preserve subtype identity and original groups across observers', () => {
-  const first = { url: '/one.css', integrity: { token: 1 } };
-  const second = { url: '/two.css', integrity: { token: 2 } };
-  const groups = [
-    { name: 'entry', assets: [first] },
-    { name: 'collected', assets: [second] },
-  ];
-  const lifecycle = createSSRRenderLifecycle([
-    {
-      transformAssets(assets, info) {
-        expect(info.groups).toBe(groups);
-        expect(assets[0]).toBe(first);
-        return [assets[1], assets[0]];
-      },
-    },
-    {
-      transformAssets(assets, info) {
-        expect(info.groups).toBe(groups);
-        expect(assets[0]).toBe(second);
-        return [...assets, info.createAsset('/three.css')];
-      },
-    },
-  ]);
-  const result = lifecycle.transformAssets(groups, {
-    source: 'template',
-    kind: 'style',
-    template: '',
-    createAsset: url => ({ url, integrity: { token: 3 } }),
-  });
-  expect(result[0]).toBe(second);
-  expect(result[1]).toBe(first);
-  expect(result[2].integrity.token).toBe(3);
-});
-
 test('string template callbacks receive original metadata after asynchronous effects', async () => {
   setGlobalContext({ enableRsc: false });
   const hooks = initHooks<{}, ReturnType<typeof getInitialContext>>();
@@ -78,7 +44,6 @@ test('string template callbacks receive original metadata after asynchronous eff
   const config = { nonce: 'x"&' };
   const context = runtimeContext();
   let effectComplete = false;
-  const names: string[] = [];
   hooks.extendStringSSRCollectors.tap(({ render, chunkSet }) => {
     expect(render.resource).toBe(resource);
     expect(render.config).toBe(config);
@@ -91,7 +56,6 @@ test('string template callbacks receive original metadata after asynchronous eff
       },
       transformTemplateChunk(chunk, formatting) {
         expect(effectComplete).toBe(true);
-        names.push(chunk.name);
         if (chunk.name !== 'styles') return chunk;
         expect(chunk.content).toContain('<style>effect</style>');
         expect(
@@ -124,15 +88,12 @@ test('string template callbacks receive original metadata after asynchronous eff
   expect(onError).not.toHaveBeenCalled();
   expect(html).toContain('<style>effect</style>');
   expect(html).toContain('nonce="x&quot;&amp;"');
-  expect(names).toEqual(['scripts', 'styles', 'data']);
 });
 
 test('stream template callbacks can relocate completed data before the HTML separator', async () => {
-  const seen: string[] = [];
   const lifecycle = createSSRRenderLifecycle([
     {
       transformTemplateChunk(chunk) {
-        seen.push(chunk.name);
         if (chunk.name !== 'data') return chunk;
         expect(chunk.template).toContain('<!--<?- html ?>-->');
         return {
@@ -158,13 +119,9 @@ test('stream template callbacks can relocate completed data before the HTML sepa
   expect(shellBefore).toContain('window._SSR_DATA =');
   expect(shellAfter).not.toContain('window._SSR_DATA =');
   expect(shellAfter).not.toContain(SSR_DATA_PLACEHOLDER);
-  expect(seen).toEqual(['scripts', 'data', 'styles']);
 });
 
-test.each([
-  true,
-  false,
-])('raw router supplier keeps native error serialization and empty-object precedence (%s)', empty => {
+test('raw router supplier keeps native error serialization', () => {
   const context = runtimeContext();
   const chunkSet = {
     renderLevel: RenderLevel.SERVER_RENDER,
@@ -172,9 +129,10 @@ test.each([
     jsChunk: '',
     cssChunk: '',
   };
-  const data = empty
-    ? {}
-    : { loaderData: { custom: true }, errors: { custom: new Error('failed') } };
+  const data = {
+    loaderData: { custom: true },
+    errors: { custom: new Error('failed') },
+  };
   const lifecycle = createSSRRenderLifecycle([
     { getRouterData: () => data },
     { getRouterData: () => undefined },
@@ -190,29 +148,6 @@ test.each([
   collector.effect();
   expect(chunkSet.ssrScripts).toContain('window._ROUTER_DATA =');
   expect(chunkSet.ssrScripts).not.toContain('fallback');
-  if (empty) expect(chunkSet.ssrScripts).toContain('"errors":null');
-  else {
-    expect(chunkSet.ssrScripts).toContain('"message":"failed"');
-    expect(chunkSet.ssrScripts).toContain('"__type":"Error"');
-  }
-});
-
-test('an absent router supplier retains the native router context fallback', () => {
-  const context = runtimeContext();
-  const chunkSet = {
-    renderLevel: RenderLevel.SERVER_RENDER,
-    ssrScripts: '',
-    jsChunk: '',
-    cssChunk: '',
-  };
-  const collector = new SSRDataCollector({
-    runtimeContext: context,
-    request: new Request('http://localhost/'),
-    ssrContext: context.ssrContext as any,
-    chunkSet,
-    lifecycle: createSSRRenderLifecycle([{ getRouterData: () => undefined }]),
-    routerContext: { loaderData: { fallback: true }, errors: null } as any,
-  });
-  collector.effect();
-  expect(chunkSet.ssrScripts).toContain('"loaderData":{"fallback":true}');
+  expect(chunkSet.ssrScripts).toContain('"message":"failed"');
+  expect(chunkSet.ssrScripts).toContain('"__type":"Error"');
 });

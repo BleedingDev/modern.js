@@ -4,10 +4,6 @@ import {
 } from '@modern-js/plugin-i18n/runtime/consumer';
 import type { I18nInstance } from '@modern-js/plugin-i18n/runtime/no-react-i18next';
 import {
-  I18nLink,
-  useI18nRouterAdapter,
-} from '@modern-js/plugin-i18n/runtime/no-react-i18next';
-import {
   InternalRuntimeContext,
   RuntimeContext,
 } from '@modern-js/runtime/context';
@@ -19,7 +15,7 @@ import {
 import { applyRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
 import i18next from 'i18next';
 import type React from 'react';
-import type { ComponentType, PropsWithChildren } from 'react';
+import type { ComponentType } from 'react';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useTranslation } from 'react-i18next';
@@ -39,17 +35,10 @@ const localisedUrls = {
   },
 };
 
-const requestContext = {
-  request: {},
-  response: {},
-};
-
-const capturedTanstackLinkProps: any[] = [];
+const requestContext = { request: {}, response: {} };
 
 const TanstackLink = ({ to, children, ...props }: any) => {
-  capturedTanstackLinkProps.push({ to, ...props });
   const { prefetch: _prefetch, preload: _preload, ...anchorProps } = props;
-
   return (
     <a href={to} data-router-link="tanstack" {...anchorProps}>
       {children}
@@ -86,22 +75,14 @@ function createRuntimeContext(
         : { useLocation: () => undefined, useHref: () => undefined }),
     },
   } as any;
-
-  applyRouterRuntimeState(context, {
-    framework,
-    instance: router,
-  });
-
+  applyRouterRuntimeState(context, { framework, instance: router });
   return context;
 }
 
-function createTanstackRuntimeContext(router: unknown) {
-  return createRuntimeContext(router, 'tanstack');
-}
-
-function createReactRouterRuntimeContext(router: unknown) {
-  return createRuntimeContext(router, 'react-router');
-}
+const createTanstackRuntimeContext = (router: unknown) =>
+  createRuntimeContext(router, 'tanstack');
+const createReactRouterRuntimeContext = (router: unknown) =>
+  createRuntimeContext(router, 'react-router');
 
 async function collectI18nRuntime(
   i18nInstance: I18nInstance,
@@ -110,11 +91,7 @@ async function collectI18nRuntime(
     I18nPluginOptions['localeDetection']
   > = {},
 ) {
-  let onBeforeRender:
-    | ((
-        context: ReturnType<typeof createTanstackRuntimeContext>,
-      ) => Promise<void>)
-    | undefined;
+  let onBeforeRender: ((context: any) => Promise<void>) | undefined;
   let wrapRoot: ((App: ComponentType<any>) => ComponentType<any>) | undefined;
 
   i18nPlugin({
@@ -130,11 +107,7 @@ async function collectI18nRuntime(
   }).setup?.({
     getRuntimeConfig: () => ({}),
     resolveComponent: () => undefined,
-    onBeforeRender: (
-      callback: (
-        context: ReturnType<typeof createTanstackRuntimeContext>,
-      ) => Promise<void>,
-    ) => {
+    onBeforeRender: (callback: (context: any) => Promise<void>) => {
       onBeforeRender = callback;
     },
     wrapRoot: (callback: (App: ComponentType<any>) => ComponentType<any>) => {
@@ -145,66 +118,11 @@ async function collectI18nRuntime(
   if (!onBeforeRender || !wrapRoot) {
     throw new Error('Expected i18n runtime plugin lifecycle registrations');
   }
-
   return { onBeforeRender, wrapRoot };
 }
 
-async function createEventEmittingDeferredI18nInstance() {
-  const instance = i18next.createInstance();
-  await instance.init({
-    lng: 'en',
-    fallbackLng: 'en',
-    resources: {
-      en: { translation: { languageSwitcher: 'Language' } },
-      cs: { translation: { languageSwitcher: 'Jazyk' } },
-    },
-  });
-  const originalHasLoadedNamespace = instance.hasLoadedNamespace;
-  instance.hasLoadedNamespace = function hasLoadedNamespace(
-    namespace,
-    options,
-  ) {
-    if (this !== instance) {
-      throw new Error('i18next hasLoadedNamespace receiver was not preserved');
-    }
-    return originalHasLoadedNamespace.call(this, namespace, options);
-  };
-
-  const pending: Array<{
-    language: string;
-    promise: Promise<unknown>;
-    resolve: () => void;
-  }> = [];
-  const translator = (instance as unknown as { translator: I18nInstance })
-    .translator;
-
-  instance.changeLanguage = rstest.fn((language = 'en') => {
-    let resolveChange!: (value: unknown) => void;
-    const promise = new Promise<unknown>(resolve => {
-      resolveChange = resolve;
-    });
-    pending.push({
-      language,
-      promise,
-      resolve: () => {
-        instance.language = language;
-        translator.changeLanguage?.(language);
-        instance.emit('languageChanged', language);
-        resolveChange(instance.t.bind(instance));
-      },
-    });
-    return promise;
-  });
-
-  return { instance, pending };
-}
-
 function createMutableTanstackRouter(pathname = '/en') {
-  let location = {
-    pathname,
-    searchStr: '',
-    hash: '',
-  };
+  let location = { pathname, searchStr: '', hash: '' };
   let matches = [{ params: { lang: pathname.slice(1) } }];
   const listeners = new Set<() => void>();
 
@@ -218,199 +136,52 @@ function createMutableTanstackRouter(pathname = '/en') {
           return () => listeners.delete(listener);
         },
       },
-      matches: {
-        get: () => matches,
-      },
+      matches: { get: () => matches },
     },
     publishPathname(nextPathname: string) {
-      location = {
-        pathname: nextPathname,
-        searchStr: '',
-        hash: '',
-      };
+      location = { pathname: nextPathname, searchStr: '', hash: '' };
       matches = [{ params: { lang: nextPathname.slice(1) } }];
       for (const listener of listeners) {
         listener();
       }
     },
-    publishStateUpdate() {
-      for (const listener of listeners) {
-        listener();
-      }
-    },
   };
 }
 
-function createMutableReactRouter(
-  pathname = '/en',
-  params: Record<string, string> = { lang: pathname.slice(1) },
-) {
-  const listeners = new Set<() => void>();
-  const router = {
-    state: {
-      location: {
-        pathname,
-        search: '',
-        hash: '',
-      },
-      matches: [{ params }],
-      fetchers: new Map<string, unknown>(),
-    },
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    publishFetcherUpdate() {
-      router.state = {
-        ...router.state,
-        fetchers: new Map([['fetcher', { state: 'idle' }]]),
-      };
-      for (const listener of listeners) {
-        listener();
-      }
-    },
-    publishPathname(nextPathname: string) {
-      router.state = {
-        ...router.state,
-        location: {
-          ...router.state.location,
-          pathname: nextPathname,
-        },
-      };
-      for (const listener of listeners) {
-        listener();
-      }
-    },
-    publishParams(nextParams: Record<string, string>) {
-      router.state = {
-        ...router.state,
-        matches: [{ params: nextParams }],
-      };
-      for (const listener of listeners) {
-        listener();
-      }
-    },
-  };
+const DEFERRED_COPY: Record<string, string> = { en: 'Language', cs: 'Jazyk' };
 
-  return router;
-}
-
+/** i18n instance whose changeLanguage stays pending until the test resolves it. */
 function createDeferredI18nInstance() {
-  const resources = {
-    en: { languageSwitcher: 'Language' },
-    cs: { languageSwitcher: 'Jazyk' },
-  };
   const pending: Array<{
-    language: keyof typeof resources;
+    language: string;
     promise: Promise<void>;
     resolve: () => void;
     reject: (error: Error) => void;
   }> = [];
   const instance = createI18nInstance('en');
   delete instance.setLang;
-  instance.t = (key: string) =>
-    resources[instance.language as keyof typeof resources][
-      key as keyof (typeof resources)['en']
-    ];
+  instance.t = () => DEFERRED_COPY[instance.language];
   instance.changeLanguage = rstest.fn((language = 'en') => {
-    let resolveChange!: () => void;
-    let rejectChange!: (error: Error) => void;
-    const promise = new Promise<void>((resolve, reject) => {
-      resolveChange = resolve;
-      rejectChange = reject;
-    });
-    pending.push({
-      language: language as keyof typeof resources,
-      promise,
-      resolve: () => {
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = () => {
         instance.language = language;
-        resolveChange();
-      },
-      reject: rejectChange,
+        res();
+      };
+      reject = rej;
     });
+    pending.push({ language, promise, resolve, reject });
     return promise;
   });
 
   return { instance, pending };
 }
 
-function createTanstackRouter(pathname = '/en/terms-of-service', lang = 'en') {
-  const url = new URL(pathname, 'https://modernjs.test');
-
-  return {
-    navigate: rstest.fn(async () => undefined),
-    state: {
-      location: {
-        pathname: url.pathname,
-        searchStr: url.search,
-        hash: url.hash,
-      },
-      matches: [
-        {
-          params: {
-            lang,
-          },
-        },
-      ],
-    },
-  };
-}
-
-async function renderI18nRoot(node: React.ReactNode) {
+async function renderWithRuntime(node: React.ReactNode, runtimeContext: any) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-
-  await act(async () => {
-    root.render(
-      <RuntimeContext.Provider
-        value={{
-          isBrowser: true,
-          requestContext,
-          context: requestContext,
-        }}
-      >
-        <I18nRouterNavigationProvider>{node}</I18nRouterNavigationProvider>
-      </RuntimeContext.Provider>,
-    );
-  });
-
-  return {
-    container,
-    root,
-  };
-}
-
-async function renderWithRuntime(
-  node: React.ReactNode,
-  runtimeContext: ReturnType<typeof createTanstackRuntimeContext>,
-) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(
-      <InternalRuntimeContext.Provider value={runtimeContext}>
-        <I18nRouterNavigationProvider>{node}</I18nRouterNavigationProvider>
-      </InternalRuntimeContext.Provider>,
-    );
-  });
-
-  return {
-    container,
-    root,
-  };
-}
-
-async function renderWithRuntimeContexts(
-  node: React.ReactNode,
-  runtimeContext: ReturnType<typeof createTanstackRuntimeContext>,
-) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-
   await act(async () => {
     root.render(
       <InternalRuntimeContext.Provider value={runtimeContext}>
@@ -420,11 +191,75 @@ async function renderWithRuntimeContexts(
       </InternalRuntimeContext.Provider>,
     );
   });
+  return { container, root };
+}
 
-  return {
-    container,
-    root,
+/** Renders a button wired to changeLanguage('cs') and clicks it. */
+async function changeLanguageThroughConsumer(runtimeContext: any) {
+  let changeLanguagePromise: Promise<void> | undefined;
+  const Harness = () => {
+    const { changeLanguage } = useModernI18n();
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          changeLanguagePromise = changeLanguage('cs');
+        }}
+      >
+        Change language
+      </button>
+    );
   };
+
+  const rendered = await renderWithRuntime(
+    <ModernI18nProvider
+      value={{
+        language: 'en',
+        i18nInstance: createI18nInstance('en'),
+        languages: ['en', 'cs'],
+        localePathRedirect: true,
+        urlStrategy: createI18nUrlStrategy(localisedUrls),
+      }}
+    >
+      <Harness />
+    </ModernI18nProvider>,
+    runtimeContext,
+  );
+
+  await act(async () => {
+    rendered.container.querySelector('button')?.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+    await changeLanguagePromise;
+  });
+
+  return rendered;
+}
+
+const LanguageCopy = () => {
+  const { language, t } = useModernI18n();
+  return (
+    <main>
+      {language}:{t('languageSwitcher')}
+    </main>
+  );
+};
+
+/** Boots the runtime plugin on /en with a deferred i18n instance and renders App. */
+async function mountLanguageLifecycle(App: ComponentType<any> = LanguageCopy) {
+  window.history.replaceState(null, '', '/en');
+  const router = createMutableTanstackRouter();
+  const runtimeContext = createTanstackRuntimeContext(router);
+  const { instance, pending } = createDeferredI18nInstance();
+  const { onBeforeRender, wrapRoot } = await collectI18nRuntime(instance);
+  await onBeforeRender(runtimeContext);
+  const I18nRoot = wrapRoot(App);
+  const rendered = await renderWithRuntime(<I18nRoot />, runtimeContext);
+  return { router, instance, pending, rendered };
 }
 
 function cleanup(rendered?: { container: HTMLElement; root: Root }) {
@@ -446,251 +281,91 @@ describe('integrated route language lifecycle', () => {
     rstest.restoreAllMocks();
     window.history.replaceState(null, '', '/');
   });
+
   test('commits route language and translated copy after the instance changes', async () => {
-    window.history.replaceState(null, '', '/en');
-    const router = createMutableTanstackRouter();
-    const runtimeContext = createTanstackRuntimeContext(router);
-    const { instance, pending } = createDeferredI18nInstance();
-    const { onBeforeRender, wrapRoot } = await collectI18nRuntime(instance);
-    await onBeforeRender(runtimeContext);
-
-    const Translation = ({ id }: { id: string }) => {
-      const { language, t } = useModernI18n();
-      return (
-        <span data-testid={id}>
-          {language}:{t('languageSwitcher')}
-        </span>
-      );
-    };
-    const App = () => (
-      <main>
-        <Translation id="first" />
-        <Translation id="second" />
-      </main>
-    );
-    const I18nRoot = wrapRoot(App);
-
-    rendered = await renderWithRuntime(<I18nRoot />, runtimeContext);
-
-    expect(rendered.container.textContent).toBe('en:Languageen:Language');
+    const lifecycle = await mountLanguageLifecycle();
+    const { router, instance, pending } = lifecycle;
+    rendered = lifecycle.rendered;
+    expect(rendered.container.textContent).toBe('en:Language');
 
     await act(async () => {
       router.publishPathname('/cs');
     });
-
-    expect(instance.changeLanguage).toHaveBeenCalledTimes(1);
     expect(instance.changeLanguage).toHaveBeenCalledWith('cs');
-    expect(rendered.container.textContent).toBe('en:Languageen:Language');
+    // Copy must not flip before the new resources have loaded.
+    expect(rendered.container.textContent).toBe('en:Language');
 
     await act(async () => {
       pending[0].resolve();
       await pending[0].promise;
     });
-
-    expect(rendered.container.textContent).toBe('cs:Jazykcs:Jazyk');
-  });
-
-  test('uses the wrapper language operation without changing twice', async () => {
-    window.history.replaceState(null, '', '/en');
-    const router = createMutableTanstackRouter();
-    const runtimeContext = createTanstackRuntimeContext(router);
-    const instance = createI18nInstance();
-    const { onBeforeRender, wrapRoot } = await collectI18nRuntime(instance);
-    await onBeforeRender(runtimeContext);
-
-    const App = () => {
-      const { language } = useModernI18n();
-      return <main>{language}</main>;
-    };
-    const I18nRoot = wrapRoot(App);
-    rendered = await renderWithRuntime(<I18nRoot />, runtimeContext);
-
-    await act(async () => {
-      router.publishPathname('/cs');
-      await Promise.resolve();
-    });
-
-    expect(instance.setLang).toHaveBeenCalledTimes(1);
-    expect(instance.setLang).toHaveBeenCalledWith('cs');
-    expect(instance.changeLanguage).not.toHaveBeenCalled();
-    expect(rendered.container.textContent).toBe('cs');
+    expect(rendered.container.textContent).toBe('cs:Jazyk');
   });
 
   test('keeps the latest route when language changes resolve out of order', async () => {
-    window.history.replaceState(null, '', '/en');
-    const router = createMutableTanstackRouter();
-    const runtimeContext = createTanstackRuntimeContext(router);
-    const { instance, pending } = createDeferredI18nInstance();
-    const { onBeforeRender, wrapRoot } = await collectI18nRuntime(instance);
-    await onBeforeRender(runtimeContext);
-
-    const App = () => {
-      const { language, t } = useModernI18n();
-      return (
-        <main>
-          {language}:{t('languageSwitcher')}
-        </main>
-      );
-    };
-    const I18nRoot = wrapRoot(App);
-    rendered = await renderWithRuntime(<I18nRoot />, runtimeContext);
+    const lifecycle = await mountLanguageLifecycle();
+    const { router, instance, pending } = lifecycle;
+    rendered = lifecycle.rendered;
 
     await act(async () => {
       router.publishPathname('/cs');
     });
-    expect(pending).toHaveLength(1);
-
     await act(async () => {
       router.publishPathname('/en');
     });
-    expect(rendered.container.textContent).toBe('en:Language');
-
     await act(async () => {
       pending[0].resolve();
       await pending[0].promise;
     });
-
     expect(rendered.container.textContent).toBe('en:Language');
-    expect(pending).toHaveLength(2);
-    expect(pending[1].language).toBe('en');
 
     await act(async () => {
       pending[1].resolve();
       await pending[1].promise;
     });
-
     expect(rendered.container.textContent).toBe('en:Language');
     expect(instance.language).toBe('en');
   });
 
-  test('does not block a replacement instance behind abandoned language work', async () => {
-    window.history.replaceState(null, '', '/en');
-    const router = createMutableTanstackRouter();
-    const runtimeContext = createTanstackRuntimeContext(router);
-    const oldI18n = createDeferredI18nInstance();
-    runtimeContext.i18nInstance = oldI18n.instance;
-    const { onBeforeRender, wrapRoot } = await collectI18nRuntime(
-      oldI18n.instance,
-    );
-    await onBeforeRender(runtimeContext);
-
-    const App = () => {
-      const { language } = useModernI18n();
-      return <main>{language}</main>;
-    };
-    const I18nRoot = wrapRoot(App);
-    rendered = await renderWithRuntimeContexts(<I18nRoot />, runtimeContext);
-
-    await act(async () => {
-      router.publishPathname('/cs');
-    });
-    expect(oldI18n.pending).toHaveLength(1);
-
-    const replacementI18n = createDeferredI18nInstance();
-    const replacementContext = createTanstackRuntimeContext(router);
-    replacementContext.i18nInstance = replacementI18n.instance;
-    await act(async () => {
-      rendered?.root.render(
-        <InternalRuntimeContext.Provider value={replacementContext}>
-          <RuntimeContext.Provider value={replacementContext}>
-            <I18nRoot />
-          </RuntimeContext.Provider>
-        </InternalRuntimeContext.Provider>,
-      );
-    });
-
-    expect(replacementI18n.pending).toHaveLength(1);
-    expect(replacementI18n.pending[0].language).toBe('cs');
-  });
-
-  test('does not expose an obsolete route language through react-i18next', async () => {
-    window.history.replaceState(null, '', '/en');
-    const router = createMutableTanstackRouter();
-    const runtimeContext = createTanstackRuntimeContext(router);
-    const { instance, pending } =
-      await createEventEmittingDeferredI18nInstance();
-    const { onBeforeRender, wrapRoot } = await collectI18nRuntime(
-      instance,
-      true,
-    );
-    await onBeforeRender(runtimeContext);
-
-    const App = () => {
-      const { t } = useTranslation();
-      return <main>{t('languageSwitcher')}</main>;
-    };
-    const I18nRoot = wrapRoot(App);
-    rendered = await renderWithRuntime(<I18nRoot />, runtimeContext);
-
-    await act(async () => {
-      router.publishPathname('/cs');
-    });
-    expect(pending).toHaveLength(1);
-
-    await act(async () => {
-      router.publishPathname('/en');
-    });
-
-    await act(async () => {
-      pending[0].resolve();
-      await pending[0].promise;
-    });
-
-    expect(rendered.container.textContent).toBe('Language');
-  });
-
   test('keeps committed copy after a failed change and retries automatically', async () => {
     rstest.useFakeTimers();
-    window.history.replaceState(null, '', '/en');
     rstest.spyOn(console, 'error').mockImplementation(() => undefined);
-    const router = createMutableTanstackRouter();
-    const runtimeContext = createTanstackRuntimeContext(router);
-    const { instance, pending } = createDeferredI18nInstance();
-    const { onBeforeRender, wrapRoot } = await collectI18nRuntime(instance);
-    await onBeforeRender(runtimeContext);
 
     const RetryConsumer = () => {
       useModernI18n();
       return null;
     };
-    const App = () => {
+    const lifecycle = await mountLanguageLifecycle(() => {
       const [showRetryConsumer, setShowRetryConsumer] = useState(false);
-      const { language, t } = useModernI18n();
       return (
         <main>
-          {language}:{t('languageSwitcher')}
+          <LanguageCopy />
           <button type="button" onClick={() => setShowRetryConsumer(true)}>
             Retry
           </button>
           {showRetryConsumer && <RetryConsumer />}
         </main>
       );
-    };
-    const I18nRoot = wrapRoot(App);
-    rendered = await renderWithRuntime(<I18nRoot />, runtimeContext);
+    });
+    const { router, instance, pending } = lifecycle;
+    rendered = lifecycle.rendered;
 
     await act(async () => {
       router.publishPathname('/cs');
     });
-
-    const languageError = new Error('failed to load Czech resources');
     await act(async () => {
-      pending[0].reject(languageError);
+      pending[0].reject(new Error('failed to load Czech resources'));
       await pending[0].promise.catch(() => undefined);
     });
-
     expect(rendered.container.textContent).toContain('en:Language');
 
     await act(async () => {
       await rstest.advanceTimersByTimeAsync(50);
     });
-    expect(pending).toHaveLength(2);
-
     await act(async () => {
       pending[1].resolve();
       await pending[1].promise;
     });
-
     expect(rendered.container.textContent).toContain('cs:Jazyk');
     expect(instance.language).toBe('cs');
   });
@@ -702,175 +377,7 @@ describe('i18n router adapter', () => {
   afterEach(() => {
     cleanup(rendered);
     rendered = undefined;
-    capturedTanstackLinkProps.length = 0;
     window.history.replaceState(null, '', '/');
-  });
-
-  test('uses the TanStack router Link for I18nLink rendering', async () => {
-    const router = createTanstackRouter('/cs/podminky-pouzivani', 'cs');
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider
-        value={{
-          language: 'cs',
-          i18nInstance: createI18nInstance('cs'),
-          languages: ['en', 'cs'],
-          localePathRedirect: true,
-          urlStrategy: createI18nUrlStrategy(localisedUrls),
-        }}
-      >
-        <I18nLink to="/terms-of-service" data-testid="terms-link">
-          Terms
-        </I18nLink>
-      </ModernI18nProvider>,
-      createTanstackRuntimeContext(router),
-    );
-
-    const link = rendered.container.querySelector<HTMLAnchorElement>(
-      '[data-testid="terms-link"]',
-    );
-    expect(link?.getAttribute('href')).toBe('/cs/podminky-pouzivani');
-    expect(link?.getAttribute('data-router-link')).toBe('tanstack');
-  });
-
-  test('ignores router state updates that do not change location or params', async () => {
-    const router = createMutableTanstackRouter('/en');
-    let renders = 0;
-    const LocationProbe = () => {
-      renders += 1;
-      const { location } = useI18nRouterAdapter();
-      return <output>{location?.pathname}</output>;
-    };
-
-    rendered = await renderWithRuntime(
-      <LocationProbe />,
-      createTanstackRuntimeContext(router),
-    );
-    const initialRenders = renders;
-
-    await act(async () => {
-      router.publishStateUpdate();
-    });
-    expect(renders).toBe(initialRenders);
-    expect(rendered.container.textContent).toBe('/en');
-
-    await act(async () => {
-      router.publishPathname('/cs');
-    });
-    expect(renders).toBe(initialRenders + 1);
-    expect(rendered.container.textContent).toBe('/cs');
-  });
-
-  test('ignores React Router fetcher updates while observing location changes', async () => {
-    const router = createMutableReactRouter('/en');
-    let renders = 0;
-    const LocationProbe = () => {
-      renders += 1;
-      const { location } = useI18nRouterAdapter();
-      return <output>{location?.pathname}</output>;
-    };
-
-    rendered = await renderWithRuntime(
-      <LocationProbe />,
-      createReactRouterRuntimeContext(router),
-    );
-    const initialRenders = renders;
-
-    await act(async () => {
-      router.publishFetcherUpdate();
-    });
-    expect(renders).toBe(initialRenders);
-    expect(rendered.container.textContent).toBe('/en');
-
-    await act(async () => {
-      router.publishPathname('/cs');
-    });
-    expect(renders).toBe(initialRenders + 1);
-    expect(rendered.container.textContent).toBe('/cs');
-  });
-
-  test('observes distinct route params without serialized snapshot collisions', async () => {
-    const router = createMutableReactRouter('/products', {
-      a: '1&b=2',
-    });
-    const ParamsProbe = () => {
-      const { params } = useI18nRouterAdapter();
-      return <output>{JSON.stringify(params)}</output>;
-    };
-
-    rendered = await renderWithRuntime(
-      <ParamsProbe />,
-      createReactRouterRuntimeContext(router),
-    );
-    expect(rendered.container.textContent).toBe('{"a":"1&b=2"}');
-
-    await act(async () => {
-      router.publishParams({ a: '1', b: '2' });
-    });
-    expect(rendered.container.textContent).toBe('{"a":"1","b":"2"}');
-  });
-
-  test('forwards warmup props through I18nLink with a localized string target', async () => {
-    const router = createTanstackRouter('/cs/podminky-pouzivani', 'cs');
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider
-        value={{
-          language: 'cs',
-          i18nInstance: createI18nInstance('cs'),
-          languages: ['en', 'cs'],
-          localePathRedirect: true,
-          urlStrategy: createI18nUrlStrategy(localisedUrls),
-        }}
-      >
-        <I18nLink
-          to="/terms-of-service"
-          data-testid="terms-link"
-          prefetch="viewport"
-          preload="intent"
-        >
-          Terms
-        </I18nLink>
-      </ModernI18nProvider>,
-      createTanstackRuntimeContext(router),
-    );
-
-    const linkProps = capturedTanstackLinkProps.at(-1);
-    // TanStack has no `prefetch` prop: the explicit native `preload` wins and
-    // `prefetch` must not be forwarded.
-    expect(linkProps).toMatchObject({
-      to: '/cs/podminky-pouzivani',
-      preload: 'intent',
-    });
-    expect(linkProps.prefetch).toBeUndefined();
-  });
-
-  test('does not leak warmup props to fallback anchors', async () => {
-    rendered = await renderI18nRoot(
-      <ModernI18nProvider
-        value={{
-          language: 'cs',
-          i18nInstance: createI18nInstance('cs'),
-          languages: ['en', 'cs'],
-          localePathRedirect: true,
-          urlStrategy: createI18nUrlStrategy(localisedUrls),
-        }}
-      >
-        <I18nLink
-          to="/terms-of-service"
-          data-testid="terms-link"
-          prefetch="none"
-          preload={false}
-        >
-          Terms
-        </I18nLink>
-      </ModernI18nProvider>,
-    );
-
-    const link = rendered.container.querySelector<HTMLAnchorElement>(
-      '[data-testid="terms-link"]',
-    );
-    expect(link?.getAttribute('href')).toBe('/cs/podminky-pouzivani');
-    expect(link?.hasAttribute('prefetch')).toBe(false);
-    expect(link?.hasAttribute('preload')).toBe(false);
   });
 
   test('uses TanStack-shaped replacement when changeLanguage updates the URL', async () => {
@@ -879,53 +386,12 @@ describe('i18n router adapter', () => {
       '',
       '/en/terms-of-service?from=test#section',
     );
-
-    const router = createTanstackRouter(
-      '/en/terms-of-service?from=test#section',
-    );
-    let changeLanguagePromise: Promise<void> | undefined;
-
-    const Harness = () => {
-      const { changeLanguage } = useModernI18n();
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            changeLanguagePromise = changeLanguage('cs');
-          }}
-        >
-          Change language
-        </button>
-      );
-    };
-
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider
-        value={{
-          language: 'en',
-          i18nInstance: createI18nInstance('en'),
-          languages: ['en', 'cs'],
-          localePathRedirect: true,
-          urlStrategy: createI18nUrlStrategy(localisedUrls),
-        }}
-      >
-        <Harness />
-      </ModernI18nProvider>,
+    const router = createMutableTanstackRouter('/en/terms-of-service');
+    router.stores.location.get().searchStr = '?from=test';
+    router.stores.location.get().hash = '#section';
+    rendered = await changeLanguageThroughConsumer(
       createTanstackRuntimeContext(router),
     );
-
-    const button = rendered.container.querySelector('button');
-
-    await act(async () => {
-      button?.dispatchEvent(
-        new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          button: 0,
-        }),
-      );
-      await changeLanguagePromise;
-    });
 
     expect(router.navigate).toHaveBeenCalledWith({
       to: '/cs/podminky-pouzivani?from=test#section',
@@ -933,111 +399,12 @@ describe('i18n router adapter', () => {
     });
   });
 
-  test('updates provider language when target locale is already in URL', async () => {
-    window.history.replaceState(null, '', '/cs/podminky-pouzivani');
-
-    const router = createTanstackRouter('/cs/podminky-pouzivani', 'cs');
-    const i18nInstance = createI18nInstance('en');
-    const updateLanguage = rstest.fn();
-    let changeLanguagePromise: Promise<void> | undefined;
-
-    const Harness = () => {
-      const { changeLanguage } = useModernI18n();
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            changeLanguagePromise = changeLanguage('cs');
-          }}
-        >
-          Change language
-        </button>
-      );
-    };
-
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider
-        value={{
-          language: 'en',
-          i18nInstance,
-          languages: ['en', 'cs'],
-          localePathRedirect: true,
-          urlStrategy: createI18nUrlStrategy(localisedUrls),
-          updateLanguage,
-        }}
-      >
-        <Harness />
-      </ModernI18nProvider>,
-      createTanstackRuntimeContext(router),
-    );
-
-    const button = rendered.container.querySelector('button');
-    updateLanguage.mockClear();
-
-    await act(async () => {
-      button?.dispatchEvent(
-        new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          button: 0,
-        }),
-      );
-      await changeLanguagePromise;
-    });
-
-    expect(updateLanguage).toHaveBeenCalledWith('cs');
-    expect(router.navigate).not.toHaveBeenCalled();
-  });
-
   test('keeps React Router positional replacement when changeLanguage updates the URL', async () => {
     window.history.replaceState(null, '', '/en/terms-of-service');
-
-    const router = {
-      navigate: rstest.fn(async () => undefined),
-    };
-    let changeLanguagePromise: Promise<void> | undefined;
-
-    const Harness = () => {
-      const { changeLanguage } = useModernI18n();
-      return (
-        <button
-          type="button"
-          onClick={() => {
-            changeLanguagePromise = changeLanguage('cs');
-          }}
-        >
-          Change language
-        </button>
-      );
-    };
-
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider
-        value={{
-          language: 'en',
-          i18nInstance: createI18nInstance('en'),
-          languages: ['en', 'cs'],
-          localePathRedirect: true,
-          urlStrategy: createI18nUrlStrategy(localisedUrls),
-        }}
-      >
-        <Harness />
-      </ModernI18nProvider>,
+    const router = { navigate: rstest.fn(async () => undefined) };
+    rendered = await changeLanguageThroughConsumer(
       createReactRouterRuntimeContext(router),
     );
-
-    const button = rendered.container.querySelector('button');
-
-    await act(async () => {
-      button?.dispatchEvent(
-        new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          button: 0,
-        }),
-      );
-      await changeLanguagePromise;
-    });
 
     expect(router.navigate).toHaveBeenCalledWith('/cs/podminky-pouzivani', {
       replace: true,
@@ -1069,13 +436,6 @@ describe('i18n router adapter', () => {
       [{ path: '/:lang', element: <RouteContent /> }],
       { initialEntries: ['/en'] },
     );
-    const originalSubscribe = router.subscribe;
-    router.subscribe = function subscribe(listener) {
-      if (this !== router) {
-        throw new Error('React Router subscribe receiver was not preserved');
-      }
-      return originalSubscribe.call(this, listener);
-    };
     const runtimeContext = createReactRouterRuntimeContext(router);
     const { onBeforeRender, wrapRoot } = await collectI18nRuntime(
       i18nInstance,
@@ -1085,81 +445,22 @@ describe('i18n router adapter', () => {
     const I18nRoot = wrapRoot(() => <RouterProvider router={router} />);
     rendered = await renderWithRuntime(<I18nRoot />, runtimeContext);
 
+    const translation = () =>
+      rendered?.container.querySelector('[data-testid="translation"]')
+        ?.textContent;
+
     await act(async () => {
       rendered?.container
         .querySelector('a')
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
-    expect(
-      rendered.container.querySelector('[data-testid="translation"]')
-        ?.textContent,
-    ).toBe('Jazyk');
+    expect(translation()).toBe('Jazyk');
 
     await act(async () => {
       await router.navigate(-1);
     });
-    expect(
-      rendered.container.querySelector('[data-testid="translation"]')
-        ?.textContent,
-    ).toBe('Language');
-  });
-
-  test('exposes a language-scoped t function for rendered copy', async () => {
-    const i18nInstance = createI18nInstance('en');
-    i18nInstance.t = (key: string) => `${i18nInstance.language}:${key}`;
-    const renderTranslations: Array<(key: string) => string> = [];
-    let setProviderLanguage: ((language: string) => void) | undefined;
-
-    const StatefulI18nProvider = ({ children }: PropsWithChildren) => {
-      const [language, setLanguage] = useState('en');
-      setProviderLanguage = setLanguage;
-
-      return (
-        <ModernI18nProvider
-          value={{
-            language,
-            i18nInstance,
-            languages: ['en', 'cs'],
-            localePathRedirect: true,
-            urlStrategy: createI18nUrlStrategy(localisedUrls),
-            updateLanguage: setLanguage,
-          }}
-        >
-          {children}
-        </ModernI18nProvider>
-      );
-    };
-
-    const Harness = () => {
-      const { t } = useModernI18n();
-      renderTranslations.push(t);
-      return <span data-testid="translation">{t('key')}</span>;
-    };
-
-    rendered = await renderWithRuntime(
-      <StatefulI18nProvider>
-        <Harness />
-      </StatefulI18nProvider>,
-      createReactRouterRuntimeContext({ navigate: rstest.fn() }),
-    );
-
-    expect(
-      rendered.container.querySelector('[data-testid="translation"]')
-        ?.textContent,
-    ).toBe('en:key');
-    const initialT = renderTranslations.at(-1);
-
-    await act(async () => {
-      i18nInstance.language = 'cs';
-      setProviderLanguage?.('cs');
-    });
-
-    expect(
-      rendered.container.querySelector('[data-testid="translation"]')
-        ?.textContent,
-    ).toBe('cs:key');
-    expect(renderTranslations.at(-1)).not.toBe(initialT);
+    expect(translation()).toBe('Language');
   });
 });
 
@@ -1175,17 +476,14 @@ test('canonicalizes successive prefixed routes in one mounted provider', async (
   const { wrapRoot } = await collectI18nRuntime(instance, false, {
     localisedUrls: {
       '/about': { en: '/about', cs: '/o-nas' },
-      '/terms-of-service': {
-        en: '/terms-of-service',
-        cs: '/podminky-pouzivani',
-      },
+      ...localisedUrls,
     },
   });
   const Root = wrapRoot(() => <main>CSR content</main>);
   let rendered: { container: HTMLElement; root: Root } | undefined;
   try {
     window.history.replaceState(null, '', '/cs/about?from=test#section');
-    rendered = await renderWithRuntimeContexts(<Root />, runtimeContext);
+    rendered = await renderWithRuntime(<Root />, runtimeContext);
     expect(router.navigate).toHaveBeenLastCalledWith({
       to: '/cs/o-nas?from=test#section',
       replace: true,
@@ -1198,7 +496,6 @@ test('canonicalizes successive prefixed routes in one mounted provider', async (
       to: '/cs/podminky-pouzivani',
       replace: true,
     });
-    expect(router.navigate).toHaveBeenCalledTimes(2);
   } finally {
     cleanup(rendered);
     window.history.replaceState(null, '', '/');

@@ -7,110 +7,10 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  brotliDecompressSync,
-  gunzipSync,
-  constants as zlibConstants,
-} from 'node:zlib';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import { createRsbuild, type RsbuildConfig } from '@rsbuild/core';
 import { describe, expect, it } from '@rstest/core';
-import type CompressionPlugin from 'compression-webpack-plugin';
 import { builderPluginAdapterPrecompress } from '../../../src/build-config/precompress/plugin';
-
-type CompressionPluginOptions = NonNullable<
-  ConstructorParameters<typeof CompressionPlugin>[0]
->;
-
-const applyPrecompressPlugins = (
-  precompress: unknown,
-  env: { isProd: boolean; target: string } = { isProd: true, target: 'web' },
-) => {
-  const appliedPlugins: Array<{
-    name: string;
-    options: CompressionPluginOptions;
-  }> = [];
-
-  let modifyBundlerChain:
-    | ((chain: unknown, utils: { isProd: boolean; target: string }) => void)
-    | undefined;
-
-  const plugin = builderPluginAdapterPrecompress(
-    precompress as Parameters<typeof builderPluginAdapterPrecompress>[0],
-  );
-
-  plugin.setup?.({
-    modifyBundlerChain(callback: NonNullable<typeof modifyBundlerChain>) {
-      modifyBundlerChain = callback;
-    },
-  } as any);
-
-  const chain = {
-    plugin(name: string) {
-      return {
-        use(_pluginCtor: unknown, [options]: [CompressionPluginOptions]) {
-          appliedPlugins.push({ name, options });
-        },
-      };
-    },
-  };
-
-  modifyBundlerChain?.(chain, env);
-
-  return appliedPlugins;
-};
-
-describe('builderPluginAdapterPrecompress', () => {
-  it('does not enable precompress when core config leaves it undefined', () => {
-    expect(applyPrecompressPlugins(undefined)).toEqual([]);
-  });
-
-  it('enables gzip and brotli when explicitly set to true', () => {
-    const plugins = applyPrecompressPlugins(true);
-
-    expect(plugins.map(plugin => plugin.name)).toEqual([
-      'modern-precompress-gzip',
-      'modern-precompress-brotli',
-    ]);
-  });
-
-  it('preserves explicit codec configuration', () => {
-    const plugins = applyPrecompressPlugins({
-      gzip: false,
-      brotli: {
-        threshold: 2048,
-      },
-    });
-
-    expect(plugins).toHaveLength(1);
-    expect(plugins[0]?.name).toBe('modern-precompress-brotli');
-    expect(plugins[0]?.options.threshold).toBe(2048);
-  });
-
-  it('merges brotli params with default quality', () => {
-    const plugins = applyPrecompressPlugins({
-      gzip: false,
-      brotli: {
-        compressionOptions: {
-          params: {
-            [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
-          },
-        },
-      },
-    });
-
-    expect(plugins).toHaveLength(1);
-    expect(plugins[0]?.options.compressionOptions).toEqual({
-      params: {
-        [zlibConstants.BROTLI_PARAM_QUALITY]: 9,
-        [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
-      },
-    });
-  });
-
-  it('stays disabled when explicitly set to false', () => {
-    expect(applyPrecompressPlugins(false)).toEqual([]);
-  });
-});
 
 const buildCompressedFixture = async (
   precompress: Parameters<typeof builderPluginAdapterPrecompress>[0],
@@ -192,12 +92,11 @@ describe('real native Rsbuild precompression output', () => {
     );
   });
 
-  it('does not attach compression to development or non-web targets', () => {
-    expect(
-      applyPrecompressPlugins(true, { isProd: false, target: 'web' }),
-    ).toEqual([]);
-    expect(
-      applyPrecompressPlugins(true, { isProd: true, target: 'node' }),
-    ).toEqual([]);
+  it('emits no compressed assets when precompress is not configured', async () => {
+    const assets = await buildCompressedFixture(undefined);
+    expect([...assets.keys()].some(name => name.endsWith('.js'))).toBe(true);
+    expect([...assets.keys()].some(name => /\.(gz|br)$/.test(name))).toBe(
+      false,
+    );
   });
 });

@@ -26,8 +26,8 @@ it('stamps and verifies only the surfaces emitted by each topology profile', asy
     path.join(os.tmpdir(), 'cloudflare-delivery-profile-'),
   );
   const profiles = [
-    { appId: 'catalog', expected: ['api'], profile: 'api-only' },
-    { appId: 'marketing', expected: ['ui'], profile: 'ui-only' },
+    { appId: 'catalog', omits: 'ui', profile: 'api-only', stamps: 'api' },
+    { appId: 'marketing', omits: 'api', profile: 'ui-only', stamps: 'ui' },
   ] as const;
 
   try {
@@ -46,7 +46,7 @@ it('stamps and verifies only the surfaces emitted by each topology profile', asy
       })}\n`,
     );
 
-    for (const { appId, expected } of profiles) {
+    for (const { appId, omits, stamps } of profiles) {
       const appDirectory = path.join(workspaceRoot, 'verticals', appId);
       await fs.mkdir(path.join(appDirectory, 'shared'), { recursive: true });
       await fs.writeFile(
@@ -58,8 +58,10 @@ it('stamps and verifies only the surfaces emitted by each topology profile', asy
 
       const topology = await resolveTopologyDeliveryUnit(appDirectory);
       const worker = await resolveWorkerDeliveryUnitStamp(appDirectory);
-      expect(Object.keys(topology?.surfaces ?? {})).toEqual(expected);
-      expect(Object.keys(worker?.surfaces ?? {})).toEqual(expected);
+      expect(topology?.surfaces?.[stamps]).toBeDefined();
+      expect(topology?.surfaces?.[omits]).toBeUndefined();
+      expect(worker?.surfaces?.[stamps]).toBeDefined();
+      expect(worker?.surfaces?.[omits]).toBeUndefined();
 
       const issues: Parameters<typeof verifyDeliveryUnitIdentity>[0] = [];
       verifyDeliveryUnitIdentity(

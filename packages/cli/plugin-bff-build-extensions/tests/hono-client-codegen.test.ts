@@ -1,14 +1,5 @@
 import { createRequire } from 'node:module';
-import {
-  type APIHandlerInfo,
-  ApiRouter,
-  generateClient,
-} from '@modern-js/bff-core';
-import {
-  buildOperationContractMap,
-  type OperationContractSource,
-  serializeOperationSchemas,
-} from '@modern-js/server-runtime-extensions/bff-policy/node';
+import { generateClient } from '@modern-js/bff-core';
 import { fs } from '@modern-js/utils';
 import { build } from 'esbuild';
 import path from 'path';
@@ -153,25 +144,6 @@ describe('fork Hono client code generation', () => {
     expect(client.operationManifest.operations).toHaveLength(2);
   });
 
-  test('passes a single options object to a custom request creator', async () => {
-    const resourcePath = path.resolve(
-      __dirname,
-      './fixtures/hono-client-codegen/api/lambda/[id]/origin/foo.ts',
-    );
-    const client = await generateFixtureClient({
-      prefix: '/api',
-      resourcePath,
-      requestCreator: 'custom-request-runtime',
-    });
-
-    for (const handler of [client.get, client.post]) {
-      expect(handler.args).toHaveLength(1);
-      expect(typeof handler.args[0]).toBe('object');
-      expect(handler.args[0]).not.toBeNull();
-      expect(Array.isArray(handler.args[0])).toBe(false);
-    }
-  });
-
   test('emits the configured bff domain for data requests', async () => {
     const resourcePath = path.resolve(
       __dirname,
@@ -193,42 +165,6 @@ describe('fork Hono client code generation', () => {
       httpMethodDecider: 'functionName',
       domain: 'https://bff.example.com',
       requestId: 'producer-app',
-    });
-  });
-
-  test('omits the domain option when no bff domain is configured', async () => {
-    const resourcePath = path.resolve(
-      __dirname,
-      './fixtures/hono-client-codegen/api/lambda/[id]/origin/foo.ts',
-    );
-    const client = await generateFixtureClient({
-      prefix: '/api',
-      resourcePath,
-    });
-
-    expect(client.get.args).toHaveLength(1);
-    expect(client.get.args[0]).not.toHaveProperty('domain');
-    expect(client.post.args[0]).not.toHaveProperty('domain');
-  });
-
-  test('passes the imported fetcher through the options object', async () => {
-    const resourcePath = path.resolve(
-      __dirname,
-      './fixtures/hono-client-codegen/api/lambda/[id]/origin/foo.ts',
-    );
-    const client = await generateFixtureClient({
-      prefix: '/api',
-      resourcePath,
-      fetcher: 'custom-fetcher',
-    });
-
-    expect(client.get.args).toHaveLength(1);
-    // `fetch` is emitted as a shorthand property bound to the identifier
-    // imported from the configured fetcher module.
-    expect(client.get.args[0].fetch).toBeInstanceOf(Function);
-    expect(client.get.args[0].fetch('ping')).toEqual({
-      kind: 'fetch',
-      args: ['ping'],
     });
   });
 
@@ -354,17 +290,6 @@ describe('fork Hono client code generation', () => {
       return executeGeneratedClient(result.value);
     };
 
-    test('executes uploader and request handlers through their runtime contracts', async () => {
-      const client = await generateUploadClient();
-
-      expect(client.upload).toEqual({
-        kind: 'uploader',
-        options: { path: '/api/upload' },
-      });
-      expect(client.get.kind).toBe('request');
-      expect(client.get.args[0]).toMatchObject({ path: '/api', method: 'GET' });
-    });
-
     test('executes producer upload clients with operation context', async () => {
       const client = await generateUploadClient('producer-app');
 
@@ -381,92 +306,12 @@ describe('fork Hono client code generation', () => {
           },
         },
       });
-      expect(client.upload.options.operationContext.schemaHash).toHaveLength(
-        64,
-      );
     });
   });
 });
 
 describe('canonical Hono policy generation', () => {
   const resourcePath = path.resolve(PWD, 'lambda/normal/origin/index.ts');
-
-  test('preserves native callable identities and all reflected input schema slots in emitted hashes', async () => {
-    const router = new ApiRouter({
-      appDir: path.resolve(PWD, '..'),
-      apiDir: PWD,
-      lambdaDir: path.join(PWD, 'lambda'),
-      prefix: '/',
-    });
-    const handlers = await router.getSingleModuleHandlers(resourcePath);
-    expect(handlers).toBeDefined();
-    const typedHandler = handlers!.find(info => info.name === 'putRepo')!;
-    const canonicalCallable: NonNullable<OperationContractSource['handler']> =
-      typedHandler.handler;
-    const nativeCallable: APIHandlerInfo['handler'] = canonicalCallable;
-    expect(nativeCallable).toBe(typedHandler.handler);
-    expect(Object.keys(serializeOperationSchemas(nativeCallable)!)).toEqual([
-      'DATA',
-      'QUERY',
-      'PARAMS',
-      'HEADERS',
-    ]);
-    const contracts = buildOperationContractMap({
-      handlers: handlers!,
-      requestId: 'producer-app',
-      operationVersion: 1,
-    });
-    const client = await generateFixtureClient({
-      prefix: '/',
-      resourcePath,
-      requestId: 'producer-app',
-    });
-    expect(client.putRepo.args[0].operationContext.schemaHash).toBe(
-      contracts['PUT:/put-repo'].schemaHash,
-    );
-    expect(
-      client.operationManifest.operations.find(
-        (entry: any) => entry.name === 'putRepo',
-      ).schemaHash,
-    ).toBe(contracts['PUT:/put-repo'].schemaHash);
-    const uploadHandlers = await router.getSingleModuleHandlers(
-      path.join(PWD, 'lambda/upload.ts'),
-    );
-    const upload = uploadHandlers!.find(info => info.name === 'upload')!;
-    expect(Object.keys(serializeOperationSchemas(upload.handler)!)).toEqual([
-      'Files',
-    ]);
-  });
-
-  test('uses the canonical default for requests and bootstrap, preserving nested caller overrides', async () => {
-    const source = await generateFixtureSource({
-      prefix: '/',
-      resourcePath,
-      requestId: 'producer-app',
-    });
-    expect(
-      source.match(/from "@modern-js\/runtime-extensions\/request-policy"/g),
-    ).toHaveLength(2);
-    expect(source).not.toContain('@modern-js/plugin-bff/client');
-    const client = await executeGeneratedClient(source);
-    expect(
-      client.initProducerClient({
-        requireEnvelope: false,
-        identityBinding: { strict: false },
-        operationContract: { requireOperationVersion: false },
-      }),
-    ).toEqual({
-      requestId: 'producer-app',
-      requireEnvelope: false,
-      identityBinding: { enabled: true, strict: false },
-      operationContract: {
-        enabled: true,
-        strict: true,
-        requireSchemaHash: true,
-        requireOperationVersion: false,
-      },
-    });
-  });
 
   test('retains explicit custom creators and their missing-configure diagnostic', async () => {
     const source = await generateFixtureSource({

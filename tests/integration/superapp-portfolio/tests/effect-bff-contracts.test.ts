@@ -222,4 +222,40 @@ describe('superapp server Effect BFF contracts', () => {
       },
     });
   });
+
+  test('applies ERP approval and chat mutations to subsequent reads', async () => {
+    const erpBase = '/bff-api/effect/apps/enterprise-mega-erp/erp';
+    const decision = await postJson(
+      port,
+      `${erpBase}/approval/ap-1001/decision`,
+      { decision: 'approved', actor: 'contract.operator' },
+    );
+    expect(decision.status).toBe(200);
+    await expect(decision.json()).resolves.toMatchObject({
+      id: 'ap-1001',
+      status: 'approved',
+    });
+
+    const chat = await postJson(port, `${erpBase}/chat/send`, {
+      channel: 'incident-war-room',
+      author: 'contract.operator',
+      text: 'Reroute high priority loads',
+      priority: 'urgent',
+    });
+    expect(chat.status).toBe(200);
+
+    const erpResponse = await fetch(`${host}:${port}${erpBase}/bootstrap`);
+    expect(erpResponse.status).toBe(200);
+    const erp = (await erpResponse.json()) as {
+      approvals: Array<{ id: string; status: string }>;
+      chat: Array<{ author: string; text: string }>;
+    };
+    expect(
+      erp.approvals.find(approval => approval.id === 'ap-1001')?.status,
+    ).toBe('approved');
+    expect(erp.chat.at(-1)).toMatchObject({
+      author: 'contract.operator',
+      text: 'Reroute high priority loads',
+    });
+  });
 });

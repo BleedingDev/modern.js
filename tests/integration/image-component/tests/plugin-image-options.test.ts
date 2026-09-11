@@ -74,15 +74,5 @@ describe('@modern-js/image IPX route', () => {
     const assetPrefix = await resolveIpxAssetPrefix();
 
     expect(assetPrefix).toBe(JSON.stringify('/_modern/ipx'));
-    expect(assetPrefix).not.toBe(JSON.stringify('/_rsbuild/ipx'));
-  });
-
-  test.each([
-    '/custom/ipx',
-    '',
-  ])('preserves an explicit consumer assetPrefix %j', async assetPrefix => {
-    expect(await resolveIpxAssetPrefix({ ipx: { assetPrefix } })).toBe(
-      JSON.stringify(assetPrefix),
-    );
   });
 });

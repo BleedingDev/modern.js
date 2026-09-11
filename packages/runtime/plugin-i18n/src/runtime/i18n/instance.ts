@@ -74,8 +74,7 @@ export type TranslateFn = (
 // declares a top-level `[key: string]: any` and overloaded call-signature
 // properties; both make i18next's `i18n` structurally unassignable to this
 // type, so the documented `i18nInstance: i18next` usage does not typecheck.
-// Do NOT restore upstream's shape when resolving a sync merge — the guard is
-// tests/type-fixture/i18nInstanceTypes.fixture.ts.
+// Do NOT restore upstream's shape when resolving a sync merge.
 export interface I18nInstance {
   language: string;
   isInitialized?: boolean;

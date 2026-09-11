@@ -1,6 +1,8 @@
 # ADR-0007: Module Onboarding Certification Gates
 
-- Status: Implemented
+> Retired 2026-09-11: the certification gate workflow, profiles and evidence tree were removed; the regular unit-test job covers this scope.
+
+- Status: Retired (2026-09-11) — replaced by the regular unit-test job.
 - Date: 2026-02-22
 - Related Beads: `modernjs-44t.6.4`
 - Depends on:
@@ -20,16 +22,11 @@ Existing RC gate tooling (`modernjs-44t.5.5`) validates release contracts, but m
 
 ## 2. Decision
 
-Add a dedicated module certification profile and run it through the consolidated contract-gates CI workflow:
-
-1. Profile:
-   - `scripts/release-gates/module-certification-profile.json`
-2. Workflow:
-   - `.github/workflows/contract-gates.yml` (`profile: module-certification`)
-3. Validation script entrypoint (reused):
-   - `scripts/release-gates/validate-release-candidate-gates.js`
-4. Repository script:
-   - `pnpm run validate:module-certification-gates`
+Historical decision: a dedicated module certification profile ran through the
+consolidated contract-gates CI workflow. The profile, the workflow, the
+`scripts/release-gates/` validator tooling and the
+`validate:module-certification-gates` repository script were all removed on
+2026-09-11; the regular unit-test job covers this scope.
 
 Status note, 2026-07-07: the module SDK contract validation tooling was retired
 because no live code consumed the contract. The JSON remains retained as a
@@ -39,7 +36,8 @@ design artifact; revisit the certification gate when a runtime consumer exists.
 
 ### 3.1 Required evidence files
 
-Under `docs/super-app-rfc-adr/evidence/module-certification/current`:
+The evidence tree under `docs/super-app-rfc-adr/evidence/module-certification/`
+was removed on 2026-09-11. The files it required were:
 
 1. `architecture-evidence.md`
 2. `validation-evidence.md`
@@ -80,5 +78,5 @@ Tradeoff:
 
 ## 5. Validation Commands
 
-1. `pnpm run validate:module-certification-gates`
-2. `node scripts/release-gates/validate-release-candidate-gates.js --profile scripts/release-gates/module-certification-profile.json --evidence-dir docs/super-app-rfc-adr/evidence/module-certification/current`
+Retired 2026-09-11 together with the gate tooling. The surviving check in this
+scope is `pnpm run validate:boundary-guards`.

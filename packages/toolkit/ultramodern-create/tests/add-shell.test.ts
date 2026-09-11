@@ -433,3 +433,33 @@ test('planUltramodernShell reports the planned shell without mutating the worksp
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('add-shell keeps consumer-authored root scripts and tsconfig bytes', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-add-shell-'));
+  const workspaceDir = path.join(tempRoot, 'workspace');
+  try {
+    createBaseWorkspace(workspaceDir);
+    const packagePath = path.join(workspaceDir, 'package.json');
+    const manifest = readJson(workspaceDir, 'package.json');
+    manifest.scripts['consumer:check'] = 'echo authored';
+    manifest.scripts.build = 'echo authored-build';
+    fs.writeFileSync(packagePath, JSON.stringify(manifest, null, 2));
+    const tsconfigPath = path.join(workspaceDir, 'tsconfig.json');
+    const authoredTsconfig =
+      '{"references":[],"compilerOptions":{"strict":true},"extra":"authored"}\n';
+    fs.writeFileSync(tsconfigPath, authoredTsconfig);
+
+    addUltramodernShell({
+      workspaceRoot: workspaceDir,
+      name: 'admin',
+      modernVersion: '3.2.1',
+    });
+
+    const next = readJson(workspaceDir, 'package.json');
+    assert.equal(next.scripts['consumer:check'], 'echo authored');
+    assert.equal(next.scripts.build, 'echo authored-build');
+    assert.equal(fs.readFileSync(tsconfigPath, 'utf-8'), authoredTsconfig);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

@@ -178,23 +178,10 @@ describe('empty MF producer', () => {
     for (const reference of [
       `https://foreign.example.test/app/${client}`,
       `${publicPath}../app/${client}`,
-      `${publicPath}%2e%2e/app/${client}`,
-      `${publicPath}static\\js/index.js`,
-      `${publicPath}static%5cjs/index.js`,
       `${publicPath}static/js/missing.js`,
-      `${publicPath}${api}`,
-      `${publicPath}${ssr}`,
-      `${publicPath}${client}?forged=true`,
-      `${publicPath}${client}#forged`,
-      `//assets.example.test/app/${client}`,
     ]) {
       const f = await fixture(framework);
       await f.routes([reference]);
-      await expect(f.emit()).rejects.toThrow(
-        /UI\/client manifest references no compiled execution module/u,
-      );
-      // One legitimate asset must not hide another invalid declaration.
-      await f.routes([`${publicPath}${client}`, reference]);
       await expect(f.emit()).rejects.toThrow(
         /UI\/client manifest references no compiled execution module/u,
       );

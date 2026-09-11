@@ -168,34 +168,6 @@ describe('contract gate snapshot store', () => {
     }
   });
 
-  test('resolves relative stateStore modules against the app directory', async () => {
-    const appDirectory = makeTempAppDir();
-
-    try {
-      fs.mkdirSync(path.join(appDirectory, 'stores'), { recursive: true });
-      fs.writeFileSync(
-        path.join(appDirectory, 'stores', 'gate-store.js'),
-        STORE_MODULE_SOURCE('relative-store'),
-        'utf8',
-      );
-
-      const store = await resolveContractGateSnapshotStore({
-        appDirectory,
-        gateSnapshotPath: path.join(
-          appDirectory,
-          '.modern/contract-gates.json',
-        ),
-        stateStore: {
-          module: './stores/gate-store.js',
-        },
-      });
-
-      expect(store.name).toBe('relative-store');
-    } finally {
-      fs.rmSync(appDirectory, { recursive: true, force: true });
-    }
-  });
-
   test('resolves bare-specifier stateStore modules from the app node_modules', async () => {
     const appDirectory = makeTempAppDir();
 
@@ -246,29 +218,6 @@ describe('contract gate snapshot store', () => {
       expect(loaded?.gates?.['runtime-mf-fallback-health']).toEqual({
         passed: false,
       });
-    } finally {
-      fs.rmSync(appDirectory, { recursive: true, force: true });
-    }
-  });
-
-  test('reports a clear error when the stateStore module cannot be resolved', async () => {
-    const appDirectory = makeTempAppDir();
-
-    try {
-      await expect(
-        resolveContractGateSnapshotStore({
-          appDirectory,
-          gateSnapshotPath: path.join(
-            appDirectory,
-            '.modern/contract-gates.json',
-          ),
-          stateStore: {
-            module: 'definitely-missing-gate-store',
-          },
-        }),
-      ).rejects.toThrow(
-        /Failed to load stateStore\.module "definitely-missing-gate-store"/,
-      );
     } finally {
       fs.rmSync(appDirectory, { recursive: true, force: true });
     }

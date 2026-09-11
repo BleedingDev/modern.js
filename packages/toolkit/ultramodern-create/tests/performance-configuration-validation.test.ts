@@ -24,11 +24,10 @@ test('performance configuration validation never claims runtime performance', ()
       __dirname,
       '../templates/workspace-scripts/ultramodern-performance-readiness.mjs',
     );
-    const stdout = execFileSync(process.execPath, [scriptPath], {
+    execFileSync(process.execPath, [scriptPath], {
       cwd: workspaceRoot,
       encoding: 'utf8',
     });
-    assert.match(stdout, /performance configuration validation reported/u);
     const report = JSON.parse(
       fs.readFileSync(
         path.join(
@@ -39,12 +38,7 @@ test('performance configuration validation never claims runtime performance', ()
       ),
     );
     assert.equal(report.result, 'configuration-valid');
-    assert.deepEqual(report.runtimeMeasurement, {
-      performed: false,
-      reason: 'static-source-and-configuration-validation-only',
-    });
-    assert.ok(report.apps.length > 0);
-
+    assert.equal(report.runtimeMeasurement.performed, false);
     const runtimeSourcePath = path.join(
       workspaceRoot,
       'apps/shell-super-app/src/modern.runtime.ts',

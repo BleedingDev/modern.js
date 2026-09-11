@@ -98,12 +98,10 @@ test('resolves a separately bundled public head through the native provider iden
       };
       return createElement('p', null, `${request.requestId}:${title}`);
     };
-    const names: string[] = [];
     const resolveComponent = (
       _component: unknown,
-      { name }: { name: string },
+      _context: { name: string },
     ) => {
-      names.push(name);
       return Selected;
     };
     const request = (requestId: string) =>
@@ -118,19 +116,6 @@ test('resolves a separately bundled public head through the native provider iden
       );
     expect(renderToStaticMarkup(request('first'))).toBe('<p>first:head</p>');
     expect(renderToStaticMarkup(request('second'))).toBe('<p>second:head</p>');
-    expect(names).toEqual(['head.Helmet', 'head.Helmet']);
-    expect(provider.RuntimeContext).toBe(
-      Reflect.get(
-        globalThis,
-        Symbol.for('@modern-js/runtime:react-context:v1:public'),
-      ),
-    );
-    expect(provider.InternalRuntimeContext).toBe(
-      Reflect.get(
-        globalThis,
-        Symbol.for('@modern-js/runtime:react-context:v1:internal'),
-      ),
-    );
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

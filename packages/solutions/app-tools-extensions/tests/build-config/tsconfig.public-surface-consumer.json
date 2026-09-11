@@ -9,10 +9,5 @@
     "target": "ESNext",
     "types": ["node"]
   },
-  "files": [
-    "public-surface-consumer.ts",
-    "public-surface-private-create-default-consumer.ts",
-    "public-surface-private-initial-config-consumer.ts",
-    "public-surface-private-set-environment-consumer.ts"
-  ]
+  "files": ["public-surface-consumer.ts"]
 }

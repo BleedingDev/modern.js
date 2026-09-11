@@ -1,6 +1,8 @@
 # ADR-0008: Bun Super-App Smoke Gates
 
-- Status: Implemented
+> Retired 2026-09-11: replaced by the regular unit-test job.
+
+- Status: Retired (2026-09-11) — replaced by the regular unit-test job.
 - Date: 2026-02-22
 - Related Beads: `modernjs-1e3`
 - Depends on:

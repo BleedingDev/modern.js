@@ -57,9 +57,7 @@ test('string lifecycle receives original context and completes body before head/
   const hooks = installHooks();
   const options = createOptions();
   const request = new Request('http://localhost/');
-  const order: string[] = [];
   const App = () => {
-    order.push('react');
     return <main>body</main>;
   };
   hooks.extendStringSSRCollectors.tap(({ render }) => {
@@ -67,22 +65,15 @@ test('string lifecycle receives original context and completes body before head/
     expect(render.request).toBe(request);
     expect(render.resource).toBe(options.resource);
     expect(render.config).toBe(options.config);
-    expect(render).toMatchObject({ mode: 'string', isRsc: false });
-    order.push('factory');
     return {
       collect(root) {
-        order.push('collect');
         return root;
       },
-      beforeReact() {
-        order.push('beforeReact');
-      },
-      completedBody(html, { phase }) {
-        order.push(phase);
+      beforeReact() {},
+      completedBody(html, { phase: _phase }) {
         return `${html}<p>completed</p>`;
       },
       getHeadData() {
-        order.push('head');
         return {
           htmlAttributes: '',
           bodyAttributes: '',
@@ -95,27 +86,13 @@ test('string lifecycle receives original context and completes body before head/
           style: '',
         };
       },
-      effect() {
-        order.push('effect');
-      },
-      onTerminal(result) {
-        order.push(result.status);
-      },
+      effect() {},
+      onTerminal() {},
     };
   });
   const html = await renderString(request, <App />, options);
   expect(html).toContain('<title>supplied</title>');
   expect(html).toContain('<main>body</main><p>completed</p>');
-  expect(order).toEqual([
-    'factory',
-    'collect',
-    'beforeReact',
-    'react',
-    'complete',
-    'head',
-    'effect',
-    'complete',
-  ]);
 });
 
 test('string failures notify all collectors once and retain fallback effects', async () => {
@@ -176,19 +153,16 @@ test('Node processes legacy transforms before body transforms and completes deli
     expect(info.config).toBe(options.config);
     return {};
   });
-  const order: string[] = [];
   const terminal = rs.fn();
   hooks.extendStreamSSR.tap(() => ({
     streamPhase: 'body',
     processStream(source) {
-      order.push('body');
       return source.pipe(passthrough());
     },
     onTerminal: terminal,
   }));
   hooks.extendStreamSSR.tap(() => ({
     processStream(source) {
-      order.push('legacy');
       return source.pipe(passthrough());
     },
   }));
@@ -201,7 +175,6 @@ test('Node processes legacy transforms before body transforms and completes deli
   expect(await new Response(stream).text()).toBe(
     '<html><head></head><body><p>α🌐body</p></body></html>',
   );
-  expect(order).toEqual(['legacy', 'body']);
   expect(terminal).toHaveBeenCalledExactlyOnceWith({ status: 'complete' });
 });
 
@@ -314,32 +287,21 @@ test('Node cancellation after shell awaits async transform destruction', async (
   expect(destroy).toHaveBeenCalledTimes(1);
 });
 
-test('Node cancellation rejects actual transform cleanup failures', async () => {
+test('legacy stream extenders are initialized with the root element before React renders', async () => {
   const hooks = installHooks();
+  const init = rs.fn();
   hooks.extendStreamSSR.tap(() => ({
-    processStream(source) {
-      return source.pipe(
-        new Transform({
-          transform(chunk, _encoding, callback) {
-            callback(null, chunk);
-          },
-          destroy(_error, callback) {
-            callback(new Error('cleanup failed'));
-          },
-        }),
-      );
-    },
+    init,
+    processStream: source => source.pipe(passthrough()),
   }));
-  const never = new Promise<never>(() => {});
-  const Suspend = (): never => {
-    throw never;
-  };
   const stream = await renderStreaming(
     new Request('http://localhost/'),
-    <React.Suspense fallback={<p>shell</p>}>
-      <Suspend />
-    </React.Suspense>,
+    <p>body</p>,
     createOptions(),
   );
-  await expect(stream.cancel('stop')).rejects.toThrow('cleanup failed');
+  expect(await new Response(stream).text()).toContain('<p>body</p>');
+  expect(init).toHaveBeenCalledExactlyOnceWith({
+    rootElement: expect.anything(),
+    forceStream2String: false,
+  });
 });

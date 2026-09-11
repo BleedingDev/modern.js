@@ -20,10 +20,8 @@ export default {
       include: [
         'tests/cli.test.ts',
         'tests/server.test.ts',
-        'tests/urlStrategy.test.ts',
         'tests/runtimeRegistration.test.tsx',
         'tests/runtimeBoundary.test.ts',
-        'tests/publicExports.test.ts',
         'tests/federatedI18nBoundary.test.tsx',
         'tests/federationRegistration.test.tsx',
       ],

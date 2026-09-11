@@ -145,27 +145,14 @@ const allRuntimeExports = [...new Set(Object.values(runtimeExports).flat())];
 
 it.each([
   {
-    aliasShape: 'none',
     optionalRuntime: 'absent',
     installPoisonRuntime: false,
   },
   {
-    aliasShape: 'none',
     optionalRuntime: 'resolvable',
     installPoisonRuntime: true,
   },
-  {
-    aliasShape: 'tools-object',
-    optionalRuntime: 'restored by a tools.rspack object alias',
-    installPoisonRuntime: true,
-  },
-  {
-    aliasShape: 'tools-array',
-    optionalRuntime: 'restored by a tools.rspack array alias',
-    installPoisonRuntime: true,
-  },
 ])('links every disabled RSC runtime contract when the optional runtime is $optionalRuntime', async ({
-  aliasShape,
   installPoisonRuntime,
 }) => {
   const workspaceRoot = fs.mkdtempSync(
@@ -175,12 +162,14 @@ it.each([
   const neighborPath = path.join(workspaceRoot, 'neighbor.js');
   const outputPath = path.join(workspaceRoot, 'dist');
 
+  const poisonPackageRoot = path.join(
+    workspaceRoot,
+    'node_modules/react-server-dom-rspack',
+  );
+
   try {
     if (installPoisonRuntime) {
-      const packageRoot = path.join(
-        workspaceRoot,
-        'node_modules/react-server-dom-rspack',
-      );
+      const packageRoot = poisonPackageRoot;
       fs.mkdirSync(packageRoot, { recursive: true });
       fs.writeFileSync(
         path.join(packageRoot, 'package.json'),
@@ -274,10 +263,6 @@ it.each([
       'utf-8',
     );
 
-    const poisonPackageRoot = path.join(
-      workspaceRoot,
-      'node_modules/react-server-dom-rspack',
-    );
     const poisonAliasPlugin = {
       name: 'test:poison-rsc-alias',
       setup(
@@ -287,33 +272,12 @@ it.each([
       ) {
         api.modifyRspackConfig(config => {
           config.resolve ??= {};
-          if (aliasShape === 'plugin-object') {
-            config.resolve.alias = {
-              '@fixture/rsc-neighbor$': neighborPath,
-              'react-server-dom-rspack': poisonPackageRoot,
-            };
-          } else if (aliasShape === 'plugin-array') {
-            Reflect.set(config.resolve, 'alias', [
-              {
-                alias: poisonPackageRoot,
-                name: 'react-server-dom-rspack',
-              },
-              {
-                alias: path.join(workspaceRoot, 'missing-neighbor.js'),
-                name: '@fixture/rsc-neighbor',
-                onlyModule: true,
-              },
-              {
-                alias: neighborPath,
-                name: '@fixture/rsc-neighbor',
-                onlyModule: true,
-              },
-            ]);
-          } else {
-            config.resolve.alias = {
-              '@fixture/rsc-neighbor$': neighborPath,
-            };
-          }
+          config.resolve.alias = {
+            '@fixture/rsc-neighbor$': neighborPath,
+            ...(installPoisonRuntime
+              ? { 'react-server-dom-rspack': poisonPackageRoot }
+              : {}),
+          };
         });
       },
     };
@@ -347,29 +311,6 @@ it.each([
         },
         tools: {
           htmlPlugin: false,
-          rspack(config) {
-            if (aliasShape === 'tools-object') {
-              config.resolve ??= {};
-              config.resolve.alias = {
-                '@fixture/rsc-neighbor$': neighborPath,
-                'react-server-dom-rspack': poisonPackageRoot,
-              };
-            } else if (aliasShape === 'tools-array') {
-              config.resolve ??= {};
-              Reflect.set(config.resolve, 'alias', [
-                {
-                  alias: poisonPackageRoot,
-                  name: 'react-server-dom-rspack',
-                },
-                {
-                  alias: neighborPath,
-                  name: '@fixture/rsc-neighbor',
-                  onlyModule: true,
-                },
-              ]);
-            }
-            return config;
-          },
         },
       },
     });

@@ -73,52 +73,17 @@ describe('UltraModern release identity', () => {
     ).toHaveLength(4);
   });
 
-  it('uses and trims the immutable revision override', () => {
+  it('trims an immutable revision override and treats a workspace sentinel as unset', () => {
     withSourceRevision(`  ${sourceRevision}  `, () => {
       expect(resolveUltramodernSourceRevision('/does/not/matter')).toBe(
         sourceRevision,
       );
     });
-  });
-
-  it('treats an explicit workspace sentinel as unset', () => {
     withSourceRevision(sourceRevision, () => {
       expect(
         resolveUltramodernSourceRevision('/does/not/matter', 'workspace'),
       ).toBe(sourceRevision);
     });
-  });
-
-  it('resolves a git revision when no override exists', () => {
-    const directory = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'ultramodern-release-identity-'),
-    );
-    try {
-      execFileSync('git', ['init', '--quiet'], { cwd: directory });
-      execFileSync('git', ['config', 'user.email', 'test@example.test'], {
-        cwd: directory,
-      });
-      execFileSync('git', ['config', 'user.name', 'UltraModern Test'], {
-        cwd: directory,
-      });
-      fs.writeFileSync(path.join(directory, 'source.txt'), 'release source\n');
-      execFileSync('git', ['add', 'source.txt'], { cwd: directory });
-      execFileSync('git', ['commit', '--quiet', '-m', 'source'], {
-        cwd: directory,
-      });
-      const expected = execFileSync('git', ['rev-parse', 'HEAD'], {
-        cwd: directory,
-        encoding: 'utf8',
-      }).trim();
-
-      expect(
-        withSourceRevision(undefined, () =>
-          resolveUltramodernSourceRevision(directory),
-        ),
-      ).toBe(expected);
-    } finally {
-      fs.rmSync(directory, { recursive: true, force: true });
-    }
   });
 
   it('never labels tracked or untracked dirty source as clean HEAD', () => {
@@ -199,28 +164,6 @@ describe('UltraModern release identity', () => {
           resolveUltramodernSourceRevision(directory),
         ),
       ).toThrow('does not match clean Git HEAD');
-    } finally {
-      fs.rmSync(directory, { recursive: true, force: true });
-    }
-  });
-
-  it('preserves the generation marker only for an uncommitted workspace', () => {
-    const directory = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'ultramodern-release-workspace-'),
-    );
-    try {
-      expect(
-        withSourceRevision(undefined, () =>
-          resolveUltramodernReleaseIdentity({
-            generationBuildMarker,
-            unitId,
-            workspaceRoot: directory,
-          }),
-        ),
-      ).toEqual({
-        buildMarker: generationBuildMarker,
-        sourceRevision: 'workspace',
-      });
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

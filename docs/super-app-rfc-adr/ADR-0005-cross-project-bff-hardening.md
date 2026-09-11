@@ -110,7 +110,6 @@ Harden cross-project BFF with fail-fast validation, safer generation, and explic
     - redirect/notFound mapping semantics
     - splat parameter mapping branch (`_splat` -> `*`)
 3. Validation coverage:
-  - `tests/integration/bff-runtime-parity/tests/effect-only-data-platform.test.ts`
   - `tests/integration/routes-tanstack/tests/tanstack-data-flow-contract.test.ts`
   - local command: `pnpm --filter tests exec jest ... --config '{\"testEnvironment\":\"node\",...}'`
 

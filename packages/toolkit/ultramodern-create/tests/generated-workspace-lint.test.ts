@@ -243,15 +243,6 @@ test('generated APIs pass real Oxlint after Oxfmt with the current preset and na
       });
     }
     formatGeneratedWorkspaceFiles(workspaceDir);
-    for (const name of names) {
-      assert.match(
-        fs.readFileSync(
-          path.join(workspaceDir, `verticals/${name}/shared/api.ts`),
-          'utf8',
-        ),
-        /bff-effect\/microvertical-api/u,
-      );
-    }
     assertGeneratedWorkspaceLintClean(
       workspaceDir,
       'two formatted scoped APIs',

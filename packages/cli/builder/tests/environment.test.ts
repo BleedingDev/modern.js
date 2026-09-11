@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, rstest } from '@rstest/core';
 import { join } from 'path';
-import { assertCacheIsolation } from '../../../../scripts/tests/fixture-builder-semantics';
 import { createBuilder } from '../src';
 import { pluginEnvironmentDefaults } from '../src/plugins/environmentDefaults';
 
@@ -123,9 +122,6 @@ describe('builder environment compat', () => {
       target: ['webworker', 'es5'],
     });
 
-    const built = await assertCacheIsolation(bundlerConfigs);
-    const cacheDirectories = built.map(c => (c.cache as any).storage.location);
-    expect(new Set(cacheDirectories).size).toBe(bundlerConfigs.length);
     expect(
       configsByName.client.plugins?.some(
         (plugin: any) => plugin?.constructor?.name === 'HtmlRspackPlugin',

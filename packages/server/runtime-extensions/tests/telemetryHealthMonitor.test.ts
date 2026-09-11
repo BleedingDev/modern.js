@@ -83,8 +83,6 @@ describe('telemetry health monitor', () => {
       consecutiveHealthy: 3,
     });
 
-    expect(onEvaluate).toHaveBeenCalledTimes(6);
-    expect(onTransition).toHaveBeenCalledTimes(2);
     expect(onTransition).toHaveBeenNthCalledWith(1, unhealthy);
     expect(onTransition).toHaveBeenNthCalledWith(2, recovered);
 

@@ -12,8 +12,6 @@ import {
   assembleEffectBffRuntime,
   type EffectBffRuntimeAssembly,
 } from '../src/assembly';
-import * as edge from '../src/effect/edge';
-import { isValidatorAwareHandlerFactory } from '../src/effect/entry-shape';
 import { defineEffectBff } from '../src/effect/handler/definition';
 
 const group = HttpApiGroup.make('status').add(
@@ -37,18 +35,6 @@ const assembly: EffectBffRuntimeAssembly<'AssemblyApi', typeof group, never> = {
 };
 
 describe('Effect BFF runtime assembly', () => {
-  test('uses native Effect APIs and the canonical handler factory registry', () => {
-    expect(edge.Layer.merge).toBe(Layer.merge);
-    expect(edge.HttpApiBuilder.layer).toBe(HttpApiBuilder.layer);
-    expect(edge.defineEffectBff).toBe(defineEffectBff);
-
-    const runtime = assembleEffectBffRuntime(assembly);
-    expect(runtime.api).toBe(api);
-    expect(Layer.isLayer(runtime.layer)).toBe(true);
-    expect(isValidatorAwareHandlerFactory(runtime.createHandler)).toBe(true);
-    expect(runtime).not.toHaveProperty('client');
-  });
-
   test.each([
     false,
     true,

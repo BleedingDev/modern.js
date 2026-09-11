@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Schema } from 'effect';
 
 const packageRoot = path.resolve(__dirname, '..');
 const requireCjs = createRequire(import.meta.url);
@@ -104,24 +105,7 @@ describe('@modern-js/bff-effect package surface', () => {
     expect(esmEntryShape.isValidatorAwareHandlerFactory(factory)).toBe(true);
   });
 
-  test('replaces the runtime macro and keeps browser factory registration local', async () => {
-    for (const format of ['cjs', 'esm-node', 'esm']) {
-      const extension = format === 'cjs' ? 'js' : 'mjs';
-      const source = readFileSync(
-        path.join(
-          packageRoot,
-          `dist/${format}/effect/entry-shape.${extension}`,
-        ),
-        'utf8',
-      );
-      expect(source).not.toContain('MODERN_EFFECT_NODE_RUNTIME');
-      if (format === 'esm') {
-        expect(source).not.toContain('process');
-        expect(source).not.toContain('node:module');
-        expect(source).not.toContain('#effect-entry-shape-registry');
-      }
-    }
-
+  test('keeps browser factory registration isolated from the Node registry', async () => {
     const browserEntryShape = await import(
       pathToFileURL(path.join(packageRoot, 'dist/esm/effect/entry-shape.mjs'))
         .href
@@ -142,6 +126,28 @@ describe('@modern-js/bff-effect package surface', () => {
     expect(cjsEntryShape.isValidatorAwareHandlerFactory(browserFactory)).toBe(
       false,
     );
+  });
+
+  test('decodes built micro-vertical schemas with the consumer Effect singleton', async () => {
+    const cjsEntry = requireCjs('@modern-js/bff-effect/microvertical-api');
+    const esmEntry = await import(
+      pathToFileURL(
+        path.join(packageRoot, 'dist/esm-node/microvertical-api.mjs'),
+      ).href
+    );
+
+    for (const entry of [cjsEntry, esmEntry]) {
+      const context = entry.createMicroVerticalOperationContext({
+        method: 'GET',
+        operationId: 'catalog.list',
+        routePath: '/catalog',
+      });
+      expect(
+        Schema.decodeUnknownSync(entry.MicroVerticalOperationContextSchema)(
+          context,
+        ),
+      ).toEqual(context);
+    }
   });
 
   test('resolves every declared types export with TypeScript 7', () => {

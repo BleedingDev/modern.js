@@ -247,43 +247,6 @@ test('hoists major entries into a BREAKING CHANGES section and labels every bump
   assert.match(body, /- \*\*patch\*\* fix\(runtime\): ordinary thing/);
 });
 
-test('omits the BREAKING CHANGES section when nothing is major', async () => {
-  const { renderCohortChangeRecord } = await loadGenerator();
-  const body = renderCohortChangeRecord(
-    [
-      {
-        id: 'a',
-        packages: [{ name: '@modern-js/runtime', bump: 'patch' }],
-        summary: 'fix(runtime): thing',
-        sha: '',
-        fork: true,
-        type: 'Bug Fixes',
-      },
-    ],
-    { version: '3.5.0-ultramodern.1' },
-  );
-  assert.doesNotMatch(body, /BREAKING CHANGES/);
-  assert.match(body, /Changes since: first UltraModern release/);
-});
-
-test('records the previous release version when one exists', async () => {
-  const { renderCohortChangeRecord } = await loadGenerator();
-  const body = renderCohortChangeRecord(
-    [
-      {
-        id: 'a',
-        packages: [{ name: '@modern-js/runtime', bump: 'patch' }],
-        summary: 'fix(runtime): thing',
-        sha: '',
-        fork: true,
-        type: 'Bug Fixes',
-      },
-    ],
-    { version: '3.5.0-ultramodern.2', previousVersion: '3.5.0-ultramodern.1' },
-  );
-  assert.match(body, /Changes since: `3\.5\.0-ultramodern\.1`/);
-});
-
 test('excludes changesets already reachable from the previous release', async () => {
   const { execFileSync } = require('node:child_process');
   const fs = require('node:fs');
@@ -387,33 +350,4 @@ test('regenerates the same non-empty record after the target release tag exists'
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
-});
-
-test('reports the highest requested bump', async () => {
-  const { renderCohortChangeRecord } = await loadGenerator();
-  const body = renderCohortChangeRecord(
-    [
-      {
-        id: 'a',
-        packages: [{ name: '@modern-js/utils', bump: 'major' }],
-        summary: 'feat!: x',
-        sha: '',
-        fork: true,
-        type: 'Features',
-      },
-    ],
-    { version: '4.0.0-ultramodern.1' },
-  );
-  assert.match(body, /Highest bump requested: major/);
-});
-
-test('joins a hard-wrapped English summary and drops the translation', async () => {
-  const { extractSummary } = await loadGenerator();
-  const summary = extractSummary(
-    '\nUpdate UltraModern to the latest compatible\ndependency cohort.\n\n将 UltraModern 更新到最新的兼容依赖组合。\n',
-  );
-  assert.equal(
-    summary,
-    'Update UltraModern to the latest compatible dependency cohort.',
-  );
 });

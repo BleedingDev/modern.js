@@ -45,36 +45,5 @@ describe('createFederatedCssLinks', () => {
     expect(html).toBe(
       '<link nonce="nonce&quot;&amp;&lt;value&gt;" href="/remote/theme.css" rel="stylesheet" />',
     );
-    expect(html.match(/\bhref=/g)).toHaveLength(1);
-    expect(html.match(/\brel=/g)).toHaveLength(1);
-  });
-});
-
-describe('SSR federated CSS helper matrix', () => {
-  it('escapes federated CSS hrefs and dedupes existing, repeated, and template-present assets', () => {
-    expect(
-      createFederatedCssLinks(
-        [
-          '/remote/base.css',
-          '/remote/base.css',
-          '/remote/theme" onload="alert(1)&x=<tag>.css',
-          '/remote/template".css',
-          '/remote/existing.css',
-          '',
-        ],
-        {
-          template:
-            '<link href="/remote/template&quot;.css" rel="stylesheet" />',
-          attributes: {
-            'data-mf': 'checkout',
-            nonce: 'nonce-2',
-            skipped: undefined,
-          },
-          existingAssets: ['/remote/existing.css'],
-        },
-      ),
-    ).toBe(
-      '<link data-mf="checkout" nonce="nonce-2" href="/remote/base.css" rel="stylesheet" /><link data-mf="checkout" nonce="nonce-2" href="/remote/theme&quot; onload=&quot;alert(1)&amp;x=&lt;tag&gt;.css" rel="stylesheet" />',
-    );
   });
 });

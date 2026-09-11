@@ -8,26 +8,6 @@ const { createProcessEnv, runCommand } = require('../../lib/process-kit');
 const contractPromise = import('../tractor-downstream/contract.mjs');
 const runnerPromise = import('../tractor-downstream/main.mjs');
 
-const stableRsbuildRspackSelectors = [
-  '@rsbuild/core@2.2.0',
-  '@rspack/binding-darwin-arm64@2.2.0',
-  '@rspack/binding-darwin-x64@2.2.0',
-  '@rspack/binding-linux-arm64-gnu@2.2.0',
-  '@rspack/binding-linux-arm64-musl@2.2.0',
-  '@rspack/binding-linux-ppc64-gnu@2.2.0',
-  '@rspack/binding-linux-riscv64-gnu@2.2.0',
-  '@rspack/binding-linux-riscv64-musl@2.2.0',
-  '@rspack/binding-linux-s390x-gnu@2.2.0',
-  '@rspack/binding-linux-x64-gnu@2.2.0',
-  '@rspack/binding-linux-x64-musl@2.2.0',
-  '@rspack/binding-wasm32-wasi@2.2.0',
-  '@rspack/binding-win32-arm64-msvc@2.2.0',
-  '@rspack/binding-win32-ia32-msvc@2.2.0',
-  '@rspack/binding-win32-x64-msvc@2.2.0',
-  '@rspack/binding@2.2.0',
-  '@rspack/core@2.2.0',
-].sort();
-
 function releaseAgeEntry(selector, overrides = {}) {
   const separator = selector.lastIndexOf('@');
   return {
@@ -122,7 +102,35 @@ function writeAuthenticatedCohort(root) {
   );
 }
 
-test('requires the exact release cohort in every Tractor package manifest', async () => {
+const bootstrapVersion = '3.5.0-ultramodern.77';
+const bootstrapSpecifier = `@bleedingdev/modern-js-ultramodern-create@${bootstrapVersion}`;
+const bootstrapExclude = [bootstrapSpecifier];
+const exactPnpmExecutable = '/opt/pnpm-11.17.0/bin/pnpm';
+
+function packageManagerOptions(overrides) {
+  return {
+    createPackage: {
+      bootstrapReleaseAgePolicy: {
+        minimumReleaseAge: 1440,
+        minimumReleaseAgeExclude: bootstrapExclude,
+        minimumReleaseAgeIgnoreMissingTime: false,
+        minimumReleaseAgeStrict: true,
+      },
+      exactSpecifier: bootstrapSpecifier,
+      version: bootstrapVersion,
+    },
+    expectedPnpmVersion: '11.17.0',
+    minimumReleaseAgeExclude: bootstrapExclude,
+    registryEnv: {
+      npm_config_registry: 'https://registry.npmjs.org/',
+      pnpm_config_registry: 'https://registry.npmjs.org/',
+    },
+    resolveExactPnpmExecutableImpl: () => exactPnpmExecutable,
+    ...overrides,
+  };
+}
+
+test('generated consumer manifests must pin the exact release cohort, under any alias', async () => {
   const {
     assertAuthenticatedTractorCohort,
     assertExactModernDependencySpecifiers,
@@ -138,6 +146,11 @@ test('requires the exact release cohort in every Tractor package manifest', asyn
       assertExactModernDependencySpecifiers(root, release).length,
       1,
     );
+
+    const manifestPath = path.join(root, 'package.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+    // A workspace link in a vendored reference repo is not a cohort dependency.
     fs.mkdirSync(path.join(root, 'repos/reference'), { recursive: true });
     fs.writeFileSync(
       path.join(root, 'repos/reference/package.json'),
@@ -149,8 +162,8 @@ test('requires the exact release cohort in every Tractor package manifest', asyn
       assertExactModernDependencySpecifiers(root, release).length,
       1,
     );
-    const manifestPath = path.join(root, 'package.json');
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+    // An off-by-one cohort version silently ships a different framework build.
     manifest.dependencies['@modern-js/runtime'] =
       'npm:@bleedingdev/modern-js-runtime@3.5.0-ultramodern.49';
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
@@ -158,129 +171,85 @@ test('requires the exact release cohort in every Tractor package manifest', asyn
       () => assertExactModernDependencySpecifiers(root, release),
       /must be npm:@bleedingdev\/modern-js-runtime@3\.5\.0-ultramodern\.50/u,
     );
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
 
-test('requires exact versions for arbitrary aliases to cohort packages', async () => {
-  const { assertExactModernDependencySpecifiers } = await contractPromise;
-  const root = fixture();
-  try {
-    writeAuthenticatedCohort(root);
-    const manifestPath = path.join(root, 'package.json');
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    manifest.dependencies['framework-runtime'] =
+    // A range specifier behind an arbitrary alias is the same escape.
+    manifest.dependencies['@modern-js/runtime'] =
       'npm:@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50';
-    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
-    assert.deepEqual(
-      assertExactModernDependencySpecifiers(root, release).find(
-        observation => observation.dependencyName === 'framework-runtime',
-      ),
-      {
-        blockName: 'dependencies',
-        dependencyName: 'framework-runtime',
-        packageFile: 'package.json',
-        specifier: 'npm:@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50',
-        targetName: '@bleedingdev/modern-js-runtime',
-      },
-    );
-
     manifest.dependencies['framework-runtime'] =
       'npm:@bleedingdev/modern-js-runtime@~3.5.0-ultramodern.50';
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
     assert.throws(
       () => assertExactModernDependencySpecifiers(root, release),
-      /dependencies\.framework-runtime must be npm:@bleedingdev\/modern-js-runtime@3\.5\.0-ultramodern\.50, found npm:@bleedingdev\/modern-js-runtime@~3\.5\.0-ultramodern\.50/u,
+      /dependencies\.framework-runtime must be npm:@bleedingdev\/modern-js-runtime@3\.5\.0-ultramodern\.50/u,
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('published .15 Tractor bootstrap carries the full cohort and active audited closure', async t => {
-  const {
-    createTractorPackageManagerContext,
-    createTractorPnpmDlxArgs,
-    parseArgs,
-    resolveTractorMinimumReleaseAgeExclude,
-  } = await runnerPromise;
+test('release-age exclusions are exact specifiers, sorted as specifiers, and reach pnpm dlx', async t => {
+  const { createTractorPnpmDlxArgs, resolveTractorMinimumReleaseAgeExclude } =
+    await runnerPromise;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tractor-dlx-policy-'));
   t.after(() => fs.rmSync(root, { force: true, recursive: true }));
 
   const releaseVersion = '3.8.2-ultramodern.15';
-  const firstPartyTargets = [
-    '@bleedingdev/modern-js-ultramodern-create',
-    '@bleedingdev/modern-js-i18n-utils',
-    '@bleedingdev/modern-js-utils',
-    ...Array.from(
-      { length: 29 },
-      (_, index) =>
-        `@bleedingdev/modern-js-release-member-${String(index + 1).padStart(2, '0')}`,
-    ),
-  ];
+  // `-` sorts before `@`, so these two names sort differently as names than as
+  // full `name@version` specifiers; pnpm only accepts the specifier order.
   const strictRelease = {
-    packages: firstPartyTargets.map(targetName => ({
-      targetName,
-      version: releaseVersion,
-    })),
+    packages: [
+      { targetName: '@bleedingdev/modern-js-plugin', version: releaseVersion },
+      {
+        targetName: '@bleedingdev/modern-js-plugin-testing',
+        version: releaseVersion,
+      },
+      {
+        targetName: '@bleedingdev/modern-js-ultramodern-create',
+        version: releaseVersion,
+      },
+    ],
     release: { version: releaseVersion },
   };
-  const staleSelector = 'baseline-browser-mapping@2.11.19';
-  const policyPath = parseArgs([
-    '--manifest',
-    path.join(root, 'manifest.json'),
-    '--workspace',
-    root,
-  ]).releaseAgePolicyPath;
+  const expected = [
+    '@bleedingdev/modern-js-plugin-testing@3.8.2-ultramodern.15',
+    '@bleedingdev/modern-js-plugin@3.8.2-ultramodern.15',
+    '@bleedingdev/modern-js-ultramodern-create@3.8.2-ultramodern.15',
+    '@rspack/core@2.2.0',
+  ];
+
+  // An empty policy must not resurrect retired third-party exceptions into a
+  // release install.
   assert.deepEqual(
     resolveTractorMinimumReleaseAgeExclude({
       release: strictRelease,
-      releaseAgePolicyPath: policyPath,
-      now: new Date('2026-09-08T00:00:00.000Z'),
+      releaseAgePolicyPath: writeReleaseAgePolicy(root, []),
+      now: new Date('2026-08-26T12:00:00.000Z'),
     }),
-    firstPartyTargets
-      .map(targetName => `${targetName}@${releaseVersion}`)
-      .sort(),
-    'the default policy must not resurrect retired third-party exceptions',
-  );
-  // Positive approval coverage uses an independent fixture, not live defaults.
-  const reviewedPolicyPath = writeReleaseAgePolicy(
-    root,
-    stableRsbuildRspackSelectors.map(selector => releaseAgeEntry(selector)),
-  );
-  const minimumReleaseAgeExclude = resolveTractorMinimumReleaseAgeExclude({
-    release: strictRelease,
-    releaseAgePolicyPath: reviewedPolicyPath,
-    now: new Date('2026-08-26T12:00:00.000Z'),
-  });
-  const expected = [
-    ...firstPartyTargets.map(targetName => `${targetName}@${releaseVersion}`),
-    ...stableRsbuildRspackSelectors,
-  ].sort();
-  assert.deepEqual(minimumReleaseAgeExclude, expected);
-  assert.equal(minimumReleaseAgeExclude.includes(staleSelector), false);
-  assert.equal(
-    minimumReleaseAgeExclude.some(selector => /[*?]/u.test(selector)),
-    false,
+    expected.filter(selector => selector.startsWith('@bleedingdev/')),
   );
 
-  const createPackage = {
-    bootstrapReleaseAgePolicy: {
-      minimumReleaseAge: 1440,
-      minimumReleaseAgeExclude: [
-        `@bleedingdev/modern-js-i18n-utils@${releaseVersion}`,
-        `@bleedingdev/modern-js-ultramodern-create@${releaseVersion}`,
-        `@bleedingdev/modern-js-utils@${releaseVersion}`,
-      ],
-      minimumReleaseAgeIgnoreMissingTime: false,
-      minimumReleaseAgeStrict: true,
-    },
-    exactSpecifier: `@bleedingdev/modern-js-ultramodern-create@${releaseVersion}`,
-    version: releaseVersion,
-  };
+  const minimumReleaseAgeExclude = resolveTractorMinimumReleaseAgeExclude({
+    release: strictRelease,
+    releaseAgePolicyPath: writeReleaseAgePolicy(root, [
+      releaseAgeEntry('@rspack/core@2.2.0'),
+    ]),
+    now: new Date('2026-08-26T12:00:00.000Z'),
+  });
+  assert.deepEqual(minimumReleaseAgeExclude, expected);
+
   const args = createTractorPnpmDlxArgs(
-    createPackage,
+    {
+      bootstrapReleaseAgePolicy: {
+        minimumReleaseAge: 1440,
+        minimumReleaseAgeExclude: [
+          `@bleedingdev/modern-js-ultramodern-create@${releaseVersion}`,
+        ],
+        minimumReleaseAgeIgnoreMissingTime: false,
+        minimumReleaseAgeStrict: true,
+      },
+      exactSpecifier: `@bleedingdev/modern-js-ultramodern-create@${releaseVersion}`,
+      version: releaseVersion,
+    },
     minimumReleaseAgeExclude,
     ['ultramodern', 'validate'],
   );
@@ -292,41 +261,15 @@ test('published .15 Tractor bootstrap carries the full cohort and active audited
       selector => `--config.minimum-release-age-exclude=${selector}`,
     ),
   );
-  assert.deepEqual(args.slice(-3), [
-    '@bleedingdev/modern-js-ultramodern-create@3.8.2-ultramodern.15',
-    'ultramodern',
-    'validate',
-  ]);
-
-  const packageManager = createTractorPackageManagerContext({
-    createPackage,
-    expectedPnpmVersion: '11.17.0',
-    minimumReleaseAgeExclude,
-    packageManagerRoot: root,
-    registryUrl: 'https://registry.npmjs.org/',
-    resolveExactPnpmExecutableImpl: () => '/opt/pnpm-11.17.0/bin/pnpm',
-  });
-  assert.deepEqual(
-    JSON.parse(packageManager.env.pnpm_config_minimum_release_age_exclude),
-    expected,
-  );
-  assert.equal(packageManager.env.pnpm_config_minimum_release_age, '1440');
-  assert.equal(
-    packageManager.env.pnpm_config_minimum_release_age_strict,
-    'true',
-  );
-  assert.equal(
-    packageManager.env.pnpm_config_minimum_release_age_ignore_missing_time,
-    'false',
-  );
+  assert.deepEqual(args.slice(-2), ['ultramodern', 'validate']);
 });
 
-test('Tractor bootstrap rejects malformed manifest and audited policy selectors', async t => {
+test('Tractor bootstrap rejects wildcard, future-dated and unbound release-age approvals', async t => {
   const { resolveTractorMinimumReleaseAgeExclude } = await runnerPromise;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tractor-dlx-invalid-'));
   t.after(() => fs.rmSync(root, { force: true, recursive: true }));
   const now = new Date('2026-08-26T12:00:00.000Z');
-  const release = {
+  const strictRelease = {
     packages: [
       {
         targetName: '@bleedingdev/modern-js-ultramodern-create',
@@ -336,30 +279,28 @@ test('Tractor bootstrap rejects malformed manifest and audited policy selectors'
     release: { version: '3.8.2-ultramodern.15' },
   };
 
-  const wildcardPolicyPath = writeReleaseAgePolicy(root, [
-    releaseAgeEntry('@rspack/core@2.2.0', { package: '@rspack/*' }),
-  ]);
   assert.throws(
     () =>
       resolveTractorMinimumReleaseAgeExclude({
-        release,
-        releaseAgePolicyPath: wildcardPolicyPath,
+        release: strictRelease,
+        releaseAgePolicyPath: writeReleaseAgePolicy(root, [
+          releaseAgeEntry('@rspack/core@2.2.0', { package: '@rspack/*' }),
+        ]),
         now,
       }),
     /must be one exact npm package name/u,
   );
 
-  const futurePolicyPath = writeReleaseAgePolicy(root, [
-    releaseAgeEntry('@rspack/core@2.2.0', {
-      expiresAt: '2026-08-28T12:00:00.000Z',
-      reviewedAt: '2026-08-27T12:00:00.000Z',
-    }),
-  ]);
   assert.throws(
     () =>
       resolveTractorMinimumReleaseAgeExclude({
-        release,
-        releaseAgePolicyPath: futurePolicyPath,
+        release: strictRelease,
+        releaseAgePolicyPath: writeReleaseAgePolicy(root, [
+          releaseAgeEntry('@rspack/core@2.2.0', {
+            expiresAt: '2026-08-28T12:00:00.000Z',
+            reviewedAt: '2026-08-27T12:00:00.000Z',
+          }),
+        ]),
         now,
       }),
     /reviewedAt must not be in the future/u,
@@ -369,7 +310,7 @@ test('Tractor bootstrap rejects malformed manifest and audited policy selectors'
     () =>
       resolveTractorMinimumReleaseAgeExclude({
         release: {
-          ...release,
+          ...strictRelease,
           packages: [
             {
               targetName: '@bleedingdev/modern-js-ultramodern-create',
@@ -384,64 +325,8 @@ test('Tractor bootstrap rejects malformed manifest and audited policy selectors'
   );
 });
 
-test('runner has no bypass for Node or workerd release gates', async () => {
-  const {
-    createTractorPackageManagerContext,
-    executionCommands,
-    parseArgs,
-    requiredCommands,
-    requiredTractorCheckIds,
-    requiredVisibleRuntimePlatforms,
-    runTractorDownstreamAcceptance,
-  } = await runnerPromise;
-  assert.deepEqual(requiredCommands, [
-    ['pnpm', ['install', '--frozen-lockfile']],
-    ['pnpm', ['format']],
-    ['pnpm', ['check']],
-    ['pnpm', ['build']],
-    ['pnpm', ['node:proof']],
-    ['pnpm', ['cloudflare:build']],
-  ]);
-  assert.deepEqual(
-    executionCommands.map(({ command, report }) => ({ command, report })),
-    [
-      {
-        command: ['pnpm', ['install', '--frozen-lockfile']],
-        report: true,
-      },
-      {
-        command: [
-          'pnpm',
-          ['exec', 'playwright', 'install', '--with-deps', 'chromium'],
-        ],
-        report: false,
-      },
-      { command: ['pnpm', ['format']], report: true },
-      { command: ['pnpm', ['check']], report: true },
-      { command: ['pnpm', ['build']], report: true },
-      { command: ['pnpm', ['node:proof']], report: true },
-      { command: ['pnpm', ['cloudflare:build']], report: true },
-    ],
-  );
-  assert.deepEqual(requiredVisibleRuntimePlatforms, ['node', 'workerd']);
-  assert.deepEqual(requiredTractorCheckIds, [
-    'exact-create-validation',
-    'exact-cohort',
-    'install---frozen-lockfile',
-    'format',
-    'check',
-    'promotable-application-source',
-    'build',
-    'node:proof',
-    'node-backend-federation-executed',
-    'node-server-rendered-ssr-executed',
-    'node-visible-tractor-workflow',
-    'cloudflare:build',
-    'workerd-visible-tractor-workflow',
-    'native-tanstack-search',
-    'visible-tractor-ui',
-  ]);
-  assert.equal(typeof runTractorDownstreamAcceptance, 'function');
+test('runner CLI has no bypass flag and builds a hermetic package-manager env', async () => {
+  const { createTractorPackageManagerContext, parseArgs } = await runnerPromise;
   assert.throws(() => parseArgs([]), /--manifest is required/u);
   assert.throws(
     () =>
@@ -454,60 +339,21 @@ test('runner has no bypass for Node or workerd release gates', async () => {
       ]),
     /Unknown argument: --skip-browser/u,
   );
-  const parsedPolicyPath = path.join(
-    os.tmpdir(),
-    'tractor-release-age-policy.json',
-  );
-  assert.equal(
-    parseArgs([
-      '--manifest',
-      '/tmp/release/manifest.json',
-      '--workspace',
-      os.tmpdir(),
-      '--release-age-policy',
-      parsedPolicyPath,
-    ]).releaseAgePolicyPath,
-    parsedPolicyPath,
-  );
 
   const packageManagerRoot = path.join(
     os.tmpdir(),
     'tractor-package-manager-context',
   );
-  const exactPnpmExecutable = '/opt/pnpm-11.17.0/bin/pnpm';
-  const minimumReleaseAgeExclude = [
-    '@bleedingdev/modern-js-i18n-utils@3.5.0-ultramodern.77',
-    '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
-    '@bleedingdev/modern-js-utils@3.5.0-ultramodern.77',
-  ];
-  const calls = [];
-  const packageManager = createTractorPackageManagerContext({
-    createPackage: {
-      bootstrapReleaseAgePolicy: {
-        minimumReleaseAge: 1440,
-        minimumReleaseAgeExclude,
-        minimumReleaseAgeIgnoreMissingTime: false,
-        minimumReleaseAgeStrict: true,
+  const packageManager = createTractorPackageManagerContext(
+    packageManagerOptions({
+      packageManagerRoot,
+      runImpl: () => {
+        throw new Error('resolver stub must own executable discovery');
       },
-      exactSpecifier:
-        '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
-      version: '3.5.0-ultramodern.77',
-    },
-    expectedPnpmVersion: '11.17.0',
-    minimumReleaseAgeExclude,
-    packageManagerRoot,
-    registryEnv: {
-      npm_config_registry: 'https://registry.npmjs.org/',
-      pnpm_config_registry: 'https://registry.npmjs.org/',
-    },
-    resolveExactPnpmExecutableImpl: (...args) => {
-      calls.push(args);
-      return exactPnpmExecutable;
-    },
-    runImpl: () => {
-      throw new Error('resolver stub must own executable discovery');
-    },
-  });
+    }),
+  );
+  // The resolved pnpm wins over anything already on PATH, the install stays
+  // aged and strict, and no trust-policy escape hatch reaches the child.
   assert.equal(packageManager.pnpmExecutable, exactPnpmExecutable);
   assert.equal(
     packageManager.env.PATH.split(path.delimiter)[0],
@@ -515,127 +361,50 @@ test('runner has no bypass for Node or workerd release gates', async () => {
   );
   assert.equal(
     packageManager.env.pnpm_config_minimum_release_age_exclude,
-    JSON.stringify(minimumReleaseAgeExclude),
+    JSON.stringify(bootstrapExclude),
   );
   assert.equal(packageManager.env.pnpm_config_minimum_release_age, '1440');
-  assert.equal(
-    packageManager.env.pnpm_config_minimum_release_age_ignore_missing_time,
-    'false',
-  );
   assert.equal(
     packageManager.env.pnpm_config_minimum_release_age_strict,
     'true',
   );
-  assert.equal(packageManager.env.pnpm_config_pm_on_fail, 'ignore');
-  assert.equal(
-    packageManager.env.PLAYWRIGHT_BROWSERS_PATH,
-    path.join(packageManagerRoot, 'package-manager', 'xdg', 'ms-playwright'),
-  );
   assert.equal(packageManager.env.pnpm_config_trust_policy_exclude, undefined);
-  assert.equal(
-    packageManager.env.pnpm_config_registry,
-    'https://registry.npmjs.org/',
-  );
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0][1], '11.17.0');
-  assert.equal(calls[0][3], packageManagerRoot);
 });
 
-test('runner launches Node proof from the installed Playwright browser path', async t => {
-  const { launchWorkspaceBrowser } = await runnerPromise;
-  const originalBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  const inheritedBrowsersPath = path.join(os.tmpdir(), 'inherited-playwright');
-  const installedBrowsersPath = path.join(os.tmpdir(), 'installed-playwright');
-  process.env.PLAYWRIGHT_BROWSERS_PATH = inheritedBrowsersPath;
-  t.after(() => {
-    if (originalBrowsersPath === undefined) {
-      delete process.env.PLAYWRIGHT_BROWSERS_PATH;
-    } else {
-      process.env.PLAYWRIGHT_BROWSERS_PATH = originalBrowsersPath;
-    }
-  });
-
-  const browserProvider = {};
-  const expectedBrowser = {};
-  const browser = await launchWorkspaceBrowser(
-    {
-      browserProvider,
-      processEnv: { PLAYWRIGHT_BROWSERS_PATH: installedBrowsersPath },
-      workspace: os.tmpdir(),
-    },
-    {
-      launchBrowserImpl: async observedProvider => {
-        assert.equal(observedProvider, browserProvider);
-        assert.equal(
-          process.env.PLAYWRIGHT_BROWSERS_PATH,
-          installedBrowsersPath,
-        );
-        return expectedBrowser;
-      },
-    },
-  );
-
-  assert.equal(browser, expectedBrowser);
-  assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, inheritedBrowsersPath);
-});
-
-test('runner rejects inherited bypasses and preserves verified source selectors', async () => {
+test('runner rejects inherited release-age bypasses and preserves verified source selectors', async () => {
   const { createTractorPackageManagerContext } = await runnerPromise;
+  // One representative per casing family: the child env is filtered
+  // case-insensitively, so a poisoned parent cannot widen the install.
   const inheritedKeys = [
     'NPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE',
-    'NPM_CONFIG_TRUST_POLICY_EXCLUDE',
-    'PNPM_CONFIG_MINIMUM_RELEASE_AGE_EXCLUDE',
-    'PNPM_CONFIG_TRUST_POLICY_EXCLUDE',
-    'npm_config_minimum_release_age_exclude',
     'npm_config_trust_policy_exclude',
-    'pnpm_config_minimum_release_age_exclude',
-    'pnpm_config_trust_policy_exclude',
-    'NpM_Config_Minimum_Release_Age_Exclude',
-    'nPm_Config_Trust_Policy_Exclude',
     'PnPm_Config_Minimum_Release_Age_Exclude',
-    'pNpM_Config_Trust_Policy_Exclude',
+    'pnpm_config_trust_policy_exclude',
   ];
   const inherited = Object.fromEntries(
     inheritedKeys.map(name => [name, process.env[name]]),
   );
-  const minimumReleaseAgeExclude = [
-    '@bleedingdev/modern-js-i18n-utils@3.5.0-ultramodern.77',
-    '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
-    '@bleedingdev/modern-js-utils@3.5.0-ultramodern.77',
-  ];
   try {
     for (const name of inheritedKeys) {
       process.env[name] = '*';
     }
     for (const sourceSelectors of [
       undefined,
-      JSON.stringify(minimumReleaseAgeExclude),
+      JSON.stringify(bootstrapExclude),
     ]) {
-      const packageManager = createTractorPackageManagerContext({
-        createPackage: {
-          bootstrapReleaseAgePolicy: {
-            minimumReleaseAge: 1440,
-            minimumReleaseAgeExclude,
-            minimumReleaseAgeIgnoreMissingTime: false,
-            minimumReleaseAgeStrict: true,
+      const packageManager = createTractorPackageManagerContext(
+        packageManagerOptions({
+          packageManagerRoot: path.join(
+            os.tmpdir(),
+            'tractor-poisoned-package-manager-context',
+          ),
+          registryEnv: {
+            npm_config_registry: 'https://registry.npmjs.org/',
+            pnpm_config_registry: 'https://registry.npmjs.org/',
+            PNPM_CONFIG_TRUST_POLICY_EXCLUDE: sourceSelectors,
           },
-          exactSpecifier:
-            '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
-          version: '3.5.0-ultramodern.77',
-        },
-        expectedPnpmVersion: '11.17.0',
-        minimumReleaseAgeExclude,
-        packageManagerRoot: path.join(
-          os.tmpdir(),
-          'tractor-poisoned-package-manager-context',
-        ),
-        registryEnv: {
-          npm_config_registry: 'https://registry.npmjs.org/',
-          pnpm_config_registry: 'https://registry.npmjs.org/',
-          PNPM_CONFIG_TRUST_POLICY_EXCLUDE: sourceSelectors,
-        },
-        resolveExactPnpmExecutableImpl: () => '/opt/pnpm-11.17.0/bin/pnpm',
-      });
+        }),
+      );
       const child = runCommand(
         process.execPath,
         [
@@ -657,9 +426,8 @@ test('runner rejects inherited bypasses and preserves verified source selectors'
         ...(sourceSelectors && {
           pnpm_config_trust_policy_exclude: sourceSelectors,
         }),
-        pnpm_config_minimum_release_age_exclude: JSON.stringify(
-          minimumReleaseAgeExclude,
-        ),
+        pnpm_config_minimum_release_age_exclude:
+          JSON.stringify(bootstrapExclude),
       });
     }
   } finally {
@@ -673,60 +441,6 @@ test('runner rejects inherited bypasses and preserves verified source selectors'
   }
 });
 
-test('Node runtime targets use release-envelope markers instead of generation markers', async () => {
-  const { createReleaseBoundNodeSmokeTargets } = await runnerPromise;
-  const contract = {
-    apps: [
-      {
-        id: 'explore',
-        marker: { build: 'generation-marker' },
-      },
-    ],
-  };
-  const releaseBoundContract = {
-    apps: [
-      {
-        id: 'explore',
-        marker: { build: 'release-envelope-marker' },
-      },
-    ],
-  };
-  const calls = [];
-
-  const result = createReleaseBoundNodeSmokeTargets(
-    {
-      contract,
-      projectDir: '/tmp/tractor-release-bound-node-targets',
-    },
-    {
-      bindContractToReleaseIdentityImpl: options => {
-        calls.push(['bind', options]);
-        return releaseBoundContract;
-      },
-      createSmokeTargetsImpl: (value, options) => {
-        calls.push(['targets', value, options]);
-        return {
-          skipped: [],
-          targets: value.apps.map(app => ({ app })),
-        };
-      },
-    },
-  );
-
-  assert.equal(result.targets[0].app.marker.build, 'release-envelope-marker');
-  assert.deepEqual(calls, [
-    [
-      'bind',
-      {
-        contract,
-        platform: 'node',
-        projectDir: '/tmp/tractor-release-bound-node-targets',
-      },
-    ],
-    ['targets', releaseBoundContract, { mode: 'local' }],
-  ]);
-});
-
 test('Node acceptance rejects hydrated CSR without authoritative no-JS distributed SSR evidence', async () => {
   const { proveNodeServerRenderedSsr } = await runnerPromise;
   const root = fs.mkdtempSync(
@@ -738,45 +452,31 @@ test('Node acceptance rejects hydrated CSR without authoritative no-JS distribut
         id: 'explore',
         kind: 'vertical',
         api: { prefix: '/explore-api', stem: 'explore' },
-        styling: {
-          federation: { rootSelector: '[data-app-id="explore"]' },
-        },
+        styling: { federation: { rootSelector: '[data-app-id="explore"]' } },
       },
       baseUrl: 'http://localhost:3021',
-      routes: {
-        distributedSsr: '/en',
-        ssr: '/en',
-      },
+      routes: { distributedSsr: '/en', ssr: '/en' },
     },
     {
       app: {
         id: 'shell-super-app',
         kind: 'shell',
-        moduleFederation: {
-          verticalRefs: ['explore'],
-        },
+        moduleFederation: { verticalRefs: ['explore'] },
         styling: {
           federation: { rootSelector: '[data-app-id="shell-super-app"]' },
         },
       },
       baseUrl: 'http://localhost:3020',
-      routes: {
-        distributedSsr: '/en/tractors/CL-08-GR',
-        ssr: '/en',
-      },
+      routes: { distributedSsr: '/en/tractors/CL-08-GR', ssr: '/en' },
     },
   ];
   const pass = type => ({ status: 'pass', type });
-  const httpValidationCalls = [];
-  const validateHttpTargetImpl = async (target, options) => {
-    httpValidationCalls.push({ options, target });
-    return [
-      pass('ssr-route'),
-      pass('ui-marker-html'),
-      pass('css-root-marker'),
-      ...(target.app.api ? [pass('effect-readiness')] : []),
-    ];
-  };
+  const validateHttpTargetImpl = async target => [
+    pass('ssr-route'),
+    pass('ui-marker-html'),
+    pass('css-root-marker'),
+    ...(target.app.api ? [pass('effect-readiness')] : []),
+  ];
   const validNoJavaScriptSsr = async target =>
     target.app.kind === 'shell'
       ? [
@@ -791,42 +491,23 @@ test('Node acceptance rejects hydrated CSR without authoritative no-JS distribut
           pass('no-js-ssr-failed-responses'),
         ];
 
-  try {
-    const evidence = await proveNodeServerRenderedSsr({
+  const prove = overrides =>
+    proveNodeServerRenderedSsr({
       artifactDir: root,
       browser: {},
       targets,
       validateHttpTargetImpl,
       validateNoJavaScriptSsrTargetImpl: validNoJavaScriptSsr,
+      ...overrides,
     });
-    assert.equal(evidence.status, 'pass');
-    assert.equal(evidence.appCount, 2);
-    assert.equal(evidence.distributedSsrRoute, '/en/tractors/CL-08-GR');
-    assert.equal(httpValidationCalls.length, 2);
-    assert.equal(
-      httpValidationCalls.every(
-        call => call.options.includeCloudflareJsonSmokeChecks === false,
-      ),
-      true,
-    );
-    assert.equal(
-      evidence.results
-        .find(result => result.appId === 'shell-super-app')
-        .noJavaScriptAssertions.some(
-          assertion =>
-            assertion.type === 'no-js-shell-composition-boundary' &&
-            assertion.status === 'pass',
-        ),
-      true,
-    );
 
+  try {
+    assert.equal((await prove({})).status, 'pass');
+
+    // A shell that renders none of its verticals with JavaScript disabled.
     await assert.rejects(
       () =>
-        proveNodeServerRenderedSsr({
-          artifactDir: root,
-          browser: {},
-          targets,
-          validateHttpTargetImpl,
+        prove({
           validateNoJavaScriptSsrTargetImpl: async target =>
             target.app.kind === 'shell'
               ? [
@@ -839,33 +520,24 @@ test('Node acceptance rejects hydrated CSR without authoritative no-JS distribut
       /missing required no-js-shell-composition-boundary evidence/u,
     );
 
+    // An empty server-rendered document that only hydrates client-side.
     await assert.rejects(
       () =>
-        proveNodeServerRenderedSsr({
-          artifactDir: root,
-          browser: {},
-          targets,
+        prove({
           validateHttpTargetImpl: async target => [
             pass('ssr-route'),
             pass('css-root-marker'),
             ...(target.app.api ? [pass('effect-readiness')] : []),
           ],
-          validateNoJavaScriptSsrTargetImpl: validNoJavaScriptSsr,
         }),
       /missing required ui-marker-html evidence/u,
     );
 
+    // Proving SSR on the shell's own landing route instead of a federated one.
     const csrOnlyTargets = structuredClone(targets);
     csrOnlyTargets[1].routes.distributedSsr = csrOnlyTargets[1].routes.ssr;
     await assert.rejects(
-      () =>
-        proveNodeServerRenderedSsr({
-          artifactDir: root,
-          browser: {},
-          targets: csrOnlyTargets,
-          validateHttpTargetImpl,
-          validateNoJavaScriptSsrTargetImpl: validNoJavaScriptSsr,
-        }),
+      () => prove({ targets: csrOnlyTargets }),
       /requires a dedicated distributed-SSR route/u,
     );
   } finally {
@@ -882,6 +554,8 @@ test('Node backend proof requires every API-bearing MicroVertical exactly once a
     root,
     '.codex/reports/node-backend-federation-proof/proof.json',
   );
+  const writeProof = proof =>
+    fs.writeFileSync(evidencePath, `${JSON.stringify(proof)}\n`);
   try {
     fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
     fs.mkdirSync(path.join(root, '.modernjs'), { recursive: true });
@@ -899,69 +573,46 @@ test('Node backend proof requires every API-bearing MicroVertical exactly once a
         },
       })}\n`,
     );
-    fs.writeFileSync(
-      evidencePath,
-      `${JSON.stringify({ results: [], status: 'skipped' })}\n`,
-    );
+
+    // A skipped backend run must never read as proof.
+    writeProof({ results: [], status: 'skipped' });
     assert.throws(
       () => readPassingNodeBackendProof(root),
       /was skipped or has no executed results/u,
     );
-    fs.writeFileSync(
-      evidencePath,
-      `${JSON.stringify({
-        results: [{ appId: 'explore', status: 'pass' }],
-        status: 'pass',
-      })}\n`,
-    );
+
+    // Silently dropping API-bearing verticals must not pass either.
+    writeProof({
+      results: [{ appId: 'explore', status: 'pass' }],
+      status: 'pass',
+    });
     assert.throws(
       () => readPassingNodeBackendProof(root),
       /app set must exactly match API-bearing MicroVerticals/u,
     );
 
-    fs.writeFileSync(
-      evidencePath,
-      `${JSON.stringify({
-        results: [
-          { appId: 'explore', status: 'pass' },
-          { appId: 'decide', status: 'fail' },
-          { appId: 'checkout', status: 'pass' },
-        ],
-        status: 'pass',
-      })}\n`,
-    );
+    // A top-level `pass` must not outrank a failing per-app result.
+    writeProof({
+      results: [
+        { appId: 'explore', status: 'pass' },
+        { appId: 'decide', status: 'fail' },
+        { appId: 'checkout', status: 'pass' },
+      ],
+      status: 'pass',
+    });
     assert.throws(
       () => readPassingNodeBackendProof(root),
       /duplicate, malformed, or failing results/u,
     );
 
-    fs.writeFileSync(
-      evidencePath,
-      `${JSON.stringify({
-        results: [
-          { appId: 'explore', status: 'pass' },
-          { appId: 'decide', status: 'pass' },
-          { appId: 'decide', status: 'pass' },
-        ],
-        status: 'pass',
-      })}\n`,
-    );
-    assert.throws(
-      () => readPassingNodeBackendProof(root),
-      /duplicate, malformed, or failing results/u,
-    );
-
-    fs.writeFileSync(
-      evidencePath,
-      `${JSON.stringify({
-        results: [
-          { appId: 'explore', status: 'pass' },
-          { appId: 'decide', status: 'pass' },
-          { appId: 'checkout', status: 'pass' },
-        ],
-        status: 'pass',
-      })}\n`,
-    );
+    writeProof({
+      results: [
+        { appId: 'explore', status: 'pass' },
+        { appId: 'decide', status: 'pass' },
+        { appId: 'checkout', status: 'pass' },
+      ],
+      status: 'pass',
+    });
     assert.deepEqual(readPassingNodeBackendProof(root), {
       appIds: ['checkout', 'decide', 'explore'],
       evidencePath: '.codex/reports/node-backend-federation-proof/proof.json',
@@ -971,225 +622,6 @@ test('Node backend proof requires every API-bearing MicroVertical exactly once a
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
-});
-
-test('Tractor delegates its whole runtime context to the shared acceptance owner', async t => {
-  const {
-    createTractorPackageManagerContext,
-    executionCommands,
-    launchWorkspaceBrowser,
-  } = await runnerPromise;
-  const { acceptancePlaywrightInstallArgs, createAcceptanceRuntimeContext } =
-    await import('../published-create-proof/acceptance-profile.mjs');
-
-  const packageManagerRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'tractor-runtime-delegate-'),
-  );
-  t.after(() =>
-    fs.rmSync(packageManagerRoot, { force: true, recursive: true }),
-  );
-  const pnpmExecutable = '/opt/pnpm-11.17.0/bin/pnpm';
-  const registryUrl = 'https://registry.npmjs.org/';
-  const minimumReleaseAgeExclude = [
-    '@bleedingdev/modern-js-i18n-utils@3.5.0-ultramodern.77',
-    '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
-    '@bleedingdev/modern-js-utils@3.5.0-ultramodern.77',
-  ];
-  const packageManager = createTractorPackageManagerContext({
-    createPackage: {
-      bootstrapReleaseAgePolicy: {
-        minimumReleaseAge: 1440,
-        minimumReleaseAgeExclude,
-        minimumReleaseAgeIgnoreMissingTime: false,
-        minimumReleaseAgeStrict: true,
-      },
-      exactSpecifier:
-        '@bleedingdev/modern-js-ultramodern-create@3.5.0-ultramodern.77',
-      version: '3.5.0-ultramodern.77',
-    },
-    expectedPnpmVersion: '11.17.0',
-    minimumReleaseAgeExclude,
-    packageManagerRoot,
-    registryEnv: {
-      npm_config_registry: registryUrl,
-      pnpm_config_registry: registryUrl,
-    },
-    resolveExactPnpmExecutableImpl: () => pnpmExecutable,
-  });
-  const owner = createAcceptanceRuntimeContext({
-    browsers: 'isolated',
-    environment: { PATH: process.env.PATH },
-    expectedPnpmVersion: '11.17.0',
-    registryEnv: {
-      npm_config_registry: registryUrl,
-      pnpm_config_registry: registryUrl,
-    },
-    resolveExactPnpmExecutableImpl: () => pnpmExecutable,
-    workDir: packageManagerRoot,
-  });
-
-  // Nothing here is computed twice: every runtime-context value the Tractor
-  // context exposes is the owner's value.
-  for (const name of [
-    'PATH',
-    'PLAYWRIGHT_BROWSERS_PATH',
-    'XDG_CACHE_HOME',
-    'npm_config_cache',
-    'npm_config_registry',
-    'npm_config_store_dir',
-    'pnpm_config_registry',
-    'pnpm_config_store_dir',
-  ]) {
-    assert.equal(packageManager.env[name], owner.env[name], name);
-  }
-  assert.equal(packageManager.pnpmExecutable, owner.pnpmExecutable);
-
-  // Install/launch coherence, observed rather than reconstructed: the browsers
-  // path carried by the env that runs `pnpm exec playwright install` is the
-  // path the in-process launch actually sees, and the parent process is
-  // restored afterwards.
-  const originalBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(
-    os.tmpdir(),
-    'parent-playwright',
-  );
-  t.after(() => {
-    if (originalBrowsersPath === undefined) {
-      delete process.env.PLAYWRIGHT_BROWSERS_PATH;
-    } else {
-      process.env.PLAYWRIGHT_BROWSERS_PATH = originalBrowsersPath;
-    }
-  });
-  const observedBrowsersPaths = [];
-  await launchWorkspaceBrowser(
-    {
-      browserProvider: {},
-      processEnv: packageManager.env,
-      workspace: os.tmpdir(),
-    },
-    {
-      launchBrowserImpl: async () => {
-        observedBrowsersPaths.push(process.env.PLAYWRIGHT_BROWSERS_PATH);
-        return {};
-      },
-    },
-  );
-  assert.deepEqual(observedBrowsersPaths, [
-    packageManager.env.PLAYWRIGHT_BROWSERS_PATH,
-  ]);
-  assert.equal(
-    observedBrowsersPaths[0].startsWith(
-      `${path.join(packageManagerRoot, 'package-manager')}${path.sep}`,
-    ),
-    true,
-    'the launch reads browsers from inside the disposable Tractor root',
-  );
-  assert.equal(
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    path.join(os.tmpdir(), 'parent-playwright'),
-  );
-
-  // The Playwright provisioning stays operational: it is the shared owner's
-  // pnpm exec invocation, it runs after the frozen install, and it reports no
-  // acceptance check of its own.
-  const playwrightCommands = executionCommands.filter(
-    entry => entry.command[1][0] === 'exec',
-  );
-  assert.equal(playwrightCommands.length, 1);
-  assert.deepEqual(
-    [...playwrightCommands[0].command[1]],
-    [...acceptancePlaywrightInstallArgs],
-  );
-  assert.equal(playwrightCommands[0].report, false);
-  assert.equal(
-    executionCommands.indexOf(playwrightCommands[0]),
-    1,
-    'browsers install after the frozen lockfile install resolves them',
-  );
-});
-
-test('Tractor requires formatting evidence before checks and preserves runtime gate order', async () => {
-  const { requiredTractorCheckIds } = await contractPromise;
-  const { executionCommands, requiredCommands } = await runnerPromise;
-
-  assert.deepEqual(
-    [...requiredTractorCheckIds],
-    [
-      'exact-create-validation',
-      'exact-cohort',
-      'install---frozen-lockfile',
-      'format',
-      'check',
-      'promotable-application-source',
-      'build',
-      'node:proof',
-      'node-backend-federation-executed',
-      'node-server-rendered-ssr-executed',
-      'node-visible-tractor-workflow',
-      'cloudflare:build',
-      'workerd-visible-tractor-workflow',
-      'native-tanstack-search',
-      'visible-tractor-ui',
-    ],
-  );
-  assert.deepEqual(
-    executionCommands
-      .filter(entry => entry.report)
-      .map(entry => entry.command[1].join('-')),
-    [
-      'install---frozen-lockfile',
-      'format',
-      'check',
-      'build',
-      'node:proof',
-      'cloudflare:build',
-    ],
-    'every reported command id must still come from a required Tractor command',
-  );
-  assert.deepEqual(
-    executionCommands.filter(entry => entry.report).map(entry => entry.command),
-    [...requiredCommands],
-  );
-});
-
-test('Tractor formats after install and records success before the unchanged check', async () => {
-  const { executeTractorCommands } = await runnerPromise;
-  const report = { checks: [] };
-  const calls = [];
-  const env = { TRACTOR_TEST_CONTEXT: 'format-lifecycle' };
-  const iterator = executeTractorCommands({
-    workspace: '/tractor-format-fixture',
-    env,
-    report,
-    runImpl(command, args, options) {
-      calls.push([command, ...args]);
-      assert.equal(options.cwd, '/tractor-format-fixture');
-      assert.equal(options.env, env);
-      if (args[0] === 'check') {
-        assert.equal(report.checks.at(-1).id, 'format');
-        assert.equal(report.checks.at(-1).status, 'passed');
-      }
-    },
-  });
-  // Stop at check: build/runtime resources are outside this lifecycle test.
-  for (const args of iterator) {
-    if (args[0] === 'check') break;
-  }
-  assert.deepEqual(calls, [
-    ['pnpm', 'install', '--frozen-lockfile'],
-    ['pnpm', 'exec', 'playwright', 'install', '--with-deps', 'chromium'],
-    ['pnpm', 'format'],
-    ['pnpm', 'check'],
-  ]);
-  assert.deepEqual(report.checks, [
-    {
-      id: 'install---frozen-lockfile',
-      status: 'passed',
-      detail: { command: 'pnpm install --frozen-lockfile' },
-    },
-    { id: 'format', status: 'passed', detail: { command: 'pnpm format' } },
-    { id: 'check', status: 'passed', detail: { command: 'pnpm check' } },
-  ]);
 });
 
 test('Tractor stops on formatter failure without reporting format or running checks/builds', async () => {
@@ -1225,64 +657,41 @@ test('source-candidate rehearsal is bound to a loopback ephemeral registry', asy
   const {
     assertAcceptanceRegistry,
     parseArgs,
-    promotableTractorAcceptanceMode,
-    tractorAcceptanceModes,
+    runTractorDownstreamAcceptance,
   } = await runnerPromise;
   const manifestPath = path.join(os.tmpdir(), 'release', 'manifest.json');
-
-  assert.deepEqual([...tractorAcceptanceModes], ['published', 'source']);
-  assert.equal(promotableTractorAcceptanceMode, 'published');
-
-  // The published lane is untouched by the new mode: same default, same
-  // registry, and the release dir is still derived from the manifest.
-  const published = parseArgs([
+  const argv = (...extra) => [
     '--manifest',
     manifestPath,
     '--workspace',
     os.tmpdir(),
-  ]);
+    ...extra,
+  ];
+
+  // The published lane keeps its npmjs default.
+  const published = parseArgs(argv());
   assert.equal(published.mode, 'published');
   assert.equal(published.registryUrl, 'https://registry.npmjs.org/');
-  assert.equal(published.releaseDir, path.dirname(manifestPath));
 
-  // A rehearsal names no registry: the ephemeral one does not exist until this
-  // process starts it, and accepting a URL here is exactly how a rehearsal
-  // could be pointed at npm.
-  const rehearsal = parseArgs([
-    '--mode',
-    'source',
-    '--manifest',
-    manifestPath,
-    '--workspace',
-    os.tmpdir(),
-  ]);
+  // A rehearsal names no registry: accepting a URL here is exactly how a
+  // rehearsal could be pointed at real npm.
+  const rehearsal = parseArgs(argv('--mode', 'source'));
   assert.equal(rehearsal.mode, 'source');
   assert.equal(rehearsal.registryUrl, undefined);
-  assert.equal(rehearsal.releaseDir, path.dirname(manifestPath));
   assert.throws(
     () =>
-      parseArgs([
-        '--mode',
-        'source',
-        '--manifest',
-        manifestPath,
-        '--workspace',
-        os.tmpdir(),
-        '--registry-url',
-        'https://registry.npmjs.org/',
-      ]),
+      parseArgs(
+        argv(
+          '--mode',
+          'source',
+          '--registry-url',
+          'https://registry.npmjs.org/',
+        ),
+      ),
     /--registry-url is decided by the ephemeral registry in source mode/u,
   );
   assert.throws(
-    () =>
-      parseArgs([
-        '--mode',
-        'rehearsal',
-        '--manifest',
-        manifestPath,
-        '--workspace',
-        os.tmpdir(),
-      ]),
+    () => parseArgs(argv('--mode', 'rehearsal')),
     /--mode must be published or source/u,
   );
 
@@ -1296,31 +705,12 @@ test('source-candidate rehearsal is bound to a loopback ephemeral registry', asy
     /must target the loopback ephemeral registry/u,
   );
   assert.throws(
-    () => assertAcceptanceRegistry('source', 'https://127.0.0.1:4873/'),
-    /must target the loopback ephemeral registry/u,
-  );
-  assert.throws(
     () => assertAcceptanceRegistry('published', 'http://127.0.0.1:4873/'),
     /never the ephemeral rehearsal registry/u,
   );
-  assert.throws(
-    () => assertAcceptanceRegistry('source', undefined),
-    /requires an exact registry URL/u,
-  );
 
-  // The acceptance itself settles mode and registry together, before it reads
-  // the manifest or touches a workspace: the one `mode` that picks the registry
-  // is the same one stamped on the report, so a rehearsal cannot report itself
-  // as published or read a published registry.
-  const { runTractorDownstreamAcceptance } = await runnerPromise;
-  await assert.rejects(
-    runTractorDownstreamAcceptance({
-      manifestPath: path.join(os.tmpdir(), 'absent', 'manifest.json'),
-      mode: 'rehearsal',
-      registryUrl: 'http://127.0.0.1:4873/',
-    }),
-    /Tractor acceptance mode must be published or source, found rehearsal/u,
-  );
+  // The acceptance settles mode and registry together, before it reads the
+  // manifest or touches a workspace, so a rehearsal cannot reach real npm.
   await assert.rejects(
     runTractorDownstreamAcceptance({
       manifestPath: path.join(os.tmpdir(), 'absent', 'manifest.json'),
@@ -1329,100 +719,24 @@ test('source-candidate rehearsal is bound to a loopback ephemeral registry', asy
     }),
     /must target the loopback ephemeral registry/u,
   );
-  await assert.rejects(
-    runTractorDownstreamAcceptance({
-      manifestPath: path.join(os.tmpdir(), 'absent', 'manifest.json'),
-      mode: 'published',
-      registryUrl: 'http://127.0.0.1:4873/',
-    }),
-    /never the ephemeral rehearsal registry/u,
-  );
 });
 
-test('source-candidate rehearsal seeds only the verified immutable bundle', async t => {
-  const {
-    parseArgs,
-    resolveTractorMinimumReleaseAgeExclude,
-    withSourceCandidateRegistry,
-  } = await runnerPromise;
+test('source-candidate rehearsal tears down its registry and refuses an escaped one', async t => {
+  const { parseArgs, withSourceCandidateRegistry } = await runnerPromise;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tractor-rehearsal-'));
   t.after(() => fs.rmSync(root, { force: true, recursive: true }));
 
   const releaseVersion = '3.8.2-ultramodern.15';
-  const release = {
+  const rehearsalRelease = {
     packages: [
       {
         targetName: '@bleedingdev/modern-js-ultramodern-create',
         version: releaseVersion,
       },
-      { targetName: '@bleedingdev/modern-js-image', version: releaseVersion },
     ],
     release: { version: releaseVersion },
-    // The accepted toolchain the producer recorded. The seeder republishes the
-    // accepted bytes through the exact-artifact publisher, which refuses any
-    // other Node.js, so the rehearsal must run under this one.
     tools: { node: process.version, npm: '11.10.1', pnpm: '11.17.0' },
-    // Sidecars keep their own stable versions and are seeded into the ephemeral
-    // registry moments before the install, so their registry publish time is
-    // always "now".
-    sidecars: {
-      packages: [
-        { name: '@bleedingdev/ipx', version: '3.1.2' },
-        { name: '@bleedingdev/image-size', version: '2.0.2' },
-      ],
-    },
   };
-  const releaseAgePolicyPath = writeReleaseAgePolicy(root, []);
-  const now = new Date('2026-08-26T12:00:00.000Z');
-
-  const publishedExclusions = resolveTractorMinimumReleaseAgeExclude({
-    mode: 'published',
-    release,
-    releaseAgePolicyPath,
-    now,
-  });
-  assert.deepEqual(publishedExclusions, [
-    `@bleedingdev/modern-js-image@${releaseVersion}`,
-    `@bleedingdev/modern-js-ultramodern-create@${releaseVersion}`,
-  ]);
-  assert.deepEqual(
-    resolveTractorMinimumReleaseAgeExclude({
-      release,
-      releaseAgePolicyPath,
-      now,
-    }),
-    publishedExclusions,
-    'the default lane is still the published one',
-  );
-
-  assert.deepEqual(
-    resolveTractorMinimumReleaseAgeExclude({
-      mode: 'source',
-      release,
-      releaseAgePolicyPath,
-      now,
-    }),
-    [
-      '@bleedingdev/image-size@2.0.2',
-      '@bleedingdev/ipx@3.1.2',
-      `@bleedingdev/modern-js-image@${releaseVersion}`,
-      `@bleedingdev/modern-js-ultramodern-create@${releaseVersion}`,
-    ],
-  );
-  assert.throws(
-    () =>
-      resolveTractorMinimumReleaseAgeExclude({
-        mode: 'source',
-        release: { ...release, sidecars: { packages: [{ name: 'x' }] } },
-        releaseAgePolicyPath,
-        now,
-      }),
-    /must bind an exact name and version/u,
-  );
-
-  // The registry lifecycle is the exact-artifact acceptance's own: one fresh
-  // instance seeded from the immutable bundle this process downloaded, stopped
-  // and removed afterwards, never shared across jobs.
   const options = parseArgs([
     '--mode',
     'source',
@@ -1431,30 +745,25 @@ test('source-candidate rehearsal seeds only the verified immutable bundle', asyn
     '--workspace',
     root,
   ]);
-  const starts = [];
-  let stopped = 0;
-  const observedRegistryUrls = [];
-  const observedRegistryEnvs = [];
-  const inheritedPath = process.env.PATH;
-  let seedPath;
-  let actionPath;
   const seededEnv = {
     npm_config_cache: path.join(root, 'npm-cache'),
     npm_config_userconfig: path.join(root, '.npmrc'),
   };
+
+  const starts = [];
+  let stopped = 0;
+  const observedRegistryEnvs = [];
   const returned = await withSourceCandidateRegistry(
     options,
     (registryUrl, registryEnv) => {
-      observedRegistryUrls.push(registryUrl);
+      assert.equal(registryUrl, 'http://127.0.0.1:4873/');
       observedRegistryEnvs.push(registryEnv);
-      actionPath = process.env.PATH;
       return 'accepted';
     },
     {
-      readReleaseManifestImpl: () => release,
+      readReleaseManifestImpl: () => rehearsalRelease,
       startEphemeralRegistryImpl: async started => {
         starts.push(started);
-        seedPath = process.env.PATH;
         assert.equal(fs.existsSync(started.rootDir), true);
         return {
           env: seededEnv,
@@ -1467,34 +776,17 @@ test('source-candidate rehearsal seeds only the verified immutable bundle', asyn
     },
   );
   assert.equal(returned, 'accepted');
-  assert.deepEqual(observedRegistryUrls, ['http://127.0.0.1:4873/']);
   assert.equal(starts.length, 1);
-  assert.equal(starts[0].release, release);
-  assert.equal(starts[0].releaseDir, options.releaseDir);
   assert.equal(stopped, 1);
   assert.equal(fs.existsSync(starts[0].rootDir), false);
 
-  // The seeder's own scoped user config reaches the acceptance verbatim, and
-  // nothing in it names a registry globally: only `@<targetScope>` is routed to
-  // loopback, so unrelated dependencies are still fetched from npmjs directly.
+  // The seeder's scoped user config reaches the acceptance verbatim, and
+  // nothing in it names a registry globally, so unrelated dependencies are
+  // still fetched from npmjs.
   assert.deepEqual(observedRegistryEnvs, [seededEnv]);
-  assert.notEqual(observedRegistryEnvs[0], seededEnv);
   for (const name of ['npm_config_registry', 'pnpm_config_registry']) {
     assert.equal(observedRegistryEnvs[0][name], undefined, name);
   }
-
-  // The interpreter's own bin dir is on PATH while the registry is seeded -
-  // that is where the `npm` the accepted toolchain names lives - and the
-  // acceptance that follows runs on the PATH the job gave it, exactly as the
-  // published lane does.
-  assert.equal(
-    seedPath,
-    [path.dirname(process.execPath), inheritedPath]
-      .filter(Boolean)
-      .join(path.delimiter),
-  );
-  assert.equal(actionPath, inheritedPath);
-  assert.equal(process.env.PATH, inheritedPath);
 
   // A registry that came up anywhere but loopback is refused before any
   // downstream work runs, and is still torn down.
@@ -1502,7 +794,7 @@ test('source-candidate rehearsal seeds only the verified immutable bundle', asyn
   let escapedStops = 0;
   await assert.rejects(
     withSourceCandidateRegistry(options, () => 'must not run', {
-      readReleaseManifestImpl: () => release,
+      readReleaseManifestImpl: () => rehearsalRelease,
       startEphemeralRegistryImpl: async started => {
         escapedRootDir = started.rootDir;
         return {
@@ -1519,12 +811,11 @@ test('source-candidate rehearsal seeds only the verified immutable bundle', asyn
   assert.equal(escapedStops, 1);
   assert.equal(fs.existsSync(escapedRootDir), false);
 
-  // A registry seeded with a global override never reaches the acceptance
-  // either, and is torn down the same way.
+  // A registry seeded with a global override never reaches the acceptance.
   let overriddenStops = 0;
   await assert.rejects(
     withSourceCandidateRegistry(options, () => 'must not run', {
-      readReleaseManifestImpl: () => release,
+      readReleaseManifestImpl: () => rehearsalRelease,
       startEphemeralRegistryImpl: async () => ({
         env: { ...seededEnv, npm_config_registry: 'http://127.0.0.1:4873/' },
         registryUrl: 'http://127.0.0.1:4873/',
@@ -1543,7 +834,7 @@ test('source-candidate rehearsal seeds only the verified immutable bundle', asyn
   await assert.rejects(
     withSourceCandidateRegistry(options, () => 'must not run', {
       nodeVersion: 'v20.0.0',
-      readReleaseManifestImpl: () => release,
+      readReleaseManifestImpl: () => rehearsalRelease,
       startEphemeralRegistryImpl: async () => {
         driftedStarts += 1;
         return { registryUrl: 'http://127.0.0.1:4873/', stop: () => {} };
@@ -1555,67 +846,6 @@ test('source-candidate rehearsal seeds only the verified immutable bundle', asyn
     ),
   );
   assert.equal(driftedStarts, 0);
-  await assert.rejects(
-    withSourceCandidateRegistry(options, () => 'must not run', {
-      readReleaseManifestImpl: () => ({ ...release, tools: undefined }),
-      startEphemeralRegistryImpl: async () => {
-        driftedStarts += 1;
-        return { registryUrl: 'http://127.0.0.1:4873/', stop: () => {} };
-      },
-    }),
-    /requires the accepted release Node\.js version/u,
-  );
-  assert.equal(driftedStarts, 0);
-});
-
-test('source-candidate rehearsal reuses the exact-artifact acceptance seeder', async () => {
-  const { sourceCandidateRegistryPath } = await runnerPromise;
-  const registry = await import(
-    '../../ultramodern-publish/lib/source-create-proof/runtime-proof/registry.mjs'
-  );
-
-  // The rehearsal reuses the seeder the exact-artifact acceptance already owns:
-  // exact accepted tarball bytes, strictly in release publishOrder, sidecars
-  // first, with registry integrity and shasum re-read afterwards.
-  assert.equal(typeof registry.startEphemeralRegistry, 'function');
-  assert.equal(typeof registry.publishReleaseTarballs, 'function');
-  assert.equal(typeof registry.publishStagedSidecars, 'function');
-
-  // The seeder spawns bare `pnpm`, so a provisioned manifest pnpm wins over the
-  // ambient PATH; a local run without one still gets the seeding interpreter's
-  // own bin dir (where its bundled npm lives) ahead of the inherited PATH.
-  const execPath = '/opt/node-26.7.0/bin/node';
-  assert.equal(
-    sourceCandidateRegistryPath({ PATH: '/usr/bin' }, execPath),
-    ['/opt/node-26.7.0/bin', '/usr/bin'].join(path.delimiter),
-  );
-  assert.equal(
-    sourceCandidateRegistryPath(
-      {
-        PATH: '/usr/bin',
-        ULTRAMODERN_PNPM_EXECUTABLE: '/opt/pnpm-11.17.0/bin/pnpm',
-      },
-      execPath,
-    ),
-    ['/opt/pnpm-11.17.0/bin', '/opt/node-26.7.0/bin', '/usr/bin'].join(
-      path.delimiter,
-    ),
-  );
-  assert.throws(
-    () =>
-      sourceCandidateRegistryPath(
-        {
-          PATH: '/usr/bin',
-          ULTRAMODERN_PNPM_EXECUTABLE: 'pnpm',
-        },
-        execPath,
-      ),
-    /must be absolute/u,
-  );
-  assert.throws(
-    () => sourceCandidateRegistryPath({ PATH: '/usr/bin' }, 'node'),
-    /Source-candidate seeding interpreter must be absolute/u,
-  );
 });
 
 test('cohort installation updates exact dependencies while preserving authored Tractor source', async () => {

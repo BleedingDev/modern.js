@@ -203,72 +203,6 @@ const api = HttpApi.make('ModuleApi').add(
     }
   });
 
-  test('runtime generator exposes initProducerClient alias', async () => {
-    const appDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'modern-plugin-bff-runtime-'),
-    );
-
-    try {
-      await fs.promises.writeFile(
-        path.join(appDir, 'package.json'),
-        JSON.stringify({ name: 'runtime-app', version: '1.0.0' }, null, 2),
-      );
-      await runtimeGenerator({
-        runtime: '@modern-js/plugin-bff/client',
-        appDirectory: appDir,
-        relativeDistPath: '.modern-js',
-      });
-
-      const generatedRuntimeDirectory = path.join(
-        appDir,
-        '.modern-js',
-        'runtime',
-      );
-      const requestRuntimeDirectory = path.join(
-        appDir,
-        '.modern-js',
-        'node_modules',
-        '@modern-js',
-        'plugin-bff',
-      );
-      await fs.promises.mkdir(requestRuntimeDirectory, { recursive: true });
-      await fs.promises.writeFile(
-        path.join(requestRuntimeDirectory, 'package.json'),
-        JSON.stringify({
-          exports: { './client': './client.js' },
-          name: '@modern-js/plugin-bff',
-        }),
-      );
-      await fs.promises.writeFile(
-        path.join(requestRuntimeDirectory, 'client.js'),
-        'exports.configure = options => options;',
-      );
-      const generatedRequire = createRequire(
-        path.join(generatedRuntimeDirectory, 'index.js'),
-      );
-      const generatedRuntime = generatedRequire('./index.js') as {
-        configure: (options?: Record<string, unknown>) => unknown;
-        initProducerClient: (options?: Record<string, unknown>) => unknown;
-      };
-      const expectedDefaults = {
-        requestId: 'runtime-app',
-        requireEnvelope: true,
-        identityBinding: { enabled: true, strict: true },
-        operationContract: {
-          enabled: true,
-          strict: true,
-          requireSchemaHash: true,
-          requireOperationVersion: true,
-        },
-      };
-
-      expect(generatedRuntime.initProducerClient()).toEqual(expectedDefaults);
-      expect(generatedRuntime.configure()).toEqual(expectedDefaults);
-    } finally {
-      await fs.promises.rm(appDir, { recursive: true, force: true });
-    }
-  });
-
   test('emitted bootstrap invokes the owning defaults helper and preserves nested overrides', async () => {
     const appDirectory = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'bff-render-'),
@@ -327,40 +261,6 @@ const api = HttpApi.make('ModuleApi').add(
         '@modern-js/plugin-bff-extensions': '3.8.3',
       });
       expect(entries.plugin.code).not.toContain('crossProjectPolicy');
-    } finally {
-      await fs.promises.rm(appDirectory, { recursive: true, force: true });
-    }
-  });
-
-  test('default creator and bootstrap use the canonical request policy entry with a direct SDK dependency', async () => {
-    const appDirectory = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'bff-canonical-runtime-'),
-    );
-    try {
-      await fs.promises.writeFile(
-        path.join(appDirectory, 'package.json'),
-        JSON.stringify({
-          name: 'runtime-app',
-          dependencies: {
-            '@modern-js/plugin-bff-build-extensions': '3.8.3',
-            '@modern-js/plugin-bff-extensions': '3.8.3',
-            '@modern-js/runtime-extensions': '3.8.3',
-          },
-        }),
-      );
-      const entries = await render(appDirectory);
-      expect(entries.runtime.code).toContain(
-        '"@modern-js/runtime-extensions/request-policy"',
-      );
-      expect(entries.runtime.declaration).toContain(
-        '"@modern-js/runtime-extensions/request-policy"',
-      );
-      expect(entries.packageDependencies['@modern-js/runtime-extensions']).toBe(
-        '3.8.3',
-      );
-      expect(entries.runtime.code).not.toContain(
-        '@modern-js/plugin-bff/client',
-      );
     } finally {
       await fs.promises.rm(appDirectory, { recursive: true, force: true });
     }

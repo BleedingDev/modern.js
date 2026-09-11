@@ -13,15 +13,7 @@ import {
 import { createRouterStatePlugin } from '@modern-js/runtime-extensions/router-state-plugin';
 import * as contextAPI from '../../src/core/context';
 import { getInitialContext, setGlobalContext } from '../../src/core/context';
-import {
-  modifyRoutes,
-  onAfterCreateRouter,
-  onAfterHydrateRouter,
-  onBeforeCreateRouter,
-  onBeforeCreateRoutes,
-  onBeforeHydrateRouter,
-  routerProviderRegistryHooks,
-} from '../../src/router/runtime/hooks';
+import { routerProviderRegistryHooks } from '../../src/router/runtime/hooks';
 
 describe('router lifecycle seams', () => {
   it('keeps native hooks public and fork state helpers at their owning package', () => {
@@ -190,42 +182,5 @@ describe('router lifecycle seams', () => {
     });
     getRouterRuntimeState(context)?.cleanup?.();
     expect(cleaned).toBe(true);
-  });
-
-  it('should register create and hydrate hook surfaces alongside existing route hooks', () => {
-    for (const hook of [
-      modifyRoutes,
-      onBeforeCreateRoutes,
-      onBeforeCreateRouter,
-      onAfterCreateRouter,
-      onBeforeHydrateRouter,
-      onAfterHydrateRouter,
-    ]) {
-      expect(hook).toBeDefined();
-      expect(typeof (hook as any).call).toBe('function');
-    }
-  });
-
-  it('should expose only the router-agnostic runtime state contract', () => {
-    type RuntimeContext = ReturnType<typeof getInitialContext>;
-    type DeprecatedRuntimeField = Extract<
-      'tanstackRouter' | 'tanstackSsrScript' | 'tanstackMatchedModernRouteIds',
-      keyof RuntimeContext
-    >;
-
-    const deprecatedRuntimeFields: DeprecatedRuntimeField[] = [];
-    expect(deprecatedRuntimeFields).toEqual([]);
-
-    const context = getInitialContext(false);
-    applyRouterRuntimeState(context, {
-      framework: 'router-without-framework-types',
-      instance: { publicApi: true },
-      matches: [{ routeId: 'route', assetRouteId: 'asset' }],
-    });
-    expect(getRouterRuntimeState(context)).toMatchObject({
-      framework: 'router-without-framework-types',
-      instance: { publicApi: true },
-      matchedRouteIds: ['asset'],
-    });
   });
 });

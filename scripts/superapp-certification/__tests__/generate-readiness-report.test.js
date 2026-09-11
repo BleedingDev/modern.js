@@ -148,3 +148,44 @@ test('readiness report exposes nested skipped artifact evidence', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+// Restored from the deleted certification-runner.test.js: the runner must never
+// report a green, qualified certification when a command fails.
+test('certification runner fails loudly when a certification command fails', () => {
+  const root = makeTempDir();
+  const binDir = path.join(root, 'bin');
+  const outDir = path.join(root, 'failure');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(path.join(binDir, 'pnpm'), '#!/bin/sh\nexit 23\n');
+  fs.chmodSync(path.join(binDir, 'pnpm'), 0o755);
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(path.dirname(scriptPath), 'run-superapp-certification.js'),
+        '--skip-upstream-drift',
+        '--out-dir',
+        outDir,
+      ],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CI: 'true',
+          PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}`,
+        },
+      },
+    );
+
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    const summary = JSON.parse(
+      fs.readFileSync(path.join(outDir, 'summary.json'), 'utf8'),
+    );
+    assert.equal(summary.status, 'failed');
+    assert.equal(summary.qualified, false);
+    assert.equal(summary.commands[0].exitCode, 23);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

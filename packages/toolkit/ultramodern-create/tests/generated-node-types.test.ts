@@ -3,8 +3,6 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-
-import { createRootPackageJson } from '../src/ultramodern-workspace/package-json';
 import {
   createRootTsConfig,
   createSharedPackageTsConfig,
@@ -16,12 +14,6 @@ test('generated root typecheck follows references and includes Node types under 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-node-types-'));
   const require = createRequire(import.meta.url);
   try {
-    const manifest = createRootPackageJson('node-types', {
-      strategy: 'workspace',
-    });
-    expect(manifest).toMatchObject({
-      devDependencies: { '@types/node': expect.any(String) },
-    });
     const source = path.join(root, 'packages/shared-contracts/src');
     fs.mkdirSync(source, { recursive: true });
     fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });

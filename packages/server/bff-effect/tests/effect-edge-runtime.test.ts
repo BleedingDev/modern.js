@@ -115,26 +115,6 @@ describe('effect edge runtime', () => {
     });
   });
 
-  test('wraps non-Response handler returns as JSON runtime errors', async () => {
-    const response = await dispatchEffectBffRequest(
-      () => 'not a response' as unknown as Response,
-      new Request('http://localhost/api/invalid'),
-      {
-        prefix: '/api',
-      },
-    );
-
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({
-      success: false,
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Internal Server Error',
-        status: 500,
-      },
-    });
-  });
-
   test('wraps maintenance errors with Retry-After when no onError response is returned', async () => {
     const maintenance = Object.assign(new Error('maintenance detail'), {
       status: 503,

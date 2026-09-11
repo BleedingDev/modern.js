@@ -208,24 +208,21 @@ jobs:
       - name: Qualify the release publication tooling
         run: |
           mise exec -- pnpm lint
-          # test:publish-tooling is the publish-security suite plus every other
-          # suite covering the scripts the two OIDC jobs load. Its globs cover
-          # the `node scripts/...` entrypoints those jobs run *and* the shared
-          # helpers those entrypoints statically import, because an untested
-          # helper in that closure is unqualified code running with
-          # id-token: write. publish-security.test.js recomputes that import
-          # closure from the workflow file and fails if any reached scripts
-          # directory with tests is not covered by these globs, so the list
-          # below is derived, not asserted by hand.
+          # test:scripts covers the scripts the two OIDC jobs load: its globs
+          # cover the `node scripts/...` entrypoints those jobs run *and* the
+          # shared helpers those entrypoints statically import, because an
+          # untested helper in that closure is unqualified code running with
+          # id-token: write. (It superseded the narrower test:publish-tooling,
+          # which was a strict subset of these globs.)
           #
           # It is not a claim about every line those jobs run: the publish job
           # also executes an inline `node <<'NODE'` heredoc that lives in this
           # file, which no test glob can load. Any such heredoc is held to
-          # importing nothing but `node:` builtins — publish-security.test.js
-          # asserts that too, which is what keeps the closure above complete.
+          # importing nothing but `node:` builtins, but that is not currently
+          # test-enforced.
           #
           # Built-package image staging runs in the disjoint after-build suite.
-          mise exec -- pnpm run test:publish-tooling
+          mise exec -- pnpm run test:scripts
 
       # Every step below through "Upload the source qualification receipt" is
       # skipped in the recovery lane: that dispatch publishes the recovered
@@ -866,8 +863,8 @@ jobs:
     with:
       mode: source
       release_bundle_artifact: bleedingdev-release-bundle-${{ needs.prepare-release.outputs.producer_artifact_identity }}
-      # Must stay identical to the published tractor-downstream pin below;
-      # publish-security.test.js compares the two.
+      # Must stay identical to the published tractor-downstream pin below.
+      # This is not currently test-enforced; keep them in sync by hand.
       tractor_ref: 70e214d1f9a7f5028abb166eb879013b78092d90
 
   # Sidecars are NOT cohort members: they keep their own stable versions and

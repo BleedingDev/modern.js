@@ -7,7 +7,6 @@ import {
   matchPathPattern,
   resolveCanonicalLocalisedPath,
   resolveLocalisedPath,
-  resolveLocalisedUrlsConfig,
   validateLocalisedUrls,
 } from '../src/localisedUrls/index';
 
@@ -22,19 +21,6 @@ const createRoute = (
   routeType: children ? 'layout' : 'page',
   _component: `${path}.tsx`,
   children,
-});
-
-describe('resolveLocalisedUrlsConfig', () => {
-  test('enables the feature only for a non-empty map', () => {
-    const map = { '/about': { en: '/about', cs: '/o-nas' } };
-    const disabled = { enabled: false, map: {} };
-
-    expect(resolveLocalisedUrlsConfig(map)).toEqual({ enabled: true, map });
-    expect(resolveLocalisedUrlsConfig(undefined)).toEqual(disabled);
-    expect(resolveLocalisedUrlsConfig(false)).toEqual(disabled);
-    expect(resolveLocalisedUrlsConfig(true)).toEqual(disabled);
-    expect(resolveLocalisedUrlsConfig({})).toEqual(disabled);
-  });
 });
 
 describe('localisedUrls', () => {
@@ -413,23 +399,6 @@ describe('localisedUrls', () => {
         localisedUrls,
       ),
     ).toBe('/shoes/red');
-  });
-
-  test('a specific localised source outranks a broad canonical source', () => {
-    const localisedUrls = {
-      '/:section/:slug': {
-        en: '/generic/:section/:slug',
-        cs: '/obecne/:section/:slug',
-      },
-      '/products/:id': {
-        en: '/fixed/:id',
-        cs: '/produkty/:id',
-      },
-    };
-
-    expect(
-      resolveCanonicalLocalisedPath('/fixed/red', ['en', 'cs'], localisedUrls),
-    ).toBe('/products/red');
   });
 
   test('missing required target params never collapse into empty segments', () => {

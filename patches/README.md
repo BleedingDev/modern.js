@@ -23,8 +23,7 @@ runtime:
 - `@tanstack/router-core@1.171.27` -> `@tanstack__router-core@1.171.27.patch`
 
 The shared list is defined in
-`packages/toolkit/ultramodern-create/src/ultramodern-workspace/shared-patches.ts` and gated
-by `packages/toolkit/ultramodern-create/tests/patch-sync.test.ts`.
+`packages/toolkit/ultramodern-create/src/ultramodern-workspace/shared-patches.ts`.
 
 Template-only patches live only under
 `packages/toolkit/ultramodern-create/template-workspace/patches/` and are used by generated

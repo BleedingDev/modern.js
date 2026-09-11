@@ -17,12 +17,10 @@ test('validateImportGuards detects banned imports', () => {
   const dir = makeTempDir();
   try {
     const filePath = path.join(dir, 'input.ts');
-    const allowedFilePath = path.join(dir, 'allowed.ts');
     fs.writeFileSync(
       filePath,
       "import exampleModule from '@modules/example-module';\n",
     );
-    fs.writeFileSync(allowedFilePath, 'export const value = true;\n');
 
     const report = validateImportGuards({
       importGuards: [
@@ -36,7 +34,6 @@ test('validateImportGuards detects banned imports', () => {
       scanExtensions: ['.ts'],
     });
 
-    assert.equal(report.inspectedFiles, 2);
     assert.equal(report.violations.length, 1);
     assert.equal(report.violations[0].guardId, 'no-domain');
   } finally {

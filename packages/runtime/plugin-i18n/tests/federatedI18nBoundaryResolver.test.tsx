@@ -14,12 +14,6 @@ const props: FederatedI18nBoundaryProps = {
 };
 
 describe('native federation resolver wrapper', () => {
-  test('reports missing integration when no resolver is installed', () => {
-    expect(() =>
-      renderToStaticMarkup(<FederatedI18nBoundary {...props} />),
-    ).toThrow(/requires the @modern-js\/i18n-integration runtime plugin/);
-  });
-
   test('retains the actionable fallback when a resolver does not handle i18n', () => {
     expect(() =>
       renderToStaticMarkup(

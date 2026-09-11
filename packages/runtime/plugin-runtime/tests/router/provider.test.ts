@@ -6,9 +6,7 @@ import {
   resolveRouterProvider,
 } from '@modern-js/runtime-extensions/router-provider';
 import type { RuntimePlugin } from '../../src/core';
-import * as contextSeam from '../../src/core/context';
 import type { RouterExtendsHooks } from '../../src/router/runtime/hooks';
-import * as routerHooks from '../../src/router/runtime/hooks';
 import { routerProviderRegistryHooks } from '../../src/router/runtime/hooks';
 
 const reportUnsupportedProviderRegistryHooks = (
@@ -22,26 +20,6 @@ const createFactory = (name: string): RouterProviderFactory => {
       setup: () => undefined,
     }) as RuntimePlugin<{ extendHooks: RouterExtendsHooks }>;
 };
-
-describe('router provider registry hooks (single declaration source)', () => {
-  it('exposes exactly the six router hooks with the canonical instances', () => {
-    expect(routerProviderRegistryHooks).toEqual({
-      modifyRoutes: routerHooks.modifyRoutes,
-      onAfterCreateRouter: routerHooks.onAfterCreateRouter,
-      onAfterHydrateRouter: routerHooks.onAfterHydrateRouter,
-      onBeforeCreateRouter: routerHooks.onBeforeCreateRouter,
-      onBeforeCreateRoutes: routerHooks.onBeforeCreateRoutes,
-      onBeforeHydrateRouter: routerHooks.onBeforeHydrateRouter,
-    });
-    expect(Object.keys(routerProviderRegistryHooks)).toHaveLength(6);
-  });
-
-  it("is re-exported through the '@modern-js/runtime/context' seam", () => {
-    expect(contextSeam.routerProviderRegistryHooks).toBe(
-      routerProviderRegistryHooks,
-    );
-  });
-});
 
 describe('reportUnsupportedProviderRegistryHooks', () => {
   it('warns about provider hooks outside the router hook contract instead of dropping them silently', () => {

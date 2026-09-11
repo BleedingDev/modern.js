@@ -1,5 +1,6 @@
 import { isNotFound, isRedirect } from '@tanstack/react-router';
 import {
+  mapSplatParamsForModernLoader,
   modernLoaderToTanstack,
   throwTanstackRedirect,
 } from '../../src/runtime/loaderBridge';
@@ -19,6 +20,50 @@ function catchThrown(fn: () => unknown): unknown {
   }
   throw new Error('expected the function to throw');
 }
+
+describe('throwTanstackRedirect', () => {
+  test('absolute URLs redirect via href (external), not via to', () => {
+    // The old inline codegen handler threw `redirect({ href })` INSIDE a
+    // try block whose catch replaced it with `redirect({ to: absoluteUrl })`,
+    // making TanStack treat the absolute URL as an internal path.
+    const thrown = catchThrown(() =>
+      throwTanstackRedirect('https://example.com/external'),
+    ) as RedirectLike;
+
+    expect(isRedirect(thrown)).toBe(true);
+    expect(thrown.options?.href).toBe('https://example.com/external');
+    expect(thrown.options?.to).toBeUndefined();
+  });
+
+  test('relative paths redirect via to so the basepath rewrite applies', () => {
+    const thrown = catchThrown(() =>
+      throwTanstackRedirect('/dashboard'),
+    ) as RedirectLike;
+
+    expect(isRedirect(thrown)).toBe(true);
+    expect(thrown.options?.to).toBe('/dashboard');
+    expect(thrown.options?.href).toBeUndefined();
+  });
+
+  test('empty location falls back to /', () => {
+    const thrown = catchThrown(() => throwTanstackRedirect('')) as RedirectLike;
+    expect(thrown.options?.to).toBe('/');
+  });
+});
+
+describe('mapSplatParamsForModernLoader', () => {
+  test('maps TanStack _splat to React Router * only for splat routes', () => {
+    expect(
+      mapSplatParamsForModernLoader({ _splat: 'a/b', id: '1' }, true),
+    ).toEqual({ '*': 'a/b', id: '1' });
+    expect(
+      mapSplatParamsForModernLoader({ _splat: 'a/b', id: '1' }, false),
+    ).toEqual({ _splat: 'a/b', id: '1' });
+    expect(mapSplatParamsForModernLoader({ id: '1' }, true)).toEqual({
+      id: '1',
+    });
+  });
+});
 
 describe('modernLoaderToTanstack', () => {
   const baseCtx = {
@@ -117,6 +162,13 @@ describe('modernLoaderToTanstack', () => {
     );
 
     expect(isNotFound(thrown)).toBe(true);
+  });
+
+  test('preserves returned non-404 error Responses as loader results', async () => {
+    const response = new Response('loader exploded', { status: 500 });
+    const loader = modernLoaderToTanstack({ hasSplat: false }, () => response);
+
+    await expect(loader(baseCtx)).resolves.toBe(response);
   });
 
   test('translates redirect Responses thrown synchronously by the loader', () => {

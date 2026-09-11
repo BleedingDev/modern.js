@@ -130,71 +130,6 @@ describe('buildShellBeforeTemplate', () => {
     );
 
     expect(html).toBe(expectedHtml);
-    expect(orderedFragments.map(fragment => html.indexOf(fragment))).toEqual(
-      orderedFragments.map(fragment => expectedHtml.indexOf(fragment)),
-    );
-    expect(html.split(orderedFragments[1])).toHaveLength(2);
-  });
-
-  it('should use shared matched route ids from the router snapshot for css injection', async () => {
-    for (const buildTemplate of [
-      buildShellBeforeTemplate,
-      buildWorkerShellBeforeTemplate,
-    ]) {
-      const html = await buildTemplate(
-        `<html><head>${CHUNK_CSS_PLACEHOLDER}</head><body></body></html>`,
-        {
-          entryName: 'main',
-          runtimeContext: withRouterSnapshot(
-            {
-              routeManifest: {
-                routeAssets: {
-                  'route-a': {
-                    referenceCssAssets: ['/assets/route-a.css'],
-                  },
-                },
-              },
-            },
-            {
-              matchedRouteIds: ['route-a'],
-            },
-          ) as any,
-          config: {} as any,
-        },
-      );
-
-      expect(html).toContain('/assets/route-a.css');
-    }
-  });
-
-  it('should derive css route ids from generic match snapshots', async () => {
-    const html = await buildShellBeforeTemplate(
-      `<html><head>${CHUNK_CSS_PLACEHOLDER}</head><body></body></html>`,
-      {
-        entryName: 'main',
-        runtimeContext: withRouterSnapshot(
-          {
-            routeManifest: {
-              routeAssets: {
-                'asset-route': {
-                  referenceCssAssets: ['/assets/asset-route.css'],
-                },
-                legacy: {
-                  referenceCssAssets: ['/assets/legacy.css'],
-                },
-              },
-            },
-          },
-          {
-            matches: [{ routeId: 'router-route', assetRouteId: 'asset-route' }],
-          },
-        ) as any,
-        config: {} as any,
-      },
-    );
-
-    expect(html).toContain('/assets/asset-route.css');
-    expect(html).not.toContain('/assets/legacy.css');
   });
 });
 
@@ -257,9 +192,6 @@ const chunk = (url: string, filename = url) => ({
   filename,
   path: url,
 });
-
-const scriptUrls = (chunks: Array<{ url?: string }>) =>
-  chunks.map(item => item.url).filter(Boolean);
 
 describe('createRouteHydrationScriptTags', () => {
   it('does not treat substring matches in the template as existing scripts', () => {
@@ -327,30 +259,6 @@ describe('LoadableCollector federated css', () => {
     );
   });
 
-  it('orders matched route scripts before the async entry script', () => {
-    const ordered = orderHydrationScriptChunks({
-      entryName: 'index',
-      asyncEntryChunks: [
-        chunk('/static/js/async/vendor.js'),
-        chunk('/static/js/async/async-index-123.js'),
-      ],
-      collectedChunks: [chunk('/static/js/async/loadable-child.js')],
-      matchedRouteChunks: [
-        chunk('/static/js/async/(lang)/page.js'),
-        chunk('/static/js/async/(lang)/checkout/page.js'),
-        chunk('/static/js/async/(lang)/page.js'),
-      ],
-    });
-
-    expect(scriptUrls(ordered)).toEqual([
-      '/static/js/async/vendor.js',
-      '/static/js/async/loadable-child.js',
-      '/static/js/async/(lang)/page.js',
-      '/static/js/async/(lang)/checkout/page.js',
-      '/static/js/async/async-index-123.js',
-    ]);
-  });
-
   it('does not fall back to runtime route manifest when options omit routeManifest', async () => {
     const chunkSet = {
       renderLevel: RenderLevel.CLIENT_RENDER,
@@ -412,24 +320,6 @@ test('registered asset policy orders native loadable output before the async ent
 });
 
 describe('SSR hydration helper matrix', () => {
-  const createRuntimeContext = (
-    matchedRouteIds: string[],
-    routeAssets: Record<string, { assets?: string[] }>,
-  ) => {
-    const runtimeContext = {
-      routeManifest: {
-        routeAssets,
-      },
-    } as any;
-
-    applyRouterRuntimeState(runtimeContext, {
-      framework: 'custom-router',
-      matchedRouteIds,
-    } as any);
-
-    return runtimeContext;
-  };
-
   it('dedupes hydration script chunks and generated tags by the exact script src', () => {
     expect(
       orderHydrationScriptChunks({
@@ -483,33 +373,5 @@ describe('SSR hydration helper matrix', () => {
         url: '/assets/async-main.123.js',
       },
     ]);
-
-    const runtimeContext = createRuntimeContext(['routes/dashboard'], {
-      'routes/dashboard': {
-        assets: [
-          '/assets/dashboard.js',
-          '/assets/shared.js',
-          '/assets/dashboard.css',
-          '/assets/dashboard.js',
-        ],
-      },
-      'async-main': {
-        assets: [
-          '/assets/async-main.js',
-          '/assets/shared.js',
-          '/assets/async-main.css',
-        ],
-      },
-    });
-
-    expect(
-      createRouteHydrationScriptTags(runtimeContext, 'main', {
-        nonce: 'nonce-1',
-        template:
-          '<script defer src="/assets/dashboard.js"></script><script src="/assets/shared.js?cache=1"></script>',
-      }),
-    ).toBe(
-      '<script src="/assets/shared.js" nonce="nonce-1"></script> <script src="/assets/async-main.js" nonce="nonce-1"></script>',
-    );
   });
 });

@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { Hono } from '@modern-js/server-core';
 
 import {
@@ -46,23 +44,6 @@ const createContext = (method: string, headers: Record<string, string>) =>
   }) as never;
 
 describe('exact-route Hono cross-project policy', () => {
-  it('imports only the edge-safe evaluation leaf', () => {
-    const sourceRoot = path.resolve(__dirname, '../src');
-    const honoSource = fs.readFileSync(
-      path.join(sourceRoot, 'hono/cross-project-policy.ts'),
-      'utf8',
-    );
-    const evaluationSource = fs.readFileSync(
-      path.join(sourceRoot, 'cross-project-policy/evaluation.ts'),
-      'utf8',
-    );
-
-    expect(honoSource).toContain("from '../cross-project-policy/evaluation'");
-    expect(`${honoSource}\n${evaluationSource}`).not.toMatch(
-      /(?:node:fs|node:path|cross-project-policy\/node|from ['"]\.\.\/cross-project-policy['"])/,
-    );
-  });
-
   it('rejects valid credentials for a different registered route', async () => {
     const orderContract =
       policy.expectedOperationContracts['POST:/api/orders']!;

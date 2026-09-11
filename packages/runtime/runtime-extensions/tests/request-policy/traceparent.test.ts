@@ -7,6 +7,8 @@ describe('parseTraceparent', () => {
   test.each([
     ['01', true],
     ['00', false],
+    ['03', true],
+    ['02', false],
   ])('parses a valid traceparent with flags %s', (flags, sampled) => {
     expect(parseTraceparent(`00-${traceId}-${spanId}-${flags}`)).toEqual({
       traceId,
@@ -25,11 +27,6 @@ describe('parseTraceparent', () => {
       spanId,
       sampled: true,
     });
-  });
-
-  test('reads the sampled bit from arbitrary flag values', () => {
-    expect(parseTraceparent(`00-${traceId}-${spanId}-03`)?.sampled).toBe(true);
-    expect(parseTraceparent(`00-${traceId}-${spanId}-02`)?.sampled).toBe(false);
   });
 
   test('rejects missing, empty, and malformed headers', () => {

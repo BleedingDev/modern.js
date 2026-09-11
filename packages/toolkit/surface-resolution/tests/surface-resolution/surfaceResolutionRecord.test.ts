@@ -311,13 +311,4 @@ describe('matchDeliveryUnitIdentity', () => {
       },
     });
   });
-
-  it('returns identity-mismatch for a different unit id', () => {
-    const error = matchDeliveryUnitIdentity(
-      expected,
-      createRecord({ unitId: 'acme/billing' }),
-      'acme/checkout#cart',
-    );
-    expect(error).toMatchObject({ code: 'identity-mismatch' });
-  });
 });

@@ -169,6 +169,42 @@ describe('tanstack data mutation fetcher', () => {
     expect(states).toEqual(['idle', 'submitting', 'loading', 'idle']);
   });
 
+  test('passes built href and matched route params to mutation actions', async () => {
+    const action = rstest.fn(
+      async ({ request, params }: Parameters<RouteHandler>[0]) => ({
+        params,
+        requestUrl: request.url,
+      }),
+    );
+    currentRouter = createRouter({
+      action,
+      params: { userId: '42' },
+    });
+
+    render(<FetcherHarness />);
+
+    await act(async () => {
+      await latestFetcher!.submit(
+        { amount: 2 },
+        {
+          method: 'post',
+          action: '/users/42?tab=edit#details',
+        },
+      );
+    });
+
+    expect(action).toHaveBeenCalledTimes(1);
+    const actionArgs = action.mock.calls[0][0];
+    const expectedRequestUrl = `${window.location.origin}/users/42?tab=edit#details`;
+    expect(actionArgs.params).toEqual({ userId: '42' });
+    expect(actionArgs.request.url).toBe(expectedRequestUrl);
+    expect(latestFetcher?.data).toEqual({
+      params: { userId: '42' },
+      requestUrl: expectedRequestUrl,
+    });
+    expect(currentRouter.invalidate).toHaveBeenCalledTimes(1);
+  });
+
   test('surfaces non-2xx action responses as fetcher errors', async () => {
     const actionResult = createDeferred<Response>();
     currentRouter = createRouter({

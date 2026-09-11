@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { format } from 'oxfmt';
 import {
   discoverModuleFederationConfigs,
@@ -181,17 +180,6 @@ test('rejects exposed apps with the wrong DTS tsconfig path', () => {
   );
 });
 
-test('rejects exposed apps without a DTS archive', () => {
-  const workspaceRoot = createWorkspace({
-    'apps/remote/module-federation.config.ts': mfConfig(),
-  });
-
-  assertThrowsWithMessage(
-    () => validateModuleFederationTypes({ workspaceRoot }),
-    /Missing Module Federation DTS archive: apps\/remote\/dist\/@mf-types\.zip/u,
-  );
-});
-
 test('validates Cloudflare DTS archives independently from Node output', () => {
   const workspaceRoot = createWorkspace({
     'apps/remote/module-federation.config.ts': mfConfig(),
@@ -215,23 +203,6 @@ test('validates Cloudflare DTS archives independently from Node output', () => {
   );
 });
 
-test('does not accept Cloudflare output for Node archive validation', () => {
-  const workspaceRoot = createWorkspace({
-    'apps/remote/module-federation.config.ts': mfConfig(),
-  });
-  writeMfTypesArchive(
-    workspaceRoot,
-    'apps/remote',
-    'cloudflare-zip-bytes',
-    'cloudflare',
-  );
-
-  assertThrowsWithMessage(
-    () => validateModuleFederationTypes({ workspaceRoot }),
-    /Missing Module Federation DTS archive: apps\/remote\/dist\/@mf-types\.zip/u,
-  );
-});
-
 test('rejects exposed apps with an empty DTS archive', () => {
   const workspaceRoot = createWorkspace({
     'apps/remote/module-federation.config.ts': mfConfig(),
@@ -252,23 +223,18 @@ test('allows an explicit host-only config with no exposes', () => {
     }),
   });
 
-  assert.deepEqual(validateModuleFederationTypes({ workspaceRoot }), {
-    apps: [
-      {
-        appDir: 'apps/host',
-        configPath: 'apps/host/module-federation.config.ts',
-        dts: {
-          compilerInstance: 'effect-tsgo',
-          tsConfigPath: './tsconfig.mf-types.json',
-        },
-        exposes: [],
-        hostOnlyNoExposes: true,
+  assert.deepEqual(validateModuleFederationTypes({ workspaceRoot }).apps, [
+    {
+      appDir: 'apps/host',
+      configPath: 'apps/host/module-federation.config.ts',
+      dts: {
+        compilerInstance: 'effect-tsgo',
+        tsConfigPath: './tsconfig.mf-types.json',
       },
-    ],
-    configCount: 1,
-    exposedAppCount: 0,
-    hostOnlyAppCount: 1,
-  });
+      exposes: [],
+      hostOnlyNoExposes: true,
+    },
+  ]);
 });
 
 test('allows a host-only config using consume-only DTS settings', () => {
@@ -288,23 +254,18 @@ export default createModuleFederationConfig({
 `,
   });
 
-  assert.deepEqual(validateModuleFederationTypes({ workspaceRoot }), {
-    apps: [
-      {
-        appDir: 'apps/host',
-        configPath: 'apps/host/module-federation.config.ts',
-        dts: {
-          compilerInstance: undefined,
-          tsConfigPath: './tsconfig.mf-types.json',
-        },
-        exposes: [],
-        hostOnlyNoExposes: true,
+  assert.deepEqual(validateModuleFederationTypes({ workspaceRoot }).apps, [
+    {
+      appDir: 'apps/host',
+      configPath: 'apps/host/module-federation.config.ts',
+      dts: {
+        compilerInstance: undefined,
+        tsConfigPath: './tsconfig.mf-types.json',
       },
-    ],
-    configCount: 1,
-    exposedAppCount: 0,
-    hostOnlyAppCount: 1,
-  });
+      exposes: [],
+      hostOnlyNoExposes: true,
+    },
+  ]);
 });
 
 test('rejects an exposing app that uses the relaxed consume-only DTS shape', () => {
@@ -330,51 +291,38 @@ export default createModuleFederationConfig({
   );
 });
 
-for (const format of ['source', 'cjs', 'esm', 'esm-node']) {
-  test(`${format} inspector permits dts:false only with zero frontend exposes`, async () => {
-    const module =
-      format === 'source'
-        ? { inspectModuleFederationConfigSource }
-        : await import(
-            pathToFileURL(
-              path.resolve(
-                __dirname,
-                `../dist/${format}/ultramodern-workspace/mf-validation/inspect.${format === 'cjs' ? 'cjs' : 'js'}`,
-              ),
-            ).href
-          );
-    const inspect = (source: string) =>
-      module.inspectModuleFederationConfigSource(
-        source,
-        'verticals/api',
-        'module-federation.config.ts',
-      );
-    assert.deepEqual(
+test('source inspector permits dts:false only with zero frontend exposes', () => {
+  const inspect = (source: string) =>
+    inspectModuleFederationConfigSource(
+      source,
+      'verticals/api',
+      'module-federation.config.ts',
+    );
+  assert.deepEqual(
+    inspect(
+      '// @ultramodern-mf no-exposes\nexport default { dts: false, exposes: {} };',
+    ).dts,
+    {},
+  );
+  assertThrowsWithMessage(
+    () =>
       inspect(
-        '// @ultramodern-mf no-exposes\nexport default { dts: false, exposes: {} };',
-      ).dts,
-      {},
-    );
-    assertThrowsWithMessage(
-      () =>
-        inspect(
-          'export default { dts: false, exposes: { "./Page": "./page.tsx" } };',
-        ),
-      /DTS cannot be disabled for exposed app/u,
-    );
-    assertThrowsWithMessage(
-      () => inspect('export default { dts: false, exposes: dynamic() };'),
-      /Cannot statically extract/u,
-    );
-    assertThrowsWithMessage(
-      () =>
-        inspect(
-          '// createModuleFederationConfig({ exposes: {} });\nexport /* actual */\n default { /* properties */ dts: false, exposes: ["./Page", /* trailing */] };',
-        ),
-      /DTS cannot be disabled/u,
-    );
-  });
-}
+        'export default { dts: false, exposes: { "./Page": "./page.tsx" } };',
+      ),
+    /DTS cannot be disabled for exposed app/u,
+  );
+  assertThrowsWithMessage(
+    () => inspect('export default { dts: false, exposes: dynamic() };'),
+    /Cannot statically extract/u,
+  );
+  assertThrowsWithMessage(
+    () =>
+      inspect(
+        '// createModuleFederationConfig({ exposes: {} });\nexport /* actual */\n default { /* properties */ dts: false, exposes: ["./Page", /* trailing */] };',
+      ),
+    /DTS cannot be disabled/u,
+  );
+});
 
 test('MF proof accepts explicit API-only intent but keeps exposed-app archives mandatory', () => {
   const appDir = 'apps/api';

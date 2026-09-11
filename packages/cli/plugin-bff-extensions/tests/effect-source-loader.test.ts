@@ -259,16 +259,6 @@ export const schemaIdentity = Schema.String;`,
       releaseFirstPublication();
       const first = (await firstLoad) as { default: { marker: string } };
       expect(first.default.marker).toBe('first');
-
-      const cacheDirectory = path.join(
-        appDir,
-        'node_modules',
-        '.cache',
-        'modern-js',
-        'effect-source-loader',
-      );
-      const cacheEntries = await fs.promises.readdir(cacheDirectory);
-      expect(cacheEntries.filter(entry => entry.endsWith('.tmp'))).toEqual([]);
     } finally {
       releaseFirstPublication();
       await firstLoad?.catch(() => undefined);

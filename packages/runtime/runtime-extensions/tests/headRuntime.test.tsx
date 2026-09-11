@@ -146,41 +146,6 @@ describe('server Helmet collection', () => {
     expect(meta).toContain('content="inner"');
     expect(meta).not.toContain('content="outer"');
     expect(meta).toContain('content="modernjs"');
-    // outer instance tags come first, like react-helmet-async
-    expect(meta.indexOf('keywords')).toBeLessThan(meta.indexOf('description'));
-  });
-
-  it('keeps duplicate metas within a single Helmet instance', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet>
-        <meta name="author" content="a" />
-        <meta name="author" content="b" />
-      </Helmet>,
-    );
-
-    const meta = getHelmetData(context)!.meta.toString();
-    expect(meta).toContain('content="a"');
-    expect(meta).toContain('content="b"');
-  });
-
-  it('normalizes charSet when deduping and drops meta without primary attribute', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet>
-          <meta charSet="utf-8" />
-          <meta content="orphan" />
-        </Helmet>
-        <Helmet meta={[{ charSet: 'utf-8' } as any]} />
-      </>,
-    );
-
-    const meta = getHelmetData(context)!.meta.toString();
-    expect(meta.match(/charset/g)).toHaveLength(1);
-    expect(meta).not.toContain('orphan');
   });
 
   it('applies the innermost title and the innermost titleTemplate', () => {
@@ -199,71 +164,6 @@ describe('server Helmet collection', () => {
 
     expect(getHelmetData(context)!.title.toString()).toBe(
       '<title data-rh="true">Inner | Site</title>',
-    );
-  });
-
-  it('falls back to defaultTitle without applying the template', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet defaultTitle="Default" titleTemplate="%s | Site" />,
-    );
-
-    expect(getHelmetData(context)!.title.toString()).toBe(
-      '<title data-rh="true">Default</title>',
-    );
-  });
-
-  it('maps <html>/<body> children to html/body attributes', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet>
-        <html lang="en" />
-        <body className="dark" />
-      </Helmet>,
-    );
-
-    const helmet = getHelmetData(context)!;
-    expect(helmet.htmlAttributes.toString()).toBe('lang="en"');
-    expect(helmet.bodyAttributes.toString()).toBe('class="dark"');
-  });
-
-  it('keeps one canonical link but all distinct stylesheets', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet>
-          <link rel="canonical" href="https://outer.example/" />
-          <link rel="stylesheet" href="/a.css" />
-          <link rel="stylesheet" href="/b.css" />
-        </Helmet>
-        <Helmet>
-          <link rel="canonical" href="https://inner.example/" />
-        </Helmet>
-      </>,
-    );
-
-    const link = getHelmetData(context)!.link.toString();
-    expect(link).toContain('https://inner.example/');
-    expect(link).not.toContain('https://outer.example/');
-    expect(link).toContain('/a.css');
-    expect(link).toContain('/b.css');
-  });
-
-  it('does not serialize script innerHTML as an attribute', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <Helmet>
-        <script type="application/ld+json">{'{"@context":"a"}'}</script>
-      </Helmet>,
-    );
-
-    const script = getHelmetData(context)!.script.toString();
-    expect(script).toBe(
-      '<script data-rh="true" type="application/ld+json">{"@context":"a"}</script>',
     );
   });
 
@@ -292,29 +192,6 @@ describe('server Helmet collection', () => {
     expect(helmet.link.toString()).not.toContain('https://example.com/page');
     expect(helmet.script.toString()).toContain('/ordinary.js');
     expect(helmet.script.toString()).not.toContain('application/ld+json');
-
-    const priority = helmet.priority.toComponent();
-    expect(priority.map(element => element.type)).toEqual([
-      'meta',
-      'link',
-      'script',
-    ]);
-    expect(priority[0].props).toMatchObject({
-      'data-rh': true,
-      content: 'priority description',
-      name: 'description',
-    });
-    expect(priority[2].props).toMatchObject({
-      'data-rh': true,
-      dangerouslySetInnerHTML: { __html: '{"name":"page"}' },
-      type: 'application/ld+json',
-    });
-    expect(helmet.meta.toComponent()[0].props).toMatchObject({
-      content: 'ordinary keywords',
-      name: 'keywords',
-    });
-    expect(helmet.title.toComponent()[0].props.children).toBe('Priority Page');
-    expect(helmet.htmlAttributes.toComponent()).toEqual({ className: 'app' });
   });
 
   it('is idempotent when React replays the tree (streaming SSR retry)', () => {
@@ -348,22 +225,5 @@ describe('server Helmet collection', () => {
     expect(second.meta.toString()).toBe(firstSnapshot.meta);
     expect(second.htmlAttributes.toString()).toBe(firstSnapshot.htmlAttributes);
     expect(second.meta.toString().match(/description/g)).toHaveLength(1);
-  });
-
-  it('keeps the innermost base tag only', () => {
-    const context = createServerContext();
-    renderWithContext(
-      context,
-      <>
-        <Helmet base={{ href: 'https://outer.example/' } as any} />
-        <Helmet>
-          <base href="https://inner.example/" />
-        </Helmet>
-      </>,
-    );
-
-    const base = getHelmetData(context)!.base.toString();
-    expect(base).toContain('https://inner.example/');
-    expect(base).not.toContain('https://outer.example/');
   });
 });

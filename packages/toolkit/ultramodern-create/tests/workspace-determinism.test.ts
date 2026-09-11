@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -118,6 +119,47 @@ test('generates byte-identical workspaces for a fixed shell and MicroVertical sp
     );
 
     assert.equal(difference, undefined, difference);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// Restored: delivery-unit build markers were once seeded per process, so a
+// marker stamped by the CLI never matched the one recomputed by a later
+// process (the generated `pnpm check` validator asserts they agree).
+test('the CLI stamps the same delivery-unit build marker as an in-process add', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-marker-cross-'));
+  try {
+    const inProcessDir = path.join(tempRoot, 'in-process');
+    generateFixedWorkspace(inProcessDir);
+
+    const cliDir = path.join(tempRoot, 'cli');
+    generateUltramodernWorkspace({
+      targetDir: cliDir,
+      packageName: 'deterministic-workspace',
+      modernVersion: '3.2.1',
+      enableTailwind: true,
+      packageSource: { strategy: 'workspace' },
+    });
+    const cli = spawnSync(
+      process.execPath,
+      [
+        path.resolve(__dirname, '../dist/esm-node/index.js'),
+        'catalog',
+        '--vertical',
+      ],
+      { cwd: cliDir, encoding: 'utf8' },
+    );
+    assert.equal(cli.status, 0, `${cli.stdout}\n${cli.stderr}`);
+
+    const markerOf = (root: string) =>
+      JSON.parse(
+        fs.readFileSync(
+          path.join(root, 'verticals/catalog/shared/ultramodern-build.json'),
+          'utf8',
+        ),
+      ).deliveryUnit.buildMarker;
+    assert.equal(markerOf(cliDir), markerOf(inProcessDir));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

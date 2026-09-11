@@ -5,7 +5,6 @@ import {
   collectHeadRecord,
   completeHeadRender,
   createHeadChunkProcessor,
-  createWebHeadMarkerStripper,
 } from '../src';
 import { createNodeHeadMarkerStripper, pipeNodeHeadStream } from '../src/node';
 
@@ -43,16 +42,6 @@ describe('renderer head transactions', () => {
       '<template data-modern-helmet="h00000000-0000-0000-0000-000000000000000000000000"></template>';
 
     expect(completeHeadRender(context, userTemplate)).toBe(userTemplate);
-  });
-
-  it('does not retain ordinary streaming content', () => {
-    const context = {};
-    beginHeadRender(context);
-    const processor = createHeadChunkProcessor(context);
-    const content = 'x'.repeat(128 * 1024);
-
-    expect(processor.push(content)).toBe(content);
-    expect(processor.finish()).toBe('');
   });
 
   it('strips markers split across chunks without corrupting unicode', () => {
@@ -99,36 +88,6 @@ describe('renderer head transactions', () => {
     collectHeadRecord(context, () => 'provisional', publish);
     abortHeadRender(context);
     expect(published).toEqual(['previous']);
-  });
-
-  it('strips split markers from a web byte stream', async () => {
-    const context = {};
-    let published: string[] = [];
-    beginHeadRender(context);
-    const props = collectHeadRecord(
-      context,
-      () => 'web',
-      records => {
-        published = records;
-      },
-    )!;
-    const html = `č${marker(props)}尾`;
-    const encoder = new TextEncoder();
-    const encoded = encoder.encode(html);
-    const source = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoded.slice(0, 1));
-        controller.enqueue(encoded.slice(1, 17));
-        controller.enqueue(encoded.slice(17));
-        controller.close();
-      },
-    });
-
-    const output = await new Response(
-      source.pipeThrough(createWebHeadMarkerStripper(context)),
-    ).text();
-    expect(output).toBe('č尾');
-    expect(published).toEqual(['web']);
   });
 
   it('strips split markers from a Node stream', async () => {

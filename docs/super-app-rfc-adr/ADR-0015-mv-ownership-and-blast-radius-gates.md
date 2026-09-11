@@ -137,9 +137,8 @@ Automated agents and service accounts may record evidence or perform mechanical 
 The ownership contract consumes existing gate artifacts:
 
 1. `scripts/boundary-guards/profile.json` for import and snippet guard references.
-2. `scripts/release-gates/module-certification-profile.json` for onboarding evidence expectations.
-3. support-matrix references for affected runtime lanes and operational commitments.
-4. incident hooks for degraded remotes, contract regressions, rollout pauses, and support-tier changes.
+2. support-matrix references for affected runtime lanes and operational commitments.
+3. incident hooks for degraded remotes, contract regressions, rollout pauses, and support-tier changes.
 
 The support-matrix and incident inputs are part of blast-radius evaluation. They can raise a local change into a cross-vertical approval path even when static imports look local.
 

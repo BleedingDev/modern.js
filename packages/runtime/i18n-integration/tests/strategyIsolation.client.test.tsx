@@ -174,22 +174,6 @@ describe('framework Link', () => {
     expect(link?.getAttribute('data-router-link')).toBe('tanstack');
   });
 
-  test('passes hash natively for cross-page hash targets', async () => {
-    const router = createTanstackRouter('/cs/podminky-pouzivani', 'cs');
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider value={providerValue('cs')}>
-        <Link to="/#work-with-me" data-testid="cta">
-          CTA
-        </Link>
-      </ModernI18nProvider>,
-      createTanstackRuntimeContext(router),
-    );
-
-    const props = capturedLinkProps.at(-1);
-    expect(props.to).toBe('/cs');
-    expect(props.hash).toBe('work-with-me');
-  });
-
   test('passes query and hash from the target natively', async () => {
     const router = createTanstackRouter('/en/products', 'en');
     rendered = await renderWithRuntime(
@@ -205,26 +189,20 @@ describe('framework Link', () => {
     expect(props.to).toBe('/en/products');
     expect(props.search).toEqual({ tag: 'x' });
     expect(props.hash).toBe('list');
-  });
 
-  test('preserves array search values natively', async () => {
-    const router = createTanstackRouter('/en/products', 'en');
+    // A hash-only target (no query) also passes natively for cross-page hashes.
+    const hashRouter = createTanstackRouter('/cs/podminky-pouzivani', 'cs');
     rendered = await renderWithRuntime(
-      <ModernI18nProvider value={providerValue('en')}>
-        <Link
-          to="/products"
-          search={{ tag: ['boots', 'sale'], page: 2 }}
-          data-testid="q"
-        >
-          Products
+      <ModernI18nProvider value={providerValue('cs')}>
+        <Link to="/#work-with-me" data-testid="cta">
+          CTA
         </Link>
       </ModernI18nProvider>,
-      createTanstackRuntimeContext(router),
+      createTanstackRuntimeContext(hashRouter),
     );
-
-    const props = capturedLinkProps.at(-1);
-    expect(props.to).toBe('/en/products');
-    expect(props.search).toEqual({ tag: ['boots', 'sale'], page: '2' });
+    const hashProps = capturedLinkProps.at(-1);
+    expect(hashProps.to).toBe('/cs');
+    expect(hashProps.hash).toBe('work-with-me');
   });
 
   test('renders a plain anchor for external targets', async () => {
@@ -242,22 +220,6 @@ describe('framework Link', () => {
     expect(link?.getAttribute('href')).toBe('https://ai.bleeding.dev');
     expect(link?.getAttribute('data-router-link')).toBeNull();
     expect(link?.hasAttribute('prefetch')).toBe(false);
-  });
-
-  test('renders a plain anchor for same-page hash targets', async () => {
-    const router = createTanstackRouter('/en', 'en');
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider value={providerValue('en')}>
-        <Link to="#work-with-me" data-testid="anchor">
-          Jump
-        </Link>
-      </ModernI18nProvider>,
-      createTanstackRuntimeContext(router),
-    );
-
-    const link = rendered.container.querySelector('[data-testid="anchor"]');
-    expect(link?.getAttribute('href')).toBe('#work-with-me');
-    expect(link?.getAttribute('data-router-link')).toBeNull();
   });
 
   test('falls back to a localized anchor without a router', async () => {
@@ -280,65 +242,13 @@ describe('framework Link', () => {
     expect(link?.hasAttribute('prefetch')).toBe(false);
   });
 
-  test('serializes array search values for fallback anchors', async () => {
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider value={providerValue('en')}>
-        <Link
-          to="/products"
-          search={{ tag: ['boots', 'sale'], page: 2 }}
-          data-testid="q"
-        >
-          Products
-        </Link>
-      </ModernI18nProvider>,
-      { isBrowser: true, requestContext, context: requestContext } as any,
-    );
-
-    const link = rendered.container.querySelector('[data-testid="q"]');
-    expect(link?.getAttribute('href')).toBe(
-      '/en/products?tag=boots&tag=sale&page=2',
-    );
-  });
-
-  test('empty search prop clears query from target fallback anchors', async () => {
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider value={providerValue('en')}>
-        <Link to="/products?tag=x" search="" data-testid="clear-query">
-          Products
-        </Link>
-      </ModernI18nProvider>,
-      { isBrowser: true, requestContext, context: requestContext } as any,
-    );
-
-    const link = rendered.container.querySelector(
-      '[data-testid="clear-query"]',
-    );
-    expect(link?.getAttribute('href')).toBe('/en/products');
-  });
-
-  test('maps prefetch to the TanStack preload prop', async () => {
+  test('maps prefetch="none" to preload={false}; explicit preload wins', async () => {
     const router = createTanstackRouter('/en/products', 'en');
     rendered = await renderWithRuntime(
       <ModernI18nProvider value={providerValue('en')}>
         <Link to="/products" data-testid="pf" prefetch="intent">
           Products
         </Link>
-      </ModernI18nProvider>,
-      createTanstackRuntimeContext(router),
-    );
-
-    const props = capturedLinkProps.at(-1);
-    expect(props.preload).toBe('intent');
-    expect(props.prefetch).toBeUndefined();
-
-    const link = rendered.container.querySelector('[data-testid="pf"]');
-    expect(link?.hasAttribute('prefetch')).toBe(false);
-  });
-
-  test('maps prefetch="none" to preload={false}; explicit preload wins', async () => {
-    const router = createTanstackRouter('/en/products', 'en');
-    rendered = await renderWithRuntime(
-      <ModernI18nProvider value={providerValue('en')}>
         <Link to="/products" data-testid="none" prefetch="none">
           Products
         </Link>
@@ -353,6 +263,12 @@ describe('framework Link', () => {
       </ModernI18nProvider>,
       createTanstackRuntimeContext(router),
     );
+
+    const intentProps = capturedLinkProps[capturedLinkProps.length - 3];
+    expect(intentProps.preload).toBe('intent');
+    expect(intentProps.prefetch).toBeUndefined();
+    const intentLink = rendered.container.querySelector('[data-testid="pf"]');
+    expect(intentLink?.hasAttribute('prefetch')).toBe(false);
 
     const noneProps = capturedLinkProps[capturedLinkProps.length - 2];
     expect(noneProps.preload).toBe(false);

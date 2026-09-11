@@ -81,11 +81,6 @@ A vertical adoption package must include:
 | Rollback evidence | LKG selection, kill switch, remote disable, service disable, recovery budget |
 | Review evidence | vertical owner, platform owner, service owner, impacted vertical approvals |
 
-Existing profile reference:
-
-1. `scripts/release-gates/module-certification-profile.json`
-2. `docs/super-app-rfc-adr/evidence/module-certification/current`
-
 ## 4. Incident SOPs
 
 ### 4.1 Remote unavailable
@@ -148,12 +143,10 @@ Operator actions:
 
 Before production promotion:
 
-1. `pnpm run validate:bun-smoke`
-2. `pnpm --dir tests run test:superapp-contracts`
-3. `pnpm --dir tests exec rstest run integration/routes-tanstack-mf/test/index.test.ts`
-4. module certification gate for the vertical evidence package.
-5. boundary guard validation for cross-vertical imports.
-6. owner and impacted-consumer review evidence.
+1. `pnpm --dir tests run test:superapp-contracts`
+2. `pnpm --dir tests exec rstest run integration/routes-tanstack-mf/test/index.test.ts`
+3. boundary guard validation for cross-vertical imports.
+4. owner and impacted-consumer review evidence.
 
 For the generated Tractor workspace, add these scaffold-specific gates:
 

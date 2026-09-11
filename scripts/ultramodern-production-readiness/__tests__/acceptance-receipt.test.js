@@ -313,3 +313,18 @@ test('producer receipt verification binds operational evidence to the receipt C0
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('producer receipt is bound to its accepted run and cannot be reused by a retry', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ultramodern-receipt-'));
+  try {
+    const fixture = await createReceiptFixture(root);
+    const retry = verifyReceipt({
+      ...fixture,
+      runIdentity: fixture.runIdentity.replace(/attempt:1$/u, 'attempt:2'),
+    });
+    assert.notEqual(retry.status, 0);
+    assert.match(retry.stderr, /run identity/u);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

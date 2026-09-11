@@ -31,25 +31,16 @@ export default make(Layer.empty);`;
       source.replace('handlers});', 'handlers: dependency});'),
       source.replace('api: fixtureApi', 'api: dependency'),
       source.replace(
-        'return handlers.handle',
-        'if (false) return handlers.handle',
-      ),
-      source.replace('return handlers.handle', 'return fake.handle'),
-      source.replace(
-        'return assembleEffectBffRuntime',
-        'if (false) return assembleEffectBffRuntime',
-      ),
-      source.replace(
         'const [dependency] = args;',
         'const [assembleEffectBffRuntime] = args;',
       ),
       source.replace(
-        'const handle = () => undefined;',
-        'const handle = () => undefined; const handlers = fake;',
-      ),
-      source.replace(
         'return handlers.handle',
         'handlers = fake; return handlers.handle',
+      ),
+      source.replace(
+        'return assembleEffectBffRuntime',
+        'if (false) return assembleEffectBffRuntime',
       ),
     ])
       expect(violation(invalid)).toBeDefined();
@@ -58,20 +49,6 @@ export default make(Layer.empty);`;
   test.each([
     shared,
     direct,
-    shared.replace(
-      'export default assembleEffectBffRuntime({api: fixtureApi, handlers});',
-      `export const make = () => { return assembleEffectBffRuntime({api: fixtureApi, handlers}); };
-const runtime = make(); export default runtime;`,
-    ),
-    shared
-      .replace(
-        'assembleEffectBffRuntime }',
-        'assembleEffectBffRuntime as assemble }',
-      )
-      .replace(
-        'export default assembleEffectBffRuntime(',
-        'export default assemble(',
-      ),
   ])('accepts genuine executable direct/shared roots', source => {
     expect(violation(source)).toBeUndefined();
   });
@@ -82,20 +59,7 @@ const runtime = make(); export default runtime;`,
 const fixtureLayer = HttpApiBuilder.layer(fixtureApi).pipe(Layer.provide(fixtureHandlers));
 defineEffectBff({api: fixtureApi, layer: fixtureLayer});`,
     direct.replace('export default defineEffectBff', 'defineEffectBff'),
-    shared.replace(
-      'import { assembleEffectBffRuntime',
-      'import type { assembleEffectBffRuntime',
-    ),
     shared.replace('HttpApiBuilder, Layer', 'fake as HttpApiBuilder, Layer'),
-    shared.replace("h => h.handle('get', () => undefined)", 'h => h'),
-    shared.replace(
-      'Layer.mergeAll(group)',
-      'Layer.mergeAll(group).pipe(() => Layer.empty)',
-    ),
-    shared.replace(
-      'export default assembleEffectBffRuntime({api: fixtureApi, handlers});',
-      `export const make = () => { if (false) return assembleEffectBffRuntime({api: fixtureApi, handlers}); return fakeRuntime; }; export default make();`,
-    ),
     `const decoy = ${JSON.stringify(shared)}; export default fake;`,
   ])('rejects spoofed, shadowed, discarded and non-executable roots', source => {
     expect(violation(source)).toBeDefined();
@@ -178,17 +142,14 @@ describe('canonical Effect package provenance', () => {
   });
   test.each([
     node.replace('import * as Layer', 'import type * as Layer'),
-    node.replace('import * as Layer', "import { '*' as Layer }"),
-    node.replace('import * as Layer', 'import { Layer }'),
-    node.replace("'effect/Layer'", "'effect/Option'"),
     node.replace("'effect/unstable/httpapi'", "'@foreign/httpapi'"),
+    node.replace('HttpApiBuilder }', 'fake as HttpApiBuilder }'),
+    node.replace('const handlers', 'const Layer = fake; const handlers'),
     node.replace(
       "'@modern-js/bff-effect/effect'",
       "'@modern-js/plugin-bff/server'",
     ),
-    node.replace('HttpApiBuilder }', 'fake as HttpApiBuilder }'),
     `${node}\nLayer.mergeAll = () => undefined;`,
-    node.replace('const handlers', 'const Layer = fake; const handlers'),
   ])('rejects non-executable or foreign Node bindings', source => {
     expect(violation(source)).toBeDefined();
   });

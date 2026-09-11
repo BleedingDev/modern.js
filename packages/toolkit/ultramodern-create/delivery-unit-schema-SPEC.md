@@ -8,8 +8,7 @@ Binding vocabulary: root [`CONTEXT.md`](../../../../../../CONTEXT.md),
 [ADR-0020](../../../../../../docs/super-app-rfc-adr/ADR-0020-zoned-surface-versioning.md)
 (Zoned Surface Versioning).
 
-Contracts live in [`types.ts`](./src/ultramodern-workspace/delivery-unit-schema/types.ts). Tests:
-[`tests/delivery-unit-schema.test.ts`](./tests/delivery-unit-schema.test.ts).
+Contracts live in [`types.ts`](./src/ultramodern-workspace/delivery-unit-schema/types.ts).
 
 ## 1. Shapes
 

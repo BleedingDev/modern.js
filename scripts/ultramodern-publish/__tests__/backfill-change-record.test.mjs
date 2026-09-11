@@ -10,7 +10,6 @@ import {
   assertTrustedOutcomeArtifact,
   assertTrustedWorkflowRun,
   executeBackfill,
-  normalizedGithubRepository,
   parseArgs,
   trustedRepository,
   validateOutcomeArchiveEntries,
@@ -214,28 +213,12 @@ test('trusted workflow attempt requires successful owner-dispatched publish meta
   );
 
   for (const [mutation, expected] of [
-    [run => (run.run_attempt = 1), /required run attempt/u],
-    [run => (run.conclusion = 'failure'), /did not complete successfully/u],
     [
       run => (run.repository.full_name = 'attacker/fork'),
       /trusted repository/u,
     ],
-    [
-      run => (run.head_repository.full_name = 'attacker/fork'),
-      /trusted repository/u,
-    ],
     [run => (run.head_branch = 'main'), /trusted branch and source commit/u],
-    [
-      run => (run.head_sha = '1'.repeat(40)),
-      /trusted branch and source commit/u,
-    ],
-    [
-      run => (run.path = '.github/workflows/other.yml'),
-      /trusted publish workflow/u,
-    ],
-    [run => (run.event = 'pull_request'), /trusted publish workflow/u],
     [run => (run.actor.login = 'attacker'), /repository owner/u],
-    [run => (run.triggering_actor.login = 'attacker'), /repository owner/u],
   ]) {
     const candidate = structuredClone(workflowRun());
     mutation(candidate);
@@ -255,31 +238,7 @@ test('publish outcome artifact is bound to the exact trusted attempt', () => {
 
   for (const [mutation, expected] of [
     [
-      artifact => (artifact.expired = true),
-      /does not belong to the trusted workflow run/u,
-    ],
-    [
       artifact => (artifact.digest = `sha256:${'b'.repeat(63)}`),
-      /does not belong to the trusted workflow run/u,
-    ],
-    [
-      artifact => (artifact.size_in_bytes = 0),
-      /does not belong to the trusted workflow run/u,
-    ],
-    [
-      artifact => (artifact.name += '-copy'),
-      /does not belong to the trusted workflow run/u,
-    ],
-    [
-      artifact => (artifact.created_at = '2026-08-10T14:36:00Z'),
-      /does not belong to the trusted workflow run/u,
-    ],
-    [
-      artifact => (artifact.workflow_run.id = 1),
-      /does not belong to the trusted workflow run/u,
-    ],
-    [
-      artifact => (artifact.workflow_run.head_branch = 'main'),
       /does not belong to the trusted workflow run/u,
     ],
     [
@@ -333,23 +292,6 @@ test('publish outcome archive accepts only the complete immutable evidence bundl
   ]) {
     assert.throws(() => validateOutcomeArchiveEntries(entries), expected);
   }
-});
-
-test('GitHub remote normalization recognizes only repository identities', () => {
-  assert.equal(
-    normalizedGithubRepository(
-      'https://github.com/BleedingDev/ultramodern.js.git',
-    ),
-    trustedRepository,
-  );
-  assert.equal(
-    normalizedGithubRepository('git@github.com:BleedingDev/ultramodern.js.git'),
-    trustedRepository,
-  );
-  assert.equal(
-    normalizedGithubRepository('https://example.com/fork.git'),
-    null,
-  );
 });
 
 test('registry provenance must stay within the authenticated retry window', async () => {

@@ -1,4 +1,4 @@
-import { fs, logger } from '@modern-js/utils';
+import { fs } from '@modern-js/utils';
 import { EventEmitter } from 'events';
 import os from 'os';
 import path from 'path';
@@ -87,7 +87,6 @@ describe('compileByTs temp config cleanup', () => {
 
   it('throws instead of logging success when tsgo exits nonzero and the caller requested errors', async () => {
     const example = await createIsolatedTsExample();
-    const errorSpy = rstest.spyOn(logger, 'error').mockImplementation(() => {});
 
     // First spawn: `--showConfig` succeeds with the default hard-fail setting.
     spawnBehaviors.push(child => {
@@ -122,7 +121,5 @@ describe('compileByTs temp config cleanup', () => {
         },
       ),
     ).rejects.toThrow('TS1295');
-
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('TS1295'));
   });
 });

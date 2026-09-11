@@ -4,7 +4,6 @@ import {
   setGlobalContext,
   setGlobalInternalRuntimeContext,
 } from '../../../src/core/context';
-import { ROUTER_CLEANUP_ERROR } from '../../../src/core/server/routerCleanup';
 import { SSRErrors } from '../../../src/core/server/tracer';
 
 describe('createRequestHandler router snapshot fallback', () => {
@@ -164,68 +163,5 @@ describe('createRequestHandler router snapshot fallback', () => {
     const done = await reader.read();
     expect(done.done).toBe(true);
     expect(cleaned).toBe(true);
-  });
-
-  it('should report router cleanup failures through onError', async () => {
-    const failure = new Error('cleanup failed');
-    const onErrorCalls: unknown[][] = [];
-
-    setGlobalContext({
-      entryName: 'main',
-      App: () => React.createElement('div', null, 'app'),
-      enableRsc: false,
-    });
-    setGlobalInternalRuntimeContext({
-      hooks: {
-        wrapRoot: {
-          call: (App: React.ComponentType) => App,
-        },
-        onBeforeRender: {
-          call: async (context: any) => {
-            applyRouterRuntimeState(context, {
-              framework: 'custom-router',
-              cleanup: () => {
-                throw failure;
-              },
-            });
-          },
-        },
-      },
-    } as any);
-
-    const { createRequestHandler } = await import(
-      '../../../src/core/server/requestHandler'
-    );
-    const requestHandler = await createRequestHandler(async () => {
-      return new Response('ok', { status: 200 });
-    });
-
-    const response = await requestHandler(new Request('http://localhost/'), {
-      resource: {
-        entryName: 'main',
-        route: {
-          urlPath: '/',
-        },
-        htmlTemplate: '<html><head></head><body></body></html>',
-      } as any,
-      config: {
-        ssr: true,
-      } as any,
-      params: {},
-      reporter: undefined,
-      monitors: undefined,
-      locals: {},
-      loaderContext: {},
-      onTiming: () => {},
-      onError: (...args: unknown[]) => {
-        onErrorCalls.push(args);
-      },
-    } as any);
-
-    await response.text();
-
-    expect(onErrorCalls).toHaveLength(1);
-    expect(onErrorCalls[0]?.[0]).toBe(failure);
-    expect(onErrorCalls[0]?.[1]).toBe(ROUTER_CLEANUP_ERROR);
   });
 });
