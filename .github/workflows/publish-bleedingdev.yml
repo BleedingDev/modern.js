@@ -208,12 +208,14 @@ jobs:
       - name: Qualify the release publication tooling
         run: |
           mise exec -- pnpm lint
-          # test:scripts covers the scripts the two OIDC jobs load: its globs
-          # cover the `node scripts/...` entrypoints those jobs run *and* the
-          # shared helpers those entrypoints statically import, because an
+          # test:publish-tooling covers the scripts the two OIDC jobs load: its
+          # globs cover the `node scripts/...` entrypoints those jobs run *and*
+          # the shared helpers those entrypoints statically import, because an
           # untested helper in that closure is unqualified code running with
-          # id-token: write. (It superseded the narrower test:publish-tooling,
-          # which was a strict subset of these globs.)
+          # id-token: write. It runs BEFORE any package is built, so it must
+          # stay the pre-build subset: scripts/__tests__ (public declarations,
+          # tsgo invocation) needs built @modern-js/utils output and belongs to
+          # test:scripts:after-build below.
           #
           # It is not a claim about every line those jobs run: the publish job
           # also executes an inline `node <<'NODE'` heredoc that lives in this
@@ -222,7 +224,7 @@ jobs:
           # test-enforced.
           #
           # Built-package image staging runs in the disjoint after-build suite.
-          mise exec -- pnpm run test:scripts
+          mise exec -- pnpm run test:publish-tooling
 
       # Every step below through "Upload the source qualification receipt" is
       # skipped in the recovery lane: that dispatch publishes the recovered
