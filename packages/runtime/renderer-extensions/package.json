@@ -45,7 +45,6 @@
     "@modern-js/runtime-extensions": "workspace:*"
   },
   "devDependencies": {
-    "@modern-js/runtime": "workspace:*",
     "@modern-js/render": "workspace:*",
     "@modern-js/rslib": "workspace:*",
     "@modern-js/tsconfig": "workspace:*",

@@ -45,6 +45,9 @@ const setupPrepare = ({
     addWatchFiles: () => {},
     onFileChanged: () => {},
     onBeforeRestart: () => {},
+    _internalRuntimePlugins: () => {},
+    _internalServerPlugins: () => {},
+    modifyResolvedConfig: () => {},
   };
 
   const plugin = appTools();

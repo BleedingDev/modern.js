@@ -1,6 +1,7 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off unnecessaryArrowBlock:off
-import type { OnError } from '@modern-js/app-tools';
+
 import { time } from '@modern-js/runtime-utils/time';
+import type { OnError } from '@modern-js/types';
 import type {
   ClientManifest as RscClientManifest,
   ServerManifest as RscServerManifest,

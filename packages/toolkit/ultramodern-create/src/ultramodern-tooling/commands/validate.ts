@@ -2,15 +2,35 @@ import path from 'node:path';
 import { readWorkspaceReleaseCohort } from '../../ultramodern-release-cohort';
 import { createUltramodernConfig } from '../../ultramodern-workspace/contracts';
 import { createShellHost } from '../../ultramodern-workspace/descriptors';
+import {
+  checkPatchParity,
+  formatPatchParityReport,
+} from '../../ultramodern-workspace/patch-parity';
 import { createPackagedWorkspaceValidationScript } from '../../ultramodern-workspace/workspace-scripts';
 import {
   readJsonObject,
   readUltramodernWorkspaceInputs,
   workspaceAppsFromToolingConfig,
 } from '../config';
-import { type CommandContext, runRenderedModule } from './context';
+import {
+  type CommandContext,
+  createPackageRoot,
+  runRenderedModule,
+} from './context';
 
 export function runValidate(context: CommandContext) {
+  // A workspace that still carries a previous cohort's patch keeps applying it,
+  // and the mismatch only shows up much later as an opaque `require.resolve`
+  // failure inside `modern build`. Name the file here instead.
+  const patchProblems = checkPatchParity({
+    workspaceRoot: context.workspaceRoot,
+    createPackageRoot,
+  });
+  if (patchProblems.length > 0) {
+    process.stderr.write(`${formatPatchParityReport(patchProblems)}\n`);
+    return 1;
+  }
+
   const workspace = readUltramodernWorkspaceInputs(context.workspaceRoot, {
     overlay: readJsonObject(
       path.join(

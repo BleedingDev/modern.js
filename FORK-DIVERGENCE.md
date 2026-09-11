@@ -33,6 +33,56 @@ every PR.
 
 ---
 
+### 2026-09-11 adoption defects found in a consumer
+
+Four defects an adopting workspace hit on 3.9.0-ultramodern.8. Each is a fork
+patch: the behaviour involved does not exist upstream, so there is no upstream
+PR to send, and what remains in each upstream-owned file is the smallest seam
+the fork-owned code hangs from.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-i18n/src/shared/urlStrategy.ts` | bleedingdev | Recognise a URL strategy that lost its methods crossing the JSON boundary into the generated runtime registration. Without this every call site treated the resulting empty object as a working strategy and threw during SSR. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/runtime/utils.ts` | bleedingdev | Fall back to the built-in language-prefix behaviour instead of calling methods a serialized strategy no longer has. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/server/redirectPolicy.ts` | bleedingdev | Same fallback on the server redirect path. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/core.tsx` | bleedingdev | Treat an unusable configured `urlStrategy` as absent at plugin setup, so one check covers the whole runtime instead of each consumer of the value. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/cli/index.ts` | bleedingdev | Never emit a strategy the runtime cannot use, and say which serializable configuration to use instead. Upstream has no mapped-locale-URL feature, so this diagnosis has no upstream home. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/server/mappedUrlStrategy.ts` | bleedingdev | Derive the URL policy from `localeDetection.localisedUrls`, which is plain data and does survive the JSON boundary. Server-side only: the fork's URL engine must stay out of the native client runtime bundle, which a boundary test pins. | `extension-point` |
+| `packages/runtime/plugin-i18n/tests/urlStrategySerialization.test.ts` | bleedingdev | Pin that a strategy stripped of its methods falls back on every call site rather than throwing, and that the serializable map still produces a working policy. | `extension-point` |
+| `packages/toolkit/types/common/index.d.ts` | bleedingdev | Give `OnError` and `OnTiming` a home the runtime already depends on. Their previous home forced every `@modern-js/runtime` consumer to install `@modern-js/app-tools` purely for `tsc`, which an isolated (pnpm) layout does not do. | `extension-point` |
+| `packages/server/core/src/types/requestHandler.ts` | bleedingdev | Re-export those two types from their new home so nothing else moves. | `inline-patch` |
+| `packages/runtime/plugin-runtime/package.json` | bleedingdev | Declare `@modern-js/server-core`, whose request types the runtime's own declarations reference. It was previously reached through the undeclared solution package. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/types.ts` | bleedingdev | Take the diagnostics callback types from `@modern-js/types` instead of the solution package. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/tracer.ts` | bleedingdev | Same import move. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/routerCleanup.ts` | bleedingdev | Same import move. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/requestResponse.ts` | bleedingdev | Same import move. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/stream/shared.tsx` | bleedingdev | Same import move. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/shared.ts` | bleedingdev | Take the server config type from `@modern-js/server-core` instead of the solution package. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/utils.ts` | bleedingdev | Same import move. | `inline-patch` |
+| `packages/runtime/plugin-runtime/src/core/server/requestHandler.tsx` | bleedingdev | Same import move for the request handler types. | `inline-patch` |
+| `packages/runtime/plugin-runtime/tests/publicTypeDependencies.test.ts` | bleedingdev | Pin that the runtime's public types never reach into the solution package again, and that every package they do reference is declared. | `extension-point` |
+
+### 2026-09-11 consumer default restoration
+
+Four consumer-visible regressions from the native-composition split are fixed
+here. Each row is a genuine fork patch: the behaviour being restored does not
+exist upstream, so there is no upstream PR to send, and the remaining change in
+the upstream-owned file is the single seam the fork-owned code hangs from.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/solutions/app-tools/src/index.ts` | bleedingdev | Apply the fork's default renderer and server policy for a plain `appTools()` app, which lost head rendering, HTML template assembly, asset ordering, localised loaders, BFF error responses, telemetry, module-federation CSS and asset cache headers and static serving when they moved into opt-in packages. The policy itself lives in fork-owned `@modern-js/app-tools-extensions/policy-defaults`; only the call and the options parameter remain here, because the plugin factory is the only place a default can be registered before the native plugins run. | `extension-point` + `inline-patch` |
+| `packages/solutions/app-tools/package.json` | bleedingdev | Publish `@modern-js/app-tools/server-plugin`, the specifier the default server policy is registered under. Server plugin descriptors are resolved from the application directory, and `@modern-js/app-tools` is the only fork package every application declares, so the re-export must live on this manifest. | `extension-point` + `inline-patch` |
+| `packages/solutions/app-tools/tests/onPrepareCleanup.test.ts` | bleedingdev | Stub the two plugin hooks the restored defaults register on, so the existing dist-cleanup harness keeps driving `appTools()` with a hand-built API. | `inline-patch` |
+| `packages/cli/builder/src/shared/parseCommonConfig.ts` | bleedingdev | Restore the `withTsgoDefaults` call that blanks the removed `baseUrl` option out of the type checker's config. Without it every project whose `tsconfig.json` still sets `baseUrl` fails with TS5102 under TypeScript 7. Upstream is not on TypeScript 7, so the shim has no upstream home; the shim itself is fork-owned in `src/shared/tsgo.ts`. | `extension-point` + `inline-patch` |
+| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Declare `@modern-js/i18n-runtime-extensions`, which supplies the localised-URL pathname helpers the server plugin now derives its default URL strategy from instead of throwing. | `inline-patch` |
+| `packages/runtime/plugin-i18n/rstest.config.mts` | bleedingdev | Register the tests that pin the derived default URL strategy and the fallback for a strategy stripped of its methods. The project lists its test files explicitly, so a new file cannot be picked up any other way. | `inline-patch` |
+| `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | The TypeScript 7 type-checker shim itself: it points the checker at the project's own TypeScript 7 (or the preview lane), writes the derived checker tsconfig, and blanks `baseUrl` and a node10 `moduleResolution` out of the checker's config. Upstream has no TypeScript 7 lane, so this file has no upstream counterpart. Restored after it was deleted in `b6794e933d`. | `extension-point` |
+| `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pins the `baseUrl` neutralisation, the user-option chain and the tsgo opt-out, so the shim cannot be dropped again without a failing test. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/server/defaultUrlStrategy.ts` | bleedingdev | Derives the localised-URL policy from `localeDetection.localisedUrls`, replacing a hard throw that stopped existing consumers' servers from starting. Upstream has no localised-URL feature, so the derivation is fork-only and kept out of the upstream-shaped `server/index.ts`. | `extension-point` |
+| `packages/runtime/plugin-i18n/tests/defaultUrlStrategy.test.ts` | bleedingdev | Pins that `localisedUrls` alone boots the server and redirects to the mapped URL, and that an explicit `resolveUrlStrategy` still wins. | `extension-point` |
+| `packages/solutions/app-tools/src/server-plugin.ts` | bleedingdev | Re-export of the fork's composed server plugin under a specifier every application can resolve from its own directory. It is a single re-export line; the policy stays in fork-owned `@modern-js/server-runtime-extensions`. | `extension-point` |
+
 ### 2026-09-10 native Effect clients
 
 | Audited-base-owned path | Owner | Reason | Disposition |

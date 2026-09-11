@@ -64,7 +64,12 @@ it.each([
     result.builderPlugins?.map(plugin =>
       plugin && 'name' in plugin ? plugin.name : undefined,
     ),
-  ).toEqual(['consumer', ...(guarded ? ['builder:rsc-disabled-runtime'] : [])]);
+  ).toEqual([
+    'consumer',
+    // Makes the composed runtime packages resolvable from the app itself.
+    'ultramodern:runtime-package-resolution',
+    ...(guarded ? ['builder:rsc-disabled-runtime'] : []),
+  ]);
   expect(result.builderPlugins?.[0]).toBe(consumer);
   expect(result.html).toEqual(input.html);
   expect(input.builderPlugins).toEqual([consumer]);

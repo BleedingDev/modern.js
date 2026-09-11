@@ -191,7 +191,9 @@ describe('native UltraModern composition', () => {
       createPlugin: ultramodernAppTools,
       rendererCount: 1,
     },
-    { name: 'native appTools', createPlugin: appTools, rendererCount: 0 },
+    // The fork's renderer policy is the default for a plain `appTools()` app,
+    // and composing `ultramodernAppTools()` must not register it twice.
+    { name: 'native appTools', createPlugin: appTools, rendererCount: 1 },
   ])('$name preserves consumer configuration and registers its renderer per entrypoint', async ({
     createPlugin,
     rendererCount,

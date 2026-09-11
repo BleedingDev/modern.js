@@ -1,7 +1,7 @@
 import { isBrowser } from '@modern-js/runtime';
 import { getGlobalBasename } from '@modern-js/runtime/context';
 import { splitUrlTarget } from '@modern-js/runtime-utils/url';
-import type { I18nUrlStrategy } from '../shared/urlStrategy';
+import { asI18nUrlStrategy, type I18nUrlStrategy } from '../shared/urlStrategy';
 
 export { splitUrlTarget } from '@modern-js/runtime-utils/url';
 
@@ -60,8 +60,9 @@ export const buildLocalizedUrl = (
   urlStrategy?: I18nUrlStrategy,
 ): string => {
   const { pathname, search, hash } = splitUrlTarget(target);
-  if (urlStrategy) {
-    return `${urlStrategy.localizePathname(pathname, language, languages)}${search}${hash}`;
+  const strategy = asI18nUrlStrategy(urlStrategy);
+  if (strategy) {
+    return `${strategy.localizePathname(pathname, language, languages)}${search}${hash}`;
   }
   const segments = pathname.split('/').filter(Boolean);
   if (
@@ -121,7 +122,9 @@ export const shouldIgnoreRedirect = (
   ignoreRedirectRoutes?: string[] | ((pathname: string) => boolean),
   urlStrategy?: I18nUrlStrategy,
 ): boolean => {
-  if (urlStrategy?.shouldSkipRedirect?.(pathname, languages)) {
+  if (
+    asI18nUrlStrategy(urlStrategy)?.shouldSkipRedirect?.(pathname, languages)
+  ) {
     return true;
   }
   if (!ignoreRedirectRoutes) {

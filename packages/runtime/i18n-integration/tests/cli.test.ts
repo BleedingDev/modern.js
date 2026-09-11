@@ -216,8 +216,10 @@ describe('combined i18n CLI route policy', () => {
       .getHooks()
       ._internalServerPlugins.call({ plugins: [] });
     expect(server.plugins).toHaveLength(1);
+    // The native descriptor is left alone; it resolves from the app and
+    // derives its own URL policy from `localisedUrls`.
     expect(server.plugins[0]).toMatchObject({
-      name: '@modern-js/i18n-integration/server',
+      name: '@modern-js/plugin-i18n/server',
     });
   });
 

@@ -235,6 +235,49 @@ function removeWorkspaceNodeModules(workspaceNodeModules: string) {
   }
 }
 
+/** A workspace file whose only job is to carry the build-script approvals. */
+function renderInstallWorkspaceFile(allowedBuilds: readonly string[]): string {
+  const entries = allowedBuilds.map(name => `  '${name}': true`).join('\n');
+  return `packages: []\n${
+    entries.length > 0 ? `\nallowBuilds:\n${entries}\n` : ''
+  }`;
+}
+
+/**
+ * The dependency build scripts the generated workspace approves, read from its
+ * own `pnpm-workspace.yaml` so the two stay in lockstep. pnpm fails an install
+ * that would silently skip an unapproved build script, and the temporary
+ * install directory cannot see the workspace file.
+ */
+function readAllowedBuilds(workspaceDir: string): string[] {
+  const workspaceFile = path.join(workspaceDir, 'pnpm-workspace.yaml');
+  if (!fs.existsSync(workspaceFile)) {
+    return [];
+  }
+  const allowed: string[] = [];
+  let inside = false;
+  for (const rawLine of fs.readFileSync(workspaceFile, 'utf8').split('\n')) {
+    const line = rawLine.replace(/\r$/u, '');
+    if (/^allowBuilds:\s*$/u.test(line)) {
+      inside = true;
+      continue;
+    }
+    if (inside && /^\S/u.test(line)) {
+      break;
+    }
+    if (!inside) {
+      continue;
+    }
+    const entry = /^\s+(?:'([^']+)'|"([^"]+)"|([^:\s]+))\s*:\s*true\s*$/u.exec(
+      line,
+    );
+    if (entry) {
+      allowed.push(entry[1] ?? entry[2] ?? entry[3]);
+    }
+  }
+  return allowed;
+}
+
 function installDependencies(
   workspaceDir: string,
   dependencies: Map<string, DependencyRecord>,
@@ -273,11 +316,40 @@ function installDependencies(
         2,
       )}\n`,
     );
-    execFileSync('pnpm', ['install', '--ignore-workspace'], {
-      cwd: installRoot,
-      env: { ...process.env, CI: 'true' },
-      stdio: 'pipe',
-    });
+    // The generated workspace approves its dependencies' build scripts in its
+    // own `pnpm-workspace.yaml`, and pnpm reads that setting only from a
+    // workspace file. Give this install directory its own, carrying the same
+    // approvals; without them pnpm refuses the install with
+    // ERR_PNPM_IGNORED_BUILDS.
+    fs.writeFileSync(
+      path.join(installRoot, 'pnpm-workspace.yaml'),
+      renderInstallWorkspaceFile(readAllowedBuilds(workspaceDir)),
+    );
+    try {
+      // No `--ignore-workspace`: the install directory is its own workspace
+      // root (outside the repository), which is how pnpm reads `allowBuilds`.
+      execFileSync('pnpm', ['install'], {
+        cwd: installRoot,
+        env: { ...process.env, CI: 'true' },
+        stdio: 'pipe',
+      });
+    } catch (error) {
+      // `stdio: 'pipe'` keeps pnpm's own `ERR_PNPM_*` diagnosis out of the
+      // test log, which leaves an install failure undiagnosable in CI.
+      const { stdout, stderr } = error as {
+        stdout?: Buffer | string;
+        stderr?: Buffer | string;
+      };
+      throw new Error(
+        [
+          `pnpm install failed in ${installRoot}`,
+          `dependencies: ${JSON.stringify(externalDependencies, null, 2)}`,
+          `stdout:\n${String(stdout ?? '')}`,
+          `stderr:\n${String(stderr ?? '')}`,
+        ].join('\n'),
+        { cause: error },
+      );
+    }
     const workspaceNodeModules = linkInstalledNodeModules(
       workspaceDir,
       path.join(installRoot, 'node_modules'),

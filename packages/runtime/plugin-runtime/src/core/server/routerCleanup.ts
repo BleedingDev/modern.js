@@ -10,8 +10,9 @@
  * failures are reported through the request's `onError` instead of being
  * swallowed.
  */
-import type { OnError } from '@modern-js/app-tools';
+
 import { getRouterRuntimeState } from '@modern-js/runtime-extensions/router-state';
+import type { OnError } from '@modern-js/types';
 import type { TInternalRuntimeContext } from '../context';
 
 export const ROUTER_CLEANUP_ERROR =

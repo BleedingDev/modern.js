@@ -39,7 +39,15 @@ export function createRendererHeadPlugin(
       api.transformRuntimeContext(projectRuntimeContext);
       api.wrapRoot(Root => {
         const HeadRoot = (props: React.ComponentProps<typeof Root>) =>
-          head.wrapClientRoot(React.createElement(Root, props));
+          // A root is only defined once the plugin that owns it (the router,
+          // for a file-system routes entry) has run. This plugin must keep
+          // working when it is registered before that one: it then wraps the
+          // children the later plugin hands it instead of a missing root.
+          head.wrapClientRoot(
+            Root
+              ? React.createElement(Root, props)
+              : ((props as { children?: React.ReactNode })?.children ?? null),
+          );
         return HeadRoot;
       });
 
@@ -113,7 +121,21 @@ export function createRendererHeadPlugin(
   };
 }
 
-export const rendererHeadPlugin = (): RuntimePlugin<{}> =>
-  createRendererHeadPlugin();
+/**
+ * The plugins whose root this one wraps. Declaring them keeps the head
+ * provider outside their trees no matter what order the CLI emitted the
+ * runtime descriptors in.
+ */
+export const RENDERER_HEAD_PRE_PLUGINS = [
+  '@modern-js/plugin-router',
+  '@modern-js/plugin-tanstack',
+  '@modern-js/plugin-state',
+  '@modern-js/plugin-i18n',
+];
+
+export const rendererHeadPlugin = (): RuntimePlugin<{}> => ({
+  ...createRendererHeadPlugin(),
+  pre: RENDERER_HEAD_PRE_PLUGINS,
+});
 
 export default rendererHeadPlugin;

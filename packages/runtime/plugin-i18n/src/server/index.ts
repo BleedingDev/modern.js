@@ -4,9 +4,10 @@ const { languageDetector } = honoPkg;
 
 import type { Context, Next, ServerPlugin } from '@modern-js/server-runtime';
 import type { LocaleDetectionOptions } from '../shared/type';
-import type { I18nUrlStrategy } from '../shared/urlStrategy';
+import { asI18nUrlStrategy, type I18nUrlStrategy } from '../shared/urlStrategy';
 import { getLocaleDetectionOptions } from '../shared/utils.js';
 import { collectApiPrefixes, matchesApiPrefix } from './apiPrefix.js';
+import { resolveDefaultUrlStrategy } from './defaultUrlStrategy.js';
 import { convertToHonoLanguageDetectorOptions } from './detectorOptions.js';
 import {
   buildLocalizedUrl,
@@ -70,17 +71,11 @@ export const i18nServerPlugin = (options: I18nPluginOptions): ServerPlugin => ({
           entryLocaleDetection,
           'localisedUrls',
         );
-        const urlStrategy = options.resolveUrlStrategy?.(entryName);
-        if (
-          legacyLocalisedUrls &&
-          typeof legacyLocalisedUrls === 'object' &&
-          Object.keys(legacyLocalisedUrls).length > 0 &&
-          !urlStrategy
-        ) {
-          throw new Error(
-            'Mapped locale URLs require a URL strategy. Use the i18n integration server plugin or supply resolveUrlStrategy.',
-          );
-        }
+        // `localeDetection.localisedUrls` is self-sufficient: when no explicit
+        // strategy is supplied the plugin derives one from the map itself.
+        const urlStrategy =
+          asI18nUrlStrategy(options.resolveUrlStrategy?.(entryName)) ??
+          resolveDefaultUrlStrategy(legacyLocalisedUrls);
         const staticRoutePrefixes = options.staticRoutePrefixes;
         const originUrlPath = route.urlPath;
         const urlPath = originUrlPath.endsWith('/')

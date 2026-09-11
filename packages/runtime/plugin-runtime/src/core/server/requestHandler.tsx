@@ -1,8 +1,5 @@
 // @effect-diagnostics asyncFunction:off strictBooleanExpressions:off
-import type {
-  RequestHandler,
-  RequestHandlerOptions,
-} from '@modern-js/app-tools';
+
 import type { DeferredData } from '@modern-js/runtime-utils/browser';
 import { storage } from '@modern-js/runtime-utils/node';
 import {
@@ -11,6 +8,10 @@ import {
   parseHeaders,
   parseQuery,
 } from '@modern-js/runtime-utils/universal/request';
+import type {
+  RequestHandler,
+  RequestHandlerOptions,
+} from '@modern-js/server-core';
 import React, { Fragment } from 'react';
 import {
   getGlobalInternalRuntimeContext,
@@ -69,7 +70,7 @@ async function handleRSCRequest(
   });
 }
 
-export type { RequestHandlerConfig as HandleRequestConfig } from '@modern-js/app-tools';
+export type { RequestHandlerConfig as HandleRequestConfig } from '@modern-js/server-core';
 
 export type HandleRequestOptions = Exclude<
   RequestHandlerOptions,
