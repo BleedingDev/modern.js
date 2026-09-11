@@ -1,4 +1,4 @@
-import type { I18nUrlStrategy } from '../shared/urlStrategy';
+import { asI18nUrlStrategy, type I18nUrlStrategy } from '../shared/urlStrategy';
 
 interface LocaleRedirectRequest {
   url: string;
@@ -23,7 +23,12 @@ export const shouldIgnoreRedirect = (
   languages: string[] = [],
 ): boolean => {
   const remainingPath = stripUrlPathPrefix(pathname, urlPath);
-  if (urlStrategy?.shouldSkipRedirect?.(remainingPath, languages)) {
+  if (
+    asI18nUrlStrategy(urlStrategy)?.shouldSkipRedirect?.(
+      remainingPath,
+      languages,
+    )
+  ) {
     return true;
   }
   if (!ignoreRedirectRoutes) {
@@ -110,8 +115,9 @@ export const buildLocalizedUrl = (
   } else {
     segments.unshift(language);
   }
-  const pathname = urlStrategy
-    ? urlStrategy.localizePathname(remainingPath, language, languages)
+  const strategy = asI18nUrlStrategy(urlStrategy);
+  const pathname = strategy
+    ? strategy.localizePathname(remainingPath, language, languages)
     : `/${segments.join('/')}`;
   return `${basePath === '/' ? '' : basePath}${pathname}${url.search}${url.hash}`;
 };

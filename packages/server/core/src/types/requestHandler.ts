@@ -1,4 +1,11 @@
-import type { Logger, Metrics, Reporter, ServerRoute } from '@modern-js/types';
+import type {
+  Logger,
+  Metrics,
+  OnError,
+  OnTiming,
+  Reporter,
+  ServerRoute,
+} from '@modern-js/types';
 import type {
   Monitors,
   ClientManifest as RscClientManifest,
@@ -32,9 +39,9 @@ export type RequestHandlerConfig = {
 
 export type LoaderContext = Map<string, any>;
 
-export type OnError = (err: unknown, key?: string) => void;
-
-export type OnTiming = (name: string, dur: number) => void;
+// Canonical home is `@modern-js/types`, so the runtime can type its SSR
+// context without depending on a server or solution package.
+export type { OnError, OnTiming };
 
 export type RequestHandlerOptions = {
   resource: Resource;

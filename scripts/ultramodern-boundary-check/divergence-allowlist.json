@@ -4,9 +4,9 @@
   "upstreamRef": "2f4d9c4559e26209a0d77f02c6757f29fe3699a2",
   "pathspec": ["packages"],
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
-  "totalFiles": 794,
-  "totalHunks": 3009,
-  "totalChangedLines": 48242,
+  "totalFiles": 799,
+  "totalHunks": 3022,
+  "totalChangedLines": 48786,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -75,13 +75,18 @@
     },
     {
       "file": "packages/cli/builder/src/shared/parseCommonConfig.ts",
-      "hunks": 8,
-      "changedLines": 25
+      "hunks": 10,
+      "changedLines": 31
     },
     {
       "file": "packages/cli/builder/src/shared/rsc/rscClientBrowserFallback.ts",
       "hunks": 2,
       "changedLines": 2
+    },
+    {
+      "file": "packages/cli/builder/src/shared/tsgo.ts",
+      "hunks": 1,
+      "changedLines": 276
     },
     {
       "file": "packages/cli/builder/src/types.ts",
@@ -137,6 +142,11 @@
       "file": "packages/cli/builder/tests/rscConfig.test.ts",
       "hunks": 2,
       "changedLines": 58
+    },
+    {
+      "file": "packages/cli/builder/tests/tsgo.test.ts",
+      "hunks": 1,
+      "changedLines": 88
     },
     {
       "file": "packages/cli/plugin-bff/CHANGELOG.md",
@@ -1090,8 +1100,8 @@
     },
     {
       "file": "packages/runtime/plugin-i18n/package.json",
-      "hunks": 14,
-      "changedLines": 72
+      "hunks": 15,
+      "changedLines": 73
     },
     {
       "file": "packages/runtime/plugin-i18n/README.md",
@@ -1101,7 +1111,7 @@
     {
       "file": "packages/runtime/plugin-i18n/rstest.config.mts",
       "hunks": 1,
-      "changedLines": 46
+      "changedLines": 47
     },
     {
       "file": "packages/runtime/plugin-i18n/src/cli/index.ts",
@@ -1299,6 +1309,11 @@
       "changedLines": 67
     },
     {
+      "file": "packages/runtime/plugin-i18n/src/server/defaultUrlStrategy.ts",
+      "hunks": 1,
+      "changedLines": 38
+    },
+    {
       "file": "packages/runtime/plugin-i18n/src/server/detectorOptions.ts",
       "hunks": 1,
       "changedLines": 96
@@ -1306,7 +1321,7 @@
     {
       "file": "packages/runtime/plugin-i18n/src/server/index.ts",
       "hunks": 15,
-      "changedLines": 299
+      "changedLines": 294
     },
     {
       "file": "packages/runtime/plugin-i18n/src/server/redirectPolicy.ts",
@@ -1332,6 +1347,11 @@
       "file": "packages/runtime/plugin-i18n/tests/backendDefaults.test.ts",
       "hunks": 1,
       "changedLines": 30
+    },
+    {
+      "file": "packages/runtime/plugin-i18n/tests/defaultUrlStrategy.test.ts",
+      "hunks": 1,
+      "changedLines": 107
     },
     {
       "file": "packages/runtime/plugin-i18n/tests/federatedI18nBoundaryResolver.test.tsx",
@@ -3055,8 +3075,8 @@
     },
     {
       "file": "packages/solutions/app-tools/package.json",
-      "hunks": 8,
-      "changedLines": 50
+      "hunks": 10,
+      "changedLines": 59
     },
     {
       "file": "packages/solutions/app-tools/rslib.config.mts",
@@ -3165,8 +3185,8 @@
     },
     {
       "file": "packages/solutions/app-tools/src/index.ts",
-      "hunks": 9,
-      "changedLines": 17
+      "hunks": 11,
+      "changedLines": 27
     },
     {
       "file": "packages/solutions/app-tools/src/plugins/analyze/getBundleEntry.ts",
@@ -3252,6 +3272,11 @@
       "file": "packages/solutions/app-tools/src/run/index.ts",
       "hunks": 7,
       "changedLines": 22
+    },
+    {
+      "file": "packages/solutions/app-tools/src/server-plugin.ts",
+      "hunks": 1,
+      "changedLines": 10
     },
     {
       "file": "packages/solutions/app-tools/src/types/config/deploy.ts",
@@ -3385,8 +3410,8 @@
     },
     {
       "file": "packages/solutions/app-tools/tests/onPrepareCleanup.test.ts",
-      "hunks": 1,
-      "changedLines": 33
+      "hunks": 2,
+      "changedLines": 36
     },
     {
       "file": "packages/solutions/app-tools/tests/plugins/initialize.test.ts",

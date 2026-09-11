@@ -11,3 +11,12 @@ export type ServerPlugin = {
 };
 
 export type SSRMode = 'string' | 'stream' | false;
+
+/**
+ * Request-scoped diagnostics callbacks. They are declared here, not in a
+ * server or solution package, so the runtime can type its own SSR context
+ * without depending on either.
+ */
+export type OnError = (err: unknown, key?: string) => void;
+
+export type OnTiming = (name: string, dur: number) => void;

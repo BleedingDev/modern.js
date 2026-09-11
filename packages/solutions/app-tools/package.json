@@ -51,6 +51,12 @@
       },
       "default": "./dist/cjs/run/index.js"
     },
+    "./server-plugin": {
+      "types": "./dist/types/server-plugin.d.ts",
+      "modern:source": "./src/server-plugin.ts",
+      "import": "./dist/esm-node/server-plugin.mjs",
+      "require": "./dist/cjs/server-plugin.js"
+    },
     "./types": {
       "types": "./lib/types.d.ts",
       "default": "./lib/types.d.ts"
@@ -70,6 +76,9 @@
       ],
       "cli/run": [
         "./dist/types/run/index.d.ts"
+      ],
+      "server-plugin": [
+        "./dist/types/server-plugin.d.ts"
       ],
       "types": [
         "./lib/types.d.ts"

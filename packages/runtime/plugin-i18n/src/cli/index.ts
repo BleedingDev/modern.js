@@ -3,7 +3,9 @@ import path from 'node:path';
 import type { AppTools, CliPlugin } from '@modern-js/app-tools';
 import { getPublicDirRoutePrefixes } from '@modern-js/server-core';
 import type { Entrypoint } from '@modern-js/types';
+import { logger } from '@modern-js/utils';
 import type { BackendOptions, LocaleDetectionOptions } from '../shared/type';
+import { isUnusableI18nUrlStrategy } from '../shared/urlStrategy';
 import { getBackendOptions, getLocaleDetectionOptions } from '../shared/utils';
 import { applyDetectedBackendPaths, detectLocalesDirectory } from './locales';
 import '../runtime/types';
@@ -112,12 +114,28 @@ export const i18nPlugin = (
       }
 
       // Build final config with base config and transformed extended config
-      const config = {
+      const config: Record<string, unknown> = {
         entryName: entrypoint.entryName,
         localeDetection: localeDetectionOptions,
         backend: backendOptions,
         ...extendedConfig,
       };
+
+      // This config is written into the generated runtime registration as
+      // JSON, so an object carrying functions arrives at the runtime with none
+      // of them. Drop it rather than shipping a broken `{}` that every call
+      // site would then have to survive, and say what to configure instead.
+      if (isUnusableI18nUrlStrategy(config.urlStrategy)) {
+        delete config.urlStrategy;
+        logger.warn(
+          '[i18n] `urlStrategy` cannot be passed through `modern.config.ts`: ' +
+            'the generated runtime registration carries plugin options as ' +
+            'JSON, which drops its methods. Configure ' +
+            '`localeDetection.localisedUrls` instead — the runtime and the ' +
+            'server both derive the URL policy from it — or register a ' +
+            'runtime plugin that supplies the strategy directly.',
+        );
+      }
       const { reactI18next } = extendedConfig as { reactI18next?: boolean };
       const runtimePluginPath =
         customPlugin?.runtime?.path ||

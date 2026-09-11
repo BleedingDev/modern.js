@@ -1,4 +1,3 @@
-import type { ServerUserConfig } from '@modern-js/app-tools';
 import type {
   SSRAssetGroup,
   SSRAssetTransformInfo,
@@ -9,6 +8,7 @@ import type {
   SSRTemplateChunk,
   StreamSSRExtender,
 } from '@modern-js/plugin/runtime';
+import type { ServerUserConfig } from '@modern-js/server-core';
 import type { HandleRequestOptions } from './requestHandler';
 import { attributesToString, hasStylesheetLink, safeReplace } from './utils';
 

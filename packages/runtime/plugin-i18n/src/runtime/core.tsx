@@ -4,7 +4,7 @@ import type {
   BaseBackendOptions,
   BaseLocaleDetectionOptions,
 } from '../shared/type';
-import type { I18nUrlStrategy } from '../shared/urlStrategy';
+import { asI18nUrlStrategy, type I18nUrlStrategy } from '../shared/urlStrategy';
 import type { I18nInitOptions, I18nInstance } from './i18n';
 import {
   type RuntimeContextWithI18n,
@@ -86,6 +86,11 @@ export const createI18nPlugin =
         ignoreRedirectRoutes,
       } = localeDetection || {};
       const { enabled: backendEnabled = false } = backend || {};
+      // A strategy configured in `modern.config.ts` reaches here through JSON,
+      // which drops its methods. Anything unusable is treated as absent so the
+      // built-in language-prefix behaviour applies instead of throwing; a
+      // mapped-URL policy is supplied by a runtime plugin that composes one.
+      const resolvedUrlStrategy = asI18nUrlStrategy(urlStrategy);
       let latestI18nInstance: I18nInstance | undefined;
       let I18nextProvider: React.ComponentType<any> | null;
 
@@ -120,7 +125,7 @@ export const createI18nPlugin =
           languages,
           fallbackLanguage,
           ignoreRedirectRoutes,
-          urlStrategy,
+          urlStrategy: resolvedUrlStrategy,
           NavigationProvider,
           LanguageSynchronization,
           getLatestI18nInstance: () => latestI18nInstance,

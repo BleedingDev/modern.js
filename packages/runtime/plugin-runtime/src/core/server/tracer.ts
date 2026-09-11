@@ -1,4 +1,4 @@
-import type { OnError, OnTiming } from '@modern-js/app-tools';
+import type { OnError, OnTiming } from '@modern-js/types';
 
 export enum SSRTimings {
   PRERENDER = 'ssr-prerender',

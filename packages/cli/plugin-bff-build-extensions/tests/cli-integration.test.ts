@@ -8,6 +8,7 @@ import { fs } from '@modern-js/utils';
 import { bffPlugin as nativeBffPlugin } from '../../plugin-bff/src/cli';
 import nativeLoader from '../../plugin-bff/src/loader';
 import { bffPlugin } from '../src';
+import { resolveSelfModule } from '../src/self-module';
 
 rstest.mock('@modern-js/plugin-bff', () => ({
   bffPlugin: nativeBffPlugin,
@@ -131,10 +132,10 @@ test('fork hono composition passes the same codegen module through native lambda
     const defaults = configurations.find(
       value => value?.bff?.clientCodegenPlugin,
     )?.bff;
+    // Resolved next to this package rather than through its own public name,
+    // which an isolated (pnpm) layout cannot resolve from here.
     expect(defaults?.clientCodegenPlugin).toBe(
-      require.resolve(
-        '@modern-js/plugin-bff-build-extensions/hono-client-codegen',
-      ),
+      resolveSelfModule('hono-client-codegen'),
     );
     Object.assign(config.bff, defaults, {
       runtimeFramework,

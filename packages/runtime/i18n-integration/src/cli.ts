@@ -28,13 +28,11 @@ export const ultramodernI18nIntegrationPlugin = (): CliPlugin<AppTools> => ({
       }),
     }));
 
-    api._internalServerPlugins(({ plugins }) => ({
-      plugins: plugins.map(plugin =>
-        plugin.name === '@modern-js/plugin-i18n/server'
-          ? { ...plugin, name: '@modern-js/i18n-integration/server' }
-          : plugin,
-      ),
-    }));
+    // The native server plugin derives its URL policy from
+    // `localeDetection.localisedUrls` on its own, so the descriptor is left
+    // alone. Rewriting it to `@modern-js/i18n-integration/server` would make
+    // the server unbootable for an app that only declares
+    // `@modern-js/ultramodern-app-tools`.
 
     api.modifyFileSystemRoutes(async ({ entrypoint, routes }) => {
       // Route generation may precede runtime module generation. Resolve the

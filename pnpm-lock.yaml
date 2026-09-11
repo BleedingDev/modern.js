@@ -1772,6 +1772,9 @@ importers:
 
   packages/runtime/plugin-i18n:
     dependencies:
+      '@modern-js/i18n-runtime-extensions':
+        specifier: workspace:*
+        version: link:../i18n-extensions
       '@modern-js/plugin':
         specifier: workspace:*
         version: link:../../toolkit/plugin
@@ -1909,6 +1912,9 @@ importers:
       '@modern-js/runtime-utils':
         specifier: workspace:*
         version: link:../../toolkit/runtime-utils
+      '@modern-js/server-core':
+        specifier: workspace:*
+        version: link:../../server/core
       '@modern-js/types':
         specifier: workspace:*
         version: link:../../toolkit/types
@@ -2156,9 +2162,6 @@ importers:
       '@modern-js/rslib':
         specifier: workspace:*
         version: link:../../../scripts/rslib
-      '@modern-js/runtime':
-        specifier: workspace:*
-        version: link:../plugin-runtime
       '@modern-js/tsconfig':
         specifier: workspace:*
         version: link:../../tsconfig
@@ -2937,6 +2940,9 @@ importers:
       '@modern-js/prod-server':
         specifier: workspace:*
         version: link:../../server/prod-server
+      '@modern-js/runtime-renderer-extensions':
+        specifier: workspace:*
+        version: link:../../runtime/renderer-extensions
       '@modern-js/server-core':
         specifier: workspace:*
         version: link:../../server/core

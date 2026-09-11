@@ -1,3 +1,7 @@
+import {
+  createPolicyDefaultsPlugin,
+  type PolicyDefaultsOptions,
+} from '@modern-js/app-tools-extensions/policy-defaults';
 import { castArray } from '@modern-js/builder';
 import { getLocaleLanguage } from '@modern-js/i18n-utils/language-detector';
 import { createAsyncHook } from '@modern-js/plugin';
@@ -44,7 +48,9 @@ import { restart } from './utils/restart';
 
 export * from './defineConfig';
 
-export const appTools = (): CliPlugin<AppTools> => ({
+export const appTools = (
+  options: PolicyDefaultsOptions = {},
+): CliPlugin<AppTools> => ({
   name: '@modern-js/app-tools',
   usePlugins: [
     serverRuntimePlugin(),
@@ -53,6 +59,7 @@ export const appTools = (): CliPlugin<AppTools> => ({
     analyzePlugin(),
     serverBuildPlugin(),
     deployPlugin(),
+    createPolicyDefaultsPlugin(options) as unknown as CliPlugin<AppTools>,
   ],
   post: [
     '@modern-js/plugin-initialize',

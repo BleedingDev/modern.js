@@ -227,6 +227,7 @@
     "@modern-js/render": "workspace:*",
     "@modern-js/runtime-extensions": "workspace:*",
     "@modern-js/runtime-utils": "workspace:*",
+    "@modern-js/server-core": "workspace:*",
     "@modern-js/types": "workspace:*",
     "@modern-js/utils": "workspace:*",
     "@swc/core": "1.16.2",

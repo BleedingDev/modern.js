@@ -9,6 +9,7 @@ import {
 } from './client-artifacts';
 import { registerBffCompilation } from './compile';
 import { registerBffGeneratedEntries } from './generated-entries';
+import { resolveSelfModule } from './self-module';
 
 export const bffPlugin = (): CliPlugin<AppTools> => ({
   name: '@modern-js/plugin-bff-build-extensions',
@@ -29,9 +30,7 @@ export const bffPlugin = (): CliPlugin<AppTools> => ({
       bff: {
         requestCreator: BFF_REQUEST_RUNTIME,
         runtimeCreateRequest: BFF_REQUEST_RUNTIME,
-        clientCodegenPlugin: require.resolve(
-          '@modern-js/plugin-bff-build-extensions/hono-client-codegen',
-        ),
+        clientCodegenPlugin: resolveSelfModule('hono-client-codegen'),
       },
     }));
     const runtimeFramework = api.getConfig()?.bff?.runtimeFramework;

@@ -98,6 +98,18 @@
       "import": "./dist/esm-node/native-type-checker.mjs",
       "require": "./dist/cjs/native-type-checker.js"
     },
+    "./runtime-package-resolution": {
+      "types": "./dist/types/runtime-package-resolution.d.ts",
+      "modern:source": "./src/runtime-package-resolution.ts",
+      "import": "./dist/esm-node/runtime-package-resolution.mjs",
+      "require": "./dist/cjs/runtime-package-resolution.js"
+    },
+    "./policy-defaults": {
+      "types": "./dist/types/policy-defaults.d.ts",
+      "modern:source": "./src/policy-defaults.ts",
+      "import": "./dist/esm-node/policy-defaults.mjs",
+      "require": "./dist/cjs/policy-defaults.js"
+    },
     "./build-config/precompress/plugin": {
       "types": "./dist/types/build-config/precompress/plugin.d.ts",
       "modern:source": "./src/build-config/precompress/plugin.ts",
@@ -161,6 +173,7 @@
     "@modern-js/backend-federation-contracts": "workspace:*",
     "@modern-js/builder": "workspace:*",
     "@modern-js/prod-server": "workspace:*",
+    "@modern-js/runtime-renderer-extensions": "workspace:*",
     "@modern-js/server-core": "workspace:*",
     "@modern-js/server-runtime-extensions": "workspace:*",
     "@modern-js/types": "workspace:*",
