@@ -49,16 +49,33 @@ describe('cli modifyFileSystemRoutes', () => {
     expect(runtimePlugin?.config.reactI18next).toBe(false);
   });
 
-  test('upstream-style configs without a map keep routes untouched', () => {
-    const modifyRoutes = rstest.fn();
+  test('upstream-style configs without a map keep routes untouched', async () => {
+    // The hook is registered unconditionally now that route expansion is a
+    // native feature; what matters is that a config with no `localisedUrls`
+    // map gets its routes back byte-for-byte instead of a locale-expanded tree.
+    let handler:
+      | ((args: { entrypoint: unknown; routes: unknown[] }) => Promise<{
+          routes: unknown[];
+        }>)
+      | undefined;
+
     i18nCliPlugin({
       localeDetection: { localePathRedirect: true, languages: ['en', 'cs'] },
     }).setup({
       _internalRuntimePlugins: () => {},
       _internalServerPlugins: () => {},
-      modifyFileSystemRoutes: modifyRoutes,
+      modifyFileSystemRoutes: (fn: any) => {
+        handler = fn;
+      },
     } as any);
-    expect(modifyRoutes).not.toHaveBeenCalled();
+
+    const routes = [{ id: 'about', path: 'about', type: 'nested' }];
+    const result = await handler?.({
+      entrypoint: { entryName: 'main' },
+      routes,
+    });
+
+    expect(result?.routes).toEqual(routes);
   });
 });
 

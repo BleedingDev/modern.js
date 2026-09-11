@@ -10,6 +10,16 @@ export interface BaseLocaleDetectionOptions {
   fallbackLanguage?: string;
   detection?: LanguageDetectorOptions;
   ignoreRedirectRoutes?: string[] | ((pathname: string) => boolean);
+  /**
+   * Canonical-path -> per-language path map, e.g.
+   * `{ '/products': { en: '/products', cs: '/produkty' } }`.
+   *
+   * Plain data on purpose: the generated runtime registration carries plugin
+   * options as JSON, so a map survives the trip where a `urlStrategy` object
+   * would lose its methods. The CLI expands file-system routes from it, and
+   * the server derives its URL strategy from it, with no extra plugin.
+   */
+  localisedUrls?: boolean | Record<string, Record<string, string>>;
 }
 
 export interface LocaleDetectionOptions extends BaseLocaleDetectionOptions {

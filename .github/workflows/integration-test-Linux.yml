@@ -22,6 +22,11 @@ jobs:
     # The type of runner that the job will run on
     runs-on: namespace-profile-testing
 
+    # `namespace-profile-testing` is 8 vCPU / 16 GB. A healthy run is ~15 min;
+    # this ceiling turns a hung fixture into a clean failure instead of letting
+    # the job sit on the GitHub default of 6 hours.
+    timeout-minutes: 60
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - name: Print runner context
