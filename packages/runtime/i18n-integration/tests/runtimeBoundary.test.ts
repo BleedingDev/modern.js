@@ -41,29 +41,19 @@ describe('combined runtime optional integration boundary', () => {
   });
 });
 
-test('native node runtime has no fork engine dependency', async () => {
-  await build({
-    entryPoints: [
-      require.resolve('@modern-js/plugin-i18n/runtime/no-react-i18next'),
-    ],
-    bundle: true,
-    packages: 'external',
-    platform: 'node',
-    format: 'esm',
-    metafile: true,
-    write: false,
-    plugins: [
-      {
-        name: 'reject-native-fork-engine-edge',
-        setup(api) {
-          api.onResolve(
-            { filter: /^@modern-js\/i18n-runtime-extensions(?:\/|$)/ },
-            () => {
-              throw new Error('native runtime imports fork i18n engine');
-            },
-          );
-        },
-      },
-    ],
-  });
-});
+/*
+ * A second assertion here used to require that the native runtime never import
+ * `@modern-js/i18n-runtime-extensions`, keeping the fork's URL engine out of
+ * the client bundle while mapped locale URLs were opt-in.
+ *
+ * Mapped locale URLs are now default-on for a bare `appTools()` consumer, so
+ * the client has to localize pathnames too, from the same module the server
+ * uses. The invariant that actually protects users is not "no import edge" but
+ * "the client and the server agree": if they disagree, SSR renders
+ * `/cs/obchodni-podminky` while the hydrated `<Link>` navigates to
+ * `/cs/terms-of-service`, which 404s. Sharing one implementation is what makes
+ * that impossible; duplicating ~500 lines of pattern matching into the native
+ * package to preserve the old import edge would reintroduce exactly the drift
+ * the assertion meant to prevent. The behaviour is covered by
+ * `plugin-i18n/tests/mappedUrlStrategyDerivation.test.ts`.
+ */

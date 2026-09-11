@@ -8,6 +8,7 @@ import type { BackendOptions, LocaleDetectionOptions } from '../shared/type';
 import { isUnusableI18nUrlStrategy } from '../shared/urlStrategy';
 import { getBackendOptions, getLocaleDetectionOptions } from '../shared/utils';
 import { applyDetectedBackendPaths, detectLocalesDirectory } from './locales';
+import { applyLocalisedRoutes } from './localisedRoutes';
 import '../runtime/types';
 
 export type TransformRuntimeConfigFn = (
@@ -153,6 +154,28 @@ export const i18nPlugin = (
         plugins,
       };
     });
+
+    // Mapped locale URLs are a property of `localeDetection.localisedUrls`, not
+    // of any particular app-tools composition, so the route expansion lives
+    // here rather than in an opt-in fork plugin. A bare `appTools()` consumer
+    // that declares the map gets `/cs/obchodni-podminky` generated alongside
+    // `/cs/terms-of-service`; without this the localized path 404s under SSR.
+    //
+    // This is deliberately not registered from `@modern-js/i18n-integration`:
+    // that package peer-depends on `@modern-js/runtime`, and pulling it into
+    // the default app-tools path closes an Nx cycle
+    // (app-tools -> app-tools-extensions -> i18n-integration -> runtime -> app-tools).
+    // `@modern-js/i18n-runtime-extensions` is already a direct dependency here,
+    // so nothing new is added to the graph.
+    api.modifyFileSystemRoutes(({ entrypoint, routes }) => ({
+      entrypoint,
+      routes: applyLocalisedRoutes(
+        routes as any,
+        localeDetection
+          ? getLocaleDetectionOptions(entrypoint.entryName, localeDetection)
+          : undefined,
+      ) as typeof routes,
+    }));
 
     api._internalServerPlugins(({ plugins }) => {
       const { serverRoutes, metaName } = api.getAppContext();

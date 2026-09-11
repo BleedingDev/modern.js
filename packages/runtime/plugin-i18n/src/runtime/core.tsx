@@ -1,5 +1,6 @@
 import type { RuntimePlugin } from '@modern-js/runtime';
 import type React from 'react';
+import { resolveMappedUrlStrategy } from '../shared/mappedUrlStrategy';
 import type {
   BaseBackendOptions,
   BaseLocaleDetectionOptions,
@@ -88,9 +89,19 @@ export const createI18nPlugin =
       const { enabled: backendEnabled = false } = backend || {};
       // A strategy configured in `modern.config.ts` reaches here through JSON,
       // which drops its methods. Anything unusable is treated as absent so the
-      // built-in language-prefix behaviour applies instead of throwing; a
-      // mapped-URL policy is supplied by a runtime plugin that composes one.
-      const resolvedUrlStrategy = asI18nUrlStrategy(urlStrategy);
+      // built-in language-prefix behaviour applies instead of throwing.
+      //
+      // Falling back to `localeDetection.localisedUrls` makes mapped locale
+      // URLs work for a bare `appTools()` consumer: the map is plain data, so
+      // it survives the JSON boundary that a `urlStrategy` object does not.
+      // The server already derives its policy from the same field, and the two
+      // must agree — otherwise SSR renders `/cs/obchodni-podminky` and the
+      // hydrated `<Link>` navigates to `/cs/terms-of-service`, which 404s.
+      // An explicit, usable `urlStrategy` (supplied by a composing runtime
+      // plugin) still wins.
+      const resolvedUrlStrategy =
+        asI18nUrlStrategy(urlStrategy) ??
+        resolveMappedUrlStrategy(localeDetection);
       let latestI18nInstance: I18nInstance | undefined;
       let I18nextProvider: React.ComponentType<any> | null;
 
