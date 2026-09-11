@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parse } from '@babel/parser';
 import * as t from '@babel/types';
 import {
+  consumerParserPlugins,
   type MicroVerticalApiBaselineExpectation,
   microVerticalApiBaselineViolation,
 } from './microvertical-api-baseline';
@@ -212,7 +213,7 @@ function check(
         const ast = parse(read(file), {
           sourceType: 'module',
           sourceFilename: file,
-          plugins: ['typescript', 'jsx'],
+          plugins: consumerParserPlugins(file),
         });
         parsed.set(file, ast);
         return ast;
@@ -232,23 +233,87 @@ function check(
         throw error;
       }
     };
+    /** Repo-relative target of a relative specifier, with TS extension rules. */
+    const resolveRelative = (
+      fromFile: string,
+      specifier: string,
+    ): string | undefined => {
+      if (!/^\.\.?\//u.test(specifier)) return undefined;
+      const base = path.posix
+        .join(path.posix.dirname(fromFile), specifier)
+        .replace(/\.(?:[cm]?[jt]sx?)$/u, '');
+      return [
+        `${base}.ts`,
+        `${base}.tsx`,
+        `${base}/index.ts`,
+        `${base}/index.tsx`,
+      ].find(candidate => exists(candidate));
+    };
+    /**
+     * A module plus everything it pulls in through relative imports and
+     * re-exports. A consumer may split one governed surface across sibling
+     * modules; the surface is still the union of what they import and call.
+     */
+    const composedModules = (file: string): string[] => {
+      const order: string[] = [];
+      const seen = new Set<string>();
+      const queue = [file];
+      while (queue.length > 0 && order.length < 128) {
+        const current = queue.shift()!;
+        if (seen.has(current)) continue;
+        seen.add(current);
+        order.push(current);
+        const ast = parseFile(current);
+        if (!ast) continue;
+        for (const statement of ast.program.body) {
+          const source =
+            (t.isImportDeclaration(statement) ||
+              t.isExportNamedDeclaration(statement) ||
+              t.isExportAllDeclaration(statement)) &&
+            statement.source
+              ? statement.source.value
+              : undefined;
+          const resolved =
+            source === undefined ? undefined : resolveRelative(current, source);
+          if (resolved !== undefined && !seen.has(resolved))
+            queue.push(resolved);
+        }
+      }
+      return order;
+    };
     const moduleShape = (
       file: string,
       imports: readonly (readonly [string, readonly string[]])[],
       calls: readonly string[],
       patterns: readonly (readonly [RegExp, string])[] = [],
       defaultExport?: string,
+      composed = false,
     ) => {
       if (!exists(file)) return;
       const ast = parseFile(file);
       if (!ast) return;
-      const body = ast.program.body;
+      // Source-shape rules (`patterns`, `defaultExport`) stay on this file;
+      // only imports and calls may be satisfied by a composed module.
+      const shapeFiles = composed ? composedModules(file) : [file];
+      const body = shapeFiles.flatMap(
+        shapeFile => parseFile(shapeFile)?.program.body ?? [],
+      );
       for (const [specifier, names] of imports) {
-        const imported = body.filter(
-          item =>
-            t.isImportDeclaration(item) &&
-            item.importKind !== 'type' &&
-            item.source.value === specifier,
+        // A relative specifier names a file, not a string: `../../shared/api`
+        // and `../../shared/api.ts` are the same module, and a sibling reaches
+        // it by its own path.
+        const target = resolveRelative(file, specifier);
+        const matchesSpecifier = (item: t.ImportDeclaration, from: string) =>
+          target === undefined
+            ? item.source.value === specifier
+            : resolveRelative(from, item.source.value) === target;
+        const imported = shapeFiles.flatMap(shapeFile =>
+          (parseFile(shapeFile)?.program.body ?? []).filter(
+            item =>
+              t.isImportDeclaration(item) &&
+              item.importKind !== 'type' &&
+              matchesSpecifier(item, shapeFile),
+          ),
         );
         assert(imported.length, `${file}: must import from ${specifier}`);
         for (const name of names)
@@ -268,7 +333,7 @@ function check(
           );
       }
       const found = new Set<string>();
-      t.traverseFast(ast, node => {
+      const collectCalls = (node: t.Node) => {
         if (!t.isCallExpression(node)) return;
         if (t.isIdentifier(node.callee)) found.add(node.callee.name);
         if (
@@ -278,7 +343,11 @@ function check(
           t.isIdentifier(node.callee.property)
         )
           found.add(`${node.callee.object.name}.${node.callee.property.name}`);
-      });
+      };
+      for (const shapeFile of shapeFiles) {
+        const shapeAst = parseFile(shapeFile);
+        if (shapeAst) t.traverseFast(shapeAst, collectCalls);
+      }
       for (const call of calls)
         assert(found.has(call), `${file}: must call ${call}(...)`);
       const source = read(file).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, '');
@@ -483,6 +552,9 @@ function check(
             [rpc ? '../../shared/rpc.ts' : '../../shared/api', []],
           ],
           [rpc ? 'makeEffectRpcClient' : 'makeEffectHttpApiClient'],
+          [],
+          undefined,
+          true,
         );
         moduleShape(
           `${appPath}/api/effect-api.ts`,

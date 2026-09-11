@@ -17,6 +17,17 @@ type ObjectLiteralElementLike =
   | t.SpreadElement;
 type CallExpression = t.CallExpression;
 
+/**
+ * Only `.tsx` is JSX. Enabling JSX for a `.ts` file misreads a generic arrow
+ * such as `const f = <T>(value: T) => value` as an unclosed JSX element.
+ */
+export const consumerParserPlugins = (
+  filePath: string,
+): ('typescript' | 'jsx')[] =>
+  filePath.endsWith('.tsx') || filePath.endsWith('.jsx')
+    ? ['typescript', 'jsx']
+    : ['typescript'];
+
 class ConsumerSyntaxError extends Error {}
 class ConsumerValidationHub extends Hub {
   override buildError(_node: t.Node | undefined, message: string): Error {
@@ -34,7 +45,7 @@ function parseConsumer(filePath: string): t.File {
     file = parse(fs.readFileSync(filePath, 'utf8'), {
       sourceType: 'module',
       sourceFilename: filePath,
-      plugins: ['typescript'],
+      plugins: consumerParserPlugins(filePath),
     });
   } catch (error) {
     if (
@@ -658,6 +669,25 @@ const rootComposesFoundation = (
   );
 };
 
+/**
+ * Effect combinators that return the same api/group without adding endpoints,
+ * from `effect/unstable/httpapi`. `prefix` is the one exception that rewrites
+ * the routes already collected, so the traversal applies it rather than
+ * ignoring it. Anything outside this set is still rejected.
+ */
+const nonEndpointCombinators: Readonly<
+  Record<'api' | 'group', Readonly<Record<string, number>>>
+> = {
+  api: { annotate: 2, annotateMerge: 1, middleware: 1 },
+  group: {
+    annotate: 2,
+    annotateEndpoints: 2,
+    annotateEndpointsMerge: 1,
+    annotateMerge: 1,
+    middleware: 1,
+  },
+};
+
 interface ReachableEndpoint {
   readonly group: string;
   readonly name: string;
@@ -742,7 +772,27 @@ const reachableEndpoints = (
         return false;
       const name = stringLiteral(chain.base.arguments[0]);
       if (!name) return false;
+      // Everything this chain contributes, so `prefix` can rewrite exactly the
+      // routes Effect would rewrite: those already added when it is applied.
+      const chainStart = endpoints.length;
+      const combinators = nonEndpointCombinators[kind];
       return chain.methods.every(method => {
+        if (method.name === 'prefix') {
+          const prefix = stringLiteral(method.arguments[0]);
+          if (method.arguments.length !== 1 || !prefix?.startsWith('/'))
+            return false;
+          for (let index = chainStart; index < endpoints.length; index += 1) {
+            const endpoint = endpoints[index]!;
+            endpoints[index] = {
+              ...endpoint,
+              routePath: `${prefix}${endpoint.routePath}`,
+            };
+          }
+          return true;
+        }
+        const combinatorArity = combinators[method.name];
+        if (combinatorArity !== undefined)
+          return method.arguments.length === combinatorArity;
         if (method.arguments.length !== 1) return false;
         if (method.name === 'pipe')
           return (
