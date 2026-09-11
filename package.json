@@ -64,6 +64,7 @@
     "ultramodern:source-create-proof": "node scripts/ultramodern-publish/validate-source-create-proof.mjs",
     "validate:tsgo": "node scripts/tsgo-critical.mjs",
     "test:scripts:after-build": "node --test scripts/__tests__/*.test.mjs scripts/boundary-guards/__tests__/*.test.js scripts/ultramodern-boundary-check/__tests__/*.test.js scripts/superapp-certification/__tests__/*.test.js",
+    "test:publish-tooling": "node --test scripts/lib/__tests__/*.test.js scripts/ultramodern-publish/__tests__/*.test.js scripts/ultramodern-publish/__tests__/*.test.mjs scripts/ultramodern-production-readiness/__tests__/*.test.js",
     "test:scripts": "node --test scripts/__tests__/*.test.mjs scripts/lib/__tests__/*.test.js scripts/boundary-guards/__tests__/*.test.js scripts/ultramodern-boundary-check/__tests__/*.test.js scripts/superapp-certification/__tests__/*.test.js scripts/ultramodern-publish/__tests__/*.test.js scripts/ultramodern-publish/__tests__/*.test.mjs scripts/ultramodern-production-readiness/__tests__/*.test.js",
     "check-doc-bundle": "cd ./scripts/check-doc-bundle && pnpm start",
     "test:build-consumers": "pnpm --dir scripts/rslib test && pnpm --filter ultramodern-sandpack-profile-smoke test",
