@@ -1351,3 +1351,17 @@ compiler cases move with that policy, with four additional activation cases.
 The obsolete strict rows for the removed replacement and its old test are
 retired; this records the provenance without granting a remaining native fork
 policy budget.
+
+### Native type-checker rootDir (2026-09-12)
+
+The tsgo checker runs against a generated config under `<app>/.modern-js/tsgo/`
+that `extends` the project's own tsconfig. Generated verticals set
+`composite: true` without an explicit `rootDir`, and TypeScript defaults
+`rootDir` to the directory holding the config, so the generated directory became
+the root and every real source file was rejected with TS6059. Upstream has no
+tsgo lane, so the shim and its fix have no upstream home.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | Pin `rootDir` to the project directory when the resolved config is `composite` and declares none, and resolve path-valued options to absolute while merging the `extends` chain, so relocating the checker config cannot re-anchor them on the generated directory. | `extension-point` |
+| `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pin the composite-vertical layout (sources under `src/` and `api/`) against TS6059, that an explicit relative `rootDir` still resolves against the project, and that a non-composite project keeps TypeScript's own inference. | `extension-point` |
