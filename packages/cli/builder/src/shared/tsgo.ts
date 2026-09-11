@@ -107,6 +107,36 @@ const resolveExtends = (
   return undefined;
 };
 
+/**
+ * Compiler options whose value is a path resolved relative to the config file
+ * that declares them.
+ *
+ * The generated checker config lives in `.modern-js/tsgo/`, not beside the
+ * project config it extends, so an inherited relative path must already be
+ * absolute by the time it is written out. Leaving `rootDir` relative made the
+ * native checker resolve it against the generated directory and reject every
+ * real source file with TS6059.
+ */
+const PATH_COMPILER_OPTIONS = ['rootDir', 'outDir', 'declarationDir'] as const;
+
+const absolutiseConfigPaths = (
+  compilerOptions: Record<string, any> | undefined,
+  configDirectory: string,
+): Record<string, any> => {
+  if (!compilerOptions) {
+    return {};
+  }
+
+  const resolved: Record<string, any> = { ...compilerOptions };
+  for (const option of PATH_COMPILER_OPTIONS) {
+    const value = resolved[option];
+    if (typeof value === 'string' && !path.isAbsolute(value)) {
+      resolved[option] = path.resolve(configDirectory, value);
+    }
+  }
+  return resolved;
+};
+
 const readTsConfig = (
   configFile: string,
   visited = new Set<string>(),
@@ -145,7 +175,7 @@ const readTsConfig = (
     ...baseConfig,
     compilerOptions: {
       ...(baseConfig.compilerOptions ?? {}),
-      ...(config.compilerOptions ?? {}),
+      ...absolutiseConfigPaths(config.compilerOptions, configDirectory),
     },
   };
 };
@@ -177,6 +207,19 @@ const createTsgoCheckerConfig = (configFile: string): string => {
   const compilerOptions: Record<string, unknown> = {
     baseUrl: null,
   };
+
+  // `rootDir` must name the project's own directory, never the generated
+  // config's. An explicit value has already been made absolute while the
+  // extends chain was merged; with `composite` and no explicit value
+  // TypeScript defaults `rootDir` to the directory holding the config, which
+  // here would be `.modern-js/tsgo/` and would put every source file outside
+  // the root (TS6059). Pin what the default would have produced in place.
+  const declaredRootDir = tsConfig.compilerOptions?.rootDir;
+  if (typeof declaredRootDir === 'string') {
+    compilerOptions.rootDir = toPosixPath(declaredRootDir);
+  } else if (tsConfig.compilerOptions?.composite === true) {
+    compilerOptions.rootDir = toPosixPath(configDirectory);
+  }
   const moduleResolution = String(
     tsConfig.compilerOptions?.moduleResolution,
   ).toLowerCase();
