@@ -20,6 +20,15 @@ export const catalogFoundationApi = HttpApi.make('CatalogFoundationApi').add(Htt
 export const catalogApi = HttpApi.make('CatalogApi').addHttpApi(catalogFoundationApi);
 export const catalogOperationContexts = { readiness: createMicroVerticalOperationContext({method: 'GET', operationId: 'CatalogApi:/catalog/readiness', routePath: '/catalog/readiness'}) } as const;
 export const catalogApiContract = { apiPrefix: '/catalog-api', basePath: '/catalog-api/catalog', ownerId: 'catalog', readinessPath: '/catalog-api/catalog/readiness' } as const;`;
+const pascal = (name: string) =>
+  `${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
+/** A root contract that composes two sub-APIs from sibling modules. */
+const composed = contract.replace(
+  `export const catalogApi = HttpApi.make('CatalogApi').addHttpApi(catalogFoundationApi);`,
+  `import { catalogSearchApi } from './apis/catalog-search.ts';
+import { catalogCommandsApi } from './commands';
+export const catalogApi = HttpApi.make('CatalogApi').addHttpApi(catalogFoundationApi).addHttpApi(catalogSearchApi).addHttpApi(catalogCommandsApi);`,
+);
 const entry = `import { defineEffectBff, HttpApiBuilder, Layer } from '@modern-js/bff-effect/effect-edge'; import { catalogApi } from '../shared/api.ts'; const handlers = HttpApiBuilder.group(catalogApi, 'foundation', h => h.handle('readiness', () => undefined)); const layer = HttpApiBuilder.layer(catalogApi).pipe(Layer.provide(handlers)); export default defineEffectBff({api: catalogApi, layer});`;
 let root: string;
 let owner: string;
@@ -85,6 +94,65 @@ const validate = (source = contract) => {
   write(file, source);
   return microVerticalApiBaselineViolation('catalog', file, expectation);
 };
+
+const subApi = (
+  exportName: string,
+  group: string,
+  route: string,
+  routeExpression = `'${route}'`,
+) => `import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
+export const ${exportName} = HttpApi.make('${pascal(exportName)}').add(HttpApiGroup.make('${group}').add(HttpApiEndpoint.post('execute', ${routeExpression}, { success: Schema.Unknown })));`;
+
+test('composes sub-APIs declared in sibling modules', () => {
+  // A named import with an explicit `.ts` specifier, plus an extension-less
+  // directory import whose index re-exports a third module: the shapes a
+  // consumer reaches for when a root API outgrows one file.
+  write(
+    path.join(root, 'verticals/catalog/shared/apis/catalog-search.ts'),
+    subApi('catalogSearchApi', 'catalogSearch', '/catalog/search'),
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/catalog-commands.ts'),
+    subApi('catalogCommandsApi', 'catalogCommands', '/catalog/commands'),
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/index.ts'),
+    `export { catalogCommandsApi } from './catalog-commands.ts';`,
+  );
+  expect(validate(composed)).toBeUndefined();
+});
+
+test('still rejects a composed identifier it cannot resolve', () => {
+  write(
+    path.join(root, 'verticals/catalog/shared/apis/catalog-search.ts'),
+    subApi('catalogSearchApi', 'catalogSearch', '/catalog/search'),
+  );
+  // `./commands` is never created, so `catalogCommandsApi` stays unresolved.
+  expect(validate(composed)).toContain('bounded native endpoint declarations');
+});
+
+test('still rejects an unbounded endpoint reached through an import', () => {
+  write(
+    path.join(root, 'verticals/catalog/shared/apis/catalog-search.ts'),
+    // A computed route path is not a bounded endpoint identity, and importing
+    // the declaration must not launder that.
+    `const searchRoute = '/catalog/search';\n${subApi(
+      'catalogSearchApi',
+      'catalogSearch',
+      '/catalog/search',
+      'searchRoute',
+    )}`,
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/catalog-commands.ts'),
+    subApi('catalogCommandsApi', 'catalogCommands', '/catalog/commands'),
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/index.ts'),
+    `export { catalogCommandsApi } from './catalog-commands.ts';`,
+  );
+  expect(validate(composed)).toContain('bounded native endpoint declarations');
+});
 
 test('checks consumer composition without inspecting framework implementation', () => {
   expect(validate()).toBeUndefined();

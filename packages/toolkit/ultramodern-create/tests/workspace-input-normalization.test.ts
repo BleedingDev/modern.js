@@ -95,3 +95,68 @@ test('disk read exposes raw fields and leaves the existing config reader compati
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   }
 });
+
+test('derives federated surface paths from the Module Federation config', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ultramodern-expose-'));
+  const vertical = path.join(root, 'verticals/party-registry');
+  const surface = path.join(vertical, 'src/federation/page-contacts.tsx');
+  try {
+    fs.mkdirSync(path.dirname(surface), { recursive: true });
+    fs.writeFileSync(surface, 'export default function PageContacts() {}\n');
+    fs.mkdirSync(path.join(root, '.modernjs'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, '.modernjs/ultramodern.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        workspace: { packageScope: '@app' },
+        topology: {
+          apps: [
+            {
+              id: shellApp.id,
+              kind: 'shell',
+              path: 'apps/shell-super-app',
+              moduleFederation: { verticalRefs: ['party-registry'] },
+            },
+            {
+              id: 'party-registry',
+              kind: 'vertical',
+              path: 'verticals/party-registry',
+              moduleFederation: { exposes: ['./PageContacts'] },
+            },
+          ],
+        },
+      }),
+    );
+    fs.writeFileSync(
+      path.join(vertical, 'module-federation.config.ts'),
+      `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
+export default createModuleFederationConfig({
+  name: 'verticalPartyRegistry',
+  exposes: { './PageContacts': './src/federation/page-contacts.tsx' },
+});
+`,
+    );
+
+    const expose = () =>
+      readUltramodernWorkspaceInputs(root).verticals[0]?.exposes?.[
+        './PageContacts'
+      ];
+    // The surface the workspace actually exposes is the file validation
+    // requires, wherever the vertical chose to keep it.
+    assert.equal(expose(), './src/federation/page-contacts.tsx');
+    assert.equal(
+      fs.existsSync(path.join(root, 'verticals/party-registry', expose()!)),
+      true,
+    );
+
+    // A declared surface that is not on disk still fails the existence gate.
+    fs.rmSync(surface);
+    assert.equal(expose(), './src/federation/page-contacts.tsx');
+    assert.equal(
+      fs.existsSync(path.join(root, 'verticals/party-registry', expose()!)),
+      false,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

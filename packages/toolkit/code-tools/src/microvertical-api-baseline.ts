@@ -221,6 +221,173 @@ const exportedConst = (
   return undefined;
 };
 
+interface ConsumerModule {
+  readonly file: SourceFile;
+  readonly path: string;
+}
+
+interface ResolvedBinding {
+  readonly expression: Expression;
+  readonly module: ConsumerModule;
+}
+
+/** Relative specifiers only: a composed contract never reaches outside the consumer workspace. */
+const resolveRelativeModulePath = (
+  fromPath: string,
+  specifier: string,
+): string | undefined => {
+  if (!/^\.\.?\//u.test(specifier)) return undefined;
+  const resolved = path.resolve(path.dirname(fromPath), specifier);
+  const stem = resolved.replace(/\.(?:[cm]?[jt]sx?)$/u, '');
+  for (const candidate of [
+    `${stem}.ts`,
+    `${stem}.tsx`,
+    path.join(stem, 'index.ts'),
+    path.join(stem, 'index.tsx'),
+  ])
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile())
+      return candidate;
+  return undefined;
+};
+
+/** Parse each composed module once; an unreadable module stays unresolved instead of assumed valid. */
+const createModuleReader = (root: ConsumerModule) => {
+  const modules = new Map<string, ConsumerModule | undefined>([
+    [root.path, root],
+  ]);
+  return (filePath: string): ConsumerModule | undefined => {
+    if (modules.has(filePath)) return modules.get(filePath);
+    if (modules.size >= 256) return undefined;
+    let module: ConsumerModule | undefined;
+    try {
+      module = { file: parseConsumer(filePath), path: filePath };
+    } catch {
+      module = undefined;
+    }
+    modules.set(filePath, module);
+    return module;
+  };
+};
+
+const importedBinding = (
+  module: ConsumerModule,
+  name: string,
+): { readonly imported: string; readonly specifier: string } | undefined => {
+  for (const statement of module.file.program.body) {
+    if (!t.isImportDeclaration(statement) || statement.importKind === 'type')
+      continue;
+    for (const specifier of statement.specifiers) {
+      if (!t.isIdentifier(specifier.local, { name })) continue;
+      if (t.isImportSpecifier(specifier) && specifier.importKind !== 'type')
+        return {
+          imported: propertyName(specifier.imported) ?? name,
+          specifier: statement.source.value,
+        };
+      if (t.isImportDefaultSpecifier(specifier))
+        return { imported: 'default', specifier: statement.source.value };
+    }
+  }
+  return undefined;
+};
+
+const reexportedBinding = (
+  module: ConsumerModule,
+  name: string,
+): { readonly local: string; readonly specifier?: string } | undefined => {
+  for (const statement of module.file.program.body) {
+    if (
+      !t.isExportNamedDeclaration(statement) ||
+      statement.exportKind === 'type'
+    )
+      continue;
+    const specifier = statement.specifiers.find(
+      value =>
+        t.isExportSpecifier(value) &&
+        value.exportKind !== 'type' &&
+        propertyName(value.exported) === name,
+    );
+    if (specifier !== undefined && t.isExportSpecifier(specifier))
+      return {
+        local: specifier.local.name,
+        ...(statement.source ? { specifier: statement.source.value } : {}),
+      };
+  }
+  return undefined;
+};
+
+/** A default export is either an inline expression or an alias for a local binding. */
+const defaultExport = (
+  module: ConsumerModule,
+): Expression | string | undefined => {
+  for (const statement of module.file.program.body) {
+    if (!t.isExportDefaultDeclaration(statement)) continue;
+    const declaration = statement.declaration;
+    if (t.isIdentifier(declaration)) return declaration.name;
+    return t.isExpression(declaration) ? declaration : undefined;
+  }
+  return undefined;
+};
+
+/**
+ * Resolve a contract identifier to its declaration, following relative imports
+ * and re-exports so a root API may compose sub-APIs declared in sibling modules.
+ * Every bounded-endpoint check still runs against the resolved declaration, and
+ * an identifier this cannot resolve stays unresolved so the rule still fails.
+ */
+const resolveBinding = (
+  module: ConsumerModule,
+  name: string,
+  scope: 'export' | 'local',
+  readModule: (filePath: string) => ConsumerModule | undefined,
+  seen: Set<string>,
+): ResolvedBinding | undefined => {
+  const key = `${scope}:${module.path}#${name}`;
+  if (seen.has(key) || seen.size >= 512) return undefined;
+  seen.add(key);
+  const declaration =
+    scope === 'export'
+      ? exportedConst(module.file, name)
+      : localConst(module.file, name);
+  if (declaration?.init) return { expression: declaration.init, module };
+  const throughModule = (
+    specifier: string,
+    imported: string,
+  ): ResolvedBinding | undefined => {
+    const resolvedPath = resolveRelativeModulePath(module.path, specifier);
+    const target =
+      resolvedPath === undefined ? undefined : readModule(resolvedPath);
+    return target === undefined
+      ? undefined
+      : resolveBinding(target, imported, 'export', readModule, seen);
+  };
+  if (scope === 'local') {
+    const imported = importedBinding(module, name);
+    return imported === undefined
+      ? undefined
+      : throughModule(imported.specifier, imported.imported);
+  }
+  if (name === 'default') {
+    const exported = defaultExport(module);
+    if (typeof exported === 'string')
+      return resolveBinding(module, exported, 'local', readModule, seen);
+    return exported === undefined
+      ? undefined
+      : { expression: exported, module };
+  }
+  const reexported = reexportedBinding(module, name);
+  if (reexported !== undefined)
+    return reexported.specifier === undefined
+      ? resolveBinding(module, reexported.local, 'local', readModule, seen)
+      : throughModule(reexported.specifier, reexported.local);
+  for (const statement of module.file.program.body) {
+    if (!t.isExportAllDeclaration(statement) || statement.exportKind === 'type')
+      continue;
+    const resolved = throughModule(statement.source.value, name);
+    if (resolved !== undefined) return resolved;
+  }
+  return undefined;
+};
+
 const objectLiteral = (
   expression: Expression | null | undefined,
 ): ObjectLiteralExpression | undefined => {
@@ -500,9 +667,10 @@ interface ReachableEndpoint {
 
 /** Read only endpoint declarations connected to the exported API, never decoy calls elsewhere. */
 const reachableEndpoints = (
-  sourceFile: SourceFile,
+  rootModule: ConsumerModule,
   declaration: VariableDeclaration | undefined,
 ): readonly ReachableEndpoint[] | undefined => {
+  const readModule = createModuleReader(rootModule);
   const active = new Set<Node>();
   const endpoints: ReachableEndpoint[] = [];
   const identities = new Set<string>();
@@ -519,6 +687,7 @@ const reachableEndpoints = (
   let visits = 0;
   const visit = (
     expression: Expression | null | undefined,
+    module: ConsumerModule,
     kind: 'api' | 'group' | 'endpoint',
     group = '',
   ): boolean => {
@@ -527,8 +696,19 @@ const reachableEndpoints = (
     if (active.has(node) || active.size >= 128 || ++visits > 2048) return false;
     active.add(node);
     try {
-      if (t.isIdentifier(node))
-        return visit(localConst(sourceFile, node.name)?.init, kind, group);
+      if (t.isIdentifier(node)) {
+        const resolved = resolveBinding(
+          module,
+          node.name,
+          'local',
+          readModule,
+          new Set(),
+        );
+        return (
+          resolved !== undefined &&
+          visit(resolved.expression, resolved.module, kind, group)
+        );
+      }
       if (kind === 'endpoint') {
         if (
           !t.isCallExpression(node) ||
@@ -567,25 +747,26 @@ const reachableEndpoints = (
         if (method.name === 'pipe')
           return (
             identifierName(method.arguments[0]) === 'identity' &&
-            importsExactBindings(sourceFile, 'effect', ['identity'])
+            importsExactBindings(module.file, 'effect', ['identity'])
           );
         if (method.name === 'add')
           return visit(
             method.arguments[0],
+            module,
             kind === 'api' ? 'group' : 'endpoint',
             kind === 'group' ? name : '',
           );
         return (
           kind === 'api' &&
           method.name === 'addHttpApi' &&
-          visit(method.arguments[0], 'api')
+          visit(method.arguments[0], module, 'api')
         );
       });
     } finally {
       active.delete(node);
     }
   };
-  return visit(declaration?.init, 'api') ? endpoints : undefined;
+  return visit(declaration?.init, rootModule, 'api') ? endpoints : undefined;
 };
 
 const operationContextFields = (property: PropertyAssignment) => {
@@ -818,10 +999,11 @@ const declarationIsIdentifier = (
   identifierName(unwrapExpression(declaration.init)) === identifier;
 
 const validateParsedContract = (
-  sourceFile: SourceFile,
+  module: ConsumerModule,
   stem: string,
   expectation: MicroVerticalApiBaselineExpectation,
 ): string | undefined => {
+  const sourceFile = module.file;
   const exportStem = camelCaseStem(stem);
   const foundationName = `${exportStem}FoundationApi`;
   const markerSchemaName = `${exportStem}MarkerSchema`;
@@ -877,7 +1059,7 @@ const validateParsedContract = (
     return 'MicroVertical root API must explicitly compose its readiness foundation API';
   }
   const endpoints = reachableEndpoints(
-    sourceFile,
+    module,
     exportedConst(sourceFile, `${exportStem}Api`),
   );
   if (!endpoints)
@@ -943,7 +1125,11 @@ export const microVerticalApiBaselineViolation = (
     const sourceFile = parseConsumer(filePath);
     if (!baselinePublicIdentityIsExact(filePath, expectation))
       return 'MicroVertical baseline imports must resolve the exact framework owner public export and schema identity';
-    return validateParsedContract(sourceFile, stem, expectation);
+    return validateParsedContract(
+      { file: sourceFile, path: filePath },
+      stem,
+      expectation,
+    );
   } catch (error) {
     if (error instanceof ConsumerSyntaxError)
       return `MicroVertical root contract must be valid TypeScript syntax (${error.message})`;
