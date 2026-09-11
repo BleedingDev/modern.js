@@ -369,9 +369,10 @@ export function additionalShellsFromToolingConfig(
 
 export function allWorkspaceAppsFromToolingConfig(
   config: UltramodernToolingConfig,
+  workspaceRoot?: string,
 ): WorkspaceApp[] {
   return [
-    ...workspaceAppsFromToolingConfig(config),
+    ...workspaceAppsFromToolingConfig(config, workspaceRoot),
     ...additionalShellsFromToolingConfig(config),
   ];
 }

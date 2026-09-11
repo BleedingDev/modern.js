@@ -20,6 +20,7 @@ import {
   sharedPackages,
   shellApp,
 } from './descriptors';
+import { readModuleFederationExposePaths } from './mf-validation';
 import { packageName, tailwindPrefixForApp } from './naming';
 import { createCloudflareSecurityContract } from './policy';
 import { publicSurfaceManagedSourceAssetPaths } from './public-surface';
@@ -200,6 +201,32 @@ function createFederatedCompositionPolicy(
   };
 }
 
+/**
+ * Federated surface files for one remote. A vertical's own Module Federation
+ * config is the authority on where each exposed surface lives; the configured
+ * expose map is the fallback when the workspace ships no readable config.
+ *
+ * Every validator path funnels through here, so the generated validator a
+ * consumer vendors and the `validate` command agree on the same files.
+ */
+function federatedSurfacePaths(
+  remote: WorkspaceApp,
+  workspaceRoot?: string,
+): string[] {
+  const declared =
+    workspaceRoot === undefined
+      ? undefined
+      : readModuleFederationExposePaths(workspaceRoot, remote.directory);
+  return Object.keys(remote.exposes ?? {})
+    .map(expose => {
+      const source = declared?.[expose] ?? remote.exposes?.[expose];
+      return source
+        ? `${remote.directory}/${source.replace(/^\.\//u, '')}`
+        : undefined;
+    })
+    .filter((componentPath): componentPath is string => Boolean(componentPath));
+}
+
 export function createWorkspaceValidationContract(
   scope: string,
   enableTailwind: boolean,
@@ -210,6 +237,7 @@ export function createWorkspaceValidationContract(
   compactConfigOverride?: Record<string, unknown>,
   ownershipOverride?: Record<string, unknown>,
   developmentOverlayOverride?: Record<string, unknown>,
+  workspaceRoot?: string,
 ) {
   const resolvedPrimaryShell = primaryShell ?? createShellHost(remotes);
   const workspaceApps = [resolvedPrimaryShell, ...remotes];
@@ -274,16 +302,7 @@ export function createWorkspaceValidationContract(
     packageName: packageName(scope, remote.packageSuffix),
     deliveryUnit: createDeliveryUnitRecord(scope, remote),
     exposes: Object.keys(remote.exposes ?? {}),
-    componentPaths: Object.keys(remote.exposes ?? {})
-      .map(expose => {
-        const source = remote.exposes?.[expose];
-        return source
-          ? `${remote.directory}/${source.replace(/^\.\//u, '')}`
-          : undefined;
-      })
-      .filter((componentPath): componentPath is string =>
-        Boolean(componentPath),
-      ),
+    componentPaths: federatedSurfacePaths(remote, workspaceRoot),
     namespace: appI18nNamespace(remote),
     routePagePaths: createRouteOwnedI18nPaths(remote)
       .filter(route => route.canonicalPath !== '/')

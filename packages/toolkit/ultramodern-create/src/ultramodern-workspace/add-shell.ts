@@ -305,6 +305,12 @@ function executeAddUltramodernShell(
           undefined,
           existingAdditionalShells,
           primaryShell,
+          undefined,
+          undefined,
+          undefined,
+          // The real workspace, not the staging copy: existing verticals keep
+          // their Module Federation configs there.
+          logicalWorkspaceRoot,
         ),
       },
       {

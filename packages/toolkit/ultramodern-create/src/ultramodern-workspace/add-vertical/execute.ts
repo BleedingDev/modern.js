@@ -158,6 +158,12 @@ function executeAddUltramodernVertical(
             app => app.kind === 'shell' && app.id !== primaryShell.id,
           ),
           previousApps.find(app => app.id === primaryShell.id),
+          undefined,
+          undefined,
+          undefined,
+          // The real workspace, not the staging copy: existing verticals keep
+          // their Module Federation configs there.
+          logicalWorkspaceRoot,
         ),
       },
       {

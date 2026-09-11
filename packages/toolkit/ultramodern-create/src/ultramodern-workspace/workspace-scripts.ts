@@ -103,6 +103,7 @@ export function createPackagedWorkspaceValidationScript(
   compactConfigOverride?: Record<string, unknown>,
   ownershipOverride?: Record<string, unknown>,
   developmentOverlayOverride?: Record<string, unknown>,
+  workspaceRoot?: string,
 ): string {
   const contract = createWorkspaceValidationContract(
     scope,
@@ -114,6 +115,7 @@ export function createPackagedWorkspaceValidationScript(
     compactConfigOverride,
     ownershipOverride,
     developmentOverlayOverride,
+    workspaceRoot,
   );
 
   return renderFileTemplate(
