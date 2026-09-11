@@ -231,6 +231,7 @@ test('allows an explicit host-only config with no exposes', () => {
         compilerInstance: 'effect-tsgo',
         tsConfigPath: './tsconfig.mf-types.json',
       },
+      exposePaths: {},
       exposes: [],
       hostOnlyNoExposes: true,
     },
@@ -262,6 +263,7 @@ export default createModuleFederationConfig({
         compilerInstance: undefined,
         tsConfigPath: './tsconfig.mf-types.json',
       },
+      exposePaths: {},
       exposes: [],
       hostOnlyNoExposes: true,
     },
@@ -441,7 +443,7 @@ test('MF inspection tolerates property comments, export line breaks and native f
       "tsConfigPath: ('./tsconfig.mf-types.json' satisfies string)",
     );
   const expected = inspectModuleFederationConfigSource(
-    mfConfig(),
+    mfConfig({ exposes: "['./Widget']" }),
     'apps/remote',
     'module-federation.config.ts',
   );

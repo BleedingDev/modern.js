@@ -25,7 +25,10 @@ export function runValidate(context: CommandContext) {
     primaryShell,
     additionalShells,
   } = workspace;
-  const compactApps = workspaceAppsFromToolingConfig(config);
+  const compactApps = workspaceAppsFromToolingConfig(
+    config,
+    context.workspaceRoot,
+  );
   const compactPrimaryShell =
     compactApps.find(app => app.kind === 'shell') ?? createShellHost(remotes);
   // Overlay ports govern local endpoints; compact metadata retains its own

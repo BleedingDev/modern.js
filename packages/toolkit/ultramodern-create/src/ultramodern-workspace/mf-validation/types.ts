@@ -7,6 +7,7 @@ export type ModuleFederationConfigInspection = {
     compilerInstance?: string;
     tsConfigPath?: string;
   };
+  exposePaths: Record<string, string>;
   exposes: string[];
   hostOnlyNoExposes: boolean;
 };

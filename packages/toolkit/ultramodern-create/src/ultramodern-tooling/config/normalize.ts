@@ -11,6 +11,7 @@ import {
   shellApp,
   ULTRAMODERN_CONFIG_PATH,
 } from '../../ultramodern-workspace/descriptors';
+import { readModuleFederationExposePaths } from '../../ultramodern-workspace/mf-validation';
 import { toKebabCase } from '../../ultramodern-workspace/naming';
 import { resolveConfiguredAdditionalShells } from '../../ultramodern-workspace/shells';
 import type {
@@ -278,8 +279,14 @@ export function normalizeCompactUltramodernConfig(
   );
 }
 
+/**
+ * `workspaceRoot` lets each vertical's federated surface paths come from the
+ * Module Federation config it actually ships. Without it the surface falls back
+ * to the generator's `src/components` layout.
+ */
 export function workspaceAppsFromToolingConfig(
   config: UltramodernToolingConfig,
+  workspaceRoot?: string,
 ): WorkspaceApp[] {
   return config.topology.apps.map(app => {
     if (app.kind === 'shell') {
@@ -299,9 +306,17 @@ export function workspaceAppsFromToolingConfig(
     const domain = app.domain ?? app.id;
     const packageSuffix = app.packageSuffix ?? domain;
     const exposePaths = app.moduleFederation?.exposePaths ?? {};
+    // A vertical may expose its federated surface from any directory it likes;
+    // its own Module Federation config is the authority on where each surface
+    // lives, so consult that before assuming the generated `src/components`
+    // layout. Nothing else about the surface expectation changes.
+    const federatedPaths =
+      workspaceRoot === undefined
+        ? undefined
+        : readModuleFederationExposePaths(workspaceRoot, app.path);
     const exposes = Object.fromEntries(
       (app.moduleFederation?.exposes ?? []).map(expose => {
-        const configuredPath = exposePaths[expose];
+        const configuredPath = federatedPaths?.[expose] ?? exposePaths[expose];
         const inferredPath =
           expose === './Route'
             ? './src/federation-entry.tsx'
@@ -389,7 +404,7 @@ export function normalizeWorkspaceInputs(
         createPrimaryShellDescriptor(inputs.topology, inputs.config),
         ...verticalsFromTopology(inputs.topology, ports),
       ]
-    : workspaceAppsFromToolingConfig(config);
+    : workspaceAppsFromToolingConfig(config, workspaceRoot);
   const apps = [
     ...topologyApps.map(app => ({
       ...app,

@@ -10,12 +10,17 @@ import {
 } from './syntax';
 import type { ModuleFederationConfigInspection } from './types';
 
+type ExtractedExposes = Pick<
+  ModuleFederationConfigInspection,
+  'exposePaths' | 'exposes'
+>;
+
 function extractExposes(
   configPath: string,
   value: string | undefined,
-): string[] {
+): ExtractedExposes {
   if (value === undefined) {
-    return [];
+    return { exposePaths: {}, exposes: [] };
   }
 
   const object = parseObjectLiteral(value);
@@ -25,12 +30,22 @@ function extractExposes(
         `Cannot statically extract Module Federation exposes from ${configPath}; use a literal exposes object without spreads.`,
       );
     }
-    return Array.from(object.properties.keys()).sort();
+    const exposePaths: Record<string, string> = {};
+    for (const [expose, source] of object.properties) {
+      const exposePath = parseLiteralString(source);
+      if (exposePath !== undefined) {
+        exposePaths[expose] = exposePath;
+      }
+    }
+    return {
+      exposePaths,
+      exposes: Array.from(object.properties.keys()).sort(),
+    };
   }
 
   const array = parseArrayLiteral(value);
   if (array) {
-    return array.sort();
+    return { exposePaths: {}, exposes: array.sort() };
   }
 
   throw new Error(
@@ -115,7 +130,7 @@ export function inspectModuleFederationConfigSource(
     );
   }
 
-  const exposes = extractExposes(
+  const { exposePaths, exposes } = extractExposes(
     configPath,
     properties.properties.get('exposes'),
   );
@@ -135,6 +150,7 @@ export function inspectModuleFederationConfigSource(
       properties.properties.get('dts'),
       exposes,
     ),
+    exposePaths,
     exposes,
     hostOnlyNoExposes,
   };
