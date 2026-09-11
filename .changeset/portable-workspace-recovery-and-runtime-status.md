@@ -5,6 +5,4 @@
 '@modern-js/plugin-bff-extensions': patch
 ---
 
-Make workspace publication and command execution portable on Windows, retain declared packages named dist or coverage during migration, and recognize released generated API artifacts after formatting while preserving authored changes.
-
-Canonicalize Windows native compiler watch paths and Effect source globals. Preserve legacy telemetry decision status and metrics alongside native health monitoring.
+Make workspace publication and command execution portable on Windows. Canonicalize Windows native compiler watch paths and Effect source globals. Expose runtime health status and snapshot observations.

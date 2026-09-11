@@ -141,6 +141,20 @@ export async function setPackage(
     },
   );
 
+  if (files.length === 0) {
+    Reflect.deleteProperty(typesVersions['*'], `${API_DIR}/*`);
+    Reflect.deleteProperty(exports, `./${API_DIR}/*`);
+  }
+
+  if (
+    !fs.existsSync(
+      path.resolve(appDirectory, relativeDistPath, RUNTIME_DIR, 'index.js'),
+    )
+  ) {
+    Reflect.deleteProperty(typesVersions['*'], RUNTIME_DIR);
+    Reflect.deleteProperty(exports, `./${RUNTIME_DIR}`);
+  }
+
   mergePackageJson(
     packageJson,
     addFiles,

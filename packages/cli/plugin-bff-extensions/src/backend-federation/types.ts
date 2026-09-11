@@ -85,12 +85,6 @@ export type BackendFederationLoadOptions = BackendFederationRuntimeOptions & {
 export type BackendFederationIdentityLoadOptions =
   BackendFederationLoadOptions & {
     expected: BackendFederationExpectedIdentity;
-    /**
-     * Tolerate legacy exposes without identity metadata (mismatching declared
-     * values still fail). Prefer leaving this unset: identity-less exposes
-     * cannot be validated against a resolved delivery-unit record.
-     */
-    allowMissingIdentityMetadata?: boolean;
   };
 
 export type BackendFederationLoadEntryPlugin = ModuleFederationRuntimePlugin & {

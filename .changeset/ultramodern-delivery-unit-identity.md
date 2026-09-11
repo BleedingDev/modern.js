@@ -10,4 +10,4 @@ Implement ADR-0019 federated loading, unified delivery: every UltraModern MicroV
 - `@modern-js/app-tools` stamps the delivery-unit record into `backend-mf-manifest.json` (Node surface) and `modern-worker-manifest.json` (Cloudflare surface, including per-surface ui/api derivation) and fails the build/output verification closed on identity drift.
 - `@modern-js/plugin-bff` backend federation runtime validates delivery-unit identity when loading federated Effect APIs and rejects mismatched unitId/build markers with typed `version_mismatch` errors carrying `failureEvent: 'modernjs:microvertical-server-fallback'` and structured details.
 
-All changes are additive to the `microvertical-server-effect-v1` contract; legacy manifests and workspaces without delivery-unit metadata keep their existing behavior.
+Backend federation requires delivery-unit identity in its manifests and consumer expectations.

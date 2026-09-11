@@ -22,7 +22,6 @@ const publicSubpaths = [
   './effect-edge',
   './effect-client',
   './microvertical-api',
-  './effect-client-runtime',
   './data-platform',
 ] as const;
 

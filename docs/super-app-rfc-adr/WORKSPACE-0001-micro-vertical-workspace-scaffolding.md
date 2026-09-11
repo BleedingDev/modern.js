@@ -19,7 +19,7 @@ This document defines the canonical downstream workspace shape for teams adoptin
 
 The goal is not a second framework mode. The goal is a repeatable repo layout and scaffold recipe that lets teams create shell, remote, service, and shared-package slices while staying aligned with the completed TanStack, Module Federation, Effect HttpApi, topology, and certification contracts.
 
-This document is not a migration guide or codemod plan. Existing-app migration guidance is intentionally deferred from this framework topology scope.
+This document defines the current generated workspace topology.
 
 ## 2. Canonical Workspace Topology
 

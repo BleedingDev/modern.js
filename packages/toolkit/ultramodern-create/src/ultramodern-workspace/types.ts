@@ -33,7 +33,7 @@ export function sortJsonValue(value: JsonValue): JsonValue {
 }
 
 /**
- * Vertical generation preset (G2a). `full-stack` is the legacy default and
+ * Vertical generation preset (G2a). `full-stack` is the default default and
  * produces byte-identical output. `api-only` omits every browser/UI artifact
  * (routes, components, MF browser exposes, Tailwind) and keeps the API + BFF +
  * backend-federation surfaces (a headless delivery unit). `ui-only` omits every
@@ -42,7 +42,7 @@ export function sortJsonValue(value: JsonValue): JsonValue {
 export type VerticalPreset = 'full-stack' | 'api-only' | 'ui-only';
 
 /**
- * API protocol SPI (G7a). `rest` is the legacy default (Effect HttpApi output,
+ * API protocol SPI (G7a). `rest` is the default default (Effect HttpApi output,
  * byte-identical). `rpc` generates an Effect RPC contract/handlers/client on
  * plugin-bff's RPC runtime primitives. GraphQL is intentionally not implemented
  * (the SPI shape leaves room to add it later).
@@ -91,7 +91,7 @@ export type WorkspaceApp = {
   verticalRefs?: string[];
   ownership: Ownership;
   /**
-   * Generation preset (G2a). Omitted for the legacy `full-stack` default so
+   * Generation preset (G2a). Omitted for the default `full-stack` default so
    * default descriptors and their serialized output stay byte-identical; only
    * `api-only` / `ui-only` set it, gating the UI/API writers respectively.
    */
@@ -105,7 +105,7 @@ export type WorkspaceApp = {
   /**
    * Existing additional shells carry their stamped delivery-unit contract
    * through regeneration (G28). Keeping this on the descriptor prevents a later
-   * add-vertical/migrate pass from minting a new build marker for an already
+   * add-vertical operation from minting a new build marker for an already
    * generated shell.
    */
   deliveryUnit?: JsonObject;
@@ -116,7 +116,7 @@ export type WorkspaceApi = {
   prefix: string;
   consumedBy: string[];
   /**
-   * API protocol (G7a). Omitted for the legacy `rest` default so default API
+   * API protocol (G7a). Omitted for the default `rest` default so default API
    * output stays byte-identical; only `rpc` sets it.
    */
   protocol?: VerticalApiProtocol;
@@ -160,7 +160,7 @@ export type Ownership = {
  * Resolve the single owner attribution for an ownership record (G3). Returns
  * the explicit `owner` when a caller opted in, otherwise the neutral default
  * `{ kind: 'team', id: ownership.team }`. Pure; does not mutate or emit —
- * legacy generation stays byte-identical because nothing serializes this
+ * default generation stays byte-identical because nothing serializes this
  * unless `ownership.owner` was set.
  */
 export function resolveOwnerAttribution(
@@ -245,7 +245,7 @@ export type AddUltramodernVerticalOptions = {
   packageSource?: UltramodernWorkspaceOptions['packageSource'];
   /**
    * Vertical generation preset (G2a). Defaults to `full-stack` (byte-identical
-   * legacy output). `api-only` / `ui-only` restrict the generated surfaces.
+   * default output). `api-only` / `ui-only` restrict the generated surfaces.
    */
   preset?: VerticalPreset;
   /**
@@ -261,7 +261,7 @@ export type AddUltramodernVerticalOptions = {
   horizontalRemote?: boolean;
   /**
    * Target shell id that should compose the new MicroVertical (G28). Defaults
-   * to the primary shell (`shell-super-app`) — the default keeps legacy
+   * to the primary shell (`shell-super-app`) — the default keeps default
    * single-shell behaviour byte-identical. An explicit id targets an additional
    * shell; targeting an unknown shell is rejected in preflight.
    */
@@ -341,7 +341,7 @@ export type UltramodernGenerationResult = {
    * (built from the same generator functions in the same process), so
    * automation can consume the canonical shape without re-reading the
    * workspace. Down-projecting a descriptor reproduces the v1 `WorkspaceApp`
-   * identity (see `projectDeliveryUnitToV1`).
+   * identity.
    */
   deliveryUnits?: DeliveryUnitDescriptor[];
 };

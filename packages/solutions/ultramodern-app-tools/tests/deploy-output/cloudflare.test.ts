@@ -9,6 +9,7 @@ import type {
   CloudflareWorkerServiceBindingConfig,
   JsonValue,
 } from '@modern-js/app-tools-extensions/config';
+import { createUltramodernBuildArtifact } from '@modern-js/backend-federation-contracts';
 import { cloudflareWorkerSources } from './fixtures/worker-sources';
 
 const tempDirectories: string[] = [];
@@ -71,7 +72,7 @@ async function createFixture({
   workerName,
   workerSecurity,
   deliveryUnit,
-  buildModuleIdentity,
+  buildArtifactIdentity,
 }: {
   artifacts?: CloudflareWorkerArtifactConfig[];
   bffCrossProjectPolicy?: Record<string, unknown>;
@@ -89,7 +90,7 @@ async function createFixture({
     buildMarker: string;
     sourceRevision: string;
   };
-  buildModuleIdentity?: {
+  buildArtifactIdentity?: {
     unitId: string;
     buildMarker: string;
     sourceRevision: string;
@@ -241,16 +242,21 @@ async function createFixture({
       )}\n`,
     );
 
-    const buildIdentity = buildModuleIdentity ?? deliveryUnit;
+    const buildIdentity = buildArtifactIdentity ?? deliveryUnit;
     await fs.mkdir(path.join(appDirectory, 'shared'), { recursive: true });
     await fs.writeFile(
-      path.join(appDirectory, 'shared/ultramodern-build.ts'),
-      `export const ultramodernDeliveryUnit = {
-  build: '${buildIdentity.buildMarker}',
-  sourceRevision: '${buildIdentity.sourceRevision}',
-  unitId: '${buildIdentity.unitId}',
-} as const;
-`,
+      path.join(appDirectory, 'shared/ultramodern-build.json'),
+      JSON.stringify(
+        createUltramodernBuildArtifact({
+          ...buildIdentity,
+          appId: 'checkout',
+          deployProfile: 'cloudflare-ssr-mf-effect-v1',
+          kind: 'microvertical-delivery-unit',
+          packageName: '@acme/checkout',
+          schemaVersion: 1,
+          version: '0.1.0',
+        }),
+      ),
     );
   }
 
@@ -341,7 +347,7 @@ describe('cloudflare deploy preset', () => {
           buildMarker: '0123456789abcdef',
           sourceRevision: 'workspace',
         },
-        buildModuleIdentity: {
+        buildArtifactIdentity: {
           unitId: 'acme/checkout',
           buildMarker: 'deadbeefdeadbeef',
           sourceRevision: 'workspace',

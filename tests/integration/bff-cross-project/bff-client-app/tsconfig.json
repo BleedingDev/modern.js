@@ -5,11 +5,9 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "jsx": "preserve",
-    "baseUrl": "./",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["./shared/*"],
-      "@api/*": ["./api/lambda/*"]
+      "@shared/*": ["./shared/*"]
     },
     "types": ["@rstest/core/globals"]
   },

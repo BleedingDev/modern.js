@@ -178,7 +178,6 @@ export default defineConfig({
     endpoint: '/_data/batch',
     maxBatchSize: 16,
     maxBatchBytes: 64 * 1024,
-    flushIntervalMs: 8,
     maxConcurrency: 4,
     requestTimeoutMs: 10000,
     allowedMethods: ['GET'],
@@ -212,9 +211,9 @@ export default defineConfig({
 });
 ```
 
-`batch.flushIntervalMs` 用于控制生成的 Effect 客户端微批处理窗口；`maxConcurrency` 与 `requestTimeoutMs` 由服务端批处理网关用于内部请求分发。
+`maxConcurrency` 与 `requestTimeoutMs` 控制服务端批处理网关。原生 `HttpApiClient` 发送独立请求，不会自动批处理。
 
-生成的 `api.client.*` API 只存在于 loader 物化后的 `@api/index` 导入中。直接导入服务端入口（`api/index`）时拿到的是 Effect BFF 定义；其中的 `client` 属性只是占位，并会在访问具体操作时报错。
+导入共享 `HttpApi` 契约并传给 `HttpApiClient.make` 或 `makeEffectHttpApiClient`，即可获得完全类型推导的客户端。`defineEffectBff` 只提供服务端 handler，不包含客户端。
 
 ## Effect 版本组
 

@@ -304,11 +304,6 @@ export type UltramodernPatchPolicy = {
   path: string;
 };
 
-export type UltramodernStalePatchPolicy = UltramodernPatchPolicy & {
-  sha256: string;
-  acceptedLegacySha256?: readonly string[];
-};
-
 export const ULTRAMODERN_PACKAGE_PINS = {
   appDependencies: {
     // Generated apps never install react-router — TanStack Router is the
@@ -420,156 +415,6 @@ const conditionalPatchPolicies: readonly UltramodernPatchPolicy[] = [
     packageName: 'drizzle-orm',
     version: DRIZZLE_ORM_VERSION,
     path: 'patches/drizzle-orm-ts7-strict-declarations.patch',
-  },
-];
-
-const stalePatchPolicies: readonly UltramodernStalePatchPolicy[] = [
-  {
-    // router-core 1.171.28 dropped the phantom `__beforeLoadContext` index
-    // from its ssr declarations, so the strict-lib-check repair is retired.
-    packageName: '@tanstack/router-core',
-    version: '1.171.27',
-    path: 'patches/@tanstack__router-core@1.171.27.patch',
-    sha256: 'd0e147ec82083771b70989d2a1da6aa47f342ae42071af86c4247649f6a5b9e9',
-  },
-  {
-    packageName: 'msgpackr',
-    version: '2.0.6',
-    path: 'patches/msgpackr@2.0.6.patch',
-    sha256: 'ea06f707e02e6b95d68e199347ada7bd640764e2653bfdd77664592390fac811',
-  },
-  {
-    packageName: 'zod',
-    version: '4.4.3',
-    path: 'patches/zod@4.4.3.patch',
-    sha256: '2ae01a829b3f4082e46f1ccb4cbcffdea0db8664c2544b3566cb507e2c471c77',
-  },
-  {
-    packageName: '@module-federation/bridge-react',
-    version: '2.8.2',
-    path: 'patches/@module-federation__bridge-react@2.8.2.patch',
-    sha256: '8c084f41790295af8fd015b897c6298bbc13d927b796c624ac96cb2bdb4bc87c',
-  },
-  {
-    packageName: '@module-federation/modern-js-v3',
-    version: '2.8.2',
-    path: 'patches/@module-federation__modern-js-v3@2.8.2.patch',
-    sha256: '948d2a725ae526f395b0343b113ff80dfaa50dbdec8158179746e98259925d20',
-  },
-  {
-    packageName: '@module-federation/bridge-react',
-    version: '2.8.0',
-    path: 'patches/@module-federation__bridge-react@2.8.0.patch',
-    sha256: '54bfc79e097473222f83cbfa6d717792e3026bf16b5097c2ed91715b7da126be',
-  },
-  {
-    packageName: '@module-federation/modern-js-v3',
-    version: '2.8.0',
-    path: 'patches/@module-federation__modern-js-v3@2.8.0.patch',
-    sha256: '948d2a725ae526f395b0343b113ff80dfaa50dbdec8158179746e98259925d20',
-  },
-  {
-    packageName: '@module-federation/bridge-react',
-    version: '2.7.0',
-    path: 'patches/@module-federation__bridge-react@2.7.0.patch',
-    sha256: '2f89441475f83a6e12d8c2a755b5b15c4d2b04523a1b33fd318c2d537382537f',
-  },
-  {
-    packageName: '@module-federation/modern-js-v3',
-    version: '2.7.0',
-    path: 'patches/@module-federation__modern-js-v3@2.7.0.patch',
-    sha256: 'f51adf0aa6c6e2daa5b7d2978a7716c0d4fb05b29af449b2f16257b957fb7923',
-  },
-  {
-    // Historical hashes keep retired Effect declarations safely removable.
-    packageName: 'effect',
-    version: '4.0.0-beta.107',
-    path: 'patches/effect-schema-error-type-id.patch',
-    sha256: 'ed9f636f82a1a1e5c128fc85e99e24a8fcf4ba06a35e89e3dd6460250875153f',
-  },
-  {
-    packageName: 'effect',
-    version: '4.0.0-beta.94',
-    path: 'patches/effect-schema-error-type-id.patch',
-    sha256: 'ed9f636f82a1a1e5c128fc85e99e24a8fcf4ba06a35e89e3dd6460250875153f',
-    acceptedLegacySha256: [
-      'd9e12b42d06a051957899a9df14b2b7b2385fc3a5677a89037eeee3674d64ebe',
-      'dc7e8088e600beb20185eb877754d749c4a93909fb79f49465e8319e40d6596a',
-      'bd29a0ae24f0674c6007e5e6060d847dbeb9499a6e2cf4c9f13b24ba9fb3af37',
-    ],
-  },
-  {
-    packageName: 'effect',
-    version: '4.0.0-beta.97',
-    path: 'patches/effect-schema-error-type-id.patch',
-    sha256: 'ed9f636f82a1a1e5c128fc85e99e24a8fcf4ba06a35e89e3dd6460250875153f',
-    acceptedLegacySha256: [
-      'd9e12b42d06a051957899a9df14b2b7b2385fc3a5677a89037eeee3674d64ebe',
-      'dc7e8088e600beb20185eb877754d749c4a93909fb79f49465e8319e40d6596a',
-      'bd29a0ae24f0674c6007e5e6060d847dbeb9499a6e2cf4c9f13b24ba9fb3af37',
-    ],
-  },
-  {
-    packageName: 'effect',
-    version: '4.0.0-beta.102',
-    path: 'patches/effect-schema-error-type-id.patch',
-    sha256: 'ed9f636f82a1a1e5c128fc85e99e24a8fcf4ba06a35e89e3dd6460250875153f',
-    acceptedLegacySha256: [
-      'd9e12b42d06a051957899a9df14b2b7b2385fc3a5677a89037eeee3674d64ebe',
-      'dc7e8088e600beb20185eb877754d749c4a93909fb79f49465e8319e40d6596a',
-      'bd29a0ae24f0674c6007e5e6060d847dbeb9499a6e2cf4c9f13b24ba9fb3af37',
-    ],
-  },
-  {
-    packageName: '@module-federation/dts-plugin',
-    version: '2.7.0',
-    path: 'patches/@module-federation__dts-plugin@2.7.0.patch',
-    sha256: '768cc3bb22e2dede264515f141fdc8af937c8f53d4f8ef8f83469bb0cec1c9a0',
-  },
-  {
-    packageName: '@module-federation/bridge-react',
-    version: '2.6.0',
-    path: 'patches/@module-federation__bridge-react@2.6.0.patch',
-    sha256: '75982bd9b4d40922ce3110ded5254f7faca39112b79d41f27fe0ac4bb416c467',
-  },
-  {
-    packageName: '@module-federation/dts-plugin',
-    version: '2.6.0',
-    path: 'patches/@module-federation__dts-plugin@2.6.0.patch',
-    sha256: 'bc998f74617f7f060ea0f65235f071a5880aade3144ccd610d098d6bbc1c52fe',
-    acceptedLegacySha256: [
-      'ad19439992ca0757dc7354ad4197eecd5ac83f3ef5ed990e9200c672138600d5',
-    ],
-  },
-  {
-    packageName: '@module-federation/modern-js-v3',
-    version: '2.6.0',
-    path: 'patches/@module-federation__modern-js-v3@2.6.0.patch',
-    sha256: '51ab49dc776c56cdaa8eb43fbd0bb2788633d6b05acfb18fb2f3a1db81c02d87',
-  },
-  {
-    packageName: '@tanstack/router-core',
-    version: '1.171.21',
-    path: 'patches/@tanstack__router-core@1.171.21.patch',
-    sha256: 'fb269f2a1c6c789ffb2d4f9341f6dd6a1dbb977b5bb66ce8e31a3a9cdd197dad',
-  },
-  {
-    packageName: '@tanstack/router-core',
-    version: '1.171.13',
-    path: 'patches/@tanstack__router-core@1.171.13.patch',
-    sha256: '0c6119dcaa6ad35a11e1ce4fd95179bf929d5b5a86e9cbee110f45bd07c5c8d3',
-  },
-  {
-    packageName: '@tanstack/router-core',
-    version: '1.171.14',
-    path: 'patches/@tanstack__router-core@1.171.14.patch',
-    sha256: '1e1572940e00d6327c75bb8457c108e32e75a2292e4d90d764208d5b6f330155',
-  },
-  {
-    packageName: 'react-server-dom-rspack',
-    version: '0.0.3',
-    path: 'patches/@react-server-dom-rspack@0.0.3.patch',
-    sha256: '11e471512012c0015883a233017b3ad695765e344cbd1d8174e79196ab6ba567',
   },
 ];
 
@@ -746,7 +591,6 @@ export const ULTRAMODERN_WORKSPACE_POLICY = {
     patchedDependencies: {
       required: requiredPatchPolicies,
       conditional: conditionalPatchPolicies,
-      stale: stalePatchPolicies,
     },
     releaseAge: {
       approvals: releaseAgeApprovals,

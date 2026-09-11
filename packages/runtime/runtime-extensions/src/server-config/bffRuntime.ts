@@ -123,10 +123,10 @@ export interface BffEffectUserConfig {
   /**
    * Enforce Effect-native API/runtime modules instead of raw request handlers.
    *
-   * When enabled, Effect API entries must export a `defineEffectBff(...)`
+   * Effect API entries must export a `defineEffectBff(...)`
    * definition or a `{ api, layer }` HttpApi module. Raw `handler` exports,
    * default request handlers, and unbranded custom `createHandler` factories
-   * are treated as legacy escape hatches.
+   * are rejected.
    *
    * @default true
    */

@@ -7,7 +7,6 @@
   - `BOUNDARY-0001-framework-core-vs-module-vs-external-matrix.md`
   - `SDK-0001-module-sdk-contracts.md`
   - `ADR-0015-mv-ownership-and-blast-radius-gates.md`
-  - `MIGRATION-PLAYBOOK-0001-existing-teams-to-mv.md`
   - `scripts/boundary-guards/profile.json`
 
 ## 1. Purpose
@@ -96,7 +95,7 @@ Every extraction PR or migration ticket must answer:
 4. Which consumers are direct and transitive?
 5. Which fallback behavior is available before rollout?
 6. Which evidence files prove route, remote, service, trust, rollback, and review readiness?
-7. Which Compat gates remain until the replacement evidence passes?
+7. Which boundary checks verify the extracted unit?
 
 Reviewers reject extraction when:
 
@@ -107,9 +106,8 @@ Reviewers reject extraction when:
 5. topology references are replaced with environment URLs.
 6. fallback or rollback behavior is undocumented.
 
-## 6. Migration Path
+## 6. Extraction Sequence
 
-Use `MIGRATION-PLAYBOOK-0001-existing-teams-to-mv.md` as the operational migration sequence:
 
 1. stabilize the current lane.
 2. move to reference-based topology.
@@ -118,7 +116,7 @@ Use `MIGRATION-PLAYBOOK-0001-existing-teams-to-mv.md` as the operational migrati
 5. promote data and workflow boundaries.
 6. certify production rollout.
 
-Migration must preserve upstream mergeability. Avoid broad framework rewrites, compatibility-lane deletion, or product taxonomy in framework core.
+Extraction must preserve upstream mergeability and keep product taxonomy out of framework core.
 
 ## 7. Acceptance Checklist
 

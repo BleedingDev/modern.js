@@ -1,32 +1,5 @@
-/**
- * Canonical MicroVertical delivery contracts (W4).
- *
- * This module DEFINES the canonical shapes only. It is intentionally UNWIRED:
- * no generator, normalizer, or runtime path imports it, and it does not change
- * any emitted output. The v1 down-projection here is a pure, tested function;
- * it is not invoked by any generation path.
- *
- * Binding vocabulary: root `CONTEXT.md`, ADR-0019 (Federated Loading, Unified
- * Delivery), ADR-0020 (Zoned Surface Versioning). See `packages/toolkit/ultramodern-create/delivery-unit-schema-SPEC.md` for the
- * SurfaceRef grammar, invariants, and the v1 mapping table.
- *
- * TS constraint: plain types + pure functions only; it must never import
- * TypeScript compiler APIs.
- */
-import {
-  DELIVERY_UNIT_DEPLOY_PROFILE,
-  DELIVERY_UNIT_KIND,
-  DELIVERY_UNIT_SCHEMA_VERSION,
-  type DeliveryUnitRecord,
-} from '@modern-js/backend-federation-contracts';
-import {
-  isVerticalApiProtocol,
-  type JsonObject,
-  type JsonValue,
-  type Ownership,
-  type WorkspaceApi,
-  type WorkspaceApp,
-} from '../types';
+/** Canonical MicroVertical delivery contracts, parsing, and serialization. */
+import type { JsonObject, JsonValue } from '../types';
 
 /* -------------------------------------------------------------------------- */
 /* Owner                                                                       */
@@ -153,7 +126,7 @@ export type DeliveryUnitKind = 'microvertical' | 'shell' | 'horizontal-remote';
  * The canonical authoring shape for one indivisible delivery unit. All surfaces
  * derive from the single `sourceRevision` / `buildMarker` identity root
  * (ADR-0019 invariants 1-2). This is a superset of today's v1 `WorkspaceApp`;
- * see {@link projectDeliveryUnitToV1} for the lossy down-projection.
+ * Generator metadata supplies the concrete build and deployment addresses.
  */
 export type DeliveryUnitDescriptor = {
   unitId: string;
@@ -450,157 +423,6 @@ export function serializeDeliveryUnitDescriptor(
     surfaces,
   };
   return output;
-}
-
-/* -------------------------------------------------------------------------- */
-/* v1 down-projection                                                          */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Generator-only fields that have no source in the canonical descriptor (port
- * assignment, directory layout, package identity, ownership metadata). The
- * descriptor deliberately does not own these; the v1 projection needs them to
- * reconstruct today's `WorkspaceApp` / `DeliveryUnitRecord`.
- */
-export type V1ProjectionContext = {
-  /**
-   * Which v1 wire vocabulary is being projected onto. Strict legacy v1 only
-   * carries the historical WorkspaceApp fields; extended-v1 also carries the
-   * additive delivery-unit discriminators introduced by the workspace
-   * topology format.
-   */
-  mode?: V1ProjectionMode;
-  directory: string;
-  packageSuffix: string;
-  displayName: string;
-  portEnv: string;
-  port: number;
-  mfName: string;
-  ownership: Ownership;
-  packageName: string;
-  version: string;
-};
-
-/**
- * The two v1 wire vocabularies understood by the projection pair.
- *
- * `strict-legacy` is the original v1 shape and intentionally rejects values
- * that would be silently collapsed by it. `extended-v1` is still schema
- * version 1, but permits the additive `deliveryUnitKind` and `api.protocol`
- * fields used by the UltraModern topology/config readers.
- */
-export type V1ProjectionMode = 'strict-legacy' | 'extended-v1';
-
-export type DeliveryUnitV1Projection = {
-  app: WorkspaceApp;
-  deliveryUnitRecord: DeliveryUnitRecord;
-  /** Unknown descriptor-level fields, preserved for lossless re-serialization. */
-  preservedUnknownFields: JsonObject;
-};
-
-function projectKind(kind: DeliveryUnitKind): WorkspaceApp['kind'] {
-  switch (kind) {
-    case 'shell':
-      return 'shell';
-    case 'microvertical':
-    case 'horizontal-remote':
-      // v1 has no 'horizontal-remote'; it collapses to 'vertical' (lossy).
-      return 'vertical';
-    default:
-      return assertNever(kind);
-  }
-}
-
-function lastSegment(unitId: string): string {
-  const segments = unitId.split('/');
-  return segments[segments.length - 1] ?? unitId;
-}
-
-function projectApi(
-  surfaces: SurfaceDescriptor[],
-  mode: V1ProjectionMode,
-): WorkspaceApi | undefined {
-  const apiSurface = surfaces.find(
-    (surface): surface is ApiSurfaceDescriptor => surface.kind === 'api',
-  );
-  if (apiSurface === undefined) {
-    return undefined;
-  }
-  const http = apiSurface.locations.find(
-    (location): location is Extract<SurfaceLocation, { platform: 'http' }> =>
-      location.platform === 'http',
-  );
-  return {
-    stem: apiSurface.surfaceId,
-    prefix: http?.address ?? `/${apiSurface.surfaceId}`,
-    consumedBy: [],
-    ...(mode === 'extended-v1' && isVerticalApiProtocol(apiSurface.protocol)
-      ? { protocol: apiSurface.protocol }
-      : {}),
-  };
-}
-
-/**
- * Down-project a canonical {@link DeliveryUnitDescriptor} onto today's v1
- * `WorkspaceApp` + `DeliveryUnitRecord` shapes. Pure and total.
- *
- * Invariant (schema-only migration preserves markers): `buildMarker`,
- * `sourceRevision`, and `unitId` flow straight through from the descriptor and
- * are never regenerated here. See `packages/toolkit/ultramodern-create/delivery-unit-schema-SPEC.md` for the field-by-field table.
- *
- * NOT wired into any generator path.
- */
-export function projectDeliveryUnitToV1(
-  descriptor: DeliveryUnitDescriptor,
-  context: V1ProjectionContext,
-): DeliveryUnitV1Projection {
-  const appId = lastSegment(descriptor.unitId);
-  const mode = context.mode ?? 'strict-legacy';
-  const api = projectApi(descriptor.surfaces, mode);
-
-  // Owner round-trip (G3): a `team` owner is v1-native (its id/contact live in
-  // `ownership.team`/`ownership.slack`), so the neutral context ownership is
-  // left byte-identical. A non-team (`agent` / `agent-team`) owner has no
-  // v1-native home, so it is carried back explicitly in `ownership.owner`,
-  // where the up-projection reads it again — faithful through the pair.
-  const ownership: Ownership =
-    descriptor.owner.kind === 'team'
-      ? context.ownership
-      : { ...context.ownership, owner: { ...descriptor.owner } };
-
-  const app: WorkspaceApp = {
-    id: appId,
-    directory: context.directory,
-    packageSuffix: context.packageSuffix,
-    displayName: context.displayName,
-    kind: projectKind(descriptor.kind),
-    portEnv: context.portEnv,
-    port: context.port,
-    mfName: context.mfName,
-    ownership,
-    ...(mode === 'extended-v1' && descriptor.kind === 'horizontal-remote'
-      ? { deliveryUnitKind: 'horizontal-remote' as const }
-      : {}),
-    ...(api === undefined ? {} : { api }),
-  };
-
-  const deliveryUnitRecord: DeliveryUnitRecord = {
-    appId,
-    buildMarker: descriptor.buildMarker,
-    deployProfile: DELIVERY_UNIT_DEPLOY_PROFILE,
-    kind: DELIVERY_UNIT_KIND,
-    packageName: context.packageName,
-    schemaVersion: DELIVERY_UNIT_SCHEMA_VERSION,
-    sourceRevision: descriptor.sourceRevision,
-    unitId: descriptor.unitId,
-    version: context.version,
-  };
-
-  return {
-    app,
-    deliveryUnitRecord,
-    preservedUnknownFields: descriptor.unknownFields ?? {},
-  };
 }
 
 /* -------------------------------------------------------------------------- */

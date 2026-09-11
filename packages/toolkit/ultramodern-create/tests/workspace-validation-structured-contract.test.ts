@@ -157,6 +157,82 @@ test('generated validator accepts equivalent structured JSON representations', (
   }
 });
 
+test('maintained workspaces can own packages, routes, platform APIs, and deployment recipes', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-maintained-'));
+  const workspaceDir = path.join(tempRoot, 'workspace');
+  try {
+    generateWorkspace(workspaceDir);
+    fs.rmSync(path.join(workspaceDir, 'CLAUDE.md'), { force: true });
+    fs.renameSync(
+      path.join(workspaceDir, '.github'),
+      path.join(tempRoot, '.github'),
+    );
+    fs.mkdirSync(path.join(workspaceDir, 'apps/shell-super-app/api'));
+    fs.writeFileSync(
+      path.join(workspaceDir, 'apps/shell-super-app/api/index.ts'),
+      'export {};\n',
+    );
+    fs.writeFileSync(path.join(workspaceDir, 'zerops.yaml'), 'zerops: []\n');
+    const owned = {
+      id: 'platform-services',
+      package: '@workspace/platform-services',
+      path: 'packages/platform-services',
+    };
+    fs.mkdirSync(path.join(workspaceDir, owned.path));
+    writeJson(workspaceDir, `${owned.path}/package.json`, {
+      name: owned.package,
+      private: true,
+    });
+    writeJson(workspaceDir, `${owned.path}/tsconfig.json`, {
+      extends: '../../tsconfig.base.json',
+      files: [],
+    });
+    mutateJson(workspaceDir, '.modernjs/ultramodern.json', value => {
+      const cloudflare = value.topology.apps.find(
+        (app: { id: string }) => app.id === 'catalog',
+      ).deploy.cloudflare;
+      delete cloudflare.routes.ssr;
+      delete cloudflare.routes.locale;
+    });
+    mutateJson(workspaceDir, 'topology/reference-topology.json', value => {
+      value.sharedPackages.push(owned);
+      value.shell.authentication = { owner: 'platform-services' };
+      delete value.verticals[0].api.domainOperations;
+    });
+    mutateJson(workspaceDir, 'topology/ownership.json', value => {
+      value.owners.push(owned);
+    });
+    mutateJson(
+      workspaceDir,
+      'topology/local-overlays/development.json',
+      value => {
+        value.applicationModules = {};
+      },
+    );
+    mutateJson(workspaceDir, 'tsconfig.json', value => {
+      value.references.push({ path: owned.path });
+    });
+    mutateJson(workspaceDir, 'apps/shell-super-app/tsconfig.json', value => {
+      value.include.push('api');
+      value.references.push({ path: `../../${owned.path}` });
+      value.references.reverse();
+    });
+    mutateJson(workspaceDir, 'package.json', value => {
+      value.devDependencies['@modern-js/codesmith'] = '2.6.9';
+    });
+    const result = runValidation(workspaceDir);
+    assert.equal(result.status, 0, commandOutput(result));
+    mutateJson(workspaceDir, `${owned.path}/package.json`, value => {
+      value.name = '@wrong/identity';
+    });
+    const invalid = runValidation(workspaceDir);
+    assert.notEqual(invalid.status, 0);
+    assert.match(commandOutput(invalid), /ownership package must match/);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('generated validator rejects schema, cohort, topology, policy, and legacy drift', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-contract-bad-'));
   const baselineDir = path.join(tempRoot, 'baseline');
@@ -384,7 +460,7 @@ test('generated validator checks active Tailwind wiring rather than unused depen
   }
 });
 
-test('generated validator enforces additional-shell ownership, build, degraded, and Zerops cohorts', () => {
+test('generated validator enforces additional-shell ownership, build, and degraded cohorts', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-shell-cohort-'));
   const baselineDir = path.join(tempRoot, 'baseline');
   const scenarios: Array<{
@@ -423,20 +499,6 @@ test('generated validator enforces additional-shell ownership, build, degraded, 
         );
       },
       expected: /shell-admin build marker is not participating/,
-    },
-    {
-      name: 'missing-zerops-service',
-      mutate: workspaceDir => {
-        const zeropsPath = path.join(workspaceDir, 'zerops.yaml');
-        fs.writeFileSync(
-          zeropsPath,
-          fs
-            .readFileSync(zeropsPath, 'utf-8')
-            .replace("setup: 'shell-admin'", "setup: 'missing-shell'"),
-          'utf-8',
-        );
-      },
-      expected: /shell-admin must have a Zerops service/,
     },
   ];
 

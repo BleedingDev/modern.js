@@ -8,7 +8,6 @@ import {
   runTemplateBackedToolingCommand,
 } from './commands/context';
 import { runMfTypes } from './commands/mf-types';
-import { runMigrateStrictEffect } from './commands/migrate-strict-effect';
 import { runRoutesGenerate } from './commands/routes-generate';
 import { runSkills } from './commands/skills';
 import { runSyncDeliveryUnit } from './commands/sync-delivery-unit';
@@ -35,8 +34,6 @@ export async function runUltramodernToolingCli(
         return runValidate(context);
       case GENERATED_TOOLING_COMMANDS.mfTypes.command:
         return runMfTypes(rest, context);
-      case GENERATED_TOOLING_COMMANDS.migrateStrictEffect.command:
-        return await runMigrateStrictEffect(rest, context);
       case GENERATED_TOOLING_COMMANDS.cloudflareOutputVerify.command:
         return runCloudflareOutputVerify(rest, context);
       case GENERATED_TOOLING_COMMANDS.routesGenerate.command:

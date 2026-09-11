@@ -22,20 +22,15 @@ import {
   TelemetryHealthMonitor,
   TelemetryRegistry,
 } from '../telemetryCore';
-import {
-  createTelemetryCanaryCompatibility,
-  type TelemetryCanaryCompatibility,
-} from './canaryCompatibility';
 
 type SetupTelemetryHealthMonitoringOptions = {
   registry: TelemetryRegistry;
   appDirectory: string;
-  legacyHealthConfig: ServerTelemetryUserConfig['canary'] | undefined;
+  healthConfig: ServerTelemetryUserConfig['health'] | undefined;
 };
 
 type SetupTelemetryHealthMonitoringResult = {
   healthMonitor?: TelemetryHealthMonitor;
-  canaryCompatibility?: TelemetryCanaryCompatibility;
   gateSnapshotStorePromise?: Promise<ContractGateSnapshotStore>;
   runtimeFallbackSignalConfig?: RuntimeFallbackSignalConfig;
   runtimeStatusAuthConfig?: RuntimeFallbackSignalAuthConfig;
@@ -64,33 +59,29 @@ function emitHealthTransitionMetric(
 export const setupTelemetryHealthMonitoring = ({
   registry,
   appDirectory,
-  legacyHealthConfig,
+  healthConfig,
 }: SetupTelemetryHealthMonitoringOptions): SetupTelemetryHealthMonitoringResult => {
-  if (!legacyHealthConfig?.enabled) {
+  if (!healthConfig?.enabled) {
     return {};
   }
 
-  const contractGates = legacyHealthConfig.contractGates as
+  const contractGates = healthConfig.contractGates as
     | Record<string, boolean | { passed: boolean; reason?: string }>
     | undefined;
 
-  const canaryCompatibility = createTelemetryCanaryCompatibility(registry);
   const healthMonitor = new TelemetryHealthMonitor({
     registry,
-    evaluationIntervalMs: legacyHealthConfig.evaluationIntervalMs,
+    evaluationIntervalMs: healthConfig.evaluationIntervalMs,
     minConsecutiveHealthyEvaluations:
-      legacyHealthConfig.minConsecutiveHealthyEvaluations,
-    // `rollbackConsecutiveFailures` is the legacy public config key. It now
-    // controls health-state hysteresis and never triggers a deployment action.
+      healthConfig.minConsecutiveHealthyEvaluations,
     minConsecutiveFailedEvaluations:
-      legacyHealthConfig.rollbackConsecutiveFailures,
-    maxQueueUtilization: legacyHealthConfig.maxQueueUtilization,
-    maxTotalDropped: legacyHealthConfig.maxTotalDropped,
-    maxUnhealthyExporters: legacyHealthConfig.maxUnhealthyExporters,
+      healthConfig.minConsecutiveFailedEvaluations,
+    maxQueueUtilization: healthConfig.maxQueueUtilization,
+    maxTotalDropped: healthConfig.maxTotalDropped,
+    maxUnhealthyExporters: healthConfig.maxUnhealthyExporters,
     requiredContractGates: Object.keys(contractGates || {}),
     onTransition: evaluation => {
       emitHealthTransitionMetric(registry, evaluation);
-      canaryCompatibility.observe(evaluation);
     },
   });
 
@@ -101,22 +92,21 @@ export const setupTelemetryHealthMonitoring = ({
   let gateSnapshotStorePromise: Promise<ContractGateSnapshotStore> | undefined;
   let runtimeFallbackSignalConfig: RuntimeFallbackSignalConfig | undefined;
 
-  // `autopilot` is retained only as the legacy config key for snapshot input.
   const snapshotObservationEnabled =
-    legacyHealthConfig.autopilot?.enabled ?? true;
+    healthConfig.snapshotObservation?.enabled ?? true;
   if (snapshotObservationEnabled) {
     const gateSnapshotPath = resolveContractGateSnapshotPath(
       appDirectory,
-      legacyHealthConfig.autopilot?.gateSnapshotPath,
+      healthConfig.snapshotObservation?.gateSnapshotPath,
     );
     gateSnapshotStorePromise = resolveContractGateSnapshotStore({
       appDirectory,
       gateSnapshotPath: gateSnapshotPath || DEFAULT_CONTRACT_GATE_SNAPSHOT_PATH,
-      stateStore: legacyHealthConfig.autopilot?.stateStore,
+      stateStore: healthConfig.snapshotObservation?.stateStore,
     });
 
     const runtimeSignalConfig =
-      legacyHealthConfig.autopilot?.runtimeFallbackSignal;
+      healthConfig.snapshotObservation?.runtimeFallbackSignal;
     if (runtimeSignalConfig?.enabled === true) {
       runtimeFallbackSignalConfig = {
         endpoint: resolveRuntimeFallbackSignalEndpoint(
@@ -148,16 +138,15 @@ export const setupTelemetryHealthMonitoring = ({
   }
 
   // Detailed runtime status stays authenticated even when signal ingestion is
-  // disabled. The auth source remains the legacy config path for compatibility.
+  // disabled.
   const runtimeStatusAuthConfig =
     runtimeFallbackSignalConfig?.auth ??
     normalizeRuntimeFallbackSignalAuthConfig(
-      legacyHealthConfig.autopilot?.runtimeFallbackSignal?.auth,
+      healthConfig.snapshotObservation?.runtimeFallbackSignal?.auth,
     );
 
   return {
     healthMonitor,
-    canaryCompatibility,
     gateSnapshotStorePromise,
     runtimeFallbackSignalConfig,
     runtimeStatusAuthConfig,

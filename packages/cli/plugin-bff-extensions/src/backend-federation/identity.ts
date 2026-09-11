@@ -21,23 +21,12 @@ export type BackendFederationIdentityIssue = {
  * Shared expected-identity validation for loaded backend federation modules.
  * Compares the expose's `backendFederationContract.compatibility` identity
  * (`unitId`, `build`) against the consumer's expected delivery-unit identity.
- * Missing identity metadata is an error: with an expectation present there is
- * no legacy escape hatch.
+ * Missing identity metadata is an error.
  */
 export function validateExpectedBackendFederationIdentity(
   loaded: unknown,
   expected: BackendFederationExpectedIdentity,
-  options: {
-    /**
-     * Tolerate exposes that declare no identity metadata (legacy modules).
-     * Mismatching declared values still fail. Used by the manifest adapter,
-     * whose manifest-side identity is already validated against `expected`;
-     * the raw identity-aware loader is strict.
-     */
-    allowMissingIdentityMetadata?: boolean;
-  } = {},
 ): BackendFederationIdentityIssue[] {
-  const allowMissing = options.allowMissingIdentityMetadata === true;
   const issues: BackendFederationIdentityIssue[] = [];
   const contract = isRecord(loaded)
     ? loaded.backendFederationContract
@@ -45,9 +34,6 @@ export function validateExpectedBackendFederationIdentity(
   const compatibility = isRecord(contract) ? contract.compatibility : undefined;
 
   if (!isRecord(compatibility)) {
-    if (allowMissing) {
-      return [];
-    }
     return [
       {
         path: 'backendFederationContract.compatibility',
@@ -59,12 +45,10 @@ export function validateExpectedBackendFederationIdentity(
 
   const unitId = compatibility.unitId;
   if (typeof unitId !== 'string' || unitId.length === 0) {
-    if (!allowMissing) {
-      issues.push({
-        path: 'backendFederationContract.compatibility.unitId',
-        message: `missing delivery-unit id; expected ${expected.unitId}`,
-      });
-    }
+    issues.push({
+      path: 'backendFederationContract.compatibility.unitId',
+      message: `missing delivery-unit id; expected ${expected.unitId}`,
+    });
   } else if (unitId !== expected.unitId) {
     issues.push({
       path: 'backendFederationContract.compatibility.unitId',
@@ -74,12 +58,10 @@ export function validateExpectedBackendFederationIdentity(
 
   const build = compatibility.build;
   if (typeof build !== 'string' || build.length === 0) {
-    if (!allowMissing) {
-      issues.push({
-        path: 'backendFederationContract.compatibility.build',
-        message: `missing build marker; expected ${expected.buildMarker}`,
-      });
-    }
+    issues.push({
+      path: 'backendFederationContract.compatibility.build',
+      message: `missing build marker; expected ${expected.buildMarker}`,
+    });
   } else if (build !== expected.buildMarker) {
     issues.push({
       path: 'backendFederationContract.compatibility.build',

@@ -45,8 +45,7 @@ export function runAgentsMd(_templateDir: string, targetDir: string): void {
   }
 
   // Versions without bundled docs get no files at all: a block written now
-  // would name docs that are not there, and a file the tool half-manages on an
-  // old version would only need migrating again after the upgrade.
+  // would name docs that are not there.
   const version = resolveVersion(targetDir);
   if (!supportsBundledDocs(version)) {
     console.log(

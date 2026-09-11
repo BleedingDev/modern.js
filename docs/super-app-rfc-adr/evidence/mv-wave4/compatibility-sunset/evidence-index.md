@@ -9,8 +9,6 @@
 
 This index records the Wave 0-3 contract and design documents retained as inputs for:
 
-1. `MIGRATION-PLAYBOOK-0001-existing-teams-to-mv.md`
-2. `SUNSET-DECISION-0001-compatibility-lanes.md`
 
 It is not a new support policy. The former remote-commerce rollout and incident artifacts were deleted in `fc9caa4877` after they were found to be fabricated/self-certified; they are not evidence of production activity. The table below therefore maps only the retained contract documents.
 

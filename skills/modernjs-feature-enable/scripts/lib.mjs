@@ -1,4 +1,4 @@
-// 配置改写公共库（从 modernjs-migrate-to-v3 已收敛实现移植，保证对真实文件的健壮性）。
+// 配置改写公共库。
 // 所有结构定位都基于「剥离注释与字符串」后的 masked 文本，改写落原文同索引。
 
 import fs from 'node:fs';
@@ -527,7 +527,7 @@ export function findConfigFile(dir) {
   );
 }
 
-// ---- 版本协议（与 migrate-to-v3 收敛逻辑一致）----
+// ---- 版本协议----
 // 非语义化协议：不能当固定版本处理
 export const WORKSPACE_PROTO =
   /^(workspace:|link:|catalog:|file:|portal:|npm:|\*$)/;
@@ -626,8 +626,7 @@ export function classifyProject(dir) {
   if (major === 2) {
     return {
       state: 'v2',
-      reason:
-        '检测到 Modern.js v2：请先用 modernjs-migrate-to-v3 升级到 v3 再启用功能',
+      reason: '检测到 Modern.js v2：仅支持当前 Modern.js v3 项目',
       signals: [],
       appTools,
     };
@@ -639,7 +638,7 @@ export function classifyProject(dir) {
     if (signals.length) {
       return {
         state: 'v2',
-        reason: `检测到 v2-only 信号（${signals.join(', ')}）：请先用 modernjs-migrate-to-v3 升级到 v3 再启用功能`,
+        reason: `检测到 v2-only 信号（${signals.join(', ')}）：仅支持当前 Modern.js v3 项目`,
         signals,
         appTools,
       };

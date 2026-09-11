@@ -1,4 +1,9 @@
 import { createHash } from 'node:crypto';
+import fs from 'node:fs/promises';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   BACKEND_FEDERATION_CONTRACT_VERSION,
   BACKEND_FEDERATION_NODE_ADAPTER_VERSION,
@@ -14,13 +19,13 @@ import {
 } from '../src/backend-federation/edge';
 import { loadBackendFederatedEffectApi } from '../src/backend-federation/node';
 import {
-  type BackendFederationManifestAdapterError,
+  BackendFederationManifestAdapterError,
   loadBackendFederationManifest,
 } from '../src/backend-federation-manifest';
 import { loadBackendFederatedEffectApiFromManifest } from '../src/backend-federation-manifest/node';
 
-function createBackendRemoteEntryDataUrl(source: string) {
-  return `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
+function createBackendRemoteEntryDataUrl(moduleSource: string) {
+  return `data:text/javascript;charset=utf-8,${encodeURIComponent(moduleSource)}`;
 }
 
 function createEffectApiEntryExports(
@@ -32,6 +37,7 @@ function createEffectApiEntryExports(
       if (id !== './effect-api') {
         throw new Error(`Unexpected backend federation expose: ${id}`);
       }
+
       return async () => effectApiModule;
     },
   };
@@ -49,6 +55,15 @@ function createBackendManifest() {
       type: 'module',
     },
     backendFederation: {
+      deliveryUnit: {
+        schemaVersion: 1,
+        kind: 'microvertical-delivery-unit',
+        packageName: '@tractor-store-vertical-demo/catalog',
+        version: '1.2.3',
+        sourceRevision: 'a'.repeat(40),
+        unitId: 'catalog@21',
+        buildMarker: 'catalog-build-123',
+      },
       role: 'microvertical-server',
       name: 'verticalCatalogBackend',
       runtimeFramework: 'effect',
@@ -60,6 +75,15 @@ function createBackendManifest() {
       manifestUrl: 'https://catalog.example.test/backend-mf-manifest.json',
       containerEntry: 'service:verticalCatalogBackend',
       versionBoundary: {
+        deliveryUnit: {
+          schemaVersion: 1,
+          kind: 'microvertical-delivery-unit',
+          packageName: '@tractor-store-vertical-demo/catalog',
+          version: '1.2.3',
+          sourceRevision: 'a'.repeat(40),
+          unitId: 'catalog@21',
+          buildMarker: 'catalog-build-123',
+        },
         invariant: 'web-and-api-same-build',
         packageName: '@tractor-store-vertical-demo/catalog',
         version: '1.2.3',
@@ -72,7 +96,15 @@ function createBackendManifest() {
 function withDeliveryUnitIdentity(
   manifest: ReturnType<typeof createBackendManifest>,
 ) {
-  const identity = { buildMarker: 'catalog-build-123', unitId: 'catalog@21' };
+  const identity = {
+    schemaVersion: 1,
+    kind: 'microvertical-delivery-unit',
+    packageName: '@tractor-store-vertical-demo/catalog',
+    version: '1.2.3',
+    sourceRevision: 'a'.repeat(40),
+    buildMarker: 'catalog-build-123',
+    unitId: 'catalog@21',
+  };
   Object.assign(manifest.backendFederation, {
     deliveryUnit: identity,
     versionBoundary: {
@@ -83,12 +115,28 @@ function withDeliveryUnitIdentity(
   return manifest;
 }
 
+async function listen(server: http.Server) {
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected backend federation test server TCP address.');
+  }
+  return `http://127.0.0.1:${address.port}`;
+}
+
 function createManifestEffectApiModule(
   overrides: Record<string, unknown> = {},
 ) {
   return {
     backendFederationContract: {
       compatibility: {
+        unitId: 'catalog@21',
         build: 'catalog-build-123',
         contractVersion: BACKEND_FEDERATION_CONTRACT_VERSION,
         nodeAdapterVersion: BACKEND_FEDERATION_NODE_ADAPTER_VERSION,
@@ -105,14 +153,41 @@ function createManifestEffectApiModule(
   };
 }
 
-// Network entry bytes need only a digest and a replaceable token: integrity
-// must reject them before evaluation.
-function createLiveBackendEntrySource() {
-  return "module.exports = { runtime: { brand: 'official-runtime-http' } };";
+function createLiveBackendEntrySource(
+  containerName: string,
+  compatibilityBuild: string,
+) {
+  return `
+module.exports = {
+  init() {},
+  get(id) {
+    if (id !== './effect-api') throw new Error('Unexpected expose ' + id);
+    return async () => ({
+      backendFederationContract: {
+        compatibility: {
+          build: '${compatibilityBuild}',
+          contractVersion: '${BACKEND_FEDERATION_CONTRACT_VERSION}',
+          nodeAdapterVersion: '${BACKEND_FEDERATION_NODE_ADAPTER_VERSION}',
+          packageName: '@tractor-store-vertical-demo/catalog',
+          unitId: 'catalog@21',
+        },
+        name: '${containerName}',
+        role: 'microvertical-server',
+        runtimeFramework: 'effect',
+        strictEffectApproach: true,
+      },
+      contract: { servicePrefix: '/catalog-api' },
+      runtime: { brand: 'official-runtime-http' },
+    });
+  },
+};
+`;
 }
 
-function createVerifiedBackendManifest(entrySource: string) {
-  const entryUrl = 'https://catalog.example.test/backendRemoteEntry.cjs';
+function createVerifiedBackendManifest(
+  entrySource: string,
+  entryUrl = 'https://catalog.example.test/backendRemoteEntry.cjs',
+) {
   const manifest = createBackendManifest();
   manifest.entry = {
     byteLength: Buffer.byteLength(entrySource),
@@ -129,6 +204,7 @@ describe('backend federation runtime', () => {
   test('rejects unverified network entries without an integrity record', async () => {
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'unverifiedNetworkBackendHost',
         remote: {
           entry: 'https://catalog.example.test/backendRemoteEntry.cjs',
@@ -140,7 +216,10 @@ describe('backend federation runtime', () => {
   });
 
   test('verifies a network remote before consulting a custom entry plugin', async () => {
-    const verifiedSource = createLiveBackendEntrySource();
+    const verifiedSource = createLiveBackendEntrySource(
+      'verticalCatalogBackend',
+      'catalog-build-123',
+    );
     const mutatedSource = verifiedSource.replace(
       'official-runtime-http',
       'tampered-runtime-http',
@@ -149,6 +228,7 @@ describe('backend federation runtime', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         entryPolicy: {
           ...({ allowTrustedEntryProvider: true } as Record<string, unknown>),
           fetch: async () => new Response(mutatedSource),
@@ -186,6 +266,7 @@ describe('backend federation runtime', () => {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'customRuntimeBypassBackendHost',
         remote: {
           entry: 'https://catalog.example.test/backendRemoteEntry.cjs',
@@ -206,10 +287,17 @@ describe('backend federation runtime', () => {
 module.exports = {
   init() {},
   get(id) {
-    if (id !== './effect-api') throw new Error('Unexpected expose ' + id);
+    if (id !== './effect-api') {
+      throw new Error('Unexpected expose ' + id);
+    }
+
     return async () => ({
       default: { brand: 'defineEffectBff-runtime' },
-      backendFederationContract: { runtimeFramework: 'effect', strictEffectApproach: true },
+      backendFederationContract: {
+        compatibility: { unitId: 'catalog@21', build: 'catalog-build-123' },
+        runtimeFramework: 'effect',
+        strictEffectApproach: true,
+      },
       contract: { ownerId: 'catalog' },
       runtime: { brand: 'defineEffectBff-runtime' },
     });
@@ -220,10 +308,16 @@ module.exports = {
     };
 
     const loaded = await loadBackendFederatedEffectApi({
+      expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
       hostName: 'shellBackendHost',
       remote,
     });
 
+    expect(loaded.backendFederationContract).toEqual({
+      compatibility: { unitId: 'catalog@21', build: 'catalog-build-123' },
+      runtimeFramework: 'effect',
+      strictEffectApproach: true,
+    });
     expect(loaded.contract).toEqual({ ownerId: 'catalog' });
     expect(loaded.default).toEqual({ brand: 'defineEffectBff-runtime' });
   });
@@ -231,6 +325,7 @@ module.exports = {
   test('initializes one edge binding container once across repeated exposes', async () => {
     let providerCalls = 0;
     const initCalls: unknown[][] = [];
+    const getCalls: string[] = [];
     const runtime = createEdgeBackendFederationRuntime({
       expected: {
         buildMarker: 'checkout-build-7',
@@ -243,6 +338,7 @@ module.exports = {
             providerCalls += 1;
             return {
               get(id) {
+                getCalls.push(id);
                 return () => ({
                   backendFederationContract: {
                     compatibility: {
@@ -286,6 +382,7 @@ module.exports = {
     );
     expect(providerCalls).toBe(1);
     expect(initCalls).toEqual([[{ hostName: 'cloudflareWorkerBackendHost' }]]);
+    expect(getCalls).toEqual(['./effect-api', './health']);
   });
 
   test('validates delivery-unit identity on the edge binding path', async () => {
@@ -322,6 +419,7 @@ module.exports = {
   test('fails closed for network entries supplied through the edge remotes array', async () => {
     await expect(
       loadEdgeBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'cloudflareArrayNetworkBackendHost',
         remoteName: 'verticalCheckoutBackend',
         remotes: [
@@ -391,9 +489,14 @@ module.exports = {
   });
 
   test('does not trust an entry digest asserted only by a network manifest', async () => {
-    const manifest = withDeliveryUnitIdentity(
-      createVerifiedBackendManifest(createLiveBackendEntrySource()),
+    const entrySource = createLiveBackendEntrySource(
+      'verticalCatalogBackend',
+      'catalog-build-123',
     );
+    const manifest = withDeliveryUnitIdentity(
+      createVerifiedBackendManifest(entrySource),
+    );
+    const fetchedUrls: string[] = [];
 
     await expect(
       loadBackendFederatedEffectApiFromManifest({
@@ -401,13 +504,20 @@ module.exports = {
           buildMarker: 'catalog-build-123',
           unitId: 'catalog@21',
         },
-        fetch: async () => new Response(JSON.stringify(manifest)),
+        fetch: async url => {
+          fetchedUrls.push(url);
+          return new Response(JSON.stringify(manifest));
+        },
         hostName: 'selfAssertedManifestIntegrityHost',
         manifestUrl: 'https://catalog.example.test/backend-mf-manifest.json',
       }),
     ).rejects.toThrow(
       /requires caller-pinned entryUrl, remoteName, sha256, and byteLength/u,
     );
+
+    expect(fetchedUrls).toEqual([
+      'https://catalog.example.test/backend-mf-manifest.json',
+    ]);
   });
 
   test('rejects a backend expose without strict Effect metadata', async () => {
@@ -424,6 +534,10 @@ module.exports = {
           resolveEntry() {
             return createEffectApiEntryExports({
               backendFederationContract: {
+                compatibility: {
+                  unitId: 'catalog@21',
+                  build: 'catalog-build-123',
+                },
                 runtimeFramework: 'effect',
                 strictEffectApproach: false,
               },
@@ -436,6 +550,7 @@ module.exports = {
 
     await expect(
       loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
         hostName: 'nonStrictBackendHost',
         remote,
         runtime,
@@ -443,46 +558,71 @@ module.exports = {
     ).rejects.toThrow(/strictEffectApproach: true/u);
   });
 
-  test('falls back with a typed error when expected.unitId does not match the manifest delivery unit', async () => {
-    const manifest = createBackendManifest();
-    manifest.backendFederation.versionBoundary.deliveryUnit = {
-      unitId: 'catalog@21',
-      buildMarker: 'catalog-build-123',
-    } as never;
-    const fallbackErrors: BackendFederationManifestAdapterError[] = [];
+  describe('ADR-0019 delivery-unit identity root', () => {
+    function createBackendManifestWithDeliveryUnit(
+      deliveryUnit: Record<string, unknown>,
+    ) {
+      const manifest = createBackendManifest();
+      manifest.backendFederation.versionBoundary.deliveryUnit = {
+        ...manifest.backendFederation.versionBoundary.deliveryUnit,
+        ...deliveryUnit,
+      };
+      return manifest;
+    }
 
-    const loaded = await loadBackendFederatedEffectApiFromManifest({
-      hostName: 'unitIdMismatchBackendHost',
-      manifest,
-      expected: { unitId: 'catalog@17' },
-      fallback(error) {
-        fallbackErrors.push(error);
-        return createManifestEffectApiModule({
-          runtime: { brand: 'typed-effect-fallback' },
-        });
-      },
-      plugins: [
-        createBackendFederationLoadEntryPlugin({
-          resolveEntry() {
-            return createEffectApiEntryExports(createManifestEffectApiModule());
-          },
-        }),
-      ],
+    test('falls back with a typed error when expected.unitId does not match the manifest delivery unit', async () => {
+      const manifest = createBackendManifestWithDeliveryUnit({
+        unitId: 'catalog@21',
+        buildMarker: 'catalog-build-123',
+      });
+      const fallbackErrors: BackendFederationManifestAdapterError[] = [];
+
+      const loaded = await loadBackendFederatedEffectApiFromManifest({
+        hostName: 'unitIdMismatchBackendHost',
+        manifest,
+        expected: { unitId: 'catalog@17' },
+        fallback(error) {
+          fallbackErrors.push(error);
+          return createManifestEffectApiModule({
+            runtime: { brand: 'typed-effect-fallback' },
+          });
+        },
+        plugins: [
+          createBackendFederationLoadEntryPlugin({
+            resolveEntry() {
+              return createEffectApiEntryExports(
+                createManifestEffectApiModule(),
+              );
+            },
+          }),
+        ],
+      });
+
+      expect(fallbackErrors).toHaveLength(1);
+      expect(fallbackErrors[0].failureEvent).toBe(
+        'modernjs:microvertical-server-fallback',
+      );
+      expect(loaded.runtime).toEqual({ brand: 'typed-effect-fallback' });
     });
-
-    expect(fallbackErrors).toHaveLength(1);
-    expect(fallbackErrors[0].code).toBe('version_mismatch');
-    expect(fallbackErrors[0].failureEvent).toBe(
-      'modernjs:microvertical-server-fallback',
-    );
-    expect(loaded.runtime).toEqual({ brand: 'typed-effect-fallback' });
   });
+});
 
-  test('rejects a caller-pinned remote whose loaded metadata names a different backend', async () => {
+describe('caller-pinned backend federation regressions', () => {
+  const createPinnedBackendRuntime = ({
+    entryExports,
+    module,
+    remoteName = 'verticalExploreBackend',
+    scheme = 'static',
+  }: {
+    entryExports?: BackendFederationEntryExports;
+    module?: unknown;
+    remoteName?: string;
+    scheme?: 'service' | 'static';
+  }) => {
     const remote: BackendFederationRemote = {
-      name: 'verticalExploreBackend',
+      name: remoteName,
       type: 'module',
-      entry: 'static:verticalExploreBackend',
+      entry: `${scheme}:${remoteName}`,
     };
     const runtime = createBackendFederationRuntime({
       hostName: 'proofHost',
@@ -490,21 +630,44 @@ module.exports = {
       plugins: [
         createBackendFederationLoadEntryPlugin({
           resolveEntry: () =>
-            createEffectApiEntryExports({
-              backendFederationContract: {
-                name: 'verticalDecideBackend',
-                runtimeFramework: 'effect',
-                strictEffectApproach: true,
+            entryExports ?? {
+              get(id) {
+                if (id !== './effect-api') {
+                  throw new Error(`unexpected expose ${id}`);
+                }
+                return async () => module;
               },
-              api: { id: 'api' },
-              runtime: { id: 'runtime' },
-            }),
+            },
         }),
       ],
     });
+    return { remote, runtime };
+  };
+
+  const strictEffectApiModule = (remoteName = 'verticalExploreBackend') => ({
+    backendFederationContract: {
+      compatibility: { unitId: 'catalog@21', build: 'catalog-build-123' },
+      name: remoteName,
+      runtimeFramework: 'effect',
+      strictEffectApproach: true,
+    },
+    api: { id: 'api' },
+    runtime: { id: 'runtime' },
+  });
+
+  test('rejects a caller-pinned remote whose loaded metadata names a different backend', async () => {
+    const { remote, runtime } = createPinnedBackendRuntime({
+      entryExports: createEffectApiEntryExports({
+        ...strictEffectApiModule('verticalDecideBackend'),
+      }),
+    });
 
     await expect(
-      loadBackendFederatedEffectApi({ runtime, remote }),
+      loadBackendFederatedEffectApi({
+        expected: { unitId: 'catalog@21', buildMarker: 'catalog-build-123' },
+        runtime,
+        remote,
+      }),
     ).rejects.toThrow('metadata name mismatch');
   });
 });

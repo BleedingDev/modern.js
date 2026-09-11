@@ -12,9 +12,7 @@ import {
   type DeliveryUnitRecord,
   deliveryUnitContractBlock,
   isUltramodernBuildArtifact,
-  ULTRAMODERN_BUILD_ARTIFACT_FILE,
   ULTRAMODERN_BUILD_ARTIFACT_PATH,
-  ULTRAMODERN_BUILD_MODULE_PATH,
   type UltramodernBuildArtifact,
   validateDeliveryUnitRecord,
   validateUltramodernBuildArtifact,
@@ -123,9 +121,6 @@ const readJsonFile = async <T>(filePath: string): Promise<T> =>
 export const buildArtifactPathFor = (appDirectory: string) =>
   path.join(appDirectory, ULTRAMODERN_BUILD_ARTIFACT_PATH);
 
-export const buildModulePathFor = (appDirectory: string) =>
-  path.join(appDirectory, ULTRAMODERN_BUILD_MODULE_PATH);
-
 export const readBuildIdentity = async (
   appDirectory: string,
 ): Promise<BackendFederationBuildIdentity> => {
@@ -159,24 +154,9 @@ export const readBuildIdentity = async (
     };
   }
 
-  const buildModulePath = buildModulePathFor(appDirectory);
-  if (!existsSync(buildModulePath)) {
-    return {};
-  }
-
-  console.warn(
-    `[backend-federation-build] ${buildArtifactPath} missing; falling back to legacy regex parsing of ${buildModulePath}. Regenerate the workspace to emit ${ULTRAMODERN_BUILD_ARTIFACT_FILE}.`,
+  throw new Error(
+    `[backend-federation-build] Missing delivery-unit build artifact at ${buildArtifactPath}.`,
   );
-
-  const source = await fs.readFile(buildModulePath, 'utf8');
-  return {
-    appId: source.match(/\bappId:\s*['"]([^'"]+)['"]/u)?.[1],
-    buildVersion: source.match(/\bbuild:\s*['"]([^'"]+)['"]/u)?.[1],
-    packageName: source.match(/\bpackageName:\s*['"]([^'"]+)['"]/u)?.[1],
-    version: source.match(/\bversion:\s*['"]([^'"]+)['"]/u)?.[1],
-    unitId: source.match(/\bunitId:\s*['"]([^'"]+)['"]/u)?.[1],
-    sourceRevision: source.match(/\bsourceRevision:\s*['"]([^'"]+)['"]/u)?.[1],
-  };
 };
 
 const toPascalCase = (value: string) =>

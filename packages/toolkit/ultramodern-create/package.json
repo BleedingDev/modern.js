@@ -1,6 +1,6 @@
 {
   "name": "@modern-js/ultramodern-create",
-  "description": "Opinionated UltraModern.js workspace scaffolding and migration tooling.",
+  "description": "Opinionated UltraModern.js workspace scaffolding and validation tooling.",
   "homepage": "https://github.com/BleedingDev/ultramodern.js#readme",
   "bugs": "https://github.com/BleedingDev/ultramodern.js/issues",
   "repository": {

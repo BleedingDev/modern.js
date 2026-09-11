@@ -248,7 +248,7 @@ async function expectOpenTelemetryTraceInBrowser(page: Page, port: number) {
   const [
     status,
     traceId,
-    rootSpanId,
+    clientSpanId,
     runSpanId,
     runParentSpanId,
     runTraceId,
@@ -259,7 +259,7 @@ async function expectOpenTelemetryTraceInBrowser(page: Page, port: number) {
   ] = await Promise.all([
     page.$eval('.trace-status', el => el.textContent?.trim() ?? ''),
     page.$eval('.trace-id', el => el.textContent?.trim() ?? ''),
-    page.$eval('.trace-root-span-id', el => el.textContent?.trim() ?? ''),
+    page.$eval('.trace-client-span-id', el => el.textContent?.trim() ?? ''),
     page.$eval('.trace-run-span-id', el => el.textContent?.trim() ?? ''),
     page.$eval('.trace-run-parent-span-id', el => el.textContent?.trim() ?? ''),
     page.$eval('.trace-run-trace-id', el => el.textContent?.trim() ?? ''),
@@ -271,7 +271,7 @@ async function expectOpenTelemetryTraceInBrowser(page: Page, port: number) {
 
   expect(status).toBe('ok');
   expect(traceId).toMatch(/^[0-9a-f]{32}$/);
-  expect(rootSpanId).toMatch(/^[0-9a-f]{16}$/);
+  expect(clientSpanId).toMatch(/^[0-9a-f]{16}$/);
   expect(runSpanId).toMatch(/^[0-9a-f]{16}$/);
   expect(runParentSpanId).toMatch(/^[0-9a-f]{16}$/);
   expect(runTraceId).toBe(traceId);
@@ -281,9 +281,8 @@ async function expectOpenTelemetryTraceInBrowser(page: Page, port: number) {
     expect.arrayContaining(['bff.effect.db.query', 'bff.effect.trace.run']),
   );
 
-  // Every recorded server span for this traceId joined the browser-initiated
-  // trace, and the run span links back to the browser root span through the
-  // server-side span tree (http server spans in between are fine).
+  // Server spans retain the native browser Effect trace and link back to the
+  // propagated HTTP client span through the server-side span tree.
   const spans = JSON.parse(spansJson) as Array<{
     name: string;
     traceId: string;
@@ -298,18 +297,18 @@ async function expectOpenTelemetryTraceInBrowser(page: Page, port: number) {
   const spansById = new Map(spans.map(span => [span.spanId, span]));
   const visited = new Set<string>();
   let cursor = spansById.get(runSpanId);
-  let reachedBrowserRoot = false;
+  let reachedBrowserClient = false;
   while (cursor && !visited.has(cursor.spanId)) {
     visited.add(cursor.spanId);
-    if (cursor.parentSpanId === rootSpanId) {
-      reachedBrowserRoot = true;
+    if (cursor.parentSpanId === clientSpanId) {
+      reachedBrowserClient = true;
       break;
     }
     cursor = cursor.parentSpanId
       ? spansById.get(cursor.parentSpanId)
       : undefined;
   }
-  expect(reachedBrowserRoot).toBe(true);
+  expect(reachedBrowserClient).toBe(true);
 }
 
 describe('bff effect tests', () => {
@@ -362,12 +361,12 @@ describe('bff effect tests', () => {
       await expectCustomServerHeaders(port);
     });
 
-    test('client sdk import still works in browser', async () => {
+    test('native inferred HttpApi client works in browser', async () => {
       expect(page).toBeDefined();
       await expectClientSdkInBrowser(page!, port);
     });
 
-    test('custom sdk interceptor works for effect client', async () => {
+    test('native HttpApi response transformation works for effect client', async () => {
       expect(page).toBeDefined();
       await expectCustomSdkInBrowser(page!, port);
     });

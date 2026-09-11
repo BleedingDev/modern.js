@@ -15,4 +15,4 @@
 
 Move fork build, deployment, debugger, federation, and contract implementations into dedicated packages. Compose UltraModern build plugins through `@modern-js/ultramodern-app-tools`, preserving native plugin ordering, runtime context identity, and checked public declarations.
 
-Generate the new package imports and dependencies directly. Migrate recognized historical generated configuration and runtime imports while preserving authored code, formatting, and atomic update behavior.
+Generate the new package imports and dependencies directly.

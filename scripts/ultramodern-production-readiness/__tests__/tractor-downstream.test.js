@@ -42,6 +42,9 @@ function fixture() {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), 'tractor-downstream-contract-'),
   );
+  fs.mkdirSync(path.join(root, 'apps/shell-super-app/locales/en'), {
+    recursive: true,
+  });
   fs.writeFileSync(
     path.join(root, 'package.json'),
     `${JSON.stringify({
@@ -50,6 +53,10 @@ function fixture() {
           'npm:@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50',
       },
     })}\n`,
+  );
+  fs.writeFileSync(
+    path.join(root, 'apps/shell-super-app/locales/en/shell.json'),
+    '{"heading":"Tractor Store"}\n',
   );
   return root;
 }
@@ -244,7 +251,7 @@ test('release-age exclusions are exact specifiers, sorted as specifiers, and rea
       version: releaseVersion,
     },
     minimumReleaseAgeExclude,
-    ['ultramodern', 'migrate-strict-effect'],
+    ['ultramodern', 'validate'],
   );
   assert.deepEqual(
     args.filter(argument =>
@@ -254,7 +261,7 @@ test('release-age exclusions are exact specifiers, sorted as specifiers, and rea
       selector => `--config.minimum-release-age-exclude=${selector}`,
     ),
   );
-  assert.deepEqual(args.slice(-2), ['ultramodern', 'migrate-strict-effect']);
+  assert.deepEqual(args.slice(-2), ['ultramodern', 'validate']);
 });
 
 test('Tractor bootstrap rejects wildcard, future-dated and unbound release-age approvals', async t => {
@@ -839,4 +846,66 @@ test('source-candidate rehearsal tears down its registry and refuses an escaped 
     ),
   );
   assert.equal(driftedStarts, 0);
+});
+
+test('cohort installation updates exact dependencies while preserving authored Tractor source', async () => {
+  const { prepareTractorCohortInstallation } = await import(
+    '../tractor-downstream/cohort-install.mjs'
+  );
+  const {
+    assertAuthenticatedTractorCohort,
+    assertExactModernDependencySpecifiers,
+  } = await contractPromise;
+  const root = fixture();
+  try {
+    writeAuthenticatedCohort(root);
+    const next = structuredClone(release);
+    next.release.version = '3.9.0-ultramodern.6';
+    next.publishOrder = Object.values(next.aliases);
+    next.cohortProjection.value.release.version = next.release.version;
+    next.cohortProjection.value.packages[0].version = next.release.version;
+    const uiFile = path.join(
+      root,
+      'apps/shell-super-app/locales/en/shell.json',
+    );
+    const before = fs.readFileSync(uiFile, 'utf8');
+    const exclusions = [
+      `@bleedingdev/modern-js-runtime@${next.release.version}`,
+    ];
+    fs.writeFileSync(
+      path.join(root, 'pnpm-workspace.yaml'),
+      "minimumReleaseAge: 1440\nminimumReleaseAgeExclude:\n  - '@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50'\ntrustPolicy: no-downgrade\n",
+    );
+    const result = prepareTractorCohortInstallation(root, next, exclusions);
+    assert.equal(result.dependencyCount, 1);
+    assert.equal(
+      assertAuthenticatedTractorCohort(root, next).version,
+      next.release.version,
+    );
+    assert.equal(assertExactModernDependencySpecifiers(root, next).length, 1);
+    assert.equal(fs.readFileSync(uiFile, 'utf8'), before);
+    const manifestFile = path.join(root, 'package.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    manifest.dependencies['@modern-js/unknown'] = 'workspace:*';
+    fs.writeFileSync(manifestFile, JSON.stringify(manifest));
+    const manifestBefore = fs.readFileSync(manifestFile, 'utf8');
+    const configFile = path.join(root, '.modernjs/ultramodern.json');
+    const configBefore = fs.readFileSync(configFile, 'utf8');
+    assert.throws(
+      () => prepareTractorCohortInstallation(root, next, exclusions),
+      /absent from the release cohort/,
+    );
+    assert.equal(fs.readFileSync(manifestFile, 'utf8'), manifestBefore);
+    assert.equal(fs.readFileSync(configFile, 'utf8'), configBefore);
+    const tampered = structuredClone(next);
+    tampered.cohortProjection.value.aliases = {
+      '@modern-js/runtime': '@untrusted/runtime',
+    };
+    assert.throws(
+      () => prepareTractorCohortInstallation(root, tampered, exclusions),
+      /authenticated release projection/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

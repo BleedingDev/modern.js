@@ -116,15 +116,20 @@ const layer = HttpApiBuilder.layer(bffApi).pipe(
 export default defineEffectBff({ api: bffApi, layer });
 ```
 
-Call Effect endpoints from browser code via `@api/index`:
+Create a native, fully inferred client from the shared contract:
 
 ```ts title="src/routes/page.tsx"
-import api from '@api/index';
+import { Effect, makeEffectHttpApiClient } from '@modern-js/bff-effect/effect-client';
+import { bffApi } from '../../shared/api';
 
-const response = await api.client.hello.ping({});
+const response = await Effect.runPromise(
+  makeEffectHttpApiClient(bffApi, { baseUrl: '/api' }).pipe(
+    Effect.flatMap(client => client.hello.ping({})),
+  ),
+);
 ```
 
-The `api.client.*` surface is materialized by the BFF loader for `@api/index` imports. Do not import `api/index` directly and expect `client` to run in server code, scripts, or tests; direct entry imports expose the server runtime definition, and `client` is only a typed placeholder there.
+Requests, responses, and declared errors are inferred from `bffApi`. No client generation or server-entry import is needed.
 
 For UltraModern, Effect `HttpApi` plus Effect BFF is the single blessed authored HTTP path. Use `HttpApi` endpoints with `query`, `params`, `payload`, `success`, and declared errors such as `HttpApiSchema.status(...)`; implement them with `HttpApiBuilder.group(...).handle(...)` and `HttpApiBuilder.layer(...).pipe(Layer.provide(...))`, then default-export the entry as `defineEffectBff({ api, layer })`. See `packages/server/bff-effect/tests/effect-edge-runtime.test.ts` for the live runtime shape.
 

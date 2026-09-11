@@ -8,7 +8,6 @@ export type GeneratedToolingCommandId =
   | 'cloudflareProof'
   | 'cloudflareOutputVerify'
   | 'performanceReadiness'
-  | 'migrateStrictEffect'
   | 'routesGenerate'
   | 'zeropsMaterialize'
   | 'cloudflareSsrProof';
@@ -20,7 +19,6 @@ interface GeneratedToolingCommand {
   command: string;
   wrapperName: string;
   wrapperPath: `scripts/${string}.mts` | `scripts/${string}.mjs`;
-  legacyPath?: `scripts/${string}.mjs`;
   requiresBackendSurface: boolean;
   requiresRemotes?: boolean;
   contractKey: string;
@@ -32,7 +30,7 @@ interface GeneratedToolingCommand {
 const defineToolingCommand = (
   command: Omit<
     GeneratedToolingCommand,
-    'wrapperPath' | 'legacyPath' | 'requiresBackendSurface'
+    'wrapperPath' | 'requiresBackendSurface'
   > & {
     requiresBackendSurface?: boolean;
     wrapperPath?: GeneratedToolingCommand['wrapperPath'];
@@ -40,9 +38,6 @@ const defineToolingCommand = (
 ): GeneratedToolingCommand => ({
   requiresBackendSurface: false,
   ...command,
-  legacyPath: command.wrapperPath
-    ? undefined
-    : `scripts/${command.wrapperName}.mjs`,
   wrapperPath: command.wrapperPath ?? `scripts/${command.wrapperName}.mts`,
 });
 
@@ -121,13 +116,6 @@ export const generatedToolingCommands = [
     rootScript: 'performance:readiness',
     templatePath:
       'templates/workspace-scripts/ultramodern-performance-readiness.mjs',
-  }),
-  defineToolingCommand({
-    id: 'migrateStrictEffect',
-    command: 'migrate-strict-effect',
-    wrapperName: 'migrate-strict-effect',
-    contractKey: 'migrateStrictEffect',
-    rootScript: 'migrate:strict-effect',
   }),
   defineToolingCommand({
     id: 'routesGenerate',

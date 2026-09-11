@@ -140,7 +140,9 @@ export const createParityBffConfig = () => ({
   crossProjectPolicy: {
     enabled: true,
     allowedNamespaces: [PARITY_REQUEST_ID],
-    allowClientAssertedNamespace: true,
+    // Simulates a verified gateway identity in this isolated adapter harness.
+    verifyProducerIdentity: (headers: Record<string, unknown>) =>
+      String(headers['x-test-verified-namespace'] ?? PARITY_REQUEST_ID),
   },
 });
 

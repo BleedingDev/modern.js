@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { generateUltramodernWorkspace } from '../src/ultramodern-workspace';
+import {
+  addUltramodernShell,
+  generateUltramodernWorkspace,
+} from '../src/ultramodern-workspace';
 
 function generateWorkspace(workspaceDir: string) {
   generateUltramodernWorkspace({
@@ -53,11 +56,11 @@ test('generated validator enforces the structural thin-shell gate', () => {
     {
       name: 'shell-api-surface',
       mutate: workspaceDir => {
-        fs.mkdirSync(path.join(workspaceDir, 'apps/shell-super-app/api'), {
+        fs.mkdirSync(path.join(workspaceDir, 'apps/shell-admin/api'), {
           recursive: true,
         });
         fs.writeFileSync(
-          path.join(workspaceDir, 'apps/shell-super-app/api/index.ts'),
+          path.join(workspaceDir, 'apps/shell-admin/api/index.ts'),
           'export const handler = () => {};\n',
         );
       },
@@ -66,11 +69,11 @@ test('generated validator enforces the structural thin-shell gate', () => {
     {
       name: 'shell-server-surface',
       mutate: workspaceDir => {
-        fs.mkdirSync(path.join(workspaceDir, 'apps/shell-super-app/server'), {
+        fs.mkdirSync(path.join(workspaceDir, 'apps/shell-admin/server'), {
           recursive: true,
         });
         fs.writeFileSync(
-          path.join(workspaceDir, 'apps/shell-super-app/server/index.ts'),
+          path.join(workspaceDir, 'apps/shell-admin/server/index.ts'),
           'export const server = () => {};\n',
         );
       },
@@ -115,6 +118,11 @@ test('generated validator enforces the structural thin-shell gate', () => {
 
   try {
     generateWorkspace(baselineDir);
+    addUltramodernShell({
+      workspaceRoot: baselineDir,
+      name: 'admin',
+      modernVersion: '3.2.1',
+    });
     const baseline = runValidation(baselineDir);
     assert.equal(baseline.status, 0, commandOutput(baseline));
 

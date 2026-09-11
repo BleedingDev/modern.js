@@ -18,17 +18,9 @@ UltraModern.js 3.0 is our SuperApp framework forked from Modern.js. It keeps the
 - Add platform-level contracts only where they improve cross-team reliability.
 - Keep escape hatches explicit and outside the generated HTTP API path.
 
-## Compatibility Contract
+## Current Workspace Contract
 
-UltraModern.js 3.0 keeps:
-
-- Modern.js app/config/plugin mental model.
-- Existing project structure and command flow.
-- Progressive adoption path (apps can stay mostly unchanged).
-
-UltraModern.js additions are designed as the default product surface for new SuperApps. The framework direction is Effect + TanStack + SSR + Micro Verticals, and generated HTTP API work uses that direction by default instead of preserving parallel raw-handler layouts.
-Existing Modern.js apps can migrate gradually; once an API surface is generated
-or migrated as UltraModern HTTP API, it must use the strict Effect HttpApi path.
+UltraModern.js uses Effect HttpApi, TanStack Router, SSR, and independently deployable Micro Verticals. Generated workspaces use `api/index.ts`, `shared/api.ts`, and `src/api/*` with concrete Effect schemas. The CLI creates, adds to, and validates workspaces against the current contract.
 
 ## Intentional Differences (v3 line)
 
@@ -56,21 +48,9 @@ or migrated as UltraModern HTTP API, it must use the strict Effect HttpApi path.
 - Generated UltraModern API work uses the Effect runtime only; raw Hono/function handlers are not part of the generated API architecture.
 - We make incompatible scaffold changes when they remove architecture drift.
 
-## Migration Guide
-
-For teams already on Modern.js 3.0 or an older BleedingDev UltraModern scaffold, the adoption path is to move API work onto the strict Effect HttpApi surface instead of preserving older raw handler layouts.
-
-1. Keep existing Modern.js apps running as-is while they are outside the generated UltraModern surface. TanStack Router is the preferred path for new scaffolds and incremental route adoption, but route migration can happen on the team's schedule.
-2. Use `bff.runtimeFramework: 'effect'` with `bff.effect.strictEffectApproach: true` for API work. Entries live at `api/index.ts`, contracts live at `shared/api.ts`, clients live under `src/api/*`, and request/response/error shapes come from Effect `Schema` plus `HttpApi`.
-3. Treat raw handlers, `api/lambda/**`, manual `Response` construction, and manual request parsing as migration defects in generated or migrated UltraModern workspaces.
-4. The public preset now ships with explicit release and certification gates. Generated workspaces include `.github/workflows/ultramodern-workspace-gates.yml`, so `pnpm check` and `pnpm build` stay part of the local adoption contract from day one while CI runs the primitive gates as parallel matrix jobs.
-
-For an older generated workspace, migrate by treating the published cohort as
-the source of truth:
+## Create and Validate a Workspace
 
 ```bash
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest --help
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest catalog --vertical --dry-run
 pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest catalog --vertical
 mise install
 mise exec -- pnpm install
@@ -78,72 +58,11 @@ mise exec -- pnpm check
 mise exec -- pnpm build
 ```
 
-### Migrating localized Cloudflare SSR workspaces
-
-Current cohorts localize Cloudflare SSR workspaces.
-The framework moves bare locale-root redirects into the framework-owned
-Cloudflare Worker entry and the i18n server runtime. A request for `/` is
-redirected server-side with `302` to the negotiated locale path, for example
-`/cs` for `Accept-Language: cs-CZ` or `/en` for English and fallback traffic.
-
-Existing generated workspaces should upgrade the whole BleedingDev Modern
-package cohort together. Resolve the current cohort version first, then run
-the matching migration:
-
-```bash
-COHORT="$(npm view @bleedingdev/modern-js-ultramodern-create version)"
-pnpm dlx "@bleedingdev/modern-js-ultramodern-create@$COHORT" ultramodern \
-  migrate-strict-effect --version "$COHORT"
-pnpm install
-pnpm check
-pnpm build
-pnpm cloudflare:build
-```
-
-For deployed Cloudflare Workers, redeploy after the cohort update and verify
-the root response before accepting the migration:
+Localized Cloudflare SSR workspaces redirect `/` on the server to the negotiated locale. For example, `Accept-Language: cs-CZ` returns `302` with `Location: /cs`, `Cache-Control: private, no-store`, and `Vary` covering locale detection headers. Validate the deployed Worker with:
 
 ```bash
 curl -I -H 'Accept-Language: cs-CZ,cs;q=0.9,en;q=0.1' https://<worker-host>/
 ```
-
-The expected response is `302` with `Location: /cs` or the matching locale,
-`Cache-Control: private, no-store`, and `Vary` covering the locale detection
-headers. Following the redirect should return the SSR locale page with the
-matching document language and i18n SSR data.
-
-Do not fix older root `404` responses by adding app-owned root route files,
-client-side redirects, custom navigation wrappers, Cloudflare Worker
-postprocessing, generated output edits, or local redirect shims. If `/` still
-returns `404` after upgrading, confirm the production build log shows
-`Modern.js Framework v<cohort-version>` for the cohort you migrated to and
-redeploy the Worker.
-
-Strict generated API migration is part of every current cohort: the direct
-`api/index.ts` generator, generated `.mts` checks, the strict Oxlint boundary
-rule set, Effect cohort overrides, and the strict Effect migration command.
-Agents that cannot install the BleedingDev cohort yet should use the local
-Modern.js workspace for migration validation; otherwise pin the target cohort
-with `--ultramodern-package-version`.
-
-Before hand-editing package aliases or generated metadata, run the framework
-migration command from the target workspace:
-
-```bash
-COHORT="$(npm view @bleedingdev/modern-js-ultramodern-create version)"
-pnpm dlx "@bleedingdev/modern-js-ultramodern-create@$COHORT" ultramodern \
-  migrate-strict-effect --version "$COHORT"
-pnpm api:check
-pnpm contract:check
-```
-
-The command updates `.modernjs/ultramodern.json`, root
-`modernjs.packageSource`, generated Modern package aliases, framework-owned
-toolchain pins, direct topology API metadata, strict Effect pnpm
-overrides/trust policy, and the pnpm lockfile. Remaining failures are source
-migration work: move code to `shared/api.ts`, `api/index.ts`, and
-`src/api/*-client.ts`, then delete `api/effect`, `api/lambda`, `shared/effect`,
-and `src/effect`.
 
 Generated strict Effect workspaces pin the compatible Effect cohort with pnpm
 overrides: `effect@4.0.0-rc.112`, `@effect/opentelemetry@4.0.0-rc.112`,

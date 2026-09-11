@@ -69,17 +69,6 @@ Harden cross-project BFF with fail-fast validation, safer generation, and explic
   - `packages/server/create-request/tests/node.test.ts`
   - `pnpm --filter @modern-js/plugin-bff test -- cross-project-api-plugin.test.ts regression.test.ts`
 
-## 8. Compatibility Notes (2026-02-22)
-
-Behavior change for producer clients:
-
-1. Non-default `requestId` configuration now requires `setDomain()` (fail-fast at `configure()` and request send).
-2. Generated SDK includes `initProducerClient` to make bootstrap explicit and less error-prone.
-3. Migration guidance:
-   - Before: `configure({ requestId: 'producer-a' })`
-   - Now: `initProducerClient({ setDomain: () => 'https://producer-a.internal' })` or `configure({ requestId: 'producer-a', setDomain: ... })`
-4. Legacy default `requestId` flows remain backward compatible.
-
 ## 9. Envelope Policy Notes (2026-02-22)
 
 1. Cross-project non-default producer calls now support `requireEnvelope` and `allowCrossOriginEnvelope` policy controls.
@@ -98,7 +87,7 @@ Behavior change for producer clients:
   - `timeout`
   - `retry`
   - `retry_exhausted`
-4. Behavior remains backward compatible by default:
+4. Transport defaults:
   - no timeout unless configured
   - no retries unless configured
 5. Validation coverage:

@@ -261,7 +261,7 @@ async function createEvidenceFixture() {
     `${JSON.stringify({
       // The contract requires every check id, exactly once, in this order.
       checks: [
-        passed('exact-create-migration', {
+        passed('exact-create-validation', {
           createPackage: `${createTargetName}@${release.version}`,
           version: release.version,
         }),

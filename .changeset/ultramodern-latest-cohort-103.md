@@ -21,8 +21,7 @@ Cloudflare v4 lane.
 RSC remains disabled by default and is not shipped in the UltraModern company
 distribution. The Rspack RSC toolchain is now an explicit optional peer of the
 framework packages, while the patched upstream runtime is retained only as an
-exact root development input for framework regression tests. Generated and
-migrated applications receive neither an RSC runtime nor a consumer-side patch.
+exact root development input for framework regression tests. Generated applications receive neither an RSC runtime nor a consumer-side patch.
 The Module Federation manifest-recovery runtime also keeps its retry timer on
 the browser-safe universal utilities surface so client bundles never traverse
 Node-only framework utilities. Production Effect BFF entries retain the native

@@ -56,12 +56,6 @@ export function deliveryUnitMetadata(
   return recordField(record, 'deliveryUnit');
 }
 
-/**
- * Resolves the delivery-unit identity root for a manifest (ADR-0019 §3):
- * prefers `versionBoundary.deliveryUnit`, falls back to the top-level
- * `backendFederation.deliveryUnit` record. Both are additive/optional so
- * legacy manifests without delivery-unit metadata continue to validate.
- */
 export function manifestDeliveryUnit(
   backendFederation: Record<string, unknown> | undefined,
   boundary: Record<string, unknown> | undefined,

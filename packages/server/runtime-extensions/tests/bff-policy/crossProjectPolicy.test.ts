@@ -7,7 +7,7 @@ import { buildOperationContractMap } from '../../src/bff-policy/operationContrac
 
 // Header/reason permutations live in crossProjectPolicy.matrix.test.ts.
 // This file only covers behaviour that matrix cannot express: binding a
-// contract to the *observed* request, and the advisory opt-out.
+// contract to the *observed* request.
 describe('cross-project policy', () => {
   test('denies operation metadata that does not match the observed request', () => {
     const contracts = buildOperationContractMap({
@@ -94,34 +94,6 @@ describe('cross-project policy', () => {
     );
 
     expect(violation).toBeNull();
-  });
-
-  test('explicit client-asserted namespace opt-out stays advisory and warns once', () => {
-    const headers = {
-      'x-modernjs-bff-envelope': JSON.stringify({
-        requestId: 'crm.producer-a',
-      }),
-    };
-    const policy = {
-      enabled: true,
-      allowedNamespaces: ['crm'],
-      allowClientAssertedNamespace: true,
-      requireOperationContext: false,
-    };
-    const warnSpy = rstest
-      .spyOn(console, 'warn')
-      .mockImplementation(() => undefined);
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'development';
-
-    try {
-      expect(evaluateCrossProjectPolicy(headers, policy)).toBeNull();
-      expect(evaluateCrossProjectPolicy(headers, policy)).toBeNull();
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      process.env.NODE_ENV = previousNodeEnv;
-      warnSpy.mockRestore();
-    }
   });
 });
 

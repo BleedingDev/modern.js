@@ -2,14 +2,10 @@ export const WORKSPACE_PACKAGE_VERSION = 'workspace:*';
 export const ULTRAMODERN_CREATE_PACKAGE = '@modern-js/ultramodern-create';
 export const BLEEDINGDEV_CREATE_PACKAGE =
   '@bleedingdev/modern-js-ultramodern-create';
-export const LEGACY_BLEEDINGDEV_CREATE_PACKAGE =
-  '@bleedingdev/modern-js-create';
 export const BLEEDINGDEV_PACKAGE_SCOPE = 'bleedingdev';
 export const BLEEDINGDEV_PACKAGE_NAME_PREFIX = 'modern-js-';
 export const ULTRAMODERN_FRAMEWORK_VERSION_ENV =
   'ULTRAMODERN_CREATE_FRAMEWORK_VERSION';
-export const BLEEDINGDEV_FRAMEWORK_VERSION_ENV =
-  'MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION';
 
 export const ULTRAMODERN_SINGLE_APP_MODERN_PACKAGES = [
   ULTRAMODERN_CREATE_PACKAGE,

@@ -85,7 +85,7 @@ nothing.
   if (!fs.existsSync(compactPath)) {
     throw new Error(
       `Missing ${ULTRAMODERN_CONFIG_PATH}. sync-delivery-unit needs the compact ` +
-        'UltraModern config; run `ultramodern-create ultramodern migrate-strict-effect` first.',
+        'UltraModern config. Create a workspace with the current generator.',
     );
   }
 

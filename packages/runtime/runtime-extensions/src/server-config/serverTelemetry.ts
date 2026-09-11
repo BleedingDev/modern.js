@@ -31,18 +31,18 @@ export interface ServerTelemetrySloUserConfig {
   alertCooldownMs?: number;
 }
 
-export interface ServerTelemetryCanaryContractGateUserConfig {
+export interface ServerTelemetryHealthContractGateUserConfig {
   /**
    * Whether this contract gate currently passes.
    */
   passed: boolean;
   /**
-   * Optional failure reason used for rollback diagnostics.
+   * Optional failure reason used for health diagnostics.
    */
   reason?: string;
 }
 
-export interface ServerTelemetryCanaryAutopilotUserConfig {
+export interface ServerTelemetrySnapshotObservationUserConfig {
   /**
    * Enable automatic contract gate synchronization from a gate snapshot file.
    *
@@ -70,15 +70,15 @@ export interface ServerTelemetryCanaryAutopilotUserConfig {
   /**
    * Runtime MF fallback signal ingestion.
    */
-  runtimeFallbackSignal?: ServerTelemetryCanaryRuntimeFallbackSignalUserConfig;
+  runtimeFallbackSignal?: ServerTelemetryHealthRuntimeFallbackSignalUserConfig;
   /**
    * Optional pluggable state store backend for contract gate snapshots.
    * When omitted, snapshots are read/written from gateSnapshotPath on local disk.
    */
-  stateStore?: ServerTelemetryCanaryAutopilotStateStoreUserConfig;
+  stateStore?: ServerTelemetrySnapshotObservationStateStoreUserConfig;
 }
 
-export interface ServerTelemetryCanaryAutopilotStateStoreUserConfig {
+export interface ServerTelemetrySnapshotObservationStateStoreUserConfig {
   /**
    * Path or package name of a module that exports
    * `createContractGateSnapshotStore(context)`.
@@ -90,7 +90,7 @@ export interface ServerTelemetryCanaryAutopilotStateStoreUserConfig {
   options?: Record<string, unknown>;
 }
 
-export interface ServerTelemetryCanaryRuntimeFallbackSignalUserConfig {
+export interface ServerTelemetryHealthRuntimeFallbackSignalUserConfig {
   /**
    * Enable runtime MF fallback signal ingestion endpoint.
    *
@@ -126,16 +126,16 @@ export interface ServerTelemetryCanaryRuntimeFallbackSignalUserConfig {
   maxBodyBytes?: number;
   /**
    * Optional runtime trust policy for fallback signal ingestion.
-   * Use this to restrict who can mutate canary contract gates.
+   * Use this to restrict who can mutate health contract gates.
    */
-  trustPolicy?: ServerTelemetryCanaryRuntimeFallbackSignalTrustPolicyUserConfig;
+  trustPolicy?: ServerTelemetryHealthRuntimeFallbackSignalTrustPolicyUserConfig;
   /**
    * Optional request authentication for runtime fallback signal endpoint.
    */
-  auth?: ServerTelemetryCanaryRuntimeFallbackSignalAuthUserConfig;
+  auth?: ServerTelemetryHealthRuntimeFallbackSignalAuthUserConfig;
 }
 
-export interface ServerTelemetryCanaryRuntimeFallbackSignalAuthUserConfig {
+export interface ServerTelemetryHealthRuntimeFallbackSignalAuthUserConfig {
   /**
    * Enable auth guard for runtime fallback signal endpoint.
    *
@@ -158,7 +158,7 @@ export interface ServerTelemetryCanaryRuntimeFallbackSignalAuthUserConfig {
   expectedValueEnv?: string;
 }
 
-export interface ServerTelemetryCanaryRuntimeFallbackSignalTrustPolicyUserConfig {
+export interface ServerTelemetryHealthRuntimeFallbackSignalTrustPolicyUserConfig {
   /**
    * Allowlist of app names accepted by runtime fallback signal endpoint.
    * Empty means no app-name allowlist check.
@@ -200,61 +200,61 @@ export interface ServerTelemetryCanaryRuntimeFallbackSignalTrustPolicyUserConfig
   dedupeWindowMs?: number;
 }
 
-export interface ServerTelemetryCanaryUserConfig {
+export interface ServerTelemetryHealthUserConfig {
   /**
-   * Enable canary rollout/rollback orchestration.
+   * Enable telemetry health observation.
    *
    * @default false
    */
   enabled?: boolean;
   /**
-   * Periodic canary evaluation interval in milliseconds.
+   * Periodic health evaluation interval in milliseconds.
    *
    * @default 15000
    */
   evaluationIntervalMs?: number;
   /**
-   * Required consecutive healthy evaluations before promotion.
+   * Required consecutive healthy evaluations before reporting healthy.
    *
    * @default 3
    */
   minConsecutiveHealthyEvaluations?: number;
   /**
-   * Consecutive failing evaluations before automated rollback.
+   * Consecutive failing evaluations before reporting unhealthy.
    *
    * @default 2
    */
-  rollbackConsecutiveFailures?: number;
+  minConsecutiveFailedEvaluations?: number;
   /**
-   * Maximum queue utilization ratio allowed during canary.
+   * Maximum queue utilization ratio allowed for healthy telemetry.
    *
    * @default 0.8
    */
   maxQueueUtilization?: number;
   /**
-   * Maximum allowed total dropped envelopes during canary.
+   * Maximum allowed total dropped envelopes for healthy telemetry.
    *
    * @default 0
    */
   maxTotalDropped?: number;
   /**
-   * Maximum allowed unhealthy exporters during canary.
+   * Maximum allowed unhealthy exporters for healthy telemetry.
    *
    * @default 0
    */
   maxUnhealthyExporters?: number;
   /**
-   * Contract gate map used in rollout decisions.
+   * Contract gate map used in health evaluations.
    * `true` means passing, `false` means failing.
    */
   contractGates?: Record<
     string,
-    boolean | ServerTelemetryCanaryContractGateUserConfig
+    boolean | ServerTelemetryHealthContractGateUserConfig
   >;
   /**
-   * Contract-gate autopilot settings.
+   * Contract-gate snapshot observation settings.
    */
-  autopilot?: ServerTelemetryCanaryAutopilotUserConfig;
+  snapshotObservation?: ServerTelemetrySnapshotObservationUserConfig;
 }
 
 export interface ServerTelemetryConfigExtension {
@@ -321,9 +321,9 @@ export interface ServerTelemetryUserConfig {
    */
   slo?: ServerTelemetrySloUserConfig;
   /**
-   * Canary rollout and automated rollback orchestration policy.
+   * Telemetry health observation policy.
    */
-  canary?: ServerTelemetryCanaryUserConfig;
+  health?: ServerTelemetryHealthUserConfig;
   exporters?: {
     /**
      * OpenTelemetry HTTP exporter.

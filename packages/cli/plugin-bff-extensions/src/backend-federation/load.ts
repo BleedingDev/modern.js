@@ -1,9 +1,5 @@
 import { BACKEND_FEDERATION_EFFECT_EXPOSE } from '@modern-js/backend-federation-contracts';
-import * as Effect from 'effect/Effect';
-import * as Logger from 'effect/Logger';
 
-import { type BackendFederationExpectedIdentity } from './identity';
-import { LEGACY_LOAD_WARNING } from './legacy-warning';
 import { collectRemotes } from './remotes';
 import { createBackendFederationRuntime } from './runtime';
 import type {
@@ -14,18 +10,6 @@ import type {
 import { normalizeExpose } from './utils';
 import { validateLoadedBackendFederatedEffectApi } from './validate-loaded';
 
-const legacyWarningLogger = Logger.withLeveledConsole(Logger.formatLogFmt);
-
-function warnLegacyLoad() {
-  Effect.runSync(
-    Effect.provideService(
-      Effect.logWarning(LEGACY_LOAD_WARNING),
-      Logger.CurrentLoggers,
-      new Set([legacyWarningLogger]),
-    ),
-  );
-}
-
 /**
  * Load a federated Effect API with mandatory delivery-unit identity
  * validation (MV-G23): the loaded expose's compatibility metadata must match
@@ -33,20 +17,6 @@ function warnLegacyLoad() {
  */
 export function loadBackendFederatedEffectApi(
   options: BackendFederationIdentityLoadOptions,
-): Promise<BackendFederatedEffectApiModule>;
-/**
- * @deprecated Pass `expected` (delivery-unit `unitId` + `buildMarker`).
- * Loads without an expected identity cannot be validated against a resolved
- * delivery-unit record and emit a runtime warning.
- */
-export function loadBackendFederatedEffectApi(
-  options: BackendFederationLoadOptions,
-): Promise<BackendFederatedEffectApiModule>;
-export function loadBackendFederatedEffectApi(
-  options: BackendFederationLoadOptions & {
-    expected?: BackendFederationExpectedIdentity;
-    allowMissingIdentityMetadata?: boolean;
-  },
 ): Promise<BackendFederatedEffectApiModule> {
   const remoteName = options.remote?.name ?? options.remoteName;
   if (remoteName === undefined || remoteName.length === 0) {
@@ -55,8 +25,12 @@ export function loadBackendFederatedEffectApi(
     );
   }
 
-  if (options.expected === undefined) {
-    warnLegacyLoad();
+  if (!options.expected?.unitId || !options.expected.buildMarker) {
+    return Promise.reject(
+      new Error(
+        '[BFF][Effect] Backend federation requires expected.unitId and expected.buildMarker.',
+      ),
+    );
   }
 
   if (options.runtime !== undefined) {
@@ -93,7 +67,6 @@ export function loadBackendFederatedEffectApi(
   const remoteRequest = `${remoteName}/${normalizeExpose(expose)}`;
   return runtime.loadRemote(remoteRequest).then(loaded =>
     validateLoadedBackendFederatedEffectApi(loaded, {
-      allowMissingIdentityMetadata: options.allowMissingIdentityMetadata,
       expected: options.expected,
       remoteName,
       remoteRequest,

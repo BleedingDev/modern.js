@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
 import {
   addUltramodernVertical,
   generateUltramodernWorkspace,
@@ -18,10 +17,7 @@ import {
   prependCommandFixturePath,
   writeNodeCommandFixture,
 } from './helpers/node-command-fixture';
-import {
-  linkWorkspaceFormatterDependencies,
-  snapshotWorkspace,
-} from './helpers/workspace-kit';
+import { linkWorkspaceFormatterDependencies } from './helpers/workspace-kit';
 
 const readJson = (root: string, relativePath: string) =>
   JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf-8'));
@@ -264,7 +260,7 @@ test('bridge mode rejects parent packages that collide with generated app depend
   }
 });
 
-test('bridge mode materializes delegated gates and preserves external parent participants on uncoordinated migration', () => {
+test('bridge mode materializes delegated gates and preserves external parent participants', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-bridge-'));
   const workspaceDir = path.join(tempRoot, 'apps/bridge-app');
 
@@ -397,87 +393,6 @@ test('bridge mode materializes delegated gates and preserves external parent par
     );
     assert.equal(failedParentGate.status, 73);
     assert.deepEqual(commandRecorder.read(), [parentTypecheckInvocation]);
-
-    // Migrating to strict-effect must refuse to silently absorb an
-    // externally-owned bridged workspace participant.
-    const beforeMigration = snapshotWorkspace(tempRoot);
-    assert.throws(
-      () =>
-        runMigrateStrictEffect(['--skip-install'], {
-          workspaceRoot: workspaceDir,
-          invocationCwd: workspaceDir,
-        }),
-      /External workspace participant requires coordinated ownership: \.\.\/\.\.\/packages\/domain-core/u,
-    );
-    assert.deepEqual(snapshotWorkspace(tempRoot), beforeMigration);
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('migration updates declared nested local bridge packages and preserves their authored fields', () => {
-  const tempRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-local-bridge-migrate-'),
-  );
-  const workspaceDir = path.join(tempRoot, 'workspace');
-  try {
-    generateUltramodernWorkspace({
-      targetDir: workspaceDir,
-      packageName: 'local-bridge',
-      modernVersion: '3.2.1',
-      packageSource: { strategy: 'workspace' },
-      bridge: {
-        parentRoot: '.',
-        lockfilePolicy: 'nested',
-        workspacePackages: [
-          { pattern: 'domain/*', packageNames: ['@acme/domain-core'] },
-        ],
-        dependencies: ['@acme/domain-core'],
-        gates: [
-          {
-            name: 'domain-check',
-            command: 'pnpm exec rstest domain/core',
-            cwd: '.',
-          },
-        ],
-      },
-    });
-    linkWorkspaceFormatterDependencies(workspaceDir);
-    const participant = path.join(workspaceDir, 'domain/core');
-    fs.mkdirSync(participant, { recursive: true });
-    fs.writeFileSync(
-      path.join(participant, 'package.json'),
-      JSON.stringify({
-        name: '@acme/domain-core',
-        private: true,
-        dependencies: {
-          '@modern-js/runtime': '0.0.0',
-          'consumer-library': '^1.2.3',
-        },
-        scripts: { test: 'consumer-test' },
-        consumer: { keep: true },
-      }),
-    );
-    fs.writeFileSync(
-      path.join(participant, 'index.ts'),
-      'export const consumer = true;\n',
-    );
-    assert.equal(
-      runMigrateStrictEffect(['--skip-install'], {
-        workspaceRoot: workspaceDir,
-        invocationCwd: workspaceDir,
-      }),
-      0,
-    );
-    const migrated = readJson(workspaceDir, 'domain/core/package.json');
-    assert.equal(migrated.dependencies['@modern-js/runtime'], 'workspace:*');
-    assert.equal(migrated.dependencies['consumer-library'], '^1.2.3');
-    assert.deepEqual(migrated.scripts, { test: 'consumer-test' });
-    assert.deepEqual(migrated.consumer, { keep: true });
-    assert.equal(
-      fs.readFileSync(path.join(participant, 'index.ts'), 'utf8'),
-      'export const consumer = true;\n',
-    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

@@ -1,9 +1,6 @@
 # Delivery-Unit Schema (canonical contracts) — SPEC
 
-Status: **defined, unwired** (MicroVertical plan task W4). Nothing in the
-generator, normalizer, or runtime imports these types; no emitted output
-changes. The v1 down-projection is a pure function that no generation path
-calls.
+The generator exposes canonical delivery-unit descriptors with release identity and surface metadata.
 
 Binding vocabulary: root [`CONTEXT.md`](../../../../../../CONTEXT.md),
 [ADR-0019](../../../../../../docs/super-app-rfc-adr/ADR-0019-federated-loading-unified-delivery.md)
@@ -11,7 +8,7 @@ Binding vocabulary: root [`CONTEXT.md`](../../../../../../CONTEXT.md),
 [ADR-0020](../../../../../../docs/super-app-rfc-adr/ADR-0020-zoned-surface-versioning.md)
 (Zoned Surface Versioning).
 
-Contracts live in [`types.ts`](./types.ts).
+Contracts live in [`types.ts`](./src/ultramodern-workspace/delivery-unit-schema/types.ts).
 
 ## 1. Shapes
 
@@ -102,40 +99,11 @@ W5 (observed-graph) and W7 (discovery record).
 4. **Zone default.** A unit with no `publicationZone` is `coordinated`
    (`resolvePublicationZone`). `external` structurally requires an
    `ExternalPublication` record (ADR-0020).
-5. **Marker preservation on schema-only migration.** Down-projection (§5) and
-   any schema-only migration pass `buildMarker` / `sourceRevision` / `unitId`
-   through unchanged; markers rotate only on a declared new build, never as a
+5. **Marker preservation.** Serialization preserves `buildMarker`,
+   `sourceRevision`, and `unitId`; markers rotate only on a declared new build, never as a
    side effect of re-serialization.
 6. **Unknown-field preservation.** `parseDeliveryUnitDescriptor` captures
    unrecognised top-level and per-surface keys into `unknownFields`;
    `serializeDeliveryUnitDescriptor` spreads them back at their original level
    (known keys win on collision). Round-trip is lossless:
    `serialize(parse(json))` deep-equals `json`.
-
-## 5. v1 down-projection
-
-`projectDeliveryUnitToV1(descriptor, context) => { app, deliveryUnitRecord,
-preservedUnknownFields }` is pure and total. Sources: `descriptor.*` from the
-canonical shape; `context.*` for generator-only fields the descriptor
-deliberately does not own (port, directory, package identity, ownership).
-
-| v1 target                       | source                                            | notes |
-|---------------------------------|---------------------------------------------------|-------|
-| `WorkspaceApp.id`               | last `/` segment of `descriptor.unitId`           | |
-| `WorkspaceApp.kind`             | `microvertical`/`horizontal-remote` → `vertical`; `shell` → `shell` | lossy: v1 has no `horizontal-remote` |
-| `WorkspaceApp.api`              | first `kind: 'api'` surface → `{ stem: surfaceId, prefix: http address ?? '/'+surfaceId, consumedBy: [] }` | omitted if no api surface |
-| `WorkspaceApp.directory/packageSuffix/displayName/portEnv/port/mfName/ownership` | `context.*` | not owned by descriptor |
-| `WorkspaceApp.exposes/verticalRefs/domain` | — | not projected (emergent/underivable) |
-| `DeliveryUnitRecord.appId`      | last `/` segment of `descriptor.unitId`           | |
-| `DeliveryUnitRecord.unitId`     | `descriptor.unitId`                               | **preserved** |
-| `DeliveryUnitRecord.buildMarker`| `descriptor.buildMarker`                          | **preserved** (invariant 5) |
-| `DeliveryUnitRecord.sourceRevision` | `descriptor.sourceRevision`                   | **preserved** |
-| `DeliveryUnitRecord.kind`       | `DELIVERY_UNIT_KIND` constant                     | v1 single-kind literal |
-| `DeliveryUnitRecord.schemaVersion` | `DELIVERY_UNIT_SCHEMA_VERSION` constant        | |
-| `DeliveryUnitRecord.deployProfile` | `DELIVERY_UNIT_DEPLOY_PROFILE` constant        | |
-| `DeliveryUnitRecord.packageName/version` | `context.*`                              | not owned by descriptor |
-| `preservedUnknownFields`        | `descriptor.unknownFields ?? {}`                  | forward-compat carry-through |
-
-Lossy fields (`kind` collapse, dropped `exposes`/`verticalRefs`, generator-only
-context fields) are why v1 is a *down*-projection: the canonical descriptor is a
-strict superset of the v1 `WorkspaceApp`.

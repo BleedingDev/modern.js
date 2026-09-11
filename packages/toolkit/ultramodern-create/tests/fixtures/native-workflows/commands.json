@@ -7,19 +7,13 @@
   "addUiOnly": ["catalog-ui", "--vertical", "--preset", "ui-only"],
   "addHorizontal": ["shared-ui", "--vertical", "--horizontal-remote"],
   "addRpc": ["orders", "--vertical", "--api-protocol", "rpc"],
-  "previewMigration": [
-    "ultramodern",
-    "migrate-strict-effect",
-    "--version",
-    "<V>",
-    "--dry-run"
-  ],
-  "migration": ["ultramodern", "migrate-strict-effect", "--version", "<V>"],
   "identityBackfill": ["ultramodern", "sync-delivery-unit"],
   "staticAcceptance": ["pnpm", "check"],
   "nodeBuild": ["pnpm", "build"],
   "cloudflareBuild": ["pnpm", "cloudflare:build"],
-  "migrationScript": "migrate:strict-effect",
-  "migrationWrapper": "scripts/migrate-strict-effect.mts",
-  "apiCheckExitCodes": { "valid": 0, "diagnostics": 1, "toolFailure": 2 }
+  "apiCheckExitCodes": {
+    "valid": 0,
+    "diagnostics": 1,
+    "toolFailure": 2
+  }
 }

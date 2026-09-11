@@ -23,13 +23,7 @@ Primary defaults for new work:
 - Module Federation as a first-class composition model.
 - Bun as preferred deployment target.
 
-Compatibility lanes remain available:
-
-- Hono for backward-compatible BFF usage only.
-- React Router / Remix paths for backward-compatible routing usage only. React
-  Router is maintenance-only: drift-reverts and regression fixes are allowed,
-  but no new features or public surface.
-- Node deployment remains supported and tested.
+Node and Cloudflare deployment targets remain supported and tested.
 
 ## 2. Architectural Principles
 
@@ -106,7 +100,7 @@ This gate model is encoded in Beads labels and acceptance criteria.
 
 ## 6. Architecture Risk Decisions
 
-1. Existing Modern.js Hono/React Router surfaces may remain during migration.
+1. UltraModern workspaces use the current Effect and TanStack contracts.
 2. We reject making Hono or React Router the default for new UltraModern-generated features.
 3. We accept temporary alpha-gated app-level MF SSR while reliability hardening completes.
 4. We reject client-trusted tenant scope for authorization or cache isolation.
@@ -117,7 +111,7 @@ This gate model is encoded in Beads labels and acceptance criteria.
 
 1. New cross-project API tickets must include Effect-first contract evidence.
 2. New routing/data orchestration tickets must include TanStack-first evidence.
-3. Compatibility-lane changes (Hono / React Router/Remix) must be explicitly labeled as backward compatibility.
+3. Upstream extension points remain the boundary for framework integration.
 4. Gate reviews reject tickets that introduce new default-path behavior outside Effect/TanStack lanes.
 
 ### 7.2 Security Enforcement
@@ -143,7 +137,7 @@ Promotion gates require all:
 1. Exporter health signals present and non-degraded.
 2. Queue drop/backpressure signals under agreed thresholds.
 3. RsDoctor artifacts produced according to documented contract.
-4. Contract/migration gates pass with attached evidence.
+4. Contract gates pass with attached evidence.
 
 ## 8. Done Criteria For ARCH-0001
 

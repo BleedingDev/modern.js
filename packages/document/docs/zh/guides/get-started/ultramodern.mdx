@@ -16,15 +16,11 @@ UltraModern.js 3.0 是我们从 Modern.js 分叉出来的 SuperApp 框架。它�
 - 仅在跨团队稳定性场景增加平台契约。
 - 保留显式 escape hatch，但它们必须位于生成 HTTP API 模块之外。
 
-## 兼容性承诺
+## 当前 Workspace 契约
 
-UltraModern.js 3.0 保持以下不变：
-
-- Modern.js 的应用/配置/插件心智模型。
-- 既有项目结构与命令使用方式。
-- 渐进式接入路径（应用无需大规模重构）。
-
-UltraModern.js 的增强能力是新 SuperApp 的默认产品面。框架方向是 Effect + TanStack + SSR + Micro Verticals，生成的 HTTP API 只走严格 Effect HttpApi surface。既有 Modern.js 应用可以渐进迁移；一旦某个 API surface 被生成为或迁移为 UltraModern HTTP API，就必须使用严格 Effect HttpApi 路径。
+UltraModern.js 使用 Effect HttpApi、TanStack Router、SSR 和可独立部署的 Micro Verticals。
+生成的 workspace 使用 `api/index.ts`、`shared/api.ts`、`src/api/*` 和具体的 Effect schema。
+CLI 按当前契约创建、扩展和验证 workspace。
 
 ## 有意引入的差异（3.0 线）
 
@@ -50,20 +46,9 @@ UltraModern.js 的增强能力是新 SuperApp 的默认产品面。框架方向�
 - 生成的 UltraModern HTTP API 只走严格 Effect HttpApi surface；原始 request handler 和 Hono/file-function API 不属于生成架构。
 - 除非稳定性硬需求，否则避免引入破坏性 API 变更。
 
-## 迁移指南
-
-对于已经在使用 Modern.js 3.0 或旧版 BleedingDev UltraModern scaffold 的团队，迁移路径是把 API 工作迁到严格 Effect HttpApi surface，而不是保留旧的原始 handler 布局。
-
-1. 既有 Modern.js 应用在尚未进入生成 UltraModern surface 前可以继续按现状运行。TanStack Router 是新脚手架与增量迁移的优先路径，团队可以按自己的节奏迁移路由层。
-2. 新建或迁移中的 BFF 能力使用 `bff.runtimeFramework: 'effect'`、`bff.effect.entry: './api/index'` 和 `bff.effect.strictEffectApproach: true`。接口先改 `shared/api.ts` 的 `HttpApi` 契约，再在 `api/index.ts` 用 `defineEffectBff(...)` / `HttpApiBuilder` 实现。
-3. 在生成或已迁移的 UltraModern workspace 中，把 raw handler、`api/lambda/**`、手写 `Response` 和手写 request parsing 视为迁移缺陷。
-4. 这套公开预设现在已经附带显式的发布 / 认证 gate。生成 workspace 会自带 `.github/workflows/ultramodern-workspace-gates.yml`，因此 `pnpm check` 与 `pnpm build` 从第一天开始就是本地接入契约的一部分；CI 会以并行矩阵运行这些基础 gate。
-
-旧版生成 workspace 迁移时，以已发布的包 cohort 作为事实来源：
+## 创建并验证 Workspace
 
 ```bash
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest --help
-pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest catalog --vertical --dry-run
 pnpm dlx @bleedingdev/modern-js-ultramodern-create@latest catalog --vertical
 mise install
 mise exec -- pnpm install
@@ -71,61 +56,13 @@ mise exec -- pnpm check
 mise exec -- pnpm build
 ```
 
-### 迁移本地化 Cloudflare SSR workspace
-
-当前 cohort 均支持本地化 Cloudflare SSR workspace。框架将裸 locale root 重定向移动到框架拥有的 Cloudflare Worker entry 和 i18n
-server runtime 中。请求 `/` 时，框架会按语言协商在服务端返回 `302`，例如
-`Accept-Language: cs-CZ` 会跳转到 `/cs`，英语或 fallback 流量会跳转到 `/en`。
-
-既有生成 workspace 应整体升级同一个 BleedingDev Modern package cohort。
-先解析当前 cohort 版本，再运行同版本迁移命令：
-
-```bash
-COHORT="$(npm view @bleedingdev/modern-js-ultramodern-create version)"
-pnpm dlx "@bleedingdev/modern-js-ultramodern-create@$COHORT" ultramodern \
-  migrate-strict-effect --version "$COHORT"
-pnpm install
-pnpm check
-pnpm build
-pnpm cloudflare:build
-```
-
-Cloudflare Workers 已部署环境需要在 cohort 更新后重新部署，并在接受迁移前验证 root
-响应：
+本地化 Cloudflare SSR workspace 在服务端将 `/` 重定向到协商的语言路径。
+`Accept-Language: cs-CZ` 返回 `302`、`Location: /cs`、
+`Cache-Control: private, no-store`，以及覆盖语言检测 Header 的 `Vary`。
 
 ```bash
 curl -I -H 'Accept-Language: cs-CZ,cs;q=0.9,en;q=0.1' https://<worker-host>/
 ```
-
-期望响应是 `302`，并带有 `Location: /cs` 或匹配的 locale、
-`Cache-Control: private, no-store`，以及覆盖语言检测 Header 的 `Vary`。继续跟随该
-redirect 后，应返回匹配语言的 SSR 页面，文档语言和 i18n SSR 数据也应一致。
-
-不要通过 app 自有 root route、客户端 redirect、自定义导航 wrapper、Cloudflare Worker
-postprocess、生成产物编辑或本地 redirect shim 来修复旧版本的 root `404`。如果升级后
-`/` 仍然返回 `404`，先确认生产构建日志显示的
-`Modern.js Framework v<cohort-version>` 就是迁移目标 cohort，然后重新部署 Worker。
-
-严格生成 API 迁移是当前每个 cohort 的组成部分：直接 `api/index.ts` 生成器、生成的
-`.mts` 检查、严格 Oxlint 边界规则、Effect 版本组 overrides 和严格 Effect 迁移命令。
-还不能安装 BleedingDev cohort 的 agent 应使用本地 Modern.js workspace 做迁移校验；
-否则用 `--ultramodern-package-version` 固定目标 cohort。
-
-手写 package alias 或生成 metadata 之前，先在目标 workspace 运行框架迁移命令：
-
-```bash
-COHORT="$(npm view @bleedingdev/modern-js-ultramodern-create version)"
-pnpm dlx "@bleedingdev/modern-js-ultramodern-create@$COHORT" ultramodern \
-  migrate-strict-effect --version "$COHORT"
-pnpm api:check
-pnpm contract:check
-```
-
-该命令会更新 `.modernjs/ultramodern.json`、根 `modernjs.packageSource`、生成的
-Modern package alias、框架拥有的 toolchain pin、直接 topology API metadata、严格 Effect
-pnpm overrides/trust policy 和 pnpm lockfile。剩余失败就是源码迁移：把代码移到
-`shared/api.ts`、`api/index.ts` 和 `src/api/*-client.ts`，再删除 `api/effect`、
-`api/lambda`、`shared/effect` 和 `src/effect`。
 
 严格 Effect 生成 workspace 会通过 pnpm overrides 固定兼容版本组：
 `effect@4.0.0-rc.112`、`@effect/opentelemetry@4.0.0-rc.112` 和

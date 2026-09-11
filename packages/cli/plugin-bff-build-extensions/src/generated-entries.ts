@@ -21,7 +21,7 @@ export function registerBffGeneratedEntries(
     const details = metadata.get(generation);
     if (!details)
       throw new Error(
-        'BFF entries require completed client artifact generation.',
+        'BFF entries require completed operation contract collection.',
       );
     metadata.delete(generation);
     const packageJson = await fs.readJSON(
@@ -35,12 +35,13 @@ export function registerBffGeneratedEntries(
       '@modern-js/plugin-bff-extensions',
     ];
     const emitsClient =
-      details.runtimeFramework === 'effect' || generation.apiFiles.length > 0;
+      details.runtimeFramework === 'hono' && generation.apiFiles.length > 0;
     if (
-      runtimeSpecifier === BFF_REQUEST_RUNTIME ||
-      (emitsClient &&
-        (generation.requestCreator || BFF_REQUEST_RUNTIME) ===
-          BFF_REQUEST_RUNTIME)
+      details.runtimeFramework === 'hono' &&
+      (runtimeSpecifier === BFF_REQUEST_RUNTIME ||
+        (emitsClient &&
+          (generation.requestCreator || BFF_REQUEST_RUNTIME) ===
+            BFF_REQUEST_RUNTIME))
     )
       dependencies.push('@modern-js/runtime-extensions');
     for (const name of dependencies) {
@@ -80,6 +81,10 @@ export function registerBffGeneratedEntries(
 export declare const crossProjectApiPlugin: () => CliPlugin<AppTools>;
 `,
     };
+    if (details.runtimeFramework === 'effect') {
+      entries.runtime = null;
+      return entries;
+    }
     const runtime = JSON.stringify(runtimeSpecifier);
     const esmRuntime = JSON.stringify(
       path.isAbsolute(runtimeSpecifier)

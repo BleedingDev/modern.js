@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { runUltramodernToolingCli } from '../src/ultramodern-tooling/commands';
 import {
   readUltramodernConfig,
   workspaceAppsFromToolingConfig,
@@ -15,7 +14,6 @@ import {
 } from '../src/ultramodern-workspace';
 import { createWorkspaceRootPackageScripts } from '../src/ultramodern-workspace/workspace-script-plan';
 import { linkBuiltCodeTools } from './helpers/built-code-tools';
-import { linkWorkspaceFormatterDependencies } from './helpers/workspace-kit';
 
 const packageRoot = path.resolve(__dirname, '..');
 const createBinPath = path.join(packageRoot, 'bin/run.js');
@@ -40,10 +38,6 @@ function writeJson(workspaceDir: string, relativePath: string, value: unknown) {
     `${JSON.stringify(value, null, 2)}\n`,
     'utf-8',
   );
-}
-
-function exists(workspaceDir: string, relativePath: string) {
-  return fs.existsSync(path.join(workspaceDir, relativePath));
 }
 
 function runGeneratedWorkspaceCheck(workspaceDir: string) {
@@ -427,75 +421,6 @@ export const handler = async (request: Request) => Response.json(await request.j
     assert.match(output, /must describe the MicroVertical server role/);
     assert.match(output, /must preserve strict Effect backend execution/);
     assert.match(output, /must preserve the server contract version/);
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('migrate converges a legacy shell-only workspace to a validator-clean state', async () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-migrate-shell-'));
-  const workspaceDir = path.join(tempRoot, 'shell-only-workspace');
-
-  try {
-    generateUltramodernWorkspace({
-      targetDir: workspaceDir,
-      packageName: 'shell-only-workspace',
-      modernVersion: '3.2.1',
-      enableTailwind: true,
-      packageSource: { strategy: 'workspace' },
-    });
-    linkWorkspaceFormatterDependencies(workspaceDir);
-
-    // Fresh shell-only workspace already satisfies the (backend-surface-gated)
-    // contract self-check.
-    const freshResult = runGeneratedWorkspaceCheck(workspaceDir);
-    assert.equal(freshResult.status, 0, commandOutput(freshResult));
-
-    // Simulate an older-create workspace: agent/i18n scripts shipped as .mjs
-    // and package.json wired at those legacy paths.
-    for (const name of [
-      'bootstrap-agent-skills',
-      'setup-agent-reference-repos',
-      'check-ultramodern-i18n-boundaries',
-    ]) {
-      fs.renameSync(
-        path.join(workspaceDir, `scripts/${name}.mts`),
-        path.join(workspaceDir, `scripts/${name}.mjs`),
-      );
-    }
-    const legacyPackage = readJson(workspaceDir, 'package.json');
-    legacyPackage.scripts['skills:install'] =
-      'node ./scripts/bootstrap-agent-skills.mjs';
-    legacyPackage.scripts['skills:check'] =
-      'node ./scripts/bootstrap-agent-skills.mjs --check';
-    legacyPackage.scripts.postinstall =
-      "oxfmt . '!repos/**' && node ./scripts/bootstrap-agent-skills.mjs --postinstall";
-    legacyPackage.scripts['agents:refs:install'] =
-      'node ./scripts/setup-agent-reference-repos.mjs';
-    legacyPackage.scripts['i18n:boundaries'] =
-      'node ./scripts/check-ultramodern-i18n-boundaries.mjs';
-    writeJson(workspaceDir, 'package.json', legacyPackage);
-
-    const migrateStatus = await runUltramodernToolingCli(
-      ['migrate-strict-effect', '--skip-install'],
-      workspaceDir,
-    );
-    assert.equal(migrateStatus, 0);
-
-    for (const name of [
-      'bootstrap-agent-skills',
-      'setup-agent-reference-repos',
-      'check-ultramodern-i18n-boundaries',
-    ]) {
-      assert.equal(exists(workspaceDir, `scripts/${name}.mts`), true, name);
-      assert.equal(exists(workspaceDir, `scripts/${name}.mjs`), false, name);
-    }
-
-    // The migrated workspace must again satisfy the generated contract check,
-    // including the skills/agent-reference wrappers and script wiring, without
-    // requiring backend-federation or Zerops artifacts.
-    const migratedResult = runGeneratedWorkspaceCheck(workspaceDir);
-    assert.equal(migratedResult.status, 0, commandOutput(migratedResult));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

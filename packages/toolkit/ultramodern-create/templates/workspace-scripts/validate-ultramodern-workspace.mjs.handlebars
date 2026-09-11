@@ -43,7 +43,6 @@ const expectedCloudflareSecurity =
   workspaceValidationContract.cloudflareSecurity;
 const publicSurfaceManagedSourceAssetPaths =
   workspaceValidationContract.publicSurfaceManagedSourceAssetPaths;
-const shellRouteMetaPaths = workspaceValidationContract.shellRouteMetaPaths;
 const compactConfigPath =
   workspaceValidationContract.metadata.compactConfig.path;
 const retiredMetadataPaths =
@@ -161,19 +160,6 @@ const assertAnyOf = relativePaths => {
     `Missing one of: ${relativePaths.join(', ')}`,
   );
 };
-const requiredShellWorkerCompositionPath = shellPath => {
-  const candidates = [
-    `${shellPath}/src/routes/vertical-components.worker.tsx`,
-    `${shellPath}/src/federated-components.worker.tsx`,
-  ];
-  const existingPath = candidates.find(candidate =>
-    fs.existsSync(path.join(root, candidate)),
-  );
-  if (existingPath !== undefined) {
-    return existingPath;
-  }
-  throw new Error(`Missing one of: ${candidates.join(', ')}`);
-};
 const canonicalizeJson = value => {
   if (Array.isArray(value)) {
     const entries = value.map(canonicalizeJson);
@@ -206,8 +192,6 @@ const sameJson = (actual, expected) =>
   JSON.stringify(canonicalizeJson(expected));
 const formatJson = value =>
   value === undefined ? 'undefined' : JSON.stringify(canonicalizeJson(value));
-const quoteYamlString = value => `'${String(value).replace(/'/gu, "''")}'`;
-const quoteShellValue = value => `'${String(value).replace(/'/gu, "'\\''")}'`;
 const selfCheckFailure = (contract, message, fixArea) =>
   `MicroVertical contract self-check failed: ${contract}. ${message}. Fix area: ${fixArea}.`;
 const assertSelfCheck = (condition, contract, message, fixArea) => {
@@ -220,6 +204,18 @@ const assertSameJson = (actual, expected, contract, fixArea) => {
     `Expected ${formatJson(expected)}, found ${formatJson(actual)}`,
     fixArea,
   );
+};
+// Project references and compiler inputs may include application-owned packages.
+const assertIncludesJson = (actual, required, contract, fixArea) => {
+  assertArray(actual, contract, fixArea);
+  for (const entry of required) {
+    assertSelfCheck(
+      actual.some(value => sameJson(value, entry)),
+      contract,
+      `Missing required entry ${formatJson(entry)}`,
+      fixArea,
+    );
+  }
 };
 const assertObject = (value, contract, fixArea) => {
   assertSelfCheck(
@@ -773,6 +769,10 @@ const assertCompilerArchitecture = () => {
   initializeCompilerSnapshot(compilerInputs);
   for (const shell of structuralPolicy.shells ?? []) {
     for (const forbidden of structuralPolicy.forbiddenPathClasses ?? []) {
+      // The platform shell can host its own authentication and BFF routes.
+      if (shell.id === 'shell-super-app' && forbidden.path !== 'backend-federation.config.ts') {
+        continue;
+      }
       assert(
         !fs.existsSync(path.join(root, shell.packageDir, forbidden.path)),
         selfCheckFailure(
@@ -1141,17 +1141,6 @@ const assertCompilerArchitecture = () => {
     }
   }
 };
-const compactConfigPolicyView = config => ({
-  schemaVersion: config.schemaVersion,
-  profile: config.profile,
-  workspace: config.workspace,
-  features: config.features,
-  deploy: config.deploy,
-  moduleFederation: config.moduleFederation,
-  backendFederation: config.backendFederation,
-  agentSkills: config.agentSkills,
-  tooling: config.tooling,
-});
 const assertStructuredWorkspaceMetadata = ({
   ultramodernConfig,
   topology,
@@ -1256,11 +1245,12 @@ const assertStructuredWorkspaceMetadata = ({
     `${workspaceValidationContract.metadata.referenceTopology.path} verticals`,
     'restore the complete generated vertical cohort',
   );
-  assertSameIdCohort(
-    topology.sharedPackages,
+  assertUniqueIdEntries(topology.sharedPackages, 'topology.sharedPackages');
+  assertIncludesJson(
+    topology.sharedPackages.map(entry => entry.id),
     workspaceValidationContract.cohort.sharedPackageIds,
-    `${workspaceValidationContract.metadata.referenceTopology.path} sharedPackages`,
-    'restore the complete generated shared package cohort',
+    'topology.sharedPackages',
+    'restore required framework ownership entries',
   );
   assertSameIdCohort(
     topology.shell?.moduleFederation?.remotes,
@@ -1270,12 +1260,24 @@ const assertStructuredWorkspaceMetadata = ({
     `${workspaceValidationContract.metadata.referenceTopology.path} shell.moduleFederation.remotes`,
     'restore the complete generated shell remote cohort',
   );
-  assertSameIdCohort(
-    ownership.owners,
+  assertUniqueIdEntries(ownership.owners, 'ownership.owners');
+  assertIncludesJson(
+    ownership.owners.map(entry => entry.id),
     workspaceValidationContract.cohort.ownerIds,
-    `${workspaceValidationContract.metadata.ownership.path} owners`,
-    'restore the complete generated ownership cohort',
+    'ownership.owners',
+    'restore required framework ownership entries',
   );
+
+  for (const entry of [...topology.sharedPackages, ...ownership.owners]) {
+    assert(
+      typeof entry.path === 'string' && entry.path.length > 0,
+      `${entry.id} must declare a package path`,
+    );
+    assert(
+      readJson(`${entry.path}/package.json`).name === entry.package,
+      `${entry.id} ownership package must match ${entry.path}/package.json`,
+    );
+  }
 
   for (const manifest of workspaceValidationContract.cohort.packageManifests) {
     assertExists(manifest.path);
@@ -1306,43 +1308,6 @@ const assertStructuredWorkspaceMetadata = ({
       releaseCohortContract.path,
     );
   }
-};
-const assertStructuredWorkspaceMetadataSemantics = ({
-  ultramodernConfig,
-  topology,
-  ownership,
-  overlay,
-}) => {
-  assertSameJson(
-    compactConfigPolicyView(ultramodernConfig),
-    workspaceValidationContract.policy.compactConfig,
-    `${compactConfigPath} policy`,
-    'restore generated compact workspace policy metadata',
-  );
-  assertSameJson(
-    ultramodernConfig.topology,
-    workspaceValidationContract.topology.compactConfig,
-    `${compactConfigPath} topology`,
-    'restore the complete generated compact topology cohort',
-  );
-  assertSameJson(
-    topology,
-    workspaceValidationContract.topology.referenceTopology,
-    workspaceValidationContract.metadata.referenceTopology.path,
-    'restore the complete generated reference topology',
-  );
-  assertSameJson(
-    ownership,
-    workspaceValidationContract.topology.ownership,
-    workspaceValidationContract.metadata.ownership.path,
-    'restore the complete generated ownership topology',
-  );
-  assertSameJson(
-    overlay,
-    workspaceValidationContract.topology.developmentOverlay,
-    workspaceValidationContract.metadata.developmentOverlay.path,
-    'restore the complete generated development topology',
-  );
 };
 const findById = (entries, id) =>
   Array.isArray(entries) ? entries.find(entry => entry?.id === id) : undefined;
@@ -2268,14 +2233,11 @@ const requiredMicroVerticalPaths = vertical => [
         `${vertical.path}/src/routes/layout.tsx`,
         `${vertical.path}/src/routes/ultramodern-route-head.tsx`,
         `${vertical.path}/src/routes/ultramodern-route-metadata.ts`,
-        `${vertical.path}/src/routes/[lang]/page.tsx`,
         ...(vertical.exposes.includes('./Widget')
           ? [
               `${vertical.path}/src/routes/[lang]/_mf/fragment/widget/page.tsx`,
             ]
           : []),
-        ...vertical.routePagePaths,
-        ...vertical.routeMetaPaths,
       ]
     : []),
   ...(vertical.emitsApi
@@ -2779,20 +2741,20 @@ const assertTsConfigReferenceGraph = () => {
     'tsconfig.json files',
     'restore the generated root project-reference tsconfig',
   );
-  assertSameJson(
+  assertIncludesJson(
     rootTsConfig.references ?? [],
     expectedRootReferences,
     'tsconfig.json references',
     'restore the generated root project-reference graph',
   );
-  assertSameJson(
+  assertIncludesJson(
     shellTsConfig.references ?? [],
     expectedShellReferences,
     'apps/shell-super-app/tsconfig.json references',
     'restore the generated shell project-reference graph',
   );
   assert(baseTsConfig.compilerOptions?.skipLibCheck !== true, 'tsconfig.base.json must not use skipLibCheck');
-  assertSameJson(
+  assertIncludesJson(
     shellTsConfig.include ?? [],
     ['src', 'locales/**/*.json', 'package.json', 'shared', 'shared/ultramodern-build.json', 'server'],
     'apps/shell-super-app/tsconfig.json include',
@@ -2802,15 +2764,9 @@ const assertTsConfigReferenceGraph = () => {
     shellTsConfig,
     'apps/shell-super-app',
   );
-  assertSameJson(
-    shellMfTypesTsConfig,
-    {
-      extends: '../../tsconfig.base.json',
-      include: ['src/modern-app-env.d.ts'],
-      compilerOptions: {
-        skipLibCheck: true,
-      },
-    },
+  assertIncludesJson(
+    shellMfTypesTsConfig.include ?? [],
+    ['src/modern-app-env.d.ts'],
     'apps/shell-super-app/tsconfig.mf-types.json',
     'restore the generated shell Module Federation DTS boundary',
   );
@@ -2835,13 +2791,13 @@ const assertTsConfigReferenceGraph = () => {
         .filter(Boolean)
         .map(referencedVertical => referencedVertical.path),
     ].map(referencePath => referenceFrom(vertical.path, referencePath));
-    assertSameJson(
+    assertIncludesJson(
       verticalTsConfig.references ?? [],
       expectedVerticalReferences,
       `${vertical.path}/tsconfig.json references`,
       'restore the generated MicroVertical project-reference graph',
     );
-    assertSameJson(
+    assertIncludesJson(
       verticalTsConfig.include ?? [],
       [
         'src',
@@ -2862,13 +2818,17 @@ const assertTsConfigReferenceGraph = () => {
         : verticalTsConfig.compilerOptions?.skipLibCheck !== true,
       `${vertical.path}/tsconfig.json must scope skipLibCheck to composed remotes`,
     );
-    assertSameJson(
-      verticalMfTypesTsConfig,
-      {
-        extends: '../../tsconfig.base.json',
-        // A headless (api-only) unit exposes no Module Federation surface, so
-        // its DTS boundary only covers the ambient env declarations (G2a).
-        include: vertical.emitsUi
+    if (!vertical.emitsUi) {
+      assertSelfCheck(
+        !(verticalMfTypesTsConfig.include ?? []).includes('src/federation-entry.tsx'),
+        `${vertical.path}/tsconfig.mf-types.json`,
+        'A headless unit cannot include a browser federation entry',
+        'restore the generated MicroVertical Module Federation DTS boundary',
+      );
+    }
+    assertIncludesJson(
+      verticalMfTypesTsConfig.include ?? [],
+      vertical.emitsUi
           ? [
               'src/federation-entry.tsx',
               ...vertical.componentPaths.map(componentPath =>
@@ -2877,10 +2837,6 @@ const assertTsConfigReferenceGraph = () => {
               'src/modern-app-env.d.ts',
             ]
           : ['src/modern-app-env.d.ts'],
-        compilerOptions: {
-          skipLibCheck: true,
-        },
-      },
       `${vertical.path}/tsconfig.mf-types.json`,
       'restore the generated MicroVertical Module Federation DTS boundary',
     );
@@ -2894,28 +2850,22 @@ const assertTsConfigReferenceGraph = () => {
     const expectedShellReferences = sharedPackagePaths.map(referencePath =>
       referenceFrom(shell.path, referencePath),
     );
-    assertSameJson(
+    assertIncludesJson(
       shellTsConfig.references ?? [],
       expectedShellReferences,
       `${shell.path}/tsconfig.json references`,
       'restore the generated additional-shell project-reference graph',
     );
-    assertSameJson(
+    assertIncludesJson(
       shellTsConfig.include ?? [],
       ['src', 'locales/**/*.json', 'package.json', 'shared', 'shared/ultramodern-build.json', 'server'],
       `${shell.path}/tsconfig.json include`,
       'restore the generated additional-shell typecheck boundary',
     );
     assertProjectReferenceEmitConfig(shellTsConfig, shell.path);
-    assertSameJson(
-      shellMfTypesTsConfig,
-      {
-        extends: '../../tsconfig.base.json',
-        include: ['src/modern-app-env.d.ts'],
-        compilerOptions: {
-          skipLibCheck: true,
-        },
-      },
+    assertIncludesJson(
+      shellMfTypesTsConfig.include ?? [],
+      ['src/modern-app-env.d.ts'],
       `${shell.path}/tsconfig.mf-types.json`,
       'restore the generated additional-shell Module Federation DTS boundary',
     );
@@ -2959,7 +2909,8 @@ const modernDependencyNames = packageJson =>
   ];
 const assertModernPackageCohort = () => {
   const modernPackageNames = workspaceValidationContract.cohort.modernPackages;
-  const modernPackageNameSet = new Set(modernPackageNames);
+  const cohortPackages = expectedReleaseCohort?.packages;
+  const modernPackageNameSet = new Set(cohortPackages?.map(entry => entry.sourceName) ?? modernPackageNames);
   const observedModernPackageNames = new Set();
   const observedAppIds = [];
   // Additional shells (G28) are their own Delivery Units registered in the
@@ -2982,10 +2933,6 @@ const assertModernPackageCohort = () => {
     }
     for (const packageName of modernDependencyNames(packageJson)) {
       observedModernPackageNames.add(packageName);
-      assert(
-        modernPackageNameSet.has(packageName),
-        `${relativePath} declares ${packageName} outside package source metadata`,
-      );
     }
     for (const section of [
       'dependencies',
@@ -2993,11 +2940,13 @@ const assertModernPackageCohort = () => {
       'optionalDependencies',
       'peerDependencies',
     ]) {
-      for (const packageName of modernPackageNames) {
+      for (const packageName of modernPackageNameSet) {
         const actual = packageJson[section]?.[packageName];
         if (actual !== undefined) {
           assert(
-            actual === expectedModernPackageSpecifier(packageName),
+            actual === (cohortPackages
+              ? `npm:${cohortPackages.find(entry => entry.sourceName === packageName).targetName}@${expectedReleaseCohort.release.version}`
+              : expectedModernPackageSpecifier(packageName)),
             `${relativePath} ${section}.${packageName} must match package source metadata`,
           );
         }
@@ -3116,16 +3065,6 @@ assert(
   `Generated workspace requires Node >=26; active Node is ${activeNodeVersion}. Run mise install, then rerun node from the activated shell.`,
 );
 
-const agentInstructionPaths = ['AGENTS.md', 'CLAUDE.md'];
-const presentAgentInstructionPaths = agentInstructionPaths.filter(
-  relativePath => fs.existsSync(path.join(root, relativePath)),
-);
-assert(
-  presentAgentInstructionPaths.length === 0 ||
-    presentAgentInstructionPaths.length === agentInstructionPaths.length,
-  'Agent instruction files must be either fully enabled (AGENTS.md and CLAUDE.md) or fully disabled',
-);
-
 const requiredPaths = [
   '.gitignore',
   'package.json',
@@ -3137,8 +3076,6 @@ const requiredPaths = [
   'tsconfig.base.json',
   'oxlint.config.ts',
   'oxfmt.config.ts',
-  '.github/renovate.json',
-  '.github/workflows/ultramodern-workspace-gates.yml',
   '.agents/agent-reference-repos.json',
   'topology/reference-topology.json',
   'topology/ownership.json',
@@ -3175,10 +3112,6 @@ const requiredPaths = [
   'apps/shell-super-app/src/routes/shell-frame.tsx',
   'apps/shell-super-app/src/routes/ultramodern-route-head.tsx',
   'apps/shell-super-app/src/routes/ultramodern-route-metadata.ts',
-  'apps/shell-super-app/src/routes/vertical-components.tsx',
-  requiredShellWorkerCompositionPath('apps/shell-super-app'),
-  'apps/shell-super-app/src/routes/[lang]/page.tsx',
-  ...shellRouteMetaPaths,
   'packages/shared-contracts/package.json',
   'packages/shared-contracts/src/index.ts',
   'packages/shared-contracts/tsconfig.json',
@@ -3230,14 +3163,8 @@ for (const shell of expectedAdditionalShells) {
     `${shell.path}/src/routes/index.css`,
     `${shell.path}/src/routes/layout.tsx`,
     `${shell.path}/src/routes/shell-frame.tsx`,
-    `${shell.path}/src/routes/vertical-components.tsx`,
-    requiredShellWorkerCompositionPath(shell.path),
     `${shell.path}/src/routes/ultramodern-route-head.tsx`,
     `${shell.path}/src/routes/ultramodern-route-metadata.ts`,
-    `${shell.path}/src/routes/[lang]/page.tsx`,
-    ...shellRouteMetaPaths.map(relativePath =>
-      relativePath.replace(/^apps\/shell-super-app/u, shell.path),
-    ),
   );
   if (tailwindEnabled) {
     requiredPaths.push(`${shell.path}/tailwind.config.ts`);
@@ -3350,12 +3277,14 @@ assertMicroVerticalContractGraph({
   overlay,
   shellPackage,
 });
-assertStructuredWorkspaceMetadataSemantics({
-  ultramodernConfig,
-  topology,
-  ownership,
-  overlay,
-});
+for (const field of ['features', 'deploy', 'moduleFederation', 'backendFederation', 'agentSkills', 'tooling']) {
+  assertSameJson(
+    ultramodernConfig[field],
+    workspaceValidationContract.policy.compactConfig[field],
+    `${compactConfigPath} policy.${field}`,
+    'restore framework policy metadata',
+  );
+}
 assertTsConfigReferenceGraph();
 
 assert(rootPackage.private === true, 'Root package must be private');
@@ -3387,7 +3316,6 @@ assert(
   ),
   'mise must activate the generated pnpm version',
 );
-assertExists('.github/workflows/ultramodern-workspace-gates.yml');
 assert(rootPackage.modernjs?.preset === 'presetUltramodern', 'Root must declare presetUltramodern');
 assert(
   rootPackage.modernjs?.packageSource?.config === './.modernjs/ultramodern.json',
@@ -3570,26 +3498,6 @@ const assertAdditionalShellCohort = () => {
       );
     }
   }
-
-
-  // Zerops artifacts exist whenever the workspace has delivery units at all
-  // (ui-only and horizontal-remote units deploy too); a shell-only workspace
-  // must not carry one.
-  if (!hasDeliveryUnits) {
-    assertNotExists('zerops.yaml');
-  } else {
-  assertExists('zerops.yaml');
-  const zeropsYaml = readText('zerops.yaml');
-  assert(
-    zeropsYaml.includes(`setup: ${quoteYamlString('shell-super-app')}`),
-    'shell-super-app must have a Zerops service',
-  );
-  for (const shell of expectedAdditionalShells) {
-    assert(zeropsYaml.includes(`setup: ${quoteYamlString(shell.id)}`), `${shell.id} must have a Zerops service`);
-    assert(zeropsYaml.includes(`start: cd ${quoteShellValue(`.zerops/runtime/${shell.id}`)} && npm run serve`), `${shell.id} Zerops service start command is missing`);
-    assert(zeropsYaml.includes(`        ${shell.portEnv}: ${quoteYamlString(String(shell.port))}`), `${shell.id} Zerops service port environment is missing`);
-  }
-  }
 };
 assertAdditionalShellCohort();
 assert(
@@ -3702,44 +3610,9 @@ assert(
   typeof rootPackage.scripts?.check === 'string',
   'Root check must expose the generated quality gate',
 );
-if (hasDeliveryUnits) {
-  const zeropsYaml = readText('zerops.yaml');
-  assert(zeropsYaml.includes('zerops:'), 'Zerops manifest must include zerops services');
-  assert(zeropsYaml.includes(`setup: ${quoteYamlString('shell-super-app')}`), 'Zerops manifest must include shell service');
-  assert(zeropsYaml.includes(`base: ${quoteYamlString('nodejs@26')}`), 'Zerops manifest must use generated Node runtime major');
-  assert(zeropsYaml.includes('deployFiles:'), 'Zerops manifest must deploy package-pruned runtime directories');
-  assert(
-    zeropsYaml.includes(`start: cd ${quoteShellValue('.zerops/runtime/shell-super-app')} && npm run serve`),
-    'Zerops shell service must start from materialized runtime package',
-  );
-  assert(
-    zeropsYaml.includes('SHELL_SUPER_APP_PORT:') &&
-      zeropsYaml.includes('ULTRAMODERN_ZEROPS_SERVICE:'),
-    'Zerops manifest must expose service identity and ports',
-  );
-  for (const vertical of fullStackVerticals) {
-    assert(zeropsYaml.includes(`setup: ${quoteYamlString(vertical.id)}`), `${vertical.id} must have a Zerops service`);
-    assert(
-      zeropsYaml.includes(`~/.local/bin/mise exec -- pnpm run zerops:materialize -- --app ${quoteShellValue(vertical.id)} --package ${quoteShellValue(vertical.packageName)} --package-dir ${quoteShellValue(vertical.path)}`),
-      `${vertical.id} Zerops service must materialize its runtime package`,
-    );
-    // Only REST-backed (or headless-less UI) units expose an HTTP readiness
-    // probe; the RPC surface has no REST readiness endpoint (G7a).
-    if (!vertical.emitsApi || vertical.apiProtocol === 'rest') {
-      const zeropsReadinessPath = vertical.emitsApi
-        ? `${vertical.apiPrefix}/${vertical.stem}/readiness`
-        : '/';
-      assert(
-        zeropsYaml.includes(`path: ${quoteYamlString(zeropsReadinessPath)}`),
-        `${vertical.id} BFF readiness path must use generated API prefix`,
-      );
-    }
-  }
-}
 assert(rootPackage.scripts?.['mf:types'] === 'node ./scripts/assert-mf-types.mts', 'Root must expose mf:types');
 assert(rootPackage.scripts?.['cloudflare:deploy'] === expectedCloudflareDeployScript, 'Root must expose cloudflare:deploy');
 assert(rootPackage.scripts?.['cloudflare:proof'] === 'node ./scripts/proof-cloudflare-version.mts --out .codex/reports/cloudflare-version-proof/public-url-proof.json', 'Root must expose cloudflare:proof');
-assert(rootPackage.scripts?.['migrate:strict-effect'] === 'node ./scripts/migrate-strict-effect.mts', 'Root must expose migrate:strict-effect');
 assert(rootPackage.scripts?.['skills:install'] === 'node ./scripts/bootstrap-agent-skills.mts', 'Root must expose skills:install');
 assert(rootPackage.scripts?.['skills:check'] === 'node ./scripts/bootstrap-agent-skills.mts --check', 'Root must expose skills:check');
 const postinstall = rootPackage.scripts?.postinstall;
@@ -4055,7 +3928,6 @@ for (const vertical of fullStackVerticals) {
     assert(topologyEntry?.api?.serverEntry === `${vertical.path}/api/index.ts`, `${vertical.id} topology server entry is incorrect`);
     if (vertical.apiProtocol !== 'rpc') {
       assert(topologyEntry?.api?.readiness?.endpoint === `/${vertical.stem}/readiness`, `${vertical.id} topology readiness endpoint is incorrect`);
-      assert(Object.keys(topologyEntry?.api?.domainOperations ?? {}).length >= 3, `${vertical.id} topology domain operations are missing`);
     }
   }
 

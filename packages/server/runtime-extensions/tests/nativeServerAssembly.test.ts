@@ -60,10 +60,10 @@ describe('applyPlugins fork plugin assembly', () => {
             logger: false,
             telemetry: {
               enabled: true,
-              canary: {
+              health: {
                 enabled: true,
-                rollbackConsecutiveFailures: 1,
-                autopilot: {
+                minConsecutiveFailedEvaluations: 1,
+                snapshotObservation: {
                   enabled: true,
                   gateSnapshotPath: snapshotPath,
                   pollIntervalMs: 60_000,
@@ -109,7 +109,7 @@ describe('applyPlugins fork plugin assembly', () => {
       expect(statusResponse.status).toBe(200);
       const status = (await statusResponse.json()) as Record<string, any>;
       expect(status.ok).toBe(true);
-      expect(status.canary.enabled).toBe(true);
+      expect(status.health.enabled).toBe(true);
 
       // The signal endpoint requires the token as well.
       const unauthorizedSignal = await server.request(

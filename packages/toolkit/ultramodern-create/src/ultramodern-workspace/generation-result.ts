@@ -3,14 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { rpcPath } from './api/rpc';
 import { createDeliveryUnitRecord } from './delivery-unit';
+import { apiSurface, exposeSurface } from './delivery-unit-schema/surfaces';
 import type {
   DeliveryUnitDescriptor,
   SurfaceDescriptor,
 } from './delivery-unit-schema/types';
-import {
-  apiSurface,
-  exposeSurface,
-} from './delivery-unit-schema/up-projection';
 import {
   appHasApi,
   resolveApiProtocol,
@@ -145,7 +142,7 @@ export function createGenerationResult(options: {
  * {@link createDeliveryUnitRecord} — the same function the emitted delivery-unit
  * records use in the same process — so the exposed descriptor matches the
  * records on disk. Every app kind (shell, UI-only vertical, api vertical)
- * carries a descriptor; down-projecting one reproduces the v1 identity.
+ * carries a descriptor with the same release identity.
  */
 function createGeneratedDeliveryUnitDescriptor(
   scope: string,
@@ -153,9 +150,7 @@ function createGeneratedDeliveryUnitDescriptor(
 ): DeliveryUnitDescriptor {
   const record = createDeliveryUnitRecord(scope, app);
   // Expose keys (e.g. `./Cart`) are MF module specifiers, not grammar-valid
-  // SurfaceRef segments. Reuse the up-projection's expose mapper so the
-  // exposed surfaceId is sanitized to the SurfaceRef grammar AND classified
-  // (route vs component) by the same rule the canonical up-projection uses.
+  // SurfaceRef segments. The shared mapper sanitizes and classifies each expose.
   const surfaces: SurfaceDescriptor[] = Object.entries(app.exposes ?? {}).map(
     ([key, value]) => exposeSurface(app, key, value),
   );

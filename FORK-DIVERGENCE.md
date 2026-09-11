@@ -33,6 +33,20 @@ every PR.
 
 ---
 
+### 2026-09-10 native Effect clients
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/plugin-bff/src/utils/client-generator/write-package.ts` | bleedingdev | Do not advertise wildcard client exports or types when no client artifacts were emitted. Effect clients now use shared HttpApi contracts through native type inference; omit exports for an absent generated request runtime while server plugin generation continues through existing build hooks. | `inline-patch` |
+| `packages/solutions/app-tools/src/types/plugin.ts` | bleedingdev | Let the existing generated-entry hook omit the request runtime with null when an integration needs only server plugin metadata. | `extension-point` + `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/runtimeGenerator.ts` | bleedingdev | Honor an omitted request runtime and remove the previous generated runtime directory so a native inferred-client build leaves no custom client configuration module. | `extension-point` + `inline-patch` |
+| `packages/cli/plugin-bff/src/utils/client-generator/package-json.ts` | bleedingdev | Remove stale framework-managed runtime exports and type mappings when the generated runtime is omitted, while preserving unrelated authored exports. | `inline-patch` |
+| `packages/cli/plugin-bff/tests/clientGenerator.test.ts` | bleedingdev | Assert that an empty client build does not advertise a missing wildcard API export. | `inline-patch` |
+| `packages/document/docs/en/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/en/configure/app/bff/effect.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/zh/guides/advanced-features/bff/frameworks.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+| `packages/document/docs/zh/configure/app/bff/effect.mdx` | bleedingdev | Document native HttpApi client inference and server-only definitions after removing the generated Effect client surface. | `inline-patch` |
+
 ### 2026-09-10 native declarations and tutorial qualification
 
 | Audited-base-owned path | Owner | Reason | Disposition |
@@ -157,7 +171,6 @@ Fork implementation and mixed-file ownership work remain separate.
 | `packages/server/core/src/plugins/render/serverActionHandler.ts` | bleedingdev | Reject non-POST server action requests before dispatching the server bundle. | `inline-patch` |
 | `packages/server/core/tests/adapters/node.test.ts` | bleedingdev | Verify native Node request/response conversion, including secure protocol and authority. | `inline-patch` |
 | `packages/server/core/tests/adapters/utils.test.ts` | bleedingdev | Verify native adapter request/response helpers. | `inline-patch` |
-| `packages/server/core/tests/context.test.ts` | bleedingdev | Verify native server request context behavior. | `inline-patch` |
 | `packages/server/core/tests/plugins/dataHandler.test.ts` | bleedingdev | Verify native server loaders run inside the request Hono context. | `inline-patch` |
 | `packages/server/core/tests/plugins/serverActionHandler.test.ts` | bleedingdev | Verify non-POST action requests return 405 before server execution. | `inline-patch` |
 | `packages/server/core/tsconfig.json` | bleedingdev | Retain native TypeScript-Go configuration: source root, alias or output typing settings for this package. | `inline-patch` |
@@ -1202,7 +1215,6 @@ pins, complete scope and stored budgets; import-boundary review remains separate
 | `packages/runtime/plugin-i18n/src/shared/type.ts` | bleedingdev | Keep native language detection configuration and remove the fork localized-map option type; mapped configuration is typed by the higher integration. | `inline-patch` |
 | `packages/runtime/plugin-i18n/src/shared/urlStrategy.ts` | bleedingdev | Define the neutral per-plugin pathname localize/canonicalize contract and optional additive redirect exclusion callback. Native callers continue to own search/hash handling and configured exclusions. | `inline-patch` |
 | `packages/runtime/plugin-i18n/tests/link.test.tsx` | bleedingdev | Retain native URL suffix handling, route-parameter interpolation, language detection priority and prefix-only localization assertions; mapped-path policy assertions move to the integration owner. | `inline-patch` |
-| `packages/runtime/plugin-i18n/tests/localisedUrlRewriteMatrix.fork.test.ts` | bleedingdev | Retain native Link target normalization, splat separator/percent encoding and search normalization cases after localized route-map policy cases move to the integration suite. | `inline-patch` |
 | `packages/runtime/plugin-i18n/tests/localisedUrls.test.ts` | bleedingdev | Retain native disabled-react integration entry, unchanged routes without mapping and API-prefix collection/middleware skip behavior. Mapped-route and custom slug assertions move to the higher integration. | `inline-patch` |
 | `packages/runtime/plugin-i18n/tests/redirectPolicy.test.ts` | bleedingdev | Verify native configured ignores across runtime/server prefixes and configured/static/upload exclusions without fork policy. | `inline-patch` |
 | `packages/runtime/plugin-i18n/tests/routerAdapter.test.tsx` | bleedingdev | Verify native root and child preservation, provider order/identity, optional react-i18next loading and stable supplied navigation/synchronization components rendering actual router primitives. | `inline-patch` |

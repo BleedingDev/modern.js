@@ -1,10 +1,4 @@
-import {
-  createRouterPlugin,
-  registerRouterProvider,
-  unsafe_resetRouterProvidersForTesting,
-} from '../src/routerProvider';
-
-afterEach(() => unsafe_resetRouterProvidersForTesting());
+import { createRouterPlugin } from '../src/routerProvider';
 
 test('selects the injected app-local factory from runtime config and preserves native hook objects', () => {
   const registryHooks = { afterCreate: { call() {} } };
@@ -24,9 +18,7 @@ test('selects the injected app-local factory from runtime config and preserves n
   expect(defaultFactory).not.toHaveBeenCalled();
 });
 
-test('does not resolve missing local providers through the global compatibility registry', () => {
-  const foreign = rstest.fn(() => ({}));
-  registerRouterProvider('foreign', foreign);
+test('rejects missing local providers', () => {
   const factory = createRouterPlugin({
     defaultProvider: { name: 'native', factory: () => ({}) },
     registryHooks: {},
@@ -34,5 +26,4 @@ test('does not resolve missing local providers through the global compatibility 
   expect(() =>
     factory({ framework: 'foreign' }).setup({ getRuntimeConfig: () => ({}) }),
   ).toThrow(/app-owned router provider realm/);
-  expect(foreign).not.toHaveBeenCalled();
 });

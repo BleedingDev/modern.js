@@ -58,11 +58,13 @@ type EffectBffEntryModule = {
   default?: unknown;
 };
 
-type LegacyEffectBffEntryShape = '`handler` export' | 'default request handler';
+type UnsupportedEffectBffEntryShape =
+  | '`handler` export'
+  | 'default request handler';
 
 export type EffectBffEntryShapeFacts = {
   module: EffectBffEntryModule;
-  legacyShape?: LegacyEffectBffEntryShape;
+  unsupportedShape?: UnsupportedEffectBffEntryShape;
   createHandler?: unknown;
   createHandlerValidatorAware: boolean;
   api?: unknown;
@@ -135,7 +137,7 @@ export function classifyEffectBffEntryModule(
 function createEntryShapeFacts(
   module: EffectBffEntryModule,
   predicates: EffectBffEntryShapePredicates,
-  legacyShape?: LegacyEffectBffEntryShape,
+  unsupportedShape?: UnsupportedEffectBffEntryShape,
 ): EffectBffEntryShapeFacts {
   const createHandler =
     typeof module.createHandler === 'function'
@@ -146,7 +148,7 @@ function createEntryShapeFacts(
 
   return {
     module,
-    legacyShape,
+    unsupportedShape,
     createHandler,
     createHandlerValidatorAware:
       createHandler !== undefined &&

@@ -14,7 +14,6 @@ export { defineEffectBff, defineEffectRpcBff } from './handler/definition';
 export { createHttpApiHandler } from './handler/http';
 export type {
   EffectApiClientFromApi,
-  EffectApiPromiseClientFromApi,
   EffectBffDefinition,
   EffectBffHandlerFactory,
   EffectBffOpenApiConfig,

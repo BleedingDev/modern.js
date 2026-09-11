@@ -316,13 +316,13 @@ function readTractorAcceptanceEvidence({
     }
     checksById.set(check.id, check);
   }
-  const createMigration = checksById.get('exact-create-migration')?.detail;
+  const createValidation = checksById.get('exact-create-validation')?.detail;
   if (
-    createMigration?.createPackage !== expectedCreateSpecifier ||
-    createMigration?.version !== version
+    createValidation?.createPackage !== expectedCreateSpecifier ||
+    createValidation?.version !== version
   ) {
     throw new Error(
-      'Tractor acceptance report exact-create migration does not match the strict release manifest',
+      'Tractor acceptance report exact-create validation does not match the strict release manifest',
     );
   }
   const exactCohort = checksById.get('exact-cohort')?.detail;

@@ -3,12 +3,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runMigrateStrictEffect } from '../src/ultramodern-tooling/commands/migrate-strict-effect';
 import { normalizeWorkspaceInputs } from '../src/ultramodern-tooling/config';
-import {
-  addUltramodernShell,
-  addUltramodernVertical,
-} from '../src/ultramodern-workspace';
+import { addUltramodernVertical } from '../src/ultramodern-workspace';
 import { formatGeneratedWorkspaceFiles } from '../src/ultramodern-workspace/fs-io';
 import {
   createWorkspaceScriptArtifacts,
@@ -35,17 +31,7 @@ function writeJson(root: string, relativePath: string, value: unknown) {
   );
 }
 
-function migrate(workspaceRoot: string) {
-  assert.equal(
-    runMigrateStrictEffect(['--skip-install'], {
-      workspaceRoot,
-      invocationCwd: workspaceRoot,
-    }),
-    0,
-  );
-}
-
-test('fresh/add-vertical/migration share script bytes for api-bearing inputs', () => {
+test('fresh/add-vertical share script bytes for api-bearing inputs', () => {
   const { tempRoot, workspaceDir } = createWorkspace('artifact-parity', {
     tempPrefix: 'um-artifact-parity-',
   });
@@ -99,14 +85,19 @@ test('fresh/add-vertical/migration share script bytes for api-bearing inputs', (
         relativePath,
       );
     }
-    migrate(workspaceDir);
-    for (const relativePath of sharedPaths) {
-      assert.equal(
-        fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
-        fs.readFileSync(path.join(freshRoot, relativePath), 'utf8'),
-        relativePath,
-      );
-    }
+    // An api-bearing vertical materializes both backend runtime wrappers.
+    assert.equal(
+      fs.existsSync(
+        path.join(workspaceDir, 'scripts/materialize-zerops-runtime.mjs'),
+      ),
+      true,
+    );
+    assert.equal(
+      fs.existsSync(
+        path.join(workspaceDir, 'scripts/generate-node-backend-federation.mts'),
+      ),
+      true,
+    );
     const validation = spawnSync(
       process.execPath,
       ['scripts/validate-ultramodern-workspace.mts'],
@@ -119,7 +110,7 @@ test('fresh/add-vertical/migration share script bytes for api-bearing inputs', (
   }
 });
 
-test('add-vertical and migration conserve authored config, script segments and live ports', () => {
+test('add-vertical conserves authored config, script segments and live ports', () => {
   const { tempRoot, workspaceDir } = createWorkspace('artifact-custom', {
     tempPrefix: 'um-artifact-custom-',
   });
@@ -174,8 +165,7 @@ test('add-vertical and migration conserve authored config, script segments and l
       name: 'orders',
       modernVersion: '3.2.1',
     });
-    for (const phase of ['add', 'migrate']) {
-      if (phase === 'migrate') migrate(workspaceDir);
+    for (const phase of ['add']) {
       for (const [relativePath, content] of Object.entries(authored)) {
         assert.equal(
           fs.readFileSync(path.join(workspaceDir, relativePath), 'utf8'),
@@ -220,106 +210,6 @@ test('add-vertical and migration conserve authored config, script segments and l
       assert.match(currentShell.scripts.build, /echo consumer-shell/);
       assert.equal(currentShell.scripts['consumer:task'], 'echo task');
     }
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('migration derives remote URLs from live ports and preserves authored URL overrides', () => {
-  const { tempRoot, workspaceDir } = createWorkspace('artifact-live-remote', {
-    tempPrefix: 'um-artifact-remote-',
-  });
-  linkWorkspaceFormatterDependencies(workspaceDir);
-  try {
-    addUltramodernVertical({
-      workspaceRoot: workspaceDir,
-      name: 'orders',
-      modernVersion: '3.2.1',
-    });
-    const compactPort = readJson(workspaceDir, configPath).topology.apps.find(
-      (app: Record<string, any>) => app.id === 'orders',
-    ).port;
-    assert.notEqual(compactPort, 3121);
-    const overlay = readJson(workspaceDir, overlayPath);
-    overlay.ports.orders = 3121;
-    // Existing generated compact-port URLs must follow the live port.
-    writeJson(workspaceDir, overlayPath, overlay);
-    addUltramodernShell({
-      workspaceRoot: workspaceDir,
-      name: 'admin',
-      verticals: ['orders'],
-      modernVersion: '3.2.1',
-    });
-    addUltramodernVertical({
-      workspaceRoot: workspaceDir,
-      name: 'catalog',
-      preset: 'ui-only',
-      modernVersion: '3.2.1',
-    });
-    assert.equal(
-      readJson(workspaceDir, overlayPath).manifests.orders,
-      'http://localhost:3121/mf-manifest.json',
-    );
-    assert.equal(
-      readJson(workspaceDir, configPath).topology.apps.find(
-        (app: Record<string, any>) => app.id === 'orders',
-      ).port,
-      compactPort,
-    );
-    const addedValidation = spawnSync(
-      process.execPath,
-      ['scripts/validate-ultramodern-workspace.mts'],
-      { cwd: workspaceDir, encoding: 'utf8' },
-    );
-    assert.equal(
-      addedValidation.status,
-      0,
-      addedValidation.stdout + addedValidation.stderr,
-    );
-    migrate(workspaceDir);
-    assert.equal(
-      readJson(workspaceDir, configPath).topology.apps.find(
-        (app: Record<string, any>) => app.id === 'orders',
-      ).port,
-      compactPort,
-    );
-    const effective = readJson(workspaceDir, overlayPath);
-    assert.equal(effective.ports.orders, 3121);
-    assert.equal(
-      effective.manifests.orders,
-      'http://localhost:3121/mf-manifest.json',
-    );
-    assert.equal(new URL(effective.apis.orders).port, '3121');
-    const validation = spawnSync(
-      process.execPath,
-      ['scripts/validate-ultramodern-workspace.mts'],
-      { cwd: workspaceDir, encoding: 'utf8' },
-    );
-    assert.equal(validation.status, 0, validation.stdout + validation.stderr);
-    // URLs already set to the effective port remain stable on another pass.
-    migrate(workspaceDir);
-    assert.deepEqual(readJson(workspaceDir, overlayPath), effective);
-    effective.manifests.orders =
-      'https://federation.example.test/orders/custom-manifest.json';
-    effective.apis.orders = 'https://api.example.test/custom/orders';
-    writeJson(workspaceDir, overlayPath, effective);
-    migrate(workspaceDir);
-    const authored = readJson(workspaceDir, overlayPath);
-    assert.equal(authored.ports.orders, 3121);
-    assert.equal(authored.manifests.orders, effective.manifests.orders);
-    assert.equal(authored.apis.orders, effective.apis.orders);
-    // Overlay URL maps are metadata, not runtime override inputs: keep the
-    // consumer bytes, and retain the validator's explicit contract conflict.
-    const unsupportedOverride = spawnSync(
-      process.execPath,
-      ['scripts/validate-ultramodern-workspace.mts'],
-      { cwd: workspaceDir, encoding: 'utf8' },
-    );
-    assert.notEqual(unsupportedOverride.status, 0);
-    assert.match(
-      unsupportedOverride.stdout + unsupportedOverride.stderr,
-      /local-overlays\/development\.json manifests\.orders/,
-    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

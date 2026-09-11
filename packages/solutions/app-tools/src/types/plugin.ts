@@ -69,7 +69,7 @@ export interface BffGeneratedModule {
 export interface BffGeneratedEntries {
   readonly generation: BffGeneration;
   plugin: BffGeneratedModule;
-  runtime: BffGeneratedModule;
+  runtime: BffGeneratedModule | null;
   /** Direct dependencies required by the emitted SDK modules. */
   packageDependencies: Record<string, string>;
 }

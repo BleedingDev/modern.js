@@ -39,6 +39,7 @@ import {
   readActiveReleaseAgeExceptionSelectors,
   validateExactExclusions,
 } from '../published-create-proof/release-age-audit.mjs';
+import { prepareTractorCohortInstallation } from './cohort-install.mjs';
 import {
   assertAuthenticatedTractorCohort,
   assertExactModernDependencySpecifiers,
@@ -67,7 +68,7 @@ const nodeBackendProofPath =
   '.codex/reports/node-backend-federation-proof/proof.json';
 const requiredCommands = Object.freeze([
   Object.freeze(['pnpm', ['install', '--frozen-lockfile']]),
-  // Migration preserves authored formatting; install refreshes pinned skills.
+  // Installation refreshes pinned skills.
   // Run the consumer's standard formatter before its mandatory quality checks.
   Object.freeze(['pnpm', ['format']]),
   Object.freeze(['pnpm', ['check']]),
@@ -762,7 +763,7 @@ function expectedNodeBackendAppIds(workspace) {
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   if (!Array.isArray(config.topology?.apps)) {
     throw new Error(
-      'Tractor compact config is missing the post-migration topology app set',
+      'Tractor compact config is missing the current topology app set',
     );
   }
   const expected = config.topology.apps
@@ -774,7 +775,7 @@ function expectedNodeBackendAppIds(workspace) {
     new Set(expected).size !== expected.length
   ) {
     throw new Error(
-      'Tractor post-migration topology must contain unique API-bearing MicroVertical ids',
+      'Tractor current topology must contain unique API-bearing MicroVertical ids',
     );
   }
   return expected.sort((left, right) => left.localeCompare(right));
@@ -911,20 +912,36 @@ async function runTractorDownstreamAcceptance(
       options.workspace,
       runImpl,
     );
+    prepareTractorCohortInstallation(
+      options.workspace,
+      release,
+      minimumReleaseAgeExclude,
+    );
+    // pnpm validates the existing lock before resolving new dependencies. A
+    // recently accepted previous cohort is outside this candidate's exact
+    // release-age approvals, so resolve the candidate from a fresh native lock.
+    runImpl(packageManager.pnpmExecutable, ['clean', '--lockfile'], {
+      cwd: options.workspace,
+      env: packageManager.env,
+    });
+    runImpl(
+      packageManager.pnpmExecutable,
+      ['install', '--no-frozen-lockfile'],
+      {
+        cwd: options.workspace,
+        env: packageManager.env,
+      },
+    );
     runImpl(
       packageManager.pnpmExecutable,
       createTractorPnpmDlxArgs(createPackage, minimumReleaseAgeExclude, [
         'ultramodern',
-        'migrate-strict-effect',
-        '--version',
-        release.release.version,
-        '--registry',
-        registryUrl,
+        'validate',
       ]),
       { cwd: options.workspace, env: packageManager.env },
     );
     report.checks.push({
-      id: 'exact-create-migration',
+      id: 'exact-create-validation',
       status: 'passed',
       detail: {
         createPackage: createPackage.exactSpecifier,

@@ -1,11 +1,16 @@
 // @effect-diagnostics asyncFunction:off globalTimers:off newPromise:off strictBooleanExpressions:off
-import api from '@api/index';
+import {
+  Effect,
+  makeEffectHttpApiClient,
+  runEffectRequest,
+} from '@modern-js/bff-effect/effect-client';
 import { useEffect, useState } from 'react';
+import { bffEffectApi } from '../../../shared/effect-api';
 
 type TraceViewModel = {
   status: string;
   traceId: string;
-  rootSpanId: string;
+  clientSpanId: string;
   runSpanId: string;
   runParentSpanId: string;
   runTraceId: string;
@@ -15,27 +20,11 @@ type TraceViewModel = {
   spansJson: string;
 };
 
-function randomHex(bytes: number) {
-  const array = new Uint8Array(bytes);
-  crypto.getRandomValues(array);
-  return Array.from(array, part => part.toString(16).padStart(2, '0')).join('');
-}
-
-function createTraceparent() {
-  const traceId = randomHex(16);
-  const rootSpanId = randomHex(8);
-  return {
-    traceId,
-    rootSpanId,
-    traceparent: `00-${traceId}-${rootSpanId}-01`,
-  };
-}
-
 export default function TracePage() {
   const [model, setModel] = useState<TraceViewModel>({
     status: 'pending',
     traceId: '',
-    rootSpanId: '',
+    clientSpanId: '',
     runSpanId: '',
     runParentSpanId: '',
     runTraceId: '',
@@ -49,18 +38,27 @@ export default function TracePage() {
     let mounted = true;
 
     const run = async () => {
-      const { traceId, rootSpanId, traceparent } = createTraceparent();
-      await api.client.greetings.traceReset({});
-      await api.client.greetings.traceRun({
-        headers: {
-          traceparent,
-        },
-      });
+      const client = await runEffectRequest(
+        makeEffectHttpApiClient(bffEffectApi, { baseUrl: '/bff-api' }),
+      );
+      await runEffectRequest(client.greetings.traceReset({}));
+      const { traceId, clientSpanId } = await runEffectRequest(
+        Effect.gen(function* () {
+          const browserSpan = yield* Effect.currentSpan;
+          const result = yield* client.greetings.traceRun({ headers: {} });
+          return {
+            traceId: browserSpan.traceId,
+            clientSpanId: result.traceparent?.split('-')[2] ?? '',
+          };
+        }).pipe(Effect.withSpan('browser.effect.trace')),
+      );
 
       for (let attempt = 0; attempt < 20; attempt++) {
-        const { spans } = await api.client.greetings.traceSpans({
-          query: { traceId },
-        });
+        const { spans } = await runEffectRequest(
+          client.greetings.traceSpans({
+            query: { traceId },
+          }),
+        );
         const runSpan = spans.find(
           span => span.name === 'bff.effect.trace.run',
         );
@@ -81,7 +79,7 @@ export default function TracePage() {
           setModel({
             status: 'ok',
             traceId,
-            rootSpanId,
+            clientSpanId,
             runSpanId: runSpan.spanId,
             runParentSpanId: runSpan.parentSpanId ?? '',
             runTraceId: runSpan.traceId,
@@ -104,7 +102,7 @@ export default function TracePage() {
           ...current,
           status: 'missing-spans',
           traceId,
-          rootSpanId,
+          clientSpanId,
         }));
       }
     };
@@ -129,7 +127,7 @@ export default function TracePage() {
     <div>
       <div className="trace-status">{model.status}</div>
       <div className="trace-id">{model.traceId}</div>
-      <div className="trace-root-span-id">{model.rootSpanId}</div>
+      <div className="trace-client-span-id">{model.clientSpanId}</div>
       <div className="trace-run-span-id">{model.runSpanId}</div>
       <div className="trace-run-parent-span-id">{model.runParentSpanId}</div>
       <div className="trace-run-trace-id">{model.runTraceId}</div>

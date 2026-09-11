@@ -5,7 +5,6 @@ import {
   nonEmptyString,
   toDeliveryUnitIdentity,
   ULTRAMODERN_BUILD_ARTIFACT_PATH,
-  ULTRAMODERN_BUILD_MODULE_PATH,
 } from '@modern-js/backend-federation-contracts';
 import { fs as fse } from '@modern-js/utils';
 import { resolveUltramodernReleaseIdentity } from '../release-identity';
@@ -148,7 +147,7 @@ export const resolveTopologyDeliveryUnit = async (
 
 /**
  * Resolve the delivery-unit identity actually bundled into the worker by
- * parsing the generated `shared/ultramodern-build.ts` module. This is the
+ * reading the generated `shared/ultramodern-build.json` artifact. This is the
  * worker snapshot / declared surface source that gets stamped into the manifest.
  */
 export const resolveWorkerDeliveryUnitStamp = async (
@@ -158,10 +157,6 @@ export const resolveWorkerDeliveryUnitStamp = async (
     appDirectory,
     ULTRAMODERN_BUILD_ARTIFACT_PATH,
   );
-  const buildModulePath = path.join(
-    appDirectory,
-    ULTRAMODERN_BUILD_MODULE_PATH,
-  );
   let identity: DeliveryUnitIdentity | undefined;
 
   if (await fse.pathExists(buildArtifactPath)) {
@@ -170,18 +165,6 @@ export const resolveWorkerDeliveryUnitStamp = async (
       return undefined;
     }
     identity = toDeliveryUnitIdentity(artifact.deliveryUnit);
-  } else if (await fse.pathExists(buildModulePath)) {
-    console.warn(
-      `[cloudflare] ${buildArtifactPath} missing; falling back to legacy regex parsing of ${buildModulePath}. Regenerate the workspace to emit ultramodern-build.json.`,
-    );
-    const source = await fse.readFile(buildModulePath, 'utf8');
-    identity = toDeliveryUnitIdentity({
-      buildMarker: source.match(/\bbuild:\s*['"]([^'"]+)['"]/u)?.[1],
-      unitId: source.match(/\bunitId:\s*['"]([^'"]+)['"]/u)?.[1],
-      sourceRevision: source.match(
-        /\bsourceRevision:\s*['"]([^'"]+)['"]/u,
-      )?.[1],
-    });
   }
 
   if (!identity) {
