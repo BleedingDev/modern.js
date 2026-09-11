@@ -4,9 +4,9 @@
   "upstreamRef": "2f4d9c4559e26209a0d77f02c6757f29fe3699a2",
   "pathspec": ["packages"],
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
-  "totalFiles": 805,
-  "totalHunks": 3035,
-  "totalChangedLines": 49273,
+  "totalFiles": 810,
+  "totalHunks": 3042,
+  "totalChangedLines": 49616,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -1111,17 +1111,22 @@
     {
       "file": "packages/runtime/plugin-i18n/rstest.config.mts",
       "hunks": 1,
-      "changedLines": 48
+      "changedLines": 50
     },
     {
       "file": "packages/runtime/plugin-i18n/src/cli/index.ts",
-      "hunks": 6,
-      "changedLines": 30
+      "hunks": 8,
+      "changedLines": 53
     },
     {
       "file": "packages/runtime/plugin-i18n/src/cli/locales.ts",
       "hunks": 2,
       "changedLines": 6
+    },
+    {
+      "file": "packages/runtime/plugin-i18n/src/cli/localisedRoutes.ts",
+      "hunks": 1,
+      "changedLines": 43
     },
     {
       "file": "packages/runtime/plugin-i18n/src/runtime/canonicalRoutes.ts",
@@ -1141,7 +1146,7 @@
     {
       "file": "packages/runtime/plugin-i18n/src/runtime/core.tsx",
       "hunks": 1,
-      "changedLines": 164
+      "changedLines": 175
     },
     {
       "file": "packages/runtime/plugin-i18n/src/runtime/hooks.ts",
@@ -1326,7 +1331,7 @@
     {
       "file": "packages/runtime/plugin-i18n/src/server/mappedUrlStrategy.ts",
       "hunks": 1,
-      "changedLines": 45
+      "changedLines": 10
     },
     {
       "file": "packages/runtime/plugin-i18n/src/server/redirectPolicy.ts",
@@ -1337,6 +1342,16 @@
       "file": "packages/runtime/plugin-i18n/src/shared/detection.ts",
       "hunks": 1,
       "changedLines": 2
+    },
+    {
+      "file": "packages/runtime/plugin-i18n/src/shared/mappedUrlStrategy.ts",
+      "hunks": 1,
+      "changedLines": 51
+    },
+    {
+      "file": "packages/runtime/plugin-i18n/src/shared/type.ts",
+      "hunks": 1,
+      "changedLines": 10
     },
     {
       "file": "packages/runtime/plugin-i18n/src/shared/urlStrategy.ts",
@@ -1374,9 +1389,19 @@
       "changedLines": 139
     },
     {
+      "file": "packages/runtime/plugin-i18n/tests/localisedRouteGeneration.test.ts",
+      "hunks": 1,
+      "changedLines": 159
+    },
+    {
       "file": "packages/runtime/plugin-i18n/tests/localisedUrls.test.ts",
       "hunks": 1,
-      "changedLines": 176
+      "changedLines": 193
+    },
+    {
+      "file": "packages/runtime/plugin-i18n/tests/mappedUrlStrategyDerivation.test.ts",
+      "hunks": 1,
+      "changedLines": 62
     },
     {
       "file": "packages/runtime/plugin-i18n/tests/reactI18nextRuntimeBoundary.test.ts",

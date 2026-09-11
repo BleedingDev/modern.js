@@ -47,7 +47,7 @@ the fork-owned code hangs from.
 | `packages/runtime/plugin-i18n/src/server/redirectPolicy.ts` | bleedingdev | Same fallback on the server redirect path. | `inline-patch` |
 | `packages/runtime/plugin-i18n/src/runtime/core.tsx` | bleedingdev | Treat an unusable configured `urlStrategy` as absent at plugin setup, so one check covers the whole runtime instead of each consumer of the value. | `inline-patch` |
 | `packages/runtime/plugin-i18n/src/cli/index.ts` | bleedingdev | Never emit a strategy the runtime cannot use, and say which serializable configuration to use instead. Upstream has no mapped-locale-URL feature, so this diagnosis has no upstream home. | `inline-patch` |
-| `packages/runtime/plugin-i18n/src/server/mappedUrlStrategy.ts` | bleedingdev | Derive the URL policy from `localeDetection.localisedUrls`, which is plain data and does survive the JSON boundary. Server-side only: the fork's URL engine must stay out of the native client runtime bundle, which a boundary test pins. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/server/mappedUrlStrategy.ts` | bleedingdev | Derive the URL policy from `localeDetection.localisedUrls`, which is plain data and does survive the JSON boundary. Now a re-export of the shared implementation in `src/shared/mappedUrlStrategy.ts`, so the client derives the same policy from the same module; see the 2026-09-12 section for why the server-only boundary was retired. | `extension-point` |
 | `packages/runtime/plugin-i18n/tests/urlStrategySerialization.test.ts` | bleedingdev | Pin that a strategy stripped of its methods falls back on every call site rather than throwing, and that the serializable map still produces a working policy. | `extension-point` |
 | `packages/toolkit/types/common/index.d.ts` | bleedingdev | Give `OnError` and `OnTiming` a home the runtime already depends on. Their previous home forced every `@modern-js/runtime` consumer to install `@modern-js/app-tools` purely for `tsc`, which an isolated (pnpm) layout does not do. | `extension-point` |
 | `packages/server/core/src/types/requestHandler.ts` | bleedingdev | Re-export those two types from their new home so nothing else moves. | `inline-patch` |
@@ -1365,3 +1365,31 @@ tsgo lane, so the shim and its fix have no upstream home.
 | --- | --- | --- | --- |
 | `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | Pin `rootDir` to the project directory when the resolved config is `composite` and declares none, and resolve path-valued options to absolute while merging the `extends` chain, so relocating the checker config cannot re-anchor them on the generated directory. | `extension-point` |
 | `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pin the composite-vertical layout (sources under `src/` and `api/`) against TS6059, that an explicit relative `rootDir` still resolves against the project, and that a non-composite project keeps TypeScript's own inference. | `extension-point` |
+### Default-on mapped locale URLs (2026-09-12)
+
+Localised route generation and the client URL policy reached only consumers of
+`ultramodernAppTools()`, because both were registered by
+`ultramodernI18nIntegrationPlugin`. A bare `appTools()` app that declared
+`localeDetection.localisedUrls` therefore 404ed every mapped path under SSR and
+hydrated links that pointed at canonical paths the server would not serve.
+
+Registering the behaviour from `@modern-js/plugin-i18n` rather than from
+`@modern-js/i18n-integration` is what keeps the Nx graph acyclic:
+`i18n-integration` peer-depends on `@modern-js/runtime`, so reaching it from the
+default app-tools path closes
+`app-tools -> app-tools-extensions -> i18n-integration -> runtime -> app-tools`.
+`plugin-i18n` already declared every dependency the behaviour needs, so no edge
+is added. Upstream has no mapped-locale-URL feature, so none of this has an
+upstream home.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-i18n/src/cli/index.ts` | bleedingdev | Register the `modifyFileSystemRoutes` hook that expands routes from `localeDetection.localisedUrls`, so a bare `appTools()` consumer gets its mapped paths generated. Only the registration and a call into fork-owned `./localisedRoutes` remain here; the localised-URL engine stays out of this upstream-owned file. The hook cannot move to `i18n-integration` without closing the Nx cycle described above, and this is the plugin the consumer already registers. | `extension-point` + `inline-patch` |
+| `packages/runtime/plugin-i18n/src/cli/localisedRoutes.ts` | bleedingdev | The route-expansion seam. Holds the import of the fork's localised-URL engine so `cli/index.ts` keeps only a hook registration and a relative call, which is what stops an upstream-owned file gaining a fork import edge. Upstream has no mapped-locale-URL feature, so the file has no upstream counterpart. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/shared/mappedUrlStrategy.ts` | bleedingdev | The one mapped-URL policy both sides use. Previously server-only; the client needs it too now that mapped URLs are default-on, and sharing one implementation is what makes a server/client disagreement impossible. Duplicating the ~500 lines of pattern matching into the native package to preserve the old import edge would reintroduce exactly the drift the retired boundary test existed to prevent. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/runtime/core.tsx` | bleedingdev | Fall back to the strategy derived from `localeDetection.localisedUrls` when no usable `urlStrategy` was supplied, so the client localizes the same paths the server serves. An explicit strategy from a composing runtime plugin still wins. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/shared/type.ts` | bleedingdev | Declare `localisedUrls` on `localeDetection` instead of carrying it as an untyped extra property that only the fork's own option type described. Written structurally rather than importing the fork's `LocalisedUrlsOption`, so this upstream-owned file gains no fork import edge. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/localisedRouteGeneration.test.ts` | bleedingdev | Registers only the native plugin, with no integration plugin in the manager, so a regression back to the opt-in wiring fails here rather than only in the integration workflow. | `extension-point` |
+| `packages/runtime/plugin-i18n/tests/mappedUrlStrategyDerivation.test.ts` | bleedingdev | Pins the derived client policy: mapped, parameterised and unmapped pathnames, and that no policy is derived without a usable map. | `extension-point` |
+| `packages/runtime/plugin-i18n/tests/localisedUrls.test.ts` | bleedingdev | The route hook is registered unconditionally now, so the case that asserted it was never registered asserts the behaviour instead: a config with no map gets its routes back unchanged. | `inline-patch` |
+| `packages/runtime/plugin-i18n/rstest.config.mts` | bleedingdev | Register the two new test files. The project lists its test files explicitly, so a new file cannot be picked up any other way. | `inline-patch` |
