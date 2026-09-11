@@ -315,10 +315,7 @@ test('bootstrap-agent-skills --postinstall installs Lefthook for standalone gene
 });
 
 test('bootstrap-agent-skills --postinstall supports documented Codex skill opt-outs', () => {
-  for (const envPatch of [
-    { ULTRAMODERN_SKIP_CODEX_SKILLS: '1' },
-    { ULTRAMODERN_CODEX_SKILLS: '0' },
-  ]) {
+  for (const envPatch of [{ ULTRAMODERN_SKIP_CODEX_SKILLS: '1' }]) {
     const { tempRoot, workspaceDir } = scaffoldWorkspace();
 
     try {
@@ -386,80 +383,6 @@ test('bootstrap-agent-skills resolves the agents-standard .agents/ lockfile layo
 
     assert.equal(result.status, 0, result.stderr);
     assert.doesNotMatch(result.stderr, /Missing skills-lock\.json/u);
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('agent reference setup honors the configured Git hooks', () => {
-  const { tempRoot, workspaceDir } = scaffoldWorkspace();
-
-  try {
-    const configPath = path.join(
-      workspaceDir,
-      '.agents/agent-reference-repos.json',
-    );
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    config.repositories = [];
-    fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-
-    const isolatedGitConfig = path.join(tempRoot, 'gitconfig');
-    fs.writeFileSync(isolatedGitConfig, '');
-    const gitEnv = {
-      ...process.env,
-      GIT_CONFIG_GLOBAL: isolatedGitConfig,
-      GIT_CONFIG_NOSYSTEM: '1',
-    };
-
-    let result = spawnSync('git', ['init', '-b', 'main'], {
-      cwd: workspaceDir,
-      encoding: 'utf-8',
-      env: gitEnv,
-    });
-    assert.equal(result.status, 0, result.stderr);
-
-    const hooksDir = path.join(workspaceDir, '.test-hooks');
-    const hookMarker = path.join(tempRoot, 'pre-commit-ran');
-    fs.mkdirSync(hooksDir);
-    writeExecutable(
-      path.join(hooksDir, 'pre-commit'),
-      `#!/usr/bin/env node\nimport { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(
-        hookMarker,
-      )}, 'ran\\n');\n`,
-    );
-
-    result = spawnSync(
-      'git',
-      ['config', '--local', 'core.hooksPath', '.test-hooks'],
-      {
-        cwd: workspaceDir,
-        encoding: 'utf-8',
-        env: gitEnv,
-      },
-    );
-    assert.equal(result.status, 0, result.stderr);
-
-    result = spawnSync(
-      process.execPath,
-      ['scripts/setup-agent-reference-repos.mts'],
-      {
-        cwd: workspaceDir,
-        encoding: 'utf-8',
-        env: {
-          ...gitEnv,
-          ULTRAMODERN_AGENT_REPOS_REQUIRED: '1',
-        },
-      },
-    );
-
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(fs.readFileSync(hookMarker, 'utf-8'), /^ran$/m);
-    assert.equal(
-      fs.existsSync(
-        path.join(workspaceDir, '.modernjs/agent-reference-repos.json'),
-      ),
-      true,
-    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

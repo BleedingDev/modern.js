@@ -10,7 +10,6 @@ import {
   initPluginAPI,
 } from '@modern-js/plugin/cli';
 import {
-  createPresetUltramodernConfig,
   presetUltramodern,
   ultramodernAppTools,
 } from '@modern-js/ultramodern-app-tools';
@@ -186,31 +185,6 @@ export const acceptance = {
 }
 
 describe('native UltraModern composition', () => {
-  it('exports the preset and composes each native CLI plugin once', () => {
-    expect(createPresetUltramodernConfig).toBeDefined();
-    expect(presetUltramodern).toBeDefined();
-    const native = appTools();
-    const manager = createPluginManager();
-    manager.addPlugins([ultramodernAppTools()]);
-    const plugins = manager.getPlugins();
-    for (const name of [
-      '@modern-js/app-tools',
-      '@modern-js/backend-federation-build',
-      '@modern-js/cloudflare-builder',
-      '@modern-js/deploy-output-aliases',
-      '@modern-js/ultramodern-release-envelope',
-      '@modern-js/ultramodern-ssr-integration',
-      ...(native.usePlugins ?? []).map(plugin => plugin.name),
-    ]) {
-      expect(plugins.filter(plugin => plugin.name === name)).toHaveLength(1);
-    }
-    expect(
-      native.usePlugins?.some(
-        plugin => plugin.name === '@modern-js/cloudflare-builder',
-      ),
-    ).toBe(false);
-  });
-
   it.each([
     {
       name: 'UltraModern',

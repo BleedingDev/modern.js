@@ -130,7 +130,7 @@ describe('tanstack rsc runtime helpers', () => {
     ).toBeUndefined();
   });
 
-  test('redacts production TanStack RSC server payload errors', () => {
+  test('redacts production TanStack RSC server payload errors (Error, RouteErrorResponse, and plain-object)', () => {
     const routeError = new ErrorResponseImpl(
       500,
       'secret status text',
@@ -165,6 +165,14 @@ describe('tanstack rsc runtime helpers', () => {
               },
               routeId: '/products',
             },
+            {
+              error: { message: 'plain secret', token: 'token secret' },
+              params: {},
+              pathname: '/plain',
+              pathnameBase: '/plain',
+              route: { id: '/plain', parentRoute: { id: '__root__' } },
+              routeId: '/plain',
+            },
           ],
         },
       }),
@@ -182,44 +190,21 @@ describe('tanstack rsc runtime helpers', () => {
         data: 'Unexpected Server Error',
         __type: 'RouteErrorResponse',
       },
-    });
-    expect(JSON.stringify(payload.errors)).not.toContain('server secret');
-    expect(JSON.stringify(payload.errors)).not.toContain('route secret');
-    expect(JSON.stringify(payload.errors)).not.toContain('secret status text');
-    expect(JSON.stringify(payload.errors)).not.toContain('stack secret');
-  });
-
-  test('redacts production TanStack RSC non-Error server payload errors', () => {
-    const payload = withNodeEnv('production', () =>
-      createTanstackRscServerPayload({
-        state: {
-          location: { href: '/plain' },
-          matches: [
-            {
-              error: { message: 'plain secret', token: 'token secret' },
-              params: {},
-              pathname: '/plain',
-              pathnameBase: '/plain',
-              route: { id: '/plain' },
-              routeId: '/plain',
-            },
-          ],
-        },
-      }),
-    );
-
-    expect(payload.errors).toMatchObject({
       '/plain': {
         message: 'Unexpected Server Error',
         stack: undefined,
         __type: 'Error',
       },
     });
+    expect(JSON.stringify(payload.errors)).not.toContain('server secret');
+    expect(JSON.stringify(payload.errors)).not.toContain('route secret');
+    expect(JSON.stringify(payload.errors)).not.toContain('secret status text');
+    expect(JSON.stringify(payload.errors)).not.toContain('stack secret');
     expect(JSON.stringify(payload.errors)).not.toContain('plain secret');
     expect(JSON.stringify(payload.errors)).not.toContain('token secret');
   });
 
-  test('normalizes redirect basenames while preserving status and headers', () => {
+  test('preserves RSC redirect response status and headers in TanStack redirects', async () => {
     const scenarios = [
       { location: '/base', name: 'exact basename', redirect: '/' },
       {
@@ -252,9 +237,7 @@ describe('tanstack rsc runtime helpers', () => {
       );
       expect(response.headers.get('X-Trace')).toBe(scenario.name);
     }
-  });
 
-  test('preserves RSC redirect response status and headers in TanStack redirects', async () => {
     rstest.stubGlobal(
       'fetch',
       rstest.fn(() =>

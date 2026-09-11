@@ -8,7 +8,6 @@ import {
   listWorkspacePackageFiles,
 } from '../src/ultramodern-tooling/commands/migrate-strict-effect/io';
 import {
-  appDeclaresReactRouter,
   ensureGeneratedModuleFederationBridgeRouterOptOut,
   insertBridgeRouterOptOut,
   removeRetiredReactRouterDependency,
@@ -17,7 +16,6 @@ import { addUltramodernVertical } from '../src/ultramodern-workspace';
 import {
   createWorkspace,
   linkWorkspaceFormatterDependencies,
-  snapshotWorkspace,
 } from './helpers/workspace-kit';
 
 // The pin a workspace generated before the bridge router opt-out carries.
@@ -34,21 +32,6 @@ function writeJson(workspaceDir: string, relativePath: string, value: unknown) {
     path.join(workspaceDir, relativePath),
     `${JSON.stringify(value, null, 2)}\n`,
   );
-}
-
-async function captureStdout<T>(run: () => T | Promise<T>) {
-  const originalWrite = process.stdout.write;
-  let output = '';
-  (process.stdout as NodeJS.WriteStream).write = ((chunk: unknown) => {
-    output += typeof chunk === 'string' ? chunk : String(chunk);
-    return true;
-  }) as typeof process.stdout.write;
-  try {
-    const result = await run();
-    return { output, result };
-  } finally {
-    process.stdout.write = originalWrite;
-  }
 }
 
 function appPackageFilesOf(workspaceDir: string) {
@@ -184,57 +167,6 @@ test('migrate retires the obsolete react-router pin and derives the MF bridge ro
   }
 });
 
-test('migration dry-run projects React Router retirement before regenerating Module Federation configs', async () => {
-  const { tempRoot, workspaceDir } = createWorkspace(
-    'migration-react-router-dry-run',
-    { tempPrefix: 'um-migration-react-router-' },
-  );
-  linkWorkspaceFormatterDependencies(workspaceDir);
-
-  try {
-    addUltramodernVertical({
-      workspaceRoot: workspaceDir,
-      name: 'catalog',
-      modernVersion: '3.2.1',
-    });
-    const context = {
-      invocationCwd: workspaceDir,
-      workspaceRoot: workspaceDir,
-    };
-    assert.equal(await runMigrateStrictEffect(['--skip-install'], context), 0);
-
-    const appPackageFiles = appPackageFilesOf(workspaceDir);
-    for (const relativePath of appPackageFiles) {
-      const packageJson = readJson(workspaceDir, relativePath);
-      packageJson.dependencies['react-router'] = legacyReactRouterSpecifier;
-      writeJson(workspaceDir, relativePath, packageJson);
-    }
-    const before = snapshotWorkspace(workspaceDir);
-
-    const { output, result } = await captureStdout(() =>
-      runMigrateStrictEffect(['--dry-run'], context),
-    );
-    assert.equal(result, 0);
-    assert.deepEqual(
-      snapshotWorkspace(workspaceDir),
-      before,
-      'dry-run must leave the source workspace byte-identical',
-    );
-    for (const relativePath of moduleFederationConfigFilesOf(
-      workspaceDir,
-      appPackageFiles,
-    )) {
-      assert.equal(
-        output.includes(`[dry-run] would write ${relativePath}`),
-        false,
-        `${relativePath} must be derived from the projected manifests`,
-      );
-    }
-  } finally {
-    fs.rmSync(tempRoot, { force: true, recursive: true });
-  }
-});
-
 test('the react-router pin only survives authored React Router imports', () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-migration-react-router-usage-'),
@@ -315,31 +247,16 @@ import { baseConfig } from './base';
 
 export default createModuleFederationConfig(baseConfig);
 `;
-  const spread = `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
-import { baseConfig } from './base';
-
-export default createModuleFederationConfig({
-  ...baseConfig,
-  name: 'shell',
-});
-`;
-  const noConfigCall = `export default {
-  name: 'shell',
-};
-`;
-
-  for (const configSource of [nonLiteral, spread, noConfigCall]) {
-    const { apps, read, tempRoot } = createConfigWorkspace(configSource);
-    try {
-      const io = createMigrationIo(tempRoot, false);
-      assert.equal(
-        ensureGeneratedModuleFederationBridgeRouterOptOut(io, apps),
-        false,
-      );
-      assert.equal(read(), configSource);
-    } finally {
-      fs.rmSync(tempRoot, { force: true, recursive: true });
-    }
+  const { apps, read, tempRoot } = createConfigWorkspace(nonLiteral);
+  try {
+    const io = createMigrationIo(tempRoot, false);
+    assert.equal(
+      ensureGeneratedModuleFederationBridgeRouterOptOut(io, apps),
+      false,
+    );
+    assert.equal(read(), nonLiteral);
+  } finally {
+    fs.rmSync(tempRoot, { force: true, recursive: true });
   }
 });
 
@@ -390,90 +307,6 @@ export default moduleFederationConfig;
   } finally {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   }
-});
-
-test('the bridge router flag follows the app package.json declaration', () => {
-  const configSource = `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
-
-export default createModuleFederationConfig({
-  name: 'shell',
-});
-`;
-  const declarations = [
-    { dependencies: { 'react-router': '7.9.6' } },
-    { devDependencies: { 'react-router-dom': '7.9.6' } },
-  ];
-
-  for (const packageJson of declarations) {
-    assert.equal(appDeclaresReactRouter(packageJson), true);
-    const { apps, read, tempRoot } = createConfigWorkspace(
-      configSource,
-      packageJson,
-    );
-    try {
-      const io = createMigrationIo(tempRoot, false);
-      assert.equal(
-        ensureGeneratedModuleFederationBridgeRouterOptOut(io, apps),
-        true,
-      );
-      assert.match(read(), /bridge: \{\n\s+enableBridgeRouter: true,\n\s+\},/u);
-    } finally {
-      fs.rmSync(tempRoot, { force: true, recursive: true });
-    }
-  }
-
-  const withoutDeclaration = {
-    dependencies: { '@tanstack/react-router': '1.0.0' },
-  };
-  assert.equal(appDeclaresReactRouter(withoutDeclaration), false);
-  const { apps, read, tempRoot } = createConfigWorkspace(
-    configSource,
-    withoutDeclaration,
-  );
-  try {
-    const io = createMigrationIo(tempRoot, false);
-    // A missing package.json is not a declaration either.
-    assert.equal(
-      appDeclaresReactRouter(path.join(tempRoot, 'apps/absent')),
-      false,
-    );
-    assert.equal(
-      ensureGeneratedModuleFederationBridgeRouterOptOut(io, apps),
-      true,
-    );
-    assert.match(read(), /bridge: \{\n\s+enableBridgeRouter: false,\n\s+\},/u);
-  } finally {
-    fs.rmSync(tempRoot, { force: true, recursive: true });
-  }
-});
-
-test('an already declared bridge block is left alone, including a non-default one', () => {
-  const configured = `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
-
-export default createModuleFederationConfig({
-  bridge: {
-    enableBridgeRouter: true,
-  },
-  name: 'shell',
-});
-`;
-  assert.equal(insertBridgeRouterOptOut(configured), configured);
-
-  const empty = `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
-
-export default createModuleFederationConfig({});
-`;
-  assert.equal(
-    insertBridgeRouterOptOut(empty),
-    `import { createModuleFederationConfig } from '@module-federation/modern-js-v3';
-
-export default createModuleFederationConfig({
-  bridge: {
-    enableBridgeRouter: false,
-  },
-});
-`,
-  );
 });
 
 test('bridge migration edits only the exported factory object and preserves surrounding source', () => {

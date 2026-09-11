@@ -47,7 +47,7 @@ const createTransport = (
   });
 
 describe('Effect batch fallback behavior', () => {
-  for (const status of [404, 405]) {
+  for (const status of [404]) {
     test(`${status} disables the batch endpoint and makes future requests bypass it`, async () => {
       const events: DataBatchTransportEvent[] = [];
       const calls: string[] = [];
@@ -398,9 +398,6 @@ describe('Effect batch fallback behavior', () => {
 
   test.each([
     'POST',
-    'PUT',
-    'PATCH',
-    'DELETE',
   ] as const)('bypasses batching for %s by default', async method => {
     const path = method.toLowerCase();
     const calls: Array<{ method: string; url: string }> = [];

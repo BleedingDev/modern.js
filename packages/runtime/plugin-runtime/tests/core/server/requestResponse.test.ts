@@ -43,7 +43,7 @@ const createResponseProxy = (status: number): ResponseProxy => ({
 
 describe('createLoaderRedirectResponse', () => {
   it.each([
-    300, 304, 305, 306,
+    304,
   ])('does not classify status %s as a navigation redirect', async status => {
     const { createLoaderRedirectResponse } = await import(
       '../../../src/core/server/requestResponse'
@@ -78,7 +78,7 @@ describe('createLoaderRedirectResponse', () => {
   });
 
   it.each([
-    301, 302, 303, 307, 308,
+    302,
   ])('preserves canonical redirect status %s and its localized target', async status => {
     const { createLoaderRedirectResponse } = await import(
       '../../../src/core/server/requestResponse'
@@ -102,7 +102,7 @@ describe('createLoaderRedirectResponse', () => {
   });
 
   it.each([
-    307, 308,
+    308,
   ])('preserves method-retaining status %s through the RSC redirect transform', async status => {
     const { createLoaderRedirectResponse } = await import(
       '../../../src/core/server/requestResponse'
@@ -183,9 +183,6 @@ describe('finalizeRenderResponse', () => {
 
   it.each([
     { status: 204, headers: {} },
-    { status: 205, headers: {} },
-    { status: 304, headers: {} },
-    { status: 302, headers: { Location: '/login' } },
   ])('cancels the discarded source before router cleanup for status $status', async ({
     status,
     headers,

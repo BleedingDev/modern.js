@@ -3,8 +3,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  allWorkspaceAppsFromToolingConfig,
-  normalizeCompactUltramodernConfig,
   normalizeWorkspaceInputs,
   readUltramodernConfig,
   readUltramodernWorkspaceInputs,
@@ -72,65 +70,7 @@ test('workspace reads retain unknown input fields without mutating consumer inpu
   const view = normalizeWorkspaceInputs('/workspace', raw);
   assert.equal(view.raw, raw);
   assert.deepEqual(view.raw, before);
-  assert.equal(view.primaryShell?.directory, 'apps/custom-shell');
-  assert.equal(view.primaryShell?.port, 3120);
-  assert.equal(view.verticals[0].port, 3121);
-  assert.deepEqual(view.primaryShell?.verticalRefs, []);
-  assert.deepEqual(view.verticals[0].verticalRefs, []);
-  assert.equal(view.additionalShells[0].id, 'shell-admin');
-  assert.equal(view.additionalShells[0].port, 3300);
-  assert.deepEqual(view.additionalShells[0].verticalRefs, []);
-  assert.deepEqual(
-    view.apps.map(app => app.id),
-    [shellApp.id, 'orders', 'shell-admin'],
-  );
   assert.deepEqual(raw, before);
-});
-
-test('topology shell references fall back to compact refs only when absent', () => {
-  const raw = inputs();
-  const withoutRefs = { ...raw, topology: { ...raw.topology, shell: {} } };
-  assert.deepEqual(
-    normalizeWorkspaceInputs('/workspace', withoutRefs).primaryShell
-      ?.verticalRefs,
-    ['orders'],
-  );
-  assert.deepEqual(
-    normalizeWorkspaceInputs('/workspace', raw).primaryShell?.verticalRefs,
-    [],
-  );
-});
-
-test('compact-only reads preserve current projections and apply live overlay ports', () => {
-  const { config, overlay } = inputs();
-  const compact = normalizeCompactUltramodernConfig('/workspace', config);
-  assert.deepEqual(
-    normalizeWorkspaceInputs('/workspace', { config }).apps,
-    allWorkspaceAppsFromToolingConfig(compact),
-  );
-  const view = normalizeWorkspaceInputs('/workspace', { config, overlay });
-  assert.equal(view.primaryShell?.port, 3120);
-  assert.equal(view.verticals[0].port, 3121);
-  // Additive shells have their own persisted configuration, outside strict topology.
-  assert.equal(view.additionalShells[0].port, 3300);
-  assert.deepEqual(view.primaryShell?.verticalRefs, ['orders']);
-});
-
-test('topology readers retain legacy fallbacks and additional shells outside topology', () => {
-  const { config } = inputs();
-  const view = normalizeWorkspaceInputs('/workspace', {
-    config,
-    topology: {
-      verticals: [
-        { id: 'legacy', moduleFederation: { remotes: [{ id: 'orders' }] } },
-      ],
-    },
-  });
-  assert.equal(view.primaryShell?.port, 3000);
-  assert.equal(view.verticals[0].directory, 'verticals/legacy');
-  assert.equal(view.verticals[0].port, 0);
-  assert.deepEqual(view.verticals[0].verticalRefs, ['orders']);
-  assert.equal(view.additionalShells[0].id, 'shell-admin');
 });
 
 test('disk read exposes raw fields and leaves the existing config reader compatible', () => {

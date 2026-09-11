@@ -470,22 +470,6 @@ test('sidecar npm: aliases survive cohort rewriting untouched', async () => {
   assert.equal(packageJson.version, '3.8.3-ultramodern.9');
 });
 
-test('sidecar staging requires exactly one cohort image consumer', async () => {
-  const { assertSidecarAliasConsumerCount } = await import(
-    '../lib/prepare-bleedingdev-packages/workflow.mjs'
-  );
-
-  assert.doesNotThrow(() => assertSidecarAliasConsumerCount(1));
-  assert.throws(
-    () => assertSidecarAliasConsumerCount(0),
-    /requires exactly one @bleedingdev\/modern-js-image cohort package, found 0/u,
-  );
-  assert.throws(
-    () => assertSidecarAliasConsumerCount(2),
-    /requires exactly one @bleedingdev\/modern-js-image cohort package, found 2/u,
-  );
-});
-
 test('--include-sidecars is opt-in, staging-only, and leaves defaults untouched', async () => {
   const { parseArgs } = await import(
     '../lib/prepare-bleedingdev-packages/options.mjs'

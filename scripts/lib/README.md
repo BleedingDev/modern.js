@@ -1,7 +1,7 @@
 # scripts/lib
 
 Shared, dependency-free helpers for the current `scripts/` gate validators
-and script helper families (`boundary-guards`, `release-gates`,
+and script helper families (`boundary-guards`,
 `superapp-certification`, `ultramodern-publish`,
 `ultramodern-production-readiness`, and friends).
 
@@ -24,8 +24,8 @@ and script helper families (`boundary-guards`, `release-gates`,
 
 Rules:
 
-- Plain CommonJS, Node builtins only. The validators run under both `node`
-  and `bun` (see `validate:bun-smoke`) without any install or build step.
+- Plain CommonJS, Node builtins only. The validators run without any install
+  or build step.
   ESM `.mjs` scripts may import these helpers through Node's CommonJS default
   interop, e.g. `import fsKit from '../lib/fs-kit.js'`.
 - Keep error messages stable; validator test suites assert on them.
@@ -48,6 +48,6 @@ parses validator output; workflows consume exit codes only.
      name or '}' in JSON at position 2 (line 1 column 3)`; exit code 1.
 
 `PLACEHOLDER_VALUES` is the shared placeholder policy for helpers that opt into
-`isPlaceholderValue` or `ensureNonPlaceholderString`. It matches the current
-`release-gates` evidence metadata policy, including `to-be-filled`, so helper
-consumers reject the same non-concrete values consistently.
+`isPlaceholderValue` or `ensureNonPlaceholderString`. It includes
+`to-be-filled`, so helper consumers reject the same non-concrete values
+consistently.

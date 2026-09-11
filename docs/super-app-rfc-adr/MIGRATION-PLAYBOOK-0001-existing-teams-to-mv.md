@@ -46,11 +46,6 @@ Before changing runtime, routing, or service shape, the owning team records thes
 | Rollback controls | Kill switch, LKG candidate, CSR or maintenance fallback, and revocation path. |
 | Evidence gap | The first missing artifact compared with the Tractor Explore/Decide/Checkout target gates. |
 
-The live release-gate evidence contracts are the repository's shape examples only. They define required file roles and metadata; they do not certify a migration or production rollout:
-
-1. `docs/super-app-rfc-adr/evidence/release-candidate/current/`
-2. `docs/super-app-rfc-adr/evidence/module-certification/current/`
-
 ## 4. Phased Migration Path
 
 ### Tractor Target Split

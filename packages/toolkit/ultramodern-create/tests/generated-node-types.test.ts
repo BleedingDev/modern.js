@@ -3,9 +3,6 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { updateGeneratedPackageScripts } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
-import { updateRootPackageToolchain } from '../src/ultramodern-tooling/commands/migrate-strict-effect/toolchain-pins';
-import { createRootPackageJson } from '../src/ultramodern-workspace/package-json';
 import {
   createRootTsConfig,
   createSharedPackageTsConfig,
@@ -17,29 +14,6 @@ test('generated root typecheck follows references and includes Node types under 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-node-types-'));
   const require = createRequire(import.meta.url);
   try {
-    const manifest = createRootPackageJson('node-types', {
-      strategy: 'workspace',
-    });
-    const migrated = {
-      devDependencies: {},
-      scripts: {
-        typecheck:
-          'node ./scripts/ultramodern-typecheck.mts --project tsconfig.json',
-      },
-    };
-    updateRootPackageToolchain(migrated);
-    updateGeneratedPackageScripts(migrated, {
-      relativePackageFile: 'package.json',
-    });
-    expect(migrated.scripts.typecheck).toBe(
-      createWorkspaceRootScriptPlan([]).typecheck,
-    );
-    expect(manifest).toMatchObject({
-      devDependencies: { '@types/node': expect.any(String) },
-    });
-    expect(migrated.devDependencies).toMatchObject({
-      '@types/node': expect.any(String),
-    });
     const source = path.join(root, 'packages/shared-contracts/src');
     fs.mkdirSync(source, { recursive: true });
     fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });

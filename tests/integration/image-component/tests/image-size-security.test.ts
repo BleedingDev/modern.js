@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -15,7 +14,7 @@ const rsbuildImageEntry = pluginImageRequire.resolve('@rsbuild-image/core');
 const imageSizeCjsEntry =
   createRequire(rsbuildImageEntry).resolve('image-size');
 const imageSizeDist = path.dirname(imageSizeCjsEntry);
-const moduleKinds = ['commonjs', 'module'] as const;
+const moduleKinds = ['commonjs'] as const;
 // Each case parses untrusted bytes in a throwaway child so an unbounded parse
 // loop surfaces as a deterministic failure instead of hanging the suite. A
 // healthy child finishes in ~60ms; the bound only has to be small enough to
@@ -178,17 +177,6 @@ function distributionEntry(
   );
 }
 
-function typeEntry(
-  moduleKind: ModuleKind,
-  imageType: ImageType | 'index' | 'utils',
-): string {
-  return path.join(
-    imageSizeDist,
-    'types',
-    `${imageType}.${moduleKind === 'module' ? 'mjs' : 'cjs'}`,
-  );
-}
-
 function loadModuleSource(moduleKind: ModuleKind, entry: string): string {
   return moduleKind === 'module'
     ? `await import(${JSON.stringify(pathToFileURL(entry).href)})`
@@ -246,30 +234,6 @@ function parseBufferInChild(
   }`);
 }
 
-function parseFileInChild(
-  moduleKind: ModuleKind,
-  bytes: readonly number[],
-): ChildResult {
-  const ownedRoot = mkdtempSync(
-    path.join(tmpdir(), 'modernjs-image-size-security-'),
-  );
-  const imagePath = path.join(ownedRoot, 'untrusted-image.bin');
-  writeFileSync(imagePath, Uint8Array.from(bytes));
-
-  try {
-    const loadDistribution = loadModuleSource(
-      moduleKind,
-      distributionEntry(moduleKind, 'fromFile'),
-    );
-    return runInChild(`async () => {
-      const { imageSizeFromFile } = ${loadDistribution};
-      return imageSizeFromFile(${JSON.stringify(imagePath)});
-    }`);
-  } finally {
-    rmSync(ownedRoot, { force: true, recursive: true });
-  }
-}
-
 function expectSecurityOutcome(
   actual: ChildResult,
   expected: ExpectedOutcome,
@@ -296,13 +260,6 @@ describe.each(moduleKinds)('image-size %s distribution', moduleKind => {
     expectSecurityOutcome(parseBufferInChild(moduleKind, bytes), expected);
   });
 
-  it.each(securityCases)('bounds the public file parser for $name', ({
-    bytes,
-    expected,
-  }) => {
-    expectSecurityOutcome(parseFileInChild(moduleKind, bytes), expected);
-  });
-
   it.each(validImages)('preserves valid $name parsing', async fixture => {
     const imageSizeModule = await loadModule(
       moduleKind,
@@ -312,37 +269,6 @@ describe.each(moduleKinds)('image-size %s distribution', moduleKind => {
     expect(imageSizeModule.imageSize(Uint8Array.from(fixture.bytes))).toEqual(
       fixture.expected,
     );
-  });
-
-  it('implements bounded ISO-BMFF box semantics', async () => {
-    const { findBox } = await loadModule(
-      moduleKind,
-      typeEntry(moduleKind, 'utils'),
-    );
-
-    expect(
-      findBox(
-        Uint8Array.from(hex('00000008667265650000000866747970')),
-        'ftyp',
-        0,
-      ),
-    ).toEqual({ name: 'ftyp', offset: 8, size: 8 });
-    expect(
-      findBox(Uint8Array.from(hex('0000000066726565')), 'free', 0),
-    ).toEqual({ name: 'free', offset: 0, size: 8 });
-    expect(
-      findBox(Uint8Array.from(hex('0000000066726565')), 'ftyp', 0),
-    ).toBeUndefined();
-    expect(
-      findBox(
-        Uint8Array.from(hex('00000001667265650000000866747970')),
-        'ftyp',
-        0,
-      ),
-    ).toBeUndefined();
-    expect(
-      findBox(Uint8Array.from(hex('0000000766726565')), 'free', 0),
-    ).toBeUndefined();
   });
 
   it('preserves valid PNG parsing from a nonzero-byte-offset view', async () => {

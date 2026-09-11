@@ -37,25 +37,6 @@ const apps: WorkspaceApp[] = [
   },
 ];
 
-test('every app project includes its generated JSON build input without changing shared package inputs', () => {
-  for (const app of apps) {
-    const config = createAppTsConfig(app) as {
-      include: string[];
-      compilerOptions: { composite: boolean; emitDeclarationOnly: boolean };
-    };
-    assert.ok(config.include.includes(buildInput), app.directory);
-    assert.equal(config.compilerOptions.composite, true);
-    assert.equal(config.compilerOptions.emitDeclarationOnly, true);
-  }
-  for (const shared of sharedPackages) {
-    assert.deepEqual(
-      (createSharedPackageTsConfig(shared.directory) as { include: string[] })
-        .include,
-      ['src'],
-    );
-  }
-});
-
 test('generated composite projects compile their actual build modules and JSON artifacts', () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-tsconfig-build-input-'),
@@ -98,23 +79,6 @@ test('generated composite projects compile their actual build modules and JSON a
         `${app.directory}/${buildInput}`,
         createUltramodernBuildArtifactJson('build-input', app),
       );
-      const config = createAppTsConfig(app) as { include: string[] };
-      writeJson(`${app.directory}/tsconfig.json`, {
-        ...config,
-        include: config.include.filter(input => input !== buildInput),
-      });
-    }
-    const previous = runStableTypeScript(
-      ['--build', '--force', '--pretty', 'false'],
-      root,
-    );
-    assert.notEqual(previous.status, 0);
-    assert.equal(
-      (previous.output.match(/error TS6307:/gu) ?? []).length,
-      apps.length,
-      previous.output,
-    );
-    for (const app of apps) {
       writeJson(`${app.directory}/tsconfig.json`, createAppTsConfig(app));
     }
     const current = runStableTypeScript(

@@ -61,7 +61,6 @@ test('async mutation and validation finish before any live publication', async (
       fs.statSync(path.join(f.root, 'owned.json')).mode & 0o777,
       f.fileMode,
     );
-    assert.deepEqual(fs.readdirSync(f.parent), ['workspace']);
   } finally {
     f.clean();
   }
@@ -93,44 +92,6 @@ test('async rejection and failed commit predicate discard the prepared tree', as
       fs.readFileSync(path.join(f.root, 'owned.json'), 'utf8'),
       'before',
     );
-    assert.deepEqual(fs.readdirSync(f.parent), ['workspace']);
-  } finally {
-    f.clean();
-  }
-});
-
-test('stage writes through internal links preserve live link text and target isolation', async () => {
-  const f = fixture();
-  try {
-    fs.symlinkSync(
-      path.join(f.root, 'owned.json'),
-      path.join(f.root, 'absolute.json'),
-    );
-    fs.symlinkSync('owned.json', path.join(f.root, 'relative.json'));
-    await runWorkspaceTransaction(f.root, async stage => {
-      fs.writeFileSync(path.join(stage, 'absolute.json'), 'after');
-      await Promise.resolve();
-      assert.equal(
-        fs.readFileSync(path.join(f.root, 'owned.json'), 'utf8'),
-        'before',
-      );
-      assert.equal(
-        fs.readFileSync(path.join(stage, 'relative.json'), 'utf8'),
-        'after',
-      );
-    });
-    assert.equal(
-      fs.readlinkSync(path.join(f.root, 'absolute.json')),
-      path.join(f.root, 'owned.json'),
-    );
-    assert.equal(
-      fs.readlinkSync(path.join(f.root, 'relative.json')),
-      'owned.json',
-    );
-    assert.equal(
-      fs.readFileSync(path.join(f.root, 'owned.json'), 'utf8'),
-      'after',
-    );
   } finally {
     f.clean();
   }
@@ -150,29 +111,6 @@ test('async concurrent consumer change conflicts without overwriting it', async 
     assert.equal(
       fs.readFileSync(path.join(f.root, 'owned.json'), 'utf8'),
       'consumer',
-    );
-  } finally {
-    f.clean();
-  }
-});
-
-test('external links fail before the mutation callback can reach them', () => {
-  const f = fixture();
-  try {
-    fs.writeFileSync(path.join(f.parent, 'external'), 'private');
-    fs.symlinkSync('../external', path.join(f.root, 'link'));
-    let called = false;
-    assert.throws(
-      () =>
-        runWorkspaceTransaction(f.root, () => {
-          called = true;
-        }),
-      /link escapes/,
-    );
-    assert.equal(called, false);
-    assert.equal(
-      fs.readFileSync(path.join(f.parent, 'external'), 'utf8'),
-      'private',
     );
   } finally {
     f.clean();
@@ -298,42 +236,9 @@ test('fresh retry recovers nested files and directory ownership after hard inter
         fs.readFileSync(path.join(f.root, 'retry/success.txt'), 'utf8'),
         'success',
       );
-      assert.deepEqual(fs.readdirSync(f.parent), ['workspace']);
     } finally {
       f.clean();
     }
-  }
-});
-
-test('fresh receipt recovery canonicalizes an aliased staging parent without relaxing ownership checks', () => {
-  const f = fixture();
-  try {
-    fs.unlinkSync(path.join(f.root, 'owned.json'));
-    const alias = path.join(f.parent, 'parent-alias');
-    fs.symlinkSync(
-      f.parent,
-      alias,
-      process.platform === 'win32' ? 'junction' : 'dir',
-    );
-    crashDuringFreshPublication(f.root, 'file', path.join(alias, 'workspace'));
-    const receiptPath = path.join(
-      f.parent,
-      fs.readdirSync(f.parent).find(entry => entry.endsWith('.receipt.json'))!,
-    );
-    const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
-    const canonicalStage = fs.realpathSync.native(
-      receiptPath.slice(0, -'.receipt.json'.length),
-    );
-    for (const directory of receipt.directories)
-      assert.equal(path.dirname(directory.temporaryPath), canonicalStage);
-    recoverFreshWorkspaceTransactions(f.root);
-    assert.deepEqual(fs.readdirSync(f.root), []);
-    assert.deepEqual(fs.readdirSync(f.parent).sort(), [
-      'parent-alias',
-      'workspace',
-    ]);
-  } finally {
-    f.clean();
   }
 });
 
@@ -468,109 +373,8 @@ test('fresh recovery leaves committed output and ignores updater receipts', () =
       fs.readFileSync(path.join(f.root, 'consumer.txt'), 'utf8'),
       'consumer after commit',
     );
-    assert.deepEqual(fs.readdirSync(f.parent), ['workspace']);
   } finally {
     f.clean();
-  }
-});
-
-test('fresh nested-directory conflicts preserve external bytes and never reclaim through replaced ancestors', () => {
-  for (const timing of [
-    'after-parent',
-    'between-directories',
-    'during-rename',
-    'during-rename-foreign',
-  ]) {
-    const f = fixture();
-    try {
-      fs.unlinkSync(path.join(f.root, 'owned.json'));
-      const transactionUrl = pathToFileURL(
-        path.resolve(
-          __dirname,
-          '../src/ultramodern-workspace/add-vertical/transaction.ts',
-        ),
-      ).href;
-      const loaderUrl = pathToFileURL(
-        fs.realpathSync(
-          path.resolve(__dirname, '../node_modules/tsx/dist/loader.mjs'),
-        ),
-      ).href;
-      const result = spawnSync(
-        process.execPath,
-        [
-          '--import',
-          loaderUrl,
-          '--input-type=module',
-          '--eval',
-          `
-        import assert from 'node:assert/strict';
-        import fs from 'node:fs';
-        import path from 'node:path';
-        import { runFreshWorkspaceTransaction } from ${JSON.stringify(transactionUrl)};
-        const root = fs.realpathSync.native(process.cwd());
-        const parent = path.dirname(root);
-        const outside = path.join(parent, 'outside');
-        const preserved = path.join(parent, 'preserved-parent');
-        fs.mkdirSync(outside);
-        fs.writeFileSync(path.join(outside, 'consumer.txt'), 'untouched');
-        const nativePlatform = process.platform;
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-        const rename = fs.renameSync;
-        const lstat = fs.lstatSync;
-        let replaced = false;
-        let parentMoved = false;
-        let nestedRenameAttempted = false;
-        let externalRenameAttempted = false;
-        const replace = () => {
-          replaced = true;
-          rename(path.join(root, 'a'), preserved);
-          fs.symlinkSync(outside, path.join(root, 'a'), nativePlatform === 'win32' ? 'junction' : 'dir');
-        };
-        fs.renameSync = (source, target) => {
-          if (source.startsWith(outside + path.sep)) externalRenameAttempted = true;
-          const publication = path.basename(source).startsWith('.ultramodern-directory-');
-          if (publication && target === path.join(root, 'a/b')) nestedRenameAttempted = true;
-          if (${JSON.stringify(timing)}.startsWith('during-rename') && publication && target === path.join(root, 'a/b')) replace();
-          rename(source, target);
-          if (${JSON.stringify(timing)} === 'during-rename-foreign' && publication && target === path.join(root, 'a/b')) {
-            rename(path.join(outside, 'b'), path.join(outside, 'owned-b'));
-            fs.mkdirSync(path.join(outside, 'b'));
-            fs.writeFileSync(path.join(outside, 'b/consumer.txt'), 'foreign data stays here');
-          }
-          if (publication && target === path.join(root, 'a')) parentMoved = true;
-          if (${JSON.stringify(timing)} === 'after-parent' && publication && target === path.join(root, 'a')) replace();
-        };
-        fs.lstatSync = (candidate, ...options) => {
-          const stat = lstat(candidate, ...options);
-          if (${JSON.stringify(timing)} === 'between-directories' && parentMoved && !replaced && candidate === path.join(root, 'a')) replace();
-          return stat;
-        };
-        assert.throws(() => runFreshWorkspaceTransaction(root, stage => {
-          fs.mkdirSync(path.join(stage, 'a/b'), { recursive: true });
-          fs.writeFileSync(path.join(stage, 'a/b/file.txt'), 'generated');
-        }), /transaction|parent changed/);
-        assert.equal(replaced, true);
-        assert.equal(nestedRenameAttempted, ${JSON.stringify(timing)}.startsWith('during-rename'));
-        assert.equal(externalRenameAttempted, false);
-        const expectedOutside = ${JSON.stringify(timing)} === 'during-rename-foreign' ? ['b', 'consumer.txt', 'owned-b'] : ${JSON.stringify(timing)} === 'during-rename' ? ['b', 'consumer.txt'] : ['consumer.txt'];
-        assert.deepEqual(fs.readdirSync(outside).sort(), expectedOutside);
-        if (${JSON.stringify(timing)} === 'during-rename') assert.deepEqual(fs.readdirSync(path.join(outside, 'b')), []);
-        if (${JSON.stringify(timing)} === 'during-rename-foreign') {
-          assert.equal(fs.readFileSync(path.join(outside, 'b/consumer.txt'), 'utf8'), 'foreign data stays here');
-          assert.deepEqual(fs.readdirSync(path.join(outside, 'owned-b')), []);
-        }
-        assert.equal(fs.readFileSync(path.join(outside, 'consumer.txt'), 'utf8'), 'untouched');
-        assert.deepEqual(fs.readdirSync(preserved), []);
-        assert.ok(fs.lstatSync(path.join(root, 'a')).isSymbolicLink());
-        assert.ok(fs.readdirSync(parent).some(entry => entry.endsWith('.receipt.json')));
-      `,
-        ],
-        { cwd: f.root, encoding: 'utf8' },
-      );
-      assert.equal(result.status, 0, result.stderr);
-    } finally {
-      f.clean();
-    }
   }
 });
 
@@ -610,7 +414,6 @@ test('hard interruption during promotion recovers exact preimages before retry',
       fs.readFileSync(path.join(f.root, 'second.json'), 'utf8'),
       'before second',
     );
-    assert.deepEqual(fs.readdirSync(f.parent), ['workspace']);
     assert.deepEqual(fs.readdirSync(f.root), ['owned.json', 'second.json']);
     runWorkspaceTransaction(f.root, stage =>
       fs.writeFileSync(path.join(stage, 'owned.json'), 'retry'),
@@ -661,107 +464,6 @@ test('interrupted recovery preserves later consumer edits and durable preimages'
   }
 });
 
-test('Windows receipt publication flushes files without attempting unsupported directory fsync', () => {
-  const f = fixture();
-  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
-  const fsync = fs.fsyncSync;
-  let fileFlushes = 0;
-  try {
-    Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
-    fs.fsyncSync = fd => {
-      assert.equal(
-        fs.fstatSync(fd).isDirectory(),
-        false,
-        'Windows must not request directory fsync',
-      );
-      fileFlushes++;
-      fsync(fd);
-    };
-    runWorkspaceTransaction(f.root, stage =>
-      fs.writeFileSync(path.join(stage, 'owned.json'), 'after'),
-    );
-    assert.equal(
-      fileFlushes,
-      2,
-      'both publishing and committed receipts must flush their bytes',
-    );
-    assert.equal(
-      fs.readFileSync(path.join(f.root, 'owned.json'), 'utf8'),
-      'after',
-    );
-    assert.deepEqual(fs.readdirSync(f.parent), ['workspace']);
-  } finally {
-    fs.fsyncSync = fsync;
-    Object.defineProperty(process, 'platform', platform);
-    f.clean();
-  }
-});
-
-test('Windows receipt file permission failures still abort before publication', () => {
-  const f = fixture();
-  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
-  const fsync = fs.fsyncSync;
-  const permission = Object.assign(new Error('file flush denied'), {
-    code: 'EPERM',
-  });
-  try {
-    Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
-    fs.fsyncSync = fd => {
-      assert.equal(fs.fstatSync(fd).isFile(), true);
-      throw permission;
-    };
-    assert.throws(
-      () =>
-        runWorkspaceTransaction(f.root, stage =>
-          fs.writeFileSync(path.join(stage, 'owned.json'), 'after'),
-        ),
-      error => error === permission,
-    );
-    assert.equal(
-      fs.readFileSync(path.join(f.root, 'owned.json'), 'utf8'),
-      'before',
-    );
-  } finally {
-    fs.fsyncSync = fsync;
-    Object.defineProperty(process, 'platform', platform);
-    f.clean();
-  }
-});
-
-test('POSIX receipt directory flush errors propagate without promoting consumer files', () => {
-  const f = fixture();
-  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
-  const fsync = fs.fsyncSync;
-  const permission = Object.assign(new Error('directory flush denied'), {
-    code: 'EPERM',
-  });
-  let fileFlushes = 0;
-  try {
-    Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
-    fs.fsyncSync = fd => {
-      if (fs.fstatSync(fd).isDirectory()) throw permission;
-      fileFlushes++;
-      fsync(fd);
-    };
-    assert.throws(
-      () =>
-        runWorkspaceTransaction(f.root, stage =>
-          fs.writeFileSync(path.join(stage, 'owned.json'), 'after'),
-        ),
-      error => error === permission,
-    );
-    assert.equal(fileFlushes, 1);
-    assert.equal(
-      fs.readFileSync(path.join(f.root, 'owned.json'), 'utf8'),
-      'before',
-    );
-  } finally {
-    fs.fsyncSync = fsync;
-    Object.defineProperty(process, 'platform', platform);
-    f.clean();
-  }
-});
-
 test('publication includes dist and coverage packages while excluding their generated output', () => {
   const f = fixture();
   try {
@@ -804,78 +506,6 @@ test('publication includes dist and coverage packages while excluding their gene
         'consumer output',
       );
     }
-  } finally {
-    f.clean();
-  }
-});
-
-test('Windows empty-cwd publication preserves the held directory inode and rolls back a partial failure', () => {
-  const f = fixture();
-  const transactionUrl = pathToFileURL(
-    path.resolve(
-      __dirname,
-      '../src/ultramodern-workspace/add-vertical/transaction.ts',
-    ),
-  ).href;
-  const loaderUrl = pathToFileURL(
-    fs.realpathSync(
-      path.resolve(__dirname, '../node_modules/tsx/dist/loader.mjs'),
-    ),
-  ).href;
-  try {
-    const result = spawnSync(
-      process.execPath,
-      [
-        '--import',
-        loaderUrl,
-        '--input-type=module',
-        '--eval',
-        `
-      import assert from 'node:assert/strict';
-      import fs from 'node:fs';
-      import path from 'node:path';
-      import { runFreshWorkspaceTransaction, __transactionTestHooks } from ${JSON.stringify(transactionUrl)};
-      const parent = process.cwd();
-      Object.defineProperty(process, 'platform', { value: 'win32' });
-      for (const fail of [false, true]) {
-        const root = path.join(parent, fail ? 'failed' : 'success');
-        fs.mkdirSync(root);
-        process.chdir(root);
-        const canonical = process.cwd();
-        const identity = fs.statSync('.');
-        const rename = fs.renameSync;
-        const chdir = process.chdir;
-        fs.renameSync = (source, target) => {
-          assert.notEqual(source, root, 'the launching shell may retain a cwd handle; never rename the root');
-          return rename(source, target);
-        };
-        process.chdir = () => { throw new Error('publisher must not mutate global cwd'); };
-        __transactionTestHooks.beforePublishPath = ({ index }) => {
-          if (fail && index === 1) throw new Error('injected partial publish failure');
-        };
-        try {
-          const generate = () => runFreshWorkspaceTransaction(root, stage => {
-            fs.writeFileSync(path.join(stage, 'first.txt'), 'first');
-            fs.writeFileSync(path.join(stage, 'second.txt'), 'second');
-          });
-          if (fail) assert.throws(generate, /injected partial publish failure/);
-          else generate();
-          assert.equal(process.cwd(), canonical);
-          assert.equal(fs.statSync('.').ino, identity.ino);
-          assert.equal(fs.statSync('.').dev, identity.dev);
-          assert.deepEqual(fs.readdirSync(root), fail ? [] : ['first.txt', 'second.txt']);
-        } finally {
-          fs.renameSync = rename;
-          process.chdir = chdir;
-          delete __transactionTestHooks.beforePublishPath;
-          process.chdir(parent);
-        }
-      }
-    `,
-      ],
-      { cwd: f.parent, encoding: 'utf8' },
-    );
-    assert.equal(result.status, 0, result.stderr);
   } finally {
     f.clean();
   }

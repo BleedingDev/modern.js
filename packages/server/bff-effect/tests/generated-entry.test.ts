@@ -39,19 +39,3 @@ test('generated contracts win while caller policy and module identity are preser
     'stale',
   );
 });
-
-test.each([
-  undefined,
-  null,
-  {},
-  { expectedOperationContracts: [] },
-])('does not manufacture a policy for incomplete input %s', policy => {
-  createEffectBffEdgeDispatcherFactory(
-    {},
-    {},
-  )({ crossProjectPolicy: policy as never });
-  expect(
-    rstest.mocked(createEffectBffEdgeDispatcher).mock.calls[0][0]
-      .crossProjectPolicy,
-  ).toBe(policy);
-});

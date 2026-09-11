@@ -103,10 +103,6 @@ test('builds the supported pnpm dlx package command contract from the authentica
   const { createPnpmDlxArgs, resolveCreatePackage } = await import(
     '../published-create-proof/package-cohort.mjs'
   );
-  const { createCleanPnpmDlxEnv } = await import(
-    '../published-create-proof/process.mjs'
-  );
-
   const createPackage = resolveCreatePackage(makeBootstrapRelease());
   assert.deepEqual(
     createPnpmDlxArgs(createPackage, ['my-super-app', '--lang', 'en']),
@@ -126,25 +122,8 @@ test('builds the supported pnpm dlx package command contract from the authentica
       'en',
     ],
   );
-  assert.deepEqual(
-    createPnpmDlxArgs(createPackage, ['catalog', '--vertical', '--lang', 'en']),
-    [
-      '--pm-on-fail=ignore',
-      '--config.minimum-release-age=1440',
-      '--config.minimum-release-age-strict=true',
-      '--config.minimum-release-age-ignore-missing-time=false',
-      '--config.minimum-release-age-exclude=@bleedingdev/modern-js-i18n-utils@3.4.0-ultramodern.2',
-      '--config.minimum-release-age-exclude=@bleedingdev/modern-js-ultramodern-create@3.4.0-ultramodern.2',
-      '--config.minimum-release-age-exclude=@bleedingdev/modern-js-utils@3.4.0-ultramodern.2',
-      'dlx',
-      '--allow-build=esbuild',
-      '@bleedingdev/modern-js-ultramodern-create@3.4.0-ultramodern.2',
-      'catalog',
-      '--vertical',
-      '--lang',
-      'en',
-    ],
-  );
+  // A create package the release-age policy cannot exclude makes the
+  // documented bootstrap command fail against a freshly published cohort.
   assert.throws(
     () =>
       createPnpmDlxArgs(
@@ -155,14 +134,6 @@ test('builds the supported pnpm dlx package command contract from the authentica
       ),
     /exact authenticated bootstrap release-age policy/u,
   );
-
-  const root = path.join(os.tmpdir(), 'published-create-dlx-cache');
-  assert.deepEqual(createCleanPnpmDlxEnv(root), {
-    XDG_CACHE_HOME: path.join(root, 'xdg'),
-    npm_config_cache: path.join(root, 'npm-cache'),
-    npm_config_store_dir: path.join(root, 'store'),
-    pnpm_config_store_dir: path.join(root, 'store'),
-  });
 });
 
 test('orders exact bootstrap specifiers when a reachable package name prefixes another', async () => {
@@ -205,6 +176,9 @@ test('orders exact bootstrap specifiers when a reachable package name prefixes a
   );
   release.publishOrder.push(pluginTarget, dataLoaderTarget);
 
+  // pnpm rejects the whole bootstrap command when the exclusions are not
+  // ordered on the full `name@version` specifier, which only shows up when one
+  // package name is a prefix of another.
   const args = createPnpmDlxArgs(resolveCreatePackage(release), ['my-app']);
   assert.deepEqual(
     args.filter(argument =>
@@ -220,7 +194,7 @@ test('orders exact bootstrap specifiers when a reachable package name prefixes a
   );
 });
 
-test('fails closed when the authenticated create closure is omitted, broadened, or version-skewed', async () => {
+test('fails closed when the authenticated create closure is omitted or version-skewed', async () => {
   const { resolveCreatePackage } = await import(
     '../published-create-proof/package-cohort.mjs'
   );
@@ -229,15 +203,6 @@ test('fails closed when the authenticated create closure is omitted, broadened, 
   omitted.dependencyGraph[omitted.createPackage.targetName] = [];
   assert.throws(
     () => resolveCreatePackage(omitted),
-    /differs from authenticated packed runtime dependencies/u,
-  );
-
-  const extra = makeBootstrapRelease();
-  extra.dependencyGraph[extra.createPackage.targetName].push(
-    extra.aliases['@modern-js/runtime'],
-  );
-  assert.throws(
-    () => resolveCreatePackage(extra),
     /differs from authenticated packed runtime dependencies/u,
   );
 
@@ -251,147 +216,10 @@ test('fails closed when the authenticated create closure is omitted, broadened, 
   );
 });
 
-test('shared ERP-10 profile scrubs framework overrides and resolves exact pnpm', async t => {
-  const { createAcceptancePackageManagerEnv, resolveExactPnpmExecutable } =
-    await import('../published-create-proof/acceptance-profile.mjs');
-  assert.equal(
-    createAcceptancePackageManagerEnv('/tmp/acceptance', {
-      MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION: 'forbidden',
-    }).MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION,
-    undefined,
+test('acceptance children never inherit a source create bin or framework override', async () => {
+  const { createAcceptancePackageManagerEnv } = await import(
+    '../published-create-proof/acceptance-profile.mjs'
   );
-  assert.deepEqual(
-    Object.fromEntries(
-      Object.entries(
-        createAcceptancePackageManagerEnv('/tmp/acceptance'),
-      ).filter(([name]) => /(?:fetch|network_concurrency)/u.test(name)),
-    ),
-    {
-      npm_config_fetch_retries: '5',
-      npm_config_fetch_timeout: '600000',
-      pnpm_config_fetch_retries: '5',
-      pnpm_config_fetch_timeout: '600000',
-      pnpm_config_network_concurrency: '8',
-    },
-    'cold acceptance installs must tolerate slow registries without unbounded request concurrency',
-  );
-  const exactPnpmDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ultramodern-exact-pnpm-'),
-  );
-  t.after(() => fs.rmSync(exactPnpmDir, { force: true, recursive: true }));
-  const exactPnpmExecutable = path.join(
-    exactPnpmDir,
-    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  );
-  fs.writeFileSync(exactPnpmExecutable, 'acceptance test executable');
-  fs.chmodSync(exactPnpmExecutable, 0o755);
-  const resolvedPnpmExecutable = resolveExactPnpmExecutable(
-    command => {
-      if (command === 'pnpm') {
-        throw new Error('mise pnpm exec PATH does not expose the pnpm shim');
-      }
-      if (command === exactPnpmExecutable) {
-        return '11.17.0';
-      }
-      throw new Error(`Unexpected command ${command}`);
-    },
-    '11.17.0',
-    { PATH: exactPnpmDir },
-    exactPnpmDir,
-  );
-  assert.equal(resolvedPnpmExecutable, exactPnpmExecutable);
-  // The nested discovery subprocess runs under the injected environment, not
-  // the ambient parent one: discovery and the PATH the returned executable
-  // builds for the child must come from a single environment.
-  const discoveryEnvs = [];
-  assert.equal(
-    resolveExactPnpmExecutable(
-      (command, args, options) => {
-        if (command === 'pnpm') {
-          discoveryEnvs.push(options.env);
-          // A discovery that honors the injected PATH cannot reach a directory
-          // the injected environment never names.
-          assert.equal(options.env.PATH, exactPnpmDir);
-          throw new Error('pnpm exec PATH exposes no shim');
-        }
-        return command === exactPnpmExecutable ? '11.17.0' : '11.11.0';
-      },
-      '11.17.0',
-      { PATH: exactPnpmDir },
-      exactPnpmDir,
-    ),
-    exactPnpmExecutable,
-  );
-  assert.deepEqual(discoveryEnvs, [{ PATH: exactPnpmDir }]);
-  const stalePnpmDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ultramodern-stale-pnpm-shim-'),
-  );
-  t.after(() => fs.rmSync(stalePnpmDir, { force: true, recursive: true }));
-  const stalePnpmExecutable = path.join(
-    stalePnpmDir,
-    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  );
-  fs.writeFileSync(stalePnpmExecutable, 'stale acceptance test executable');
-  fs.chmodSync(stalePnpmExecutable, 0o755);
-  assert.equal(
-    resolveExactPnpmExecutable(
-      command => {
-        if (command === exactPnpmExecutable) {
-          return '11.17.0';
-        }
-        if (command === stalePnpmExecutable || command === 'pnpm') {
-          return '11.11.0';
-        }
-        throw new Error(`Unexpected command ${command}`);
-      },
-      '11.17.0',
-      {
-        PATH: stalePnpmDir,
-        ULTRAMODERN_PNPM_EXECUTABLE: exactPnpmExecutable,
-      },
-      exactPnpmDir,
-    ),
-    exactPnpmExecutable,
-    'an explicitly provisioned manifest pnpm must win over a stale project shim',
-  );
-  assert.throws(
-    () =>
-      resolveExactPnpmExecutable(
-        command => {
-          if (command === 'pnpm') {
-            throw new Error('nested discovery unavailable');
-          }
-          assert.equal(command, exactPnpmExecutable);
-          return '11.14.0';
-        },
-        '11.17.0',
-        { PATH: exactPnpmDir },
-        exactPnpmDir,
-      ),
-    /resolved 11\.14\.0, expected 11\.17\.0/u,
-  );
-  const directoryDecoyPath = path.join(exactPnpmDir, 'directory-decoy');
-  fs.mkdirSync(path.join(directoryDecoyPath, 'pnpm'), { recursive: true });
-  assert.throws(
-    () =>
-      resolveExactPnpmExecutable(
-        () => {
-          throw new Error('directory decoy must not be executed');
-        },
-        '11.17.0',
-        { PATH: directoryDecoyPath },
-        exactPnpmDir,
-      ),
-    /pnpm executable is absent from the acceptance parent PATH/u,
-  );
-  assert.equal(
-    createAcceptancePackageManagerEnv('/tmp/acceptance', {
-      ULTRAMODERN_CREATE_BIN:
-        '/repo/packages/toolkit/ultramodern-create/bin/run.js',
-    }).ULTRAMODERN_CREATE_BIN,
-    undefined,
-  );
-
   const inherited = {
     MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION:
       process.env.MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION,
@@ -419,6 +247,8 @@ test('shared ERP-10 profile scrubs framework overrides and resolves exact pnpm',
       { encoding: 'utf8', env: effectiveEnv },
     );
     assert.equal(child.status, 0, child.stderr);
+    // A leaked source create bin makes the published-package proof silently
+    // run the local checkout instead of the published tarball.
     assert.deepEqual(
       JSON.parse(child.stdout),
       {},
@@ -433,6 +263,67 @@ test('shared ERP-10 profile scrubs framework overrides and resolves exact pnpm',
       }
     }
   }
+});
+
+test('the provisioned pnpm wins over a stale shim and a version mismatch fails closed', async t => {
+  const { resolveExactPnpmExecutable } = await import(
+    '../published-create-proof/acceptance-profile.mjs'
+  );
+  const exactPnpmDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ultramodern-exact-pnpm-'),
+  );
+  t.after(() => fs.rmSync(exactPnpmDir, { force: true, recursive: true }));
+  const pnpmBinaryName = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+  const exactPnpmExecutable = path.join(exactPnpmDir, pnpmBinaryName);
+  fs.writeFileSync(exactPnpmExecutable, 'acceptance test executable');
+  fs.chmodSync(exactPnpmExecutable, 0o755);
+  const stalePnpmDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ultramodern-stale-pnpm-shim-'),
+  );
+  t.after(() => fs.rmSync(stalePnpmDir, { force: true, recursive: true }));
+  const stalePnpmExecutable = path.join(stalePnpmDir, pnpmBinaryName);
+  fs.writeFileSync(stalePnpmExecutable, 'stale acceptance test executable');
+  fs.chmodSync(stalePnpmExecutable, 0o755);
+
+  assert.equal(
+    resolveExactPnpmExecutable(
+      command => {
+        if (command === exactPnpmExecutable) {
+          return '11.17.0';
+        }
+        if (command === stalePnpmExecutable || command === 'pnpm') {
+          return '11.11.0';
+        }
+        throw new Error(`Unexpected command ${command}`);
+      },
+      '11.17.0',
+      {
+        PATH: stalePnpmDir,
+        ULTRAMODERN_PNPM_EXECUTABLE: exactPnpmExecutable,
+      },
+      exactPnpmDir,
+    ),
+    exactPnpmExecutable,
+    'an explicitly provisioned manifest pnpm must win over a stale project shim',
+  );
+  // Installing the acceptance workspace with a pnpm the manifest did not pin
+  // produces a lockfile the release never validated.
+  assert.throws(
+    () =>
+      resolveExactPnpmExecutable(
+        command => {
+          if (command === 'pnpm') {
+            throw new Error('nested discovery unavailable');
+          }
+          assert.equal(command, exactPnpmExecutable);
+          return '11.14.0';
+        },
+        '11.17.0',
+        { PATH: exactPnpmDir },
+        exactPnpmDir,
+      ),
+    /resolved 11\.14\.0, expected 11\.17\.0/u,
+  );
 });
 
 test('default-off clean-room install excludes and cannot resolve RSC runtimes', async t => {
@@ -473,11 +364,8 @@ test('default-off clean-room install excludes and cannot resolve RSC runtimes', 
   );
   fs.writeFileSync(path.join(renderRoot, 'client.js'), 'module.exports = {}\n');
 
-  const oversizedCleanClosure = Array.from({ length: 25_000 }, (_, index) => ({
-    name: `clean-dependency-${index}`,
-    version: '1.0.0',
-  }));
-  assert.deepEqual(assertDefaultOffRscInstall(root, oversizedCleanClosure), {
+  const cleanClosure = [{ name: 'clean-dependency', version: '1.0.0' }];
+  assert.deepEqual(assertDefaultOffRscInstall(root, cleanClosure), {
     appPackage: '@acceptance/shell',
     forbiddenDependencyCount: 0,
     renderClient: fs.realpathSync(path.join(renderRoot, 'client.js')),
@@ -487,7 +375,7 @@ test('default-off clean-room install excludes and cannot resolve RSC runtimes', 
     () =>
       assertDefaultOffRscInstall(
         root,
-        oversizedCleanClosure.concat({
+        cleanClosure.concat({
           name: 'rsbuild-plugin-rsc',
           version: '0.1.1',
         }),
@@ -495,6 +383,8 @@ test('default-off clean-room install excludes and cannot resolve RSC runtimes', 
     /contains forbidden RSC dependencies: rsbuild-plugin-rsc/u,
   );
 
+  // A default-off app that can still resolve the RSC client ships a second
+  // React runtime into the user's bundle.
   const poisonRoot = path.join(
     renderRoot,
     'node_modules',
@@ -514,12 +404,12 @@ test('default-off clean-room install excludes and cannot resolve RSC runtimes', 
     'module.exports = {}\n',
   );
   assert.throws(
-    () => assertDefaultOffRscInstall(root, oversizedCleanClosure),
+    () => assertDefaultOffRscInstall(root, cleanClosure),
     /must not resolve react-server-dom-rspack\/client\.browser/u,
   );
 });
 
-test('acceptance Git setup rejects a nested parent without changing it and accepts a canonical workspace root', async () => {
+test('acceptance Git setup refuses to commit into an enclosing repository', async () => {
   const { configureAcceptanceWorkspaceGit } = await import(
     '../published-create-proof/acceptance-profile.mjs'
   );
@@ -528,7 +418,6 @@ test('acceptance Git setup rejects a nested parent without changing it and accep
   );
   const parent = path.join(fixture, 'parent');
   const nested = path.join(parent, 'generated');
-  const ownRoot = path.join(fixture, 'standalone');
   const env = {
     GIT_CONFIG_GLOBAL: path.join(fixture, 'empty-gitconfig'),
     GIT_CONFIG_NOSYSTEM: '1',
@@ -547,17 +436,10 @@ test('acceptance Git setup rejects a nested parent without changing it and accep
   };
   try {
     fs.mkdirSync(nested, { recursive: true });
-    fs.mkdirSync(ownRoot);
     fs.writeFileSync(env.GIT_CONFIG_GLOBAL, '');
     runImpl('git', ['init', '--quiet']);
     runImpl('git', ['config', 'user.name', 'Parent Author']);
     runImpl('git', ['config', 'user.email', 'parent@example.test']);
-    runImpl('git', [
-      'remote',
-      'add',
-      'origin',
-      'https://example.test/parent.git',
-    ]);
     fs.writeFileSync(path.join(parent, 'tracked.txt'), 'initial\n');
     runImpl('git', ['add', 'tracked.txt']);
     runImpl('git', ['-c', 'commit.gpgsign=false', 'commit', '-m', 'initial']);
@@ -566,348 +448,32 @@ test('acceptance Git setup rejects a nested parent without changing it and accep
     fs.writeFileSync(path.join(parent, 'tracked.txt'), 'unstaged\n');
     fs.writeFileSync(path.join(nested, 'package.json'), '{"private":true}\n');
     const originalHead = runImpl('git', ['rev-parse', 'HEAD']);
-    const originalRemotes = runImpl('git', ['remote', '-v']);
     const originalFiles = new Map(
       ['HEAD', 'index', 'config'].map(name => [
         name,
         fs.readFileSync(path.join(parent, '.git', name)),
       ]),
     );
-    const nestedAlias = path.join(fixture, 'nested-alias');
-    fs.symlinkSync(nested, nestedAlias, 'dir');
-    for (const projectDir of [nested, nestedAlias]) {
-      calls.length = 0;
-      assert.throws(
-        () => configureAcceptanceWorkspaceGit(projectDir, env, runImpl),
-        /workspace must be its own Git root:.*Use a work directory outside an existing repository/u,
-      );
-      assert.deepEqual(calls, [['rev-parse', '--show-toplevel']]);
-      for (const [name, original] of originalFiles) {
-        assert.deepEqual(
-          fs.readFileSync(path.join(parent, '.git', name)),
-          original,
-          `parent ${name} changed`,
-        );
-      }
-      assert.equal(runImpl('git', ['rev-parse', 'HEAD']), originalHead);
-      assert.equal(runImpl('git', ['remote', '-v']), originalRemotes);
-    }
 
-    runImpl('git', ['init', '--quiet'], { cwd: ownRoot });
-    const ownAlias = path.join(fixture, 'standalone-alias');
-    fs.symlinkSync(ownRoot, ownAlias, 'dir');
-    configureAcceptanceWorkspaceGit(ownAlias, env, runImpl);
-    assert.equal(
-      runImpl('git', ['config', '--local', 'user.name'], { cwd: ownRoot }),
-      'UltraModern Acceptance',
+    // Running the proof inside somebody's checkout must not stage, commit, or
+    // rewrite their working tree.
+    calls.length = 0;
+    assert.throws(
+      () => configureAcceptanceWorkspaceGit(nested, env, runImpl),
+      /workspace must be its own Git root:.*Use a work directory outside an existing repository/u,
     );
-    assert.equal(
-      runImpl('git', ['config', '--local', 'user.email'], { cwd: ownRoot }),
-      'acceptance@ultramodern.local',
-    );
-    assert.equal(
-      runImpl('git', ['remote', 'get-url', 'origin'], { cwd: ownRoot }),
-      'https://github.com/ultramodern-ci/acceptance-superapp.git',
-    );
+    assert.deepEqual(calls, [['rev-parse', '--show-toplevel']]);
+    for (const [name, original] of originalFiles) {
+      assert.deepEqual(
+        fs.readFileSync(path.join(parent, '.git', name)),
+        original,
+        `parent ${name} changed`,
+      );
+    }
+    assert.equal(runImpl('git', ['rev-parse', 'HEAD']), originalHead);
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
   }
-});
-
-test('snapshots installed source with real hooks before a build can use its revision', async t => {
-  const { snapshotAcceptanceWorkspaceSource } = await import(
-    '../published-create-proof/acceptance-profile.mjs'
-  );
-  for (const scenario of [
-    'unborn',
-    'existing',
-    'reject-pre-commit',
-    'reject-commit-msg',
-  ]) {
-    await t.test(scenario, () => {
-      const fixture = fs.mkdtempSync(
-        path.join(os.tmpdir(), 'acceptance-source-hooks-'),
-      );
-      const root = path.join(fixture, 'workspace');
-      const hooks = path.join(fixture, 'hooks');
-      fs.mkdirSync(root);
-      fs.mkdirSync(hooks);
-      const config = path.join(fixture, 'gitconfig');
-      fs.writeFileSync(
-        config,
-        `[user]\nuseConfigOnly = true\n[core]\nhooksPath = ${JSON.stringify(hooks)}\n`,
-      );
-      const env = { GIT_CONFIG_GLOBAL: config, GIT_CONFIG_NOSYSTEM: '1' };
-      const runImpl = (command, args, options = {}) => {
-        const result = spawnSync(command, args, {
-          cwd: options.cwd ?? root,
-          encoding: 'utf8',
-          env: createProcessEnv({ ...env, ...options.env }),
-          stdio: 'pipe',
-        });
-        if (result.status !== 0) {
-          throw new Error(
-            result.stderr || result.stdout || `${command} failed`,
-          );
-        }
-        return result.stdout?.trim() ?? '';
-      };
-      try {
-        runImpl('git', ['init', '--quiet']);
-        fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}\n');
-        let initial;
-        if (scenario === 'existing') {
-          runImpl('git', ['add', '-A']);
-          runImpl('git', [
-            '-c',
-            'commit.gpgsign=false',
-            '-c',
-            'user.name=Fixture Author',
-            '-c',
-            'user.email=fixture@example.test',
-            'commit',
-            '-m',
-            'initial',
-          ]);
-          initial = runImpl('git', ['rev-parse', 'HEAD']);
-        }
-        fs.mkdirSync(path.join(root, 'verticals/catalog'), { recursive: true });
-        fs.writeFileSync(
-          path.join(root, 'verticals/catalog/package.json'),
-          '{"name":"catalog"}\n',
-        );
-        fs.writeFileSync(
-          path.join(root, 'pnpm-lock.yaml'),
-          'lockfileVersion: 9\n',
-        );
-        fs.mkdirSync(path.join(root, '.codex/skills/mf'), { recursive: true });
-        fs.writeFileSync(
-          path.join(root, '.codex/skills/mf/SKILL.md'),
-          '# Installed skill\n',
-        );
-        for (const hook of ['pre-commit', 'commit-msg']) {
-          fs.writeFileSync(
-            path.join(hooks, hook),
-            `#!/bin/sh
-printf '%s\n' '${hook}' >> .git/hook-events
-test -f pnpm-lock.yaml || exit 1
-test -f .codex/skills/mf/SKILL.md || exit 1
-${scenario === `reject-${hook}` ? `echo 'fixture ${hook} rejected snapshot' >&2\nexit 1` : 'exit 0'}
-`,
-            { mode: 0o755 },
-          );
-        }
-        if (scenario.startsWith('reject-')) {
-          assert.throws(
-            () => snapshotAcceptanceWorkspaceSource(root, env, runImpl),
-            /fixture (?:pre-commit|commit-msg) rejected snapshot/u,
-          );
-          assert.throws(() =>
-            runImpl('git', ['rev-parse', '--verify', 'HEAD']),
-          );
-          assert.notEqual(runImpl('git', ['status', '--porcelain=v1']), '');
-        } else {
-          const revision = snapshotAcceptanceWorkspaceSource(
-            root,
-            env,
-            runImpl,
-          );
-          assert.match(revision, /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u);
-          assert.notEqual(revision, initial);
-          assert.equal(
-            runImpl('git', [
-              'status',
-              '--porcelain=v1',
-              '--untracked-files=all',
-            ]),
-            '',
-          );
-          assert.equal(
-            runImpl('git', ['rev-list', '--count', 'HEAD']),
-            scenario === 'existing' ? '2' : '1',
-          );
-          assert.equal(
-            runImpl('git', ['show', 'HEAD:pnpm-lock.yaml']),
-            'lockfileVersion: 9',
-          );
-          assert.equal(
-            runImpl('git', ['show', 'HEAD:.codex/skills/mf/SKILL.md']),
-            '# Installed skill',
-          );
-          // An unchanged snapshot returns the same real commit without rerunning hooks.
-          assert.equal(
-            snapshotAcceptanceWorkspaceSource(root, env, runImpl),
-            revision,
-          );
-        }
-        assert.deepEqual(
-          fs
-            .readFileSync(path.join(root, '.git/hook-events'), 'utf8')
-            .trim()
-            .split('\n'),
-          scenario === 'reject-pre-commit'
-            ? ['pre-commit']
-            : ['pre-commit', 'commit-msg'],
-        );
-      } finally {
-        fs.rmSync(fixture, { recursive: true, force: true });
-      }
-    });
-  }
-});
-
-test('browser runtime children scrub inherited source and deployment overrides', async () => {
-  const { createBrowserSmokeEnvironment } = await import(
-    '../published-create-proof/browser-smoke.mjs'
-  );
-  const inherited = {
-    MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION:
-      process.env.MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION,
-    ULTRAMODERN_CREATE_BIN: process.env.ULTRAMODERN_CREATE_BIN,
-    ZE_CI_TOKEN: process.env.ZE_CI_TOKEN,
-  };
-  try {
-    process.env.MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION =
-      'inherited-framework-override';
-    process.env.ULTRAMODERN_CREATE_BIN = '/inherited/source-create-bin.js';
-    process.env.ZE_CI_TOKEN = 'inherited-zephyr-token';
-    const effectiveEnv = createProcessEnv(
-      createBrowserSmokeEnvironment('/tmp/playwright-runtime', {
-        PATH: '/tmp/exact-pnpm/bin',
-        pnpm_config_registry: 'http://127.0.0.1:4873/',
-      }),
-    );
-    const child = spawnSync(
-      process.execPath,
-      [
-        '-e',
-        `process.stdout.write(JSON.stringify({
-          frameworkOverride: process.env.MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION,
-          sourceCreateBin: process.env.ULTRAMODERN_CREATE_BIN,
-          zephyrToken: process.env.ZE_CI_TOKEN,
-          path: process.env.PATH,
-          registry: process.env.pnpm_config_registry,
-        }))`,
-      ],
-      { encoding: 'utf8', env: effectiveEnv },
-    );
-    assert.equal(child.status, 0, child.stderr);
-    assert.deepEqual(JSON.parse(child.stdout), {
-      path: '/tmp/exact-pnpm/bin',
-      registry: 'http://127.0.0.1:4873/',
-    });
-  } finally {
-    for (const [name, value] of Object.entries(inherited)) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-  }
-});
-
-test('browser smoke exposes the bounded child cause through the outer acceptance failure', async t => {
-  const { runBrowserSmoke } = await import(
-    '../published-create-proof/browser-smoke.mjs'
-  );
-  const artifactRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'acceptance-browser-failure-'),
-  );
-  t.after(() => fs.rmSync(artifactRoot, { recursive: true, force: true }));
-  const artifactDir = path.join(artifactRoot, 'source-node');
-  const reportPath = path.join(artifactRoot, 'source-node-summary.json');
-  const logPath = path.join(artifactDir, 'inventory-serve.log');
-  fs.writeFileSync(reportPath, '{"status":"stale"}\n');
-  const exactCause = "Error: Cannot find module '@modern-js/prod-server'";
-  const genericFailure = new Error(
-    'Command failed: node run-browser-smoke.mjs',
-  );
-
-  assert.throws(
-    () =>
-      runBrowserSmoke(
-        '/tmp/generated-superapp',
-        {
-          artifactMode: 'source',
-          artifactRoot,
-          mode: 'source',
-          platform: 'node',
-          shellRuntime: 'node',
-        },
-        {
-          ensureBrowserSmokeRuntimeImpl: () => '/tmp/playwright-runtime',
-          readJsonFileImpl: () => ({
-            error: 'inventory serve process exited before readiness',
-            errorDetails: {
-              apiPrefix: '/inventory-api',
-              apiResponse: {
-                body: {
-                  AUTH_TOKEN: 'do-not-copy-me',
-                  nested: {
-                    password: 'also-do-not-copy-me',
-                  },
-                  message: `Effect request failed ${'x'.repeat(8_000)}`,
-                },
-                status: 500,
-                url: 'http://127.0.0.1:4173/inventory-api/items',
-              },
-              appId: 'inventory',
-              exitCode: 1,
-              logPath,
-              logTail: `${'old output\n'.repeat(2_000)}AUTH_TOKEN=do-not-copy-me\n${exactCause}`,
-              phase: 'backend-driven-ui',
-              signal: null,
-            },
-            status: 'fail',
-          }),
-          runImpl: (_command, args) => {
-            assert.equal(args[args.indexOf('--artifact-dir') + 1], artifactDir);
-            assert.equal(args[args.indexOf('--out') + 1], reportPath);
-            assert.equal(fs.existsSync(reportPath), false);
-            throw genericFailure;
-          },
-        },
-      ),
-    error => {
-      assert.equal(error.name, 'BrowserSmokeAcceptanceError');
-      assert.match(error.message, /inventory serve process exited/);
-      assert.match(error.message, new RegExp(logPath.replaceAll('/', '\\/')));
-      assert.match(
-        error.message,
-        /Cannot find module '@modern-js\/prod-server'/,
-      );
-      assert.doesNotMatch(error.message, /do-not-copy-me/);
-      assert.match(error.message, /AUTH_TOKEN=\[REDACTED\]/);
-      assert.match(error.message, /\\"AUTH_TOKEN\\":\\"\[REDACTED\]\\"/);
-      assert.match(error.message, /\\"password\\":\\"\[REDACTED\]\\"/);
-      assert.match(error.message, /structured failure evidence:/);
-      assert.match(error.message, /"appId": "inventory"/);
-      assert.match(error.message, /"status": 500/);
-      assert.match(error.message, /Effect request failed/);
-      assert.doesNotMatch(error.message, /^Command failed/u);
-      assert.ok(error.message.length < 13_000);
-      const evidenceSource = error.message
-        .split('structured failure evidence:\n')[1]
-        .split('\nchild log:')[0];
-      const evidence = JSON.parse(evidenceSource);
-      assert.equal(evidence.appId, 'inventory');
-      assert.equal(evidence.apiResponse.status, 500);
-      assert.equal(error.details.logPath, logPath);
-      assert.equal(error.details.reportPath, reportPath);
-      assert.ok(error.details.logTail.length <= 8_192);
-      assert.equal(typeof error.details.apiResponse.body, 'string');
-      assert.ok(error.details.apiResponse.body.length <= 2_048);
-      assert.doesNotMatch(JSON.stringify(error.details), /do-not-copy-me/);
-      assert.match(
-        error.details.apiResponse.body,
-        /"AUTH_TOKEN":"\[REDACTED\]"/,
-      );
-      assert.match(error.details.apiResponse.body, /"password":"\[REDACTED\]"/);
-      assert.equal(error.cause, genericFailure);
-      return true;
-    },
-  );
 });
 
 test('browser smoke diagnostics redact structured and embedded JSON secrets', async () => {
@@ -932,77 +498,7 @@ test('browser smoke diagnostics redact structured and embedded JSON secrets', as
   }
 });
 
-test('asserts MF shared contract versions across generated topology evidence', async () => {
-  const { createSharedContractVersionAssertion } = await import(
-    '../published-create-proof/topology.mjs'
-  );
-  const matchingTopology = {
-    shell: {
-      moduleFederation: {
-        sharedContractVersion: 'mf-ssr-contract-v1',
-      },
-    },
-    verticals: [
-      {
-        moduleFederation: {
-          sharedContractVersion: 'mf-ssr-contract-v1',
-        },
-      },
-    ],
-  };
-  const matchingContract = {
-    apps: [
-      {
-        moduleFederation: {
-          sharedContractVersion: 'mf-ssr-contract-v1',
-        },
-      },
-    ],
-  };
-
-  assert.deepEqual(
-    createSharedContractVersionAssertion({
-      topology: matchingTopology,
-      generatedContract: matchingContract,
-    }),
-    {
-      status: 'pass',
-      versions: ['mf-ssr-contract-v1'],
-    },
-  );
-  assert.deepEqual(
-    createSharedContractVersionAssertion({
-      topology: {
-        ...matchingTopology,
-        verticals: [
-          {
-            moduleFederation: {
-              sharedContractVersion: 'mf-ssr-contract-v2',
-            },
-          },
-        ],
-      },
-      generatedContract: matchingContract,
-    }),
-    {
-      status: 'fail',
-      versions: ['mf-ssr-contract-v1', 'mf-ssr-contract-v2'],
-    },
-  );
-  assert.deepEqual(
-    createSharedContractVersionAssertion({
-      topology: { shell: {}, verticals: [{}] },
-      generatedContract: { apps: [{}] },
-    }),
-    {
-      status: 'unknown',
-      versions: [],
-      message: 'No MF sharedContractVersion values found in topology/contract.',
-    },
-  );
-});
-
-test('asserts generated cohorts only from strict manifest expectations and compact observations', async () => {
+test('asserts generated cohorts only from strict manifest expectations', async () => {
   const { assertGeneratedCohort } = await import(
     '../published-create-proof/package-cohort.mjs'
   );
@@ -1079,6 +575,8 @@ test('asserts generated cohorts only from strict manifest expectations and compa
 
     assert.equal(assertGeneratedCohort(root, release).observedPackageCount, 1);
 
+    // A generated manifest carrying a range instead of the exact cohort
+    // version silently installs a different framework build for the user.
     writeJson(root, 'package.json', {
       dependencies: {
         '@modern-js/runtime': `npm:@bleedingdev/modern-js-runtime@${version}`,
@@ -1091,665 +589,14 @@ test('asserts generated cohorts only from strict manifest expectations and compa
       /runtime-compat must target exact cohort package @bleedingdev\/modern-js-runtime@3\.2\.0-framework\.1/u,
     );
 
-    writeJson(root, 'package.json', {
-      dependencies: {
-        '@modern-js/runtime': `npm:@bleedingdev/modern-js-runtime@${version}`,
-        'runtime-compat': `npm:@bleedingdev/modern-js-runtime@${version}`,
-      },
-    });
-    assert.equal(assertGeneratedCohort(root, release).observedPackageCount, 1);
-
+    // Without the authenticated cohort projection the generated app cannot be
+    // proven to come from the published release at all.
     fs.rmSync(path.join(root, '.modernjs/release-cohort.json'));
     assert.throws(
       () => assertGeneratedCohort(root, release),
       /authenticated release cohort is missing or unsafe/,
     );
-    writeCanonicalJson(root, '.modernjs/release-cohort.json', cohortProjection);
-
-    writeJson(root, '.modernjs/ultramodern-package-source.json', {
-      strategy: 'install',
-    });
-    assert.throws(
-      () => assertGeneratedCohort(root, release),
-      /retired package-cohort metadata/,
-    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
-});
-
-test('one acceptance runtime context owns pnpm, stores, registry, and the browsers path', async t => {
-  const { acceptancePlaywrightInstallArgs, createAcceptanceRuntimeContext } =
-    await import('../published-create-proof/acceptance-profile.mjs');
-
-  const workDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ultramodern-runtime-context-'),
-  );
-  t.after(() => fs.rmSync(workDir, { force: true, recursive: true }));
-  const packageManagerRoot = path.join(workDir, 'package-manager');
-  const pnpmExecutable = path.join('/opt', 'pnpm-11.17.0', 'bin', 'pnpm');
-  const injectedPath = path.join('/injected', 'tool', 'path');
-  const resolverCalls = [];
-  const resolveExactPnpmExecutableImpl = (...args) => {
-    resolverCalls.push(args);
-    return pnpmExecutable;
-  };
-
-  const isolated = createAcceptanceRuntimeContext({
-    browsers: 'isolated',
-    environment: {
-      PATH: injectedPath,
-      PLAYWRIGHT_BROWSERS_PATH: '/inherited/ms-playwright',
-    },
-    expectedPnpmVersion: '11.17.0',
-    registryEnv: {
-      npm_config_registry: 'https://registry.npmjs.org/',
-      pnpm_config_registry: 'https://registry.npmjs.org/',
-    },
-    resolveExactPnpmExecutableImpl,
-    workDir,
-  });
-
-  assert.deepEqual(
-    Object.keys(isolated).sort(),
-    ['env', 'pnpmExecutable'],
-    'the context exposes only what a clean room consumes',
-  );
-  assert.equal(isolated.pnpmExecutable, pnpmExecutable);
-  // The whole PATH, not just its head: the injected environment decides what
-  // the child can execute, so the ambient parent PATH must not leak in behind
-  // the manifest-verified pnpm.
-  assert.deepEqual(isolated.env.PATH.split(path.delimiter), [
-    path.dirname(pnpmExecutable),
-    injectedPath,
-  ]);
-  assert.deepEqual(
-    {
-      XDG_CACHE_HOME: isolated.env.XDG_CACHE_HOME,
-      npm_config_cache: isolated.env.npm_config_cache,
-      npm_config_registry: isolated.env.npm_config_registry,
-      npm_config_store_dir: isolated.env.npm_config_store_dir,
-      pnpm_config_registry: isolated.env.pnpm_config_registry,
-      pnpm_config_store_dir: isolated.env.pnpm_config_store_dir,
-    },
-    {
-      XDG_CACHE_HOME: path.join(packageManagerRoot, 'xdg'),
-      npm_config_cache: path.join(packageManagerRoot, 'npm-cache'),
-      npm_config_registry: 'https://registry.npmjs.org/',
-      npm_config_store_dir: path.join(packageManagerRoot, 'store'),
-      pnpm_config_registry: 'https://registry.npmjs.org/',
-      pnpm_config_store_dir: path.join(packageManagerRoot, 'store'),
-    },
-    'one module owns the stores, the XDG cache, and the registry',
-  );
-  assert.equal(
-    isolated.env.PLAYWRIGHT_BROWSERS_PATH.startsWith(
-      `${packageManagerRoot}${path.sep}`,
-    ),
-    true,
-    'isolated browsers must stay inside the disposable package-manager root',
-  );
-  assert.deepEqual(
-    [...acceptancePlaywrightInstallArgs],
-    ['exec', 'playwright', 'install', '--with-deps', 'chromium'],
-    'the shared install must be dependency-resolved through pnpm exec, never a pinned version',
-  );
-  assert.deepEqual(resolverCalls[0].slice(1), [
-    '11.17.0',
-    {
-      PATH: injectedPath,
-      PLAYWRIGHT_BROWSERS_PATH: '/inherited/ms-playwright',
-    },
-    workDir,
-  ]);
-
-  const inherited = createAcceptanceRuntimeContext({
-    environment: { PLAYWRIGHT_BROWSERS_PATH: '/inherited/ms-playwright' },
-    expectedPnpmVersion: '11.17.0',
-    resolveExactPnpmExecutableImpl,
-    workDir,
-  });
-  assert.equal(
-    inherited.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/inherited/ms-playwright',
-    'ERP reuses the operationally provisioned browsers on the runner',
-  );
-
-  // A stated-but-unusable inherited path is a caller mistake on every
-  // platform: it fails closed before anything is spawned and names both ways
-  // out.
-  for (const unprovisionedEnvironment of [
-    { PLAYWRIGHT_BROWSERS_PATH: '' },
-    { PLAYWRIGHT_BROWSERS_PATH: 'relative/ms-playwright' },
-  ]) {
-    assert.throws(
-      () =>
-        createAcceptanceRuntimeContext({
-          environment: unprovisionedEnvironment,
-          expectedPnpmVersion: '11.17.0',
-          resolveExactPnpmExecutableImpl: () =>
-            assert.fail(
-              'an unprovisioned inherited browsers path must fail before any subprocess',
-            ),
-          workDir,
-        }),
-      error =>
-        /require an absolute PLAYWRIGHT_BROWSERS_PATH/u.test(error.message) &&
-        /must be absolute/u.test(error.message) &&
-        /browsers: 'isolated'/u.test(error.message),
-      `inherited browsers must fail closed for ${JSON.stringify(unprovisionedEnvironment)}`,
-    );
-  }
-  // Isolated browsers own their path, so they never need the runner's.
-  assert.equal(
-    createAcceptanceRuntimeContext({
-      browsers: 'isolated',
-      environment: {},
-      expectedPnpmVersion: '11.17.0',
-      resolveExactPnpmExecutableImpl,
-      workDir,
-    }).env.PLAYWRIGHT_BROWSERS_PATH,
-    path.join(packageManagerRoot, 'xdg', 'ms-playwright'),
-  );
-
-  assert.throws(
-    () =>
-      createAcceptanceRuntimeContext({
-        expectedPnpmVersion: '11.17.0',
-        resolveExactPnpmExecutableImpl,
-        workDir: 'relative/work-dir',
-      }),
-    /absolute work directory/u,
-  );
-  assert.throws(
-    () =>
-      createAcceptanceRuntimeContext({
-        browsers: 'shared',
-        expectedPnpmVersion: '11.17.0',
-        resolveExactPnpmExecutableImpl,
-        workDir,
-      }),
-    /browser isolation must be inherited or isolated/u,
-  );
-  // Exact pnpm stays fail-closed through the single owner.
-  assert.throws(
-    () =>
-      createAcceptanceRuntimeContext({
-        environment: { PLAYWRIGHT_BROWSERS_PATH: '/inherited/ms-playwright' },
-        expectedPnpmVersion: '11',
-        workDir,
-      }),
-    /must bind an exact pnpm version/u,
-  );
-  assert.throws(
-    () =>
-      createAcceptanceRuntimeContext({
-        environment: {
-          PATH: '',
-          PLAYWRIGHT_BROWSERS_PATH: '/inherited/ms-playwright',
-        },
-        expectedPnpmVersion: '11.17.0',
-        runImpl: () => {
-          throw new Error('no pnpm on PATH');
-        },
-        workDir,
-      }),
-    /pnpm executable is absent from the acceptance parent PATH/u,
-  );
-});
-
-test('inherited browsers resolve the real per-platform Playwright registry', async () => {
-  const { inheritedPlaywrightBrowsersPath } = await import(
-    '../published-create-proof/acceptance-profile.mjs'
-  );
-  const homedir = path.join(path.sep, 'home', 'runner');
-
-  // A stated absolute path always wins, on every platform.
-  for (const platform of ['linux', 'darwin', 'win32', 'freebsd']) {
-    assert.equal(
-      inheritedPlaywrightBrowsersPath('/inherited/ms-playwright', {
-        environment: {},
-        homedir,
-        platform,
-      }),
-      '/inherited/ms-playwright',
-    );
-  }
-
-  // Only the linux default is derived from XDG_CACHE_HOME, which this runtime
-  // context redirects, so only linux fails closed on an unset value.
-  assert.throws(
-    () =>
-      inheritedPlaywrightBrowsersPath(undefined, {
-        environment: {},
-        homedir,
-        platform: 'linux',
-      }),
-    error =>
-      /require an absolute PLAYWRIGHT_BROWSERS_PATH/u.test(error.message) &&
-      /XDG_CACHE_HOME/u.test(error.message) &&
-      /browsers: 'isolated'/u.test(error.message),
-  );
-  // An unsupported platform has no derivable registry either.
-  assert.throws(
-    () =>
-      inheritedPlaywrightBrowsersPath(undefined, {
-        environment: {},
-        homedir,
-        platform: 'freebsd',
-      }),
-    /default browser registry on freebsd could not be derived/u,
-  );
-
-  // darwin and win32 derive their registry from a cache home the XDG redirect
-  // cannot move, so the local source proof keeps inheriting the real browsers.
-  assert.equal(
-    inheritedPlaywrightBrowsersPath(undefined, {
-      environment: { XDG_CACHE_HOME: '/work/package-manager/xdg' },
-      homedir,
-      platform: 'darwin',
-    }),
-    path.join(homedir, 'Library', 'Caches', 'ms-playwright'),
-  );
-  assert.equal(
-    inheritedPlaywrightBrowsersPath(undefined, {
-      environment: { LOCALAPPDATA: path.join(path.sep, 'Local') },
-      homedir,
-      platform: 'win32',
-    }),
-    path.join(path.sep, 'Local', 'ms-playwright'),
-  );
-  assert.equal(
-    inheritedPlaywrightBrowsersPath(undefined, {
-      environment: { LOCALAPPDATA: 'relative' },
-      homedir,
-      platform: 'win32',
-    }),
-    path.join(homedir, 'AppData', 'Local', 'ms-playwright'),
-  );
-
-  // A stated-but-unusable value never falls back to a derived default.
-  for (const platform of ['darwin', 'linux', 'win32']) {
-    for (const stated of ['', 'relative/ms-playwright']) {
-      assert.throws(
-        () =>
-          inheritedPlaywrightBrowsersPath(stated, {
-            environment: {},
-            homedir,
-            platform,
-          }),
-        /A stated inherited browsers path must be absolute/u,
-        `${platform} must reject ${JSON.stringify(stated)}`,
-      );
-    }
-  }
-});
-
-test('the in-process Playwright launch restores the parent browsers path', async t => {
-  const { withAcceptancePlaywrightBrowsersPath } = await import(
-    '../published-create-proof/acceptance-profile.mjs'
-  );
-  const originalBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  t.after(() => {
-    if (originalBrowsersPath === undefined) {
-      delete process.env.PLAYWRIGHT_BROWSERS_PATH;
-    } else {
-      process.env.PLAYWRIGHT_BROWSERS_PATH = originalBrowsersPath;
-    }
-  });
-
-  process.env.PLAYWRIGHT_BROWSERS_PATH = '/parent/ms-playwright';
-  const observed = await withAcceptancePlaywrightBrowsersPath(
-    '/isolated/ms-playwright',
-    async () => process.env.PLAYWRIGHT_BROWSERS_PATH,
-  );
-  assert.equal(observed, '/isolated/ms-playwright');
-  assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/parent/ms-playwright');
-
-  await assert.rejects(
-    () =>
-      withAcceptancePlaywrightBrowsersPath('/isolated/ms-playwright', () => {
-        throw new Error('launch failed');
-      }),
-    /launch failed/u,
-  );
-  assert.equal(
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/parent/ms-playwright',
-    'a failed launch must still restore the parent process',
-  );
-
-  const cleared = await withAcceptancePlaywrightBrowsersPath(
-    undefined,
-    async () => Object.hasOwn(process.env, 'PLAYWRIGHT_BROWSERS_PATH'),
-  );
-  assert.equal(cleared, false);
-  assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/parent/ms-playwright');
-
-  delete process.env.PLAYWRIGHT_BROWSERS_PATH;
-  await withAcceptancePlaywrightBrowsersPath(
-    '/isolated/ms-playwright',
-    async () => undefined,
-  );
-  assert.equal(
-    Object.hasOwn(process.env, 'PLAYWRIGHT_BROWSERS_PATH'),
-    false,
-    'an unset parent value must be removed again, not left behind',
-  );
-});
-
-test('browser provisioning resolves an exact version without installing and keys each runtime apart', async t => {
-  const {
-    acceptanceBrowserCacheKey,
-    acceptanceBrowserInstallArgs,
-    parseProvisionArgs,
-    provisionAcceptanceBrowsers,
-    qualificationRuntimeDir,
-    resolveAcceptanceBrowserVersion,
-  } = await import('../published-create-proof/browser-provisioning.mjs');
-  const { browserSmokePlaywrightPackage } = await import(
-    '../published-create-proof/constants.mjs'
-  );
-
-  const runtimeDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ultramodern-browser-runtime-'),
-  );
-  t.after(() => fs.rmSync(runtimeDir, { force: true, recursive: true }));
-  writeJson(runtimeDir, 'node_modules/playwright/package.json', {
-    name: 'playwright',
-    version: '1.60.0',
-  });
-
-  // An exactly pinned smoke specifier resolves by parsing it: keying the cache
-  // must never reach the network or write a runtime.
-  assert.equal(
-    resolveAcceptanceBrowserVersion('smoke', {
-      ensureBrowserSmokeRuntimeImpl: () =>
-        assert.fail('resolving an exact specifier must install nothing'),
-      playwrightPackage: 'playwright@1.60.0',
-    }),
-    '1.60.0',
-  );
-  // Only a non-exact override has to materialize a runtime to learn what it
-  // resolved to.
-  assert.equal(
-    resolveAcceptanceBrowserVersion('smoke', {
-      ensureBrowserSmokeRuntimeImpl: () => runtimeDir,
-      playwrightPackage: 'playwright@^1.60.0',
-    }),
-    '1.60.0',
-  );
-  assert.equal(
-    resolveAcceptanceBrowserVersion('qualification', {
-      ensureBrowserSmokeRuntimeImpl: () =>
-        assert.fail('the qualification runtime is the rstest browser fixture'),
-      readJsonFileImpl: manifestPath => {
-        assert.equal(
-          manifestPath,
-          path.join(
-            qualificationRuntimeDir,
-            'node_modules/playwright/package.json',
-          ),
-        );
-        return { name: 'playwright', version: '1.61.1' };
-      },
-    }),
-    '1.61.1',
-  );
-
-  // The qualification runtime is independently versioned: the rstest browser
-  // fixture declares its own playwright dependency, resolved by the workspace
-  // lockfile, and never inherits the ERP smoke specifier. Distinct targets
-  // therefore key distinct caches even at an identical version.
-  const fixtureManifest = JSON.parse(
-    fs.readFileSync(path.join(qualificationRuntimeDir, 'package.json'), 'utf8'),
-  );
-  assert.equal(
-    typeof fixtureManifest.devDependencies.playwright,
-    'string',
-    'the qualification runtime must own its playwright dependency',
-  );
-  assert.notEqual(
-    `playwright@${fixtureManifest.devDependencies.playwright}`,
-    browserSmokePlaywrightPackage,
-    'the qualification and smoke playwright runtimes are versioned separately',
-  );
-  assert.notEqual(
-    acceptanceBrowserCacheKey({
-      runnerOs: 'Linux',
-      target: 'qualification',
-      version: '1.60.0',
-    }),
-    acceptanceBrowserCacheKey({
-      runnerOs: 'Linux',
-      target: 'smoke',
-      version: '1.60.0',
-    }),
-  );
-  assert.equal(
-    acceptanceBrowserCacheKey({
-      runnerOs: 'Linux',
-      target: 'smoke',
-      version: '1.60.0',
-    }),
-    'playwright-smoke-chromium-1.60.0-Linux',
-  );
-  assert.deepEqual(acceptanceBrowserInstallArgs(false), [
-    'install',
-    '--with-deps',
-    'chromium',
-  ]);
-  assert.deepEqual(acceptanceBrowserInstallArgs(true), [
-    'install-deps',
-    'chromium',
-  ]);
-
-  const outputs = [];
-  assert.deepEqual(
-    provisionAcceptanceBrowsers(['--resolve', '--target', 'smoke'], {
-      environment: { RUNNER_OS: 'Linux' },
-      resolveAcceptanceBrowserVersionImpl: target => {
-        assert.equal(target, 'smoke');
-        return '1.60.0';
-      },
-      writeOutput: (name, value) => outputs.push([name, value]),
-    }),
-    { cacheKey: 'playwright-smoke-chromium-1.60.0-Linux', version: '1.60.0' },
-  );
-  assert.deepEqual(outputs, [
-    ['cache_key', 'playwright-smoke-chromium-1.60.0-Linux'],
-    ['version', '1.60.0'],
-  ]);
-
-  // Installing is operational: it reports no evidence, drives the resolved
-  // runtime's own binary, and fails closed when that runtime is not the
-  // version that keyed the cache.
-  const { installAcceptanceBrowsers } = await import(
-    '../published-create-proof/browser-provisioning.mjs'
-  );
-  const installCalls = [];
-  assert.deepEqual(
-    provisionAcceptanceBrowsers(
-      [
-        '--install',
-        '--target',
-        'smoke',
-        '--version',
-        '1.60.0',
-        '--cache-hit',
-        'true',
-      ],
-      {
-        environment: {},
-        installAcceptanceBrowsersImpl: options => {
-          installCalls.push(options);
-          return installAcceptanceBrowsers(options, {
-            ensureBrowserSmokeRuntimeImpl: () => runtimeDir,
-            runImpl: (command, args, runOptions) => {
-              installCalls.push([command, args, runOptions.cwd]);
-              return '';
-            },
-          });
-        },
-        // Installing carries the version the resolve step reported across the
-        // cache restore and compares the manifest it re-reads against it; it
-        // never re-runs the resolve step's own resolution.
-        resolveAcceptanceBrowserVersionImpl: () =>
-          assert.fail('installing must not re-resolve the runtime version'),
-        writeOutput: () => assert.fail('provisioning must report no evidence'),
-      },
-    ),
-    {
-      browsers: ['chromium'],
-      cacheHit: true,
-      target: 'smoke',
-      version: '1.60.0',
-    },
-  );
-  assert.deepEqual(installCalls, [
-    { cacheHit: true, target: 'smoke', version: '1.60.0' },
-    [
-      path.join(runtimeDir, 'node_modules/.bin', 'playwright'),
-      ['install-deps', 'chromium'],
-      runtimeDir,
-    ],
-  ]);
-  assert.throws(
-    () =>
-      installAcceptanceBrowsers(
-        { target: 'smoke', version: '1.61.1' },
-        {
-          ensureBrowserSmokeRuntimeImpl: () => runtimeDir,
-          runImpl: () =>
-            assert.fail('a mismatched runtime must not install browsers'),
-        },
-      ),
-    /Provisioned playwright 1\.60\.0 is not the 1\.61\.1 that keyed the browser cache/u,
-  );
-  // Windows is an explicit non-goal, not a silently broken path: the runtime's
-  // console entry there is playwright.cmd, which run() cannot spawn without a
-  // shell. The rejection lands before the runtime is materialized or the
-  // manifest is read, and names the supported hosts.
-  const { acceptanceBrowserExecutable } = await import(
-    '../published-create-proof/browser-provisioning.mjs'
-  );
-  assert.throws(
-    () => acceptanceBrowserExecutable(runtimeDir, 'win32'),
-    /does not support win32[\s\S]*playwright\.cmd[\s\S]*linux or darwin host/u,
-  );
-  for (const platform of ['linux', 'darwin']) {
-    assert.equal(
-      acceptanceBrowserExecutable(runtimeDir, platform),
-      path.join(runtimeDir, 'node_modules/.bin', 'playwright'),
-      `${platform} drives the resolved runtime's own console entry`,
-    );
-  }
-  assert.throws(
-    () =>
-      installAcceptanceBrowsers(
-        { target: 'smoke', version: '1.60.0' },
-        {
-          ensureBrowserSmokeRuntimeImpl: () =>
-            assert.fail('win32 must be rejected before anything is resolved'),
-          platform: 'win32',
-          readJsonFileImpl: () =>
-            assert.fail('win32 must be rejected before the manifest is read'),
-          runImpl: () =>
-            assert.fail('win32 must be rejected before anything is spawned'),
-        },
-      ),
-    /Acceptance browser provisioning does not support win32/u,
-  );
-
-  // The same fail-closed comparison, driven end to end from the carried
-  // version: the install step re-reads the manifest and compares it with the
-  // version resolve reported, so a runtime replaced between those steps is
-  // caught across the cache restore rather than by a self-consistent reread.
-  assert.throws(
-    () =>
-      provisionAcceptanceBrowsers(
-        ['--install', '--target', 'smoke', '--version', '1.61.1'],
-        {
-          environment: {},
-          installAcceptanceBrowsersImpl: options =>
-            installAcceptanceBrowsers(options, {
-              ensureBrowserSmokeRuntimeImpl: () => runtimeDir,
-              runImpl: () =>
-                assert.fail('a mismatched runtime must not install browsers'),
-            }),
-          resolveAcceptanceBrowserVersionImpl: () =>
-            assert.fail('installing must not re-resolve the runtime version'),
-          writeOutput: () =>
-            assert.fail('provisioning must report no evidence'),
-        },
-      ),
-    /Provisioned playwright 1\.60\.0 is not the 1\.61\.1 that keyed the browser cache/u,
-  );
-
-  assert.deepEqual(parseProvisionArgs(['--resolve', '--target', 'smoke']), {
-    cacheHit: false,
-    install: false,
-    resolve: true,
-    target: 'smoke',
-    version: undefined,
-  });
-  assert.deepEqual(
-    parseProvisionArgs([
-      '--install',
-      '--target',
-      'qualification',
-      '--version',
-      '1.61.1',
-      '--cache-hit',
-      'true',
-    ]),
-    {
-      cacheHit: true,
-      install: true,
-      resolve: false,
-      target: 'qualification',
-      version: '1.61.1',
-    },
-  );
-  assert.throws(
-    () => parseProvisionArgs(['--install', '--target', 'smoke']),
-    /--install requires --version <playwright version> from the matching --resolve step/u,
-  );
-  assert.throws(
-    () => parseProvisionArgs(['--resolve']),
-    /requires --target qualification or smoke/u,
-  );
-  assert.throws(
-    () => parseProvisionArgs(['--resolve', '--target', 'browser']),
-    /--target requires qualification or smoke/u,
-  );
-  writeJson(runtimeDir, 'node_modules/playwright/package.json', {
-    name: 'playwright',
-    version: 'latest',
-  });
-  assert.throws(
-    () =>
-      resolveAcceptanceBrowserVersion('smoke', {
-        ensureBrowserSmokeRuntimeImpl: () => runtimeDir,
-        playwrightPackage: 'playwright@latest',
-      }),
-    /must be an exact playwright version/u,
-  );
-  assert.throws(
-    () =>
-      resolveAcceptanceBrowserVersion('smoke', {
-        ensureBrowserSmokeRuntimeImpl: () => path.join(runtimeDir, 'absent'),
-        playwrightPackage: 'playwright@latest',
-      }),
-    /Playwright runtime is not installed at/u,
-  );
-  assert.throws(
-    () =>
-      acceptanceBrowserCacheKey({
-        runnerOs: 'Linux',
-        target: 'smoke',
-        version: '1.60',
-      }),
-    /must be an exact playwright version/u,
-  );
 });

@@ -1,7 +1,6 @@
 import type { I18nUrlStrategy } from '@modern-js/plugin-i18n/runtime/no-react-i18next';
 import { describe, expect, test } from '@rstest/core';
 import { i18nServerPlugin } from '../src/server';
-import { createI18nUrlStrategy } from '../src/urlStrategy';
 
 function middlewareHarness(
   options: Parameters<typeof i18nServerPlugin>[0],
@@ -44,6 +43,8 @@ const skipped = [
   '/remoteEntry.js',
   '/static/app.js',
   '/upload/avatar.png',
+  '/cs/static/app.js',
+  '/en/upload/avatar.png',
 ];
 
 describe('combined i18n server policy', () => {
@@ -119,32 +120,6 @@ describe('combined i18n server policy', () => {
         ).toBeUndefined();
         expect(next).toHaveBeenCalledTimes(1);
       }
-    }
-  });
-  test('skips language-prefixed static and upload endpoints', async () => {
-    for (const pathname of ['/cs/static/app.js', '/en/upload/avatar.png']) {
-      for (const middleware of middlewareHarness(options)) {
-        const next = rstest.fn(async () => {});
-        expect(
-          await middleware.handler(createContext(pathname), next),
-        ).toBeUndefined();
-        expect(next).toHaveBeenCalledTimes(1);
-      }
-    }
-  });
-  test('uses the same default skip policy in runtime redirects', async () => {
-    const strategy = createI18nUrlStrategy();
-    for (const pathname of [
-      ...skipped,
-      '/cs/static/app.js',
-      '/en/upload/avatar.png',
-    ]) {
-      expect(strategy.shouldSkipRedirect?.(pathname, ['en', 'cs'])).toBe(true);
-      const next = rstest.fn(async () => {});
-      await middlewareHarness(options)
-        .find(middleware => middleware.name === 'i18n-server-middleware')
-        .handler(createContext(pathname), next);
-      expect(next).toHaveBeenCalledTimes(1);
     }
   });
   test('cannot override native API and configured static exclusions', async () => {

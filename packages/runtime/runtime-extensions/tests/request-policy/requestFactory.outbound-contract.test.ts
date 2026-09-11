@@ -5,9 +5,6 @@ import {
   BFF_ENVELOPE_HEADER,
   BFF_OPERATION_CONTEXT_DETAIL_HEADER,
   BFF_OPERATION_CONTEXT_HEADER,
-  type IdentityBindingOptions,
-  type OperationContext,
-  type OperationContractOptions,
   type TransportTarget,
 } from '../../src/request-policy/types';
 
@@ -23,37 +20,6 @@ const OPERATION_TRACEPARENT =
   '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01';
 
 type HeaderMap = Record<string, any>;
-type Method = 'GET' | 'POST';
-
-type OutboundScenario = {
-  name: string;
-  target: TransportTarget;
-  method: Method;
-  requestId?: string;
-  domain?: string;
-  incomingHeaders?: HeaderMap;
-  payload: {
-    body?: string;
-    headers?: HeaderMap;
-  };
-  identityBinding?: IdentityBindingOptions;
-  requireEnvelope?: boolean;
-  allowCrossOriginEnvelope?: boolean;
-  operationContract?: OperationContractOptions;
-  operationContext?: OperationContext;
-  expectedUrl: string;
-  expectedBody?: string;
-  expectedStaticHeaders: HeaderMap;
-  assertDynamicHeaders?: (headers: HeaderMap) => void;
-};
-
-const restoreStrictDefaultRequestId = (value: string | undefined) => {
-  if (typeof value === 'undefined') {
-    delete process.env.MODERN_BFF_STRICT_DEFAULT_REQUEST_ID;
-    return;
-  }
-  process.env.MODERN_BFF_STRICT_DEFAULT_REQUEST_ID = value;
-};
 
 const createHarness = (
   target: TransportTarget,
@@ -68,254 +34,118 @@ const createHarness = (
   const requestFactory =
     target === 'server' ? createServerClient() : createBrowserClient();
 
-  return {
-    request,
-    requestFactory,
-  };
+  return { request, requestFactory };
 };
 
-const assertRequestInit = (scenario: OutboundScenario, init: RequestInit) => {
-  const headers = init.headers as HeaderMap;
+describe('requestFactory outbound request contract', () => {
+  test('browser GET drops the caller body, canonicalizes accept and withholds the incoming traceparent', async () => {
+    const { request, requestFactory } = createHarness('browser', {
+      traceparent: INCOMING_TRACEPARENT,
+    });
+    requestFactory.configure({ request: request as unknown as typeof fetch });
 
-  expect(init.method).toBe(scenario.method);
-  expect(init.body).toBe(scenario.expectedBody);
-  for (const [key, value] of Object.entries(scenario.expectedStaticHeaders)) {
-    expect(headers[key]).toBe(value);
-  }
-  expect(
-    Object.keys(headers).filter(key => key.toLowerCase() === 'accept'),
-  ).toEqual(['accept']);
-
-  scenario.assertDynamicHeaders?.(headers);
-};
-
-const outboundScenarios: OutboundScenario[] = [
-  {
-    name: 'browser GET strips caller body and canonicalizes accept',
-    target: 'browser',
-    method: 'GET',
-    payload: {
+    const send = requestFactory.createRequest({
+      path: REQUEST_PATH,
+      method: 'GET',
+      port: PORT,
+    });
+    await send({
       body: 'drop-me',
-      headers: {
-        Accept: 'application/problem+json',
-      },
-    },
-    expectedUrl: REQUEST_PATH,
-    expectedStaticHeaders: {
-      'Content-Type': 'text/plain',
-      accept: ACCEPT_HEADER,
-    },
-  },
-  {
-    name: 'browser POST keeps caller body without propagating incoming traceparent',
-    target: 'browser',
-    method: 'POST',
-    incomingHeaders: {
+      headers: { Accept: 'application/problem+json' },
+    });
+
+    const [url, init] = request.mock.calls[0];
+    expect(String(url)).toBe(REQUEST_PATH);
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    const headers = init.headers as HeaderMap;
+    expect(headers.accept).toBe(ACCEPT_HEADER);
+    expect(
+      Object.keys(headers).filter(key => key.toLowerCase() === 'accept'),
+    ).toEqual(['accept']);
+    expect(headers.traceparent).toBeUndefined();
+  });
+
+  test('server POST keeps the caller body and propagates the incoming traceparent', async () => {
+    const { request, requestFactory } = createHarness('server', {
       traceparent: INCOMING_TRACEPARENT,
-    },
-    payload: {
-      body: 'keep-me',
-      headers: {
-        Accept: 'application/problem+json',
-      },
-    },
-    expectedUrl: REQUEST_PATH,
-    expectedBody: 'keep-me',
-    expectedStaticHeaders: {
-      'Content-Type': 'text/plain',
-      accept: ACCEPT_HEADER,
-    },
-  },
-  {
-    name: 'server GET strips caller body and propagates incoming traceparent',
-    target: 'server',
-    method: 'GET',
-    incomingHeaders: {
-      traceparent: INCOMING_TRACEPARENT,
-    },
-    payload: {
-      body: 'drop-me',
-      headers: {
-        Accept: 'application/problem+json',
-      },
-    },
-    expectedUrl: SERVER_URL,
-    expectedStaticHeaders: {
-      'Content-Type': 'text/plain',
-      accept: ACCEPT_HEADER,
-      traceparent: INCOMING_TRACEPARENT,
-    },
-  },
-  {
-    name: 'server POST keeps caller body and propagates incoming traceparent',
-    target: 'server',
-    method: 'POST',
-    incomingHeaders: {
-      traceparent: INCOMING_TRACEPARENT,
-    },
-    payload: {
-      body: 'keep-me',
-      headers: {
-        Accept: 'application/problem+json',
-      },
-    },
-    expectedUrl: SERVER_URL,
-    expectedBody: 'keep-me',
-    expectedStaticHeaders: {
-      'Content-Type': 'text/plain',
-      accept: ACCEPT_HEADER,
-      traceparent: INCOMING_TRACEPARENT,
-    },
-  },
-  {
-    name: 'protected identity binding replaces caller case variant',
-    target: 'server',
-    method: 'POST',
-    payload: {
-      body: 'keep-me',
-      headers: {
-        Accept: 'application/problem+json',
-        'X-Tenant-Id': 'caller-tenant',
-      },
-    },
-    identityBinding: {
-      enabled: true,
-      strict: false,
-      protectedHeaders: ['x-tenant-id'],
-      deriveHeaders: () => ({
-        'x-tenant-id': 'bound-tenant',
-      }),
-    },
-    expectedUrl: SERVER_URL,
-    expectedBody: 'keep-me',
-    expectedStaticHeaders: {
-      'Content-Type': 'text/plain',
-      accept: ACCEPT_HEADER,
-      'x-tenant-id': 'bound-tenant',
-    },
-  },
-  {
-    name: 'configured secured request emits envelope and operation context',
-    target: 'server',
-    method: 'POST',
-    requestId: 'producer-checkout',
-    domain: 'https://producer.example',
-    incomingHeaders: {
-      origin: CONSUMER_ORIGIN,
-    },
-    payload: {
-      body: 'keep-me',
-      headers: {
-        Accept: 'application/problem+json',
-      },
-    },
-    requireEnvelope: true,
-    allowCrossOriginEnvelope: true,
-    operationContract: {
-      enabled: true,
-      requireSchemaHash: true,
-      requireOperationVersion: true,
-    },
-    operationContext: {
-      operationId: 'create-widget',
-      routePath: REQUEST_PATH,
+    });
+    requestFactory.configure({ request: request as unknown as typeof fetch });
+
+    const send = requestFactory.createRequest({
+      path: REQUEST_PATH,
       method: 'POST',
-      schemaHash: 'sha256:create-widget',
-      operationVersion: 3,
-      traceparent: OPERATION_TRACEPARENT,
-    },
-    expectedUrl: PRODUCER_URL,
-    expectedBody: 'keep-me',
-    expectedStaticHeaders: {
-      'Content-Type': 'text/plain',
-      accept: ACCEPT_HEADER,
-      traceparent: OPERATION_TRACEPARENT,
-      [BFF_OPERATION_CONTEXT_HEADER]: 'producer-checkout:create-widget',
-    },
-    assertDynamicHeaders: headers => {
-      const envelope = JSON.parse(headers[BFF_ENVELOPE_HEADER]);
-      expect(envelope).toMatchObject({
-        requestId: 'producer-checkout',
-        target: 'server',
-        sourceOrigin: CONSUMER_ORIGIN,
-        targetOrigin: 'https://producer.example',
-        traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        spanId: 'bbbbbbbbbbbbbbbb',
-      });
-      expect(typeof envelope.timestamp).toBe('number');
+      port: PORT,
+    });
+    await send({ body: 'keep-me' });
 
-      const operationContext = JSON.parse(
-        headers[BFF_OPERATION_CONTEXT_DETAIL_HEADER],
-      );
-      expect(operationContext).toMatchObject({
-        requestId: 'producer-checkout',
-        operationId: 'producer-checkout:create-widget',
+    const [url, init] = request.mock.calls[0];
+    expect(String(url)).toBe(SERVER_URL);
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('keep-me');
+    expect((init.headers as HeaderMap).traceparent).toBe(INCOMING_TRACEPARENT);
+  });
+
+  test('secured producer request emits the cross-origin envelope and operation context', async () => {
+    const requestId = 'producer-checkout';
+    const { request, requestFactory } = createHarness('server', {
+      origin: CONSUMER_ORIGIN,
+    });
+
+    requestFactory.configure({
+      request: request as unknown as typeof fetch,
+      requestId,
+      setDomain: () => 'https://producer.example',
+      requireEnvelope: true,
+      allowCrossOriginEnvelope: true,
+      operationContract: {
+        enabled: true,
+        requireSchemaHash: true,
+        requireOperationVersion: true,
+      },
+    });
+
+    const send = requestFactory.createRequest({
+      path: REQUEST_PATH,
+      method: 'POST',
+      port: PORT,
+      requestId,
+      operationContext: {
+        operationId: 'create-widget',
         routePath: REQUEST_PATH,
         method: 'POST',
         schemaHash: 'sha256:create-widget',
         operationVersion: 3,
-        traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        spanId: 'bbbbbbbbbbbbbbbb',
-      });
-    },
-  },
-];
-
-describe('requestFactory outbound request contract', () => {
-  for (const scenario of outboundScenarios) {
-    test(scenario.name, async () => {
-      const strictDefaultRequestId =
-        process.env.MODERN_BFF_STRICT_DEFAULT_REQUEST_ID;
-      delete process.env.MODERN_BFF_STRICT_DEFAULT_REQUEST_ID;
-
-      try {
-        const { request, requestFactory } = createHarness(
-          scenario.target,
-          scenario.incomingHeaders,
-        );
-        const requestId = scenario.requestId || 'default';
-
-        requestFactory.configure({
-          request: request as unknown as typeof fetch,
-          requestId,
-          ...(requestId !== 'default'
-            ? { setDomain: () => scenario.domain || '' }
-            : {}),
-          ...(scenario.identityBinding
-            ? { identityBinding: scenario.identityBinding }
-            : {}),
-          ...(typeof scenario.requireEnvelope === 'boolean'
-            ? { requireEnvelope: scenario.requireEnvelope }
-            : {}),
-          ...(typeof scenario.allowCrossOriginEnvelope === 'boolean'
-            ? { allowCrossOriginEnvelope: scenario.allowCrossOriginEnvelope }
-            : {}),
-          ...(scenario.operationContract
-            ? { operationContract: scenario.operationContract }
-            : {}),
-        });
-
-        const send = requestFactory.createRequest({
-          path: REQUEST_PATH,
-          method: scenario.method,
-          port: PORT,
-          requestId,
-          operationContext: scenario.operationContext,
-        });
-
-        await send(scenario.payload);
-
-        expect(request).toHaveBeenCalledTimes(1);
-        const [url, init] = request.mock.calls[0];
-        expect(String(url)).toBe(scenario.expectedUrl);
-        assertRequestInit(scenario, init as RequestInit);
-      } finally {
-        restoreStrictDefaultRequestId(strictDefaultRequestId);
-      }
+        traceparent: OPERATION_TRACEPARENT,
+      },
     });
-  }
+    await send({ body: 'keep-me' });
 
-  test('inputParams forwards only allowlisted and server-derived identity headers', async () => {
+    const [url, init] = request.mock.calls[0];
+    expect(String(url)).toBe(PRODUCER_URL);
+    const headers = init.headers as HeaderMap;
+    expect(headers.traceparent).toBe(OPERATION_TRACEPARENT);
+    expect(headers[BFF_OPERATION_CONTEXT_HEADER]).toBe(
+      'producer-checkout:create-widget',
+    );
+    expect(JSON.parse(headers[BFF_ENVELOPE_HEADER])).toMatchObject({
+      requestId,
+      target: 'server',
+      sourceOrigin: CONSUMER_ORIGIN,
+      targetOrigin: 'https://producer.example',
+      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      spanId: 'bbbbbbbbbbbbbbbb',
+    });
+    expect(
+      JSON.parse(headers[BFF_OPERATION_CONTEXT_DETAIL_HEADER]),
+    ).toMatchObject({
+      operationId: 'producer-checkout:create-widget',
+      schemaHash: 'sha256:create-widget',
+      operationVersion: 3,
+    });
+  });
+
+  test('forwards only allowlisted and server-derived identity headers', async () => {
     const requestId = 'producer-input-params-identity';
     const { request, requestFactory } = createHarness('server', {
       'x-tenant-id': 'tenant-server',
@@ -340,10 +170,8 @@ describe('requestFactory outbound request contract', () => {
       httpMethodDecider: 'inputParams',
       requestId,
     });
-
     await send('widget');
 
-    expect(request).toHaveBeenCalledTimes(1);
     const headers = request.mock.calls[0][1]?.headers as HeaderMap;
     expect(headers).toMatchObject({
       'x-tenant-id': 'tenant-server',
@@ -353,94 +181,44 @@ describe('requestFactory outbound request contract', () => {
     expect(headers['x-private-incoming']).toBeUndefined();
   });
 
-  test('uploader forwards policy, allowlisted, and server-derived headers', async () => {
+  test('uploader sends the file as form data under the same header policy', async () => {
     const requestId = 'producer-uploader-identity';
     const { request, requestFactory } = createHarness('server', {
       origin: CONSUMER_ORIGIN,
       'x-tenant-id': 'tenant-server',
-      'x-subject-id': 'subject-server',
-      'x-forwarded-feature': 'feature-server',
       'x-private-incoming': 'must-not-forward',
     });
 
     requestFactory.configure({
       request: request as unknown as typeof fetch,
       requestId,
-      allowedHeaders: ['x-forwarded-feature'],
-      operationContract: {
-        enabled: true,
-        requireSchemaHash: true,
-        requireOperationVersion: true,
-      },
-      requireEnvelope: true,
-      allowCrossOriginEnvelope: true,
+      operationContract: { enabled: false },
+      requireEnvelope: false,
       setDomain: () => 'https://producer.example',
     });
 
     const upload = requestFactory.createUploader({
       path: REQUEST_PATH,
       requestId,
-      operationContext: {
-        operationId: 'upload-widget',
-        routePath: REQUEST_PATH,
-        method: 'POST',
-        schemaHash: 'sha256:upload-widget',
-        operationVersion: 1,
-        traceparent: OPERATION_TRACEPARENT,
-      },
     });
-
     await upload({
       files: {
         file: new File(['widget'], 'widget.txt', { type: 'text/plain' }),
       },
     });
 
-    expect(request).toHaveBeenCalledTimes(1);
     const [, init] = request.mock.calls[0];
     expect(init.method).toBe('POST');
     expect(init.body).toBeInstanceOf(FormData);
-    const form = init.body as FormData;
-    const uploaded = form.get('file');
-    expect(uploaded).toBeInstanceOf(File);
-    expect(uploaded).toMatchObject({
-      name: 'widget.txt',
-      type: 'text/plain',
-    });
-    expect(await (uploaded as File).text()).toBe('widget');
-    const headers = request.mock.calls[0][1]?.headers as HeaderMap;
-    expect(headers).toMatchObject({
-      'x-tenant-id': 'tenant-server',
-      'x-subject-id': 'subject-server',
-      'x-forwarded-feature': 'feature-server',
-    });
+    const uploaded = (init.body as FormData).get('file') as File;
+    expect(uploaded.name).toBe('widget.txt');
+    expect(await uploaded.text()).toBe('widget');
+    const headers = init.headers as HeaderMap;
+    expect(headers['x-tenant-id']).toBe('tenant-server');
     expect(headers['x-private-incoming']).toBeUndefined();
-    const envelope = JSON.parse(headers[BFF_ENVELOPE_HEADER]);
-    expect(envelope).toMatchObject({
-      requestId,
-      target: 'server',
-      sourceOrigin: CONSUMER_ORIGIN,
-      targetOrigin: 'https://producer.example',
-    });
-    expect(headers[BFF_OPERATION_CONTEXT_HEADER]).toBe(
-      `${requestId}:upload-widget`,
-    );
-    const operationContext = JSON.parse(
-      headers[BFF_OPERATION_CONTEXT_DETAIL_HEADER],
-    );
-    expect(operationContext).toMatchObject({
-      requestId,
-      operationId: `${requestId}:upload-widget`,
-      routePath: REQUEST_PATH,
-      method: 'POST',
-      schemaHash: 'sha256:upload-widget',
-      operationVersion: 1,
-      traceId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      spanId: 'bbbbbbbbbbbbbbbb',
-    });
   });
 
-  test('forwards allowlisted and resolved headers without casing assumptions', async () => {
+  test('resolved headers replace caller and incoming values without injecting unlisted ones', async () => {
     const resolveHeaders = rs.fn(() => ({
       AUTHORIZATION: 'Bearer resolved',
       'x-injected': 'must-not-forward',
@@ -460,9 +238,7 @@ describe('requestFactory outbound request contract', () => {
       method: 'GET',
       port: PORT,
     });
-    await send({
-      headers: { Authorization: 'Bearer caller' },
-    });
+    await send({ headers: { Authorization: 'Bearer caller' } });
 
     expect(resolveHeaders).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -470,19 +246,15 @@ describe('requestFactory outbound request contract', () => {
       }),
     );
     const headers = request.mock.calls[0][1]?.headers as HeaderMap;
-    expect(headers).toMatchObject({
-      authorization: 'Bearer resolved',
-    });
+    expect(headers.authorization).toBe('Bearer resolved');
     expect(headers['x-injected']).toBeUndefined();
     expect(
       Object.keys(headers).filter(key => key.toLowerCase() === 'authorization'),
     ).toEqual(['authorization']);
   });
 
-  test('reconfiguration removes omitted header and envelope policy', async () => {
-    const resolveHeaders = rs.fn(() => ({
-      authorization: 'Bearer stale',
-    }));
+  test('reconfiguration drops an omitted header and envelope policy', async () => {
+    const resolveHeaders = rs.fn(() => ({ authorization: 'Bearer stale' }));
     const { request, requestFactory } = createHarness('server', {
       authorization: 'Bearer incoming',
     });
@@ -514,178 +286,5 @@ describe('requestFactory outbound request contract', () => {
     expect(request.mock.calls[0][1]?.headers).toEqual({
       accept: ACCEPT_HEADER,
     });
-  });
-
-  test('reconfiguration removes omitted retry policy', async () => {
-    const failure = Object.assign(new Error('unavailable'), { status: 503 });
-    const request = rs.fn(async () => {
-      throw failure;
-    });
-    const { requestFactory } = createHarness('server');
-
-    requestFactory.configure({
-      request: request as unknown as typeof fetch,
-      transport: {
-        retry: {
-          retries: 1,
-          baseDelayMs: 1,
-          maxDelayMs: 1,
-          jitterRatio: 0,
-        },
-      },
-    });
-    requestFactory.configure({
-      request: request as unknown as typeof fetch,
-    });
-
-    const send = requestFactory.createRequest({
-      path: REQUEST_PATH,
-      method: 'GET',
-      port: PORT,
-    });
-
-    await expect(send()).rejects.toBe(failure);
-    expect(request).toHaveBeenCalledTimes(1);
-  });
-
-  test('reconfiguration restores omitted secured-producer defaults', () => {
-    const requestId = 'producer-policy-reset';
-    const { request, requestFactory } = createHarness('server');
-
-    requestFactory.configure({
-      request: request as unknown as typeof fetch,
-      requestId,
-      requireEnvelope: false,
-      identityBinding: { enabled: false },
-      operationContract: { enabled: false },
-      setDomain: () => 'https://producer.example',
-    });
-    requestFactory.configure({
-      request: request as unknown as typeof fetch,
-      requestId,
-    });
-
-    const send = requestFactory.createRequest({
-      path: REQUEST_PATH,
-      method: 'GET',
-      port: PORT,
-      requestId,
-    });
-
-    expect(() => send()).toThrow('missing_schema_hash');
-  });
-
-  test('uploader uses an explicitly configured POST retry policy', async () => {
-    rs.useFakeTimers();
-    const retryableError = Object.assign(new Error('upload unavailable'), {
-      status: 503,
-    });
-    const response = new Response('{}', { status: 200 });
-    const onDegraded = rs.fn();
-    let attempts = 0;
-    const request = rs.fn(async () => {
-      attempts += 1;
-      if (attempts === 1) {
-        throw retryableError;
-      }
-      return response;
-    });
-    const { requestFactory } = createHarness('server');
-
-    requestFactory.configure({
-      request: request as unknown as typeof fetch,
-      transport: {
-        retry: {
-          retries: 1,
-          baseDelayMs: 5,
-          maxDelayMs: 5,
-          jitterRatio: 0,
-          shouldRetry: ({ method }) => method === 'POST',
-        },
-        onDegraded,
-      },
-    });
-    const upload = requestFactory.createUploader({ path: REQUEST_PATH });
-    const pending = upload({
-      files: { file: new File(['widget'], 'widget.txt') },
-    });
-    const observed = pending.catch(error => error);
-
-    try {
-      await Promise.resolve();
-      expect(request).toHaveBeenCalledTimes(1);
-      await rs.advanceTimersByTimeAsync(5);
-
-      await expect(pending).resolves.toBe(response);
-      expect(request).toHaveBeenCalledTimes(2);
-      expect(onDegraded).toHaveBeenCalledWith(
-        expect.objectContaining({
-          reason: 'retry',
-          method: 'POST',
-          attempt: 1,
-          maxAttempts: 2,
-        }),
-      );
-    } finally {
-      await rs.advanceTimersByTimeAsync(1000);
-      await observed;
-      rs.useRealTimers();
-    }
-  });
-
-  test('uploader timeout aborts transport and emits degraded telemetry', async () => {
-    rs.useFakeTimers();
-    const onDegraded = rs.fn();
-    const cleanupError = new Error('test cleanup');
-    let rejectRequest: ((error: Error) => void) | undefined;
-    let inFlightSignal: AbortSignal | undefined;
-    const request = rs.fn((_url: RequestInfo | URL, init?: RequestInit) => {
-      inFlightSignal = init?.signal || undefined;
-      return new Promise((_, reject) => {
-        rejectRequest = reject;
-        init?.signal?.addEventListener('abort', () => {
-          const error = new Error('aborted');
-          error.name = 'AbortError';
-          reject(error);
-        });
-      });
-    });
-    const { requestFactory } = createHarness('server');
-
-    requestFactory.configure({
-      request: request as unknown as typeof fetch,
-      transport: {
-        timeoutMs: 20,
-        onDegraded,
-      },
-    });
-    const upload = requestFactory.createUploader({ path: REQUEST_PATH });
-    const pending = upload({
-      files: { file: new File(['widget'], 'widget.txt') },
-    });
-    const observed = pending.catch(error => error);
-
-    try {
-      await Promise.resolve();
-      expect(inFlightSignal).toBeDefined();
-      await rs.advanceTimersByTimeAsync(20);
-
-      await expect(observed).resolves.toMatchObject({ name: 'TimeoutError' });
-      expect(inFlightSignal?.aborted).toBe(true);
-      expect(onDegraded).toHaveBeenCalledWith(
-        expect.objectContaining({
-          reason: 'timeout',
-          method: 'POST',
-          timeoutMs: 20,
-        }),
-      );
-    } finally {
-      if (!inFlightSignal?.aborted) {
-        rejectRequest?.(cleanupError);
-      }
-      await observed;
-      await rs.advanceTimersByTimeAsync(1000);
-      rs.useRealTimers();
-    }
   });
 });

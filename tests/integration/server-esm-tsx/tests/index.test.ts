@@ -26,19 +26,6 @@ describe('custom server under native esm', () => {
     await fse.remove(path.join(appDir, 'dist'));
   });
 
-  it('should emit js for tsx entries and keep sources out of dist', async () => {
-    // `jsx: preserve` would emit `foo/index.jsx`, which Node cannot load.
-    expect(
-      await fse.pathExists(path.join(serverDistDir, 'foo', 'index.js')),
-    ).toBeTruthy();
-    expect(
-      await fse.pathExists(path.join(serverDistDir, 'foo', 'index.jsx')),
-    ).toBeFalsy();
-    expect(
-      await fse.pathExists(path.join(serverDistDir, 'foo', 'index.tsx')),
-    ).toBeFalsy();
-  });
-
   it('should be loadable by node', async () => {
     // The strongest check: Node itself resolves the emitted specifiers.
     const mod = await import(

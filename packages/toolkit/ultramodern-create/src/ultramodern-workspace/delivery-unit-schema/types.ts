@@ -10,8 +10,8 @@
  * Delivery), ADR-0020 (Zoned Surface Versioning). See `packages/toolkit/ultramodern-create/delivery-unit-schema-SPEC.md` for the
  * SurfaceRef grammar, invariants, and the v1 mapping table.
  *
- * TS constraint: plain types + pure functions only. This file is scanned by
- * `tsgo-boundary.test.ts`; it must never import TypeScript compiler APIs.
+ * TS constraint: plain types + pure functions only; it must never import
+ * TypeScript compiler APIs.
  */
 import {
   DELIVERY_UNIT_DEPLOY_PROFILE,

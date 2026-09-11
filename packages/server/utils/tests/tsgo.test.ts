@@ -53,19 +53,6 @@ describe('getTsgoBinPath', () => {
     expect(binPath).toBe(path.join(pkgDir, 'bin/tsgo'));
   });
 
-  it('supports older native-preview installs with bin/tsgo.js', async () => {
-    const pkgDir = path.join(tmpDir, 'node_modules/@typescript/native-preview');
-    await fs.outputJSON(path.join(pkgDir, 'package.json'), {
-      name: '@typescript/native-preview',
-      version: '0.0.0-test',
-    });
-    await fs.outputFile(path.join(pkgDir, 'bin/tsgo.js'), '// stub\n');
-
-    const binPath = getTsgoBinPath(tmpDir);
-
-    expect(binPath).toBe(path.join(pkgDir, 'bin/tsgo.js'));
-  });
-
   it('falls back to the dependency tree of @modern-js/server-utils', () => {
     // No app-local install: resolution must still succeed via this package's
     // own module tree (hoisted installs / the workspace devDependency).

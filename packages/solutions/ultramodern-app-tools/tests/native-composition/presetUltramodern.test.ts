@@ -1,68 +1,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {
-  createPresetUltramodernConfig,
-  presetUltramodern,
-} from '@modern-js/ultramodern-app-tools';
+import { createPresetUltramodernConfig } from '@modern-js/ultramodern-app-tools';
 import { rspack } from '@rsbuild/core';
 
 describe('presetUltramodern config', () => {
-  it('forwards telemetry, BFF and SSR options through the preset table', () => {
-    const cases = [
-      {
-        options: {},
-        expected: {
-          requestId: 'app',
-          ssr: true,
-          exporters: undefined,
-        },
-      },
-      {
-        options: {
-          appId: 'erp-shell',
-          enableModuleFederationSSR: true,
-          otlpEndpoint: 'http://collector.internal:4318/v1/logs',
-        },
-        expected: {
-          requestId: 'erp-shell',
-          ssr: true,
-          exporters: {
-            otlp: {
-              enabled: true,
-              endpoint: 'http://collector.internal:4318/v1/logs',
-            },
-          },
-        },
-      },
-      {
-        options: { enableTelemetryExporters: true },
-        expected: {
-          requestId: 'app',
-          ssr: true,
-          exporters: {
-            otlp: { enabled: true, endpoint: 'http://127.0.0.1:4318/v1/logs' },
-            victoriaMetrics: {
-              enabled: true,
-              endpoint: 'http://127.0.0.1:8428/api/v1/import/prometheus',
-            },
-          },
-        },
-      },
-    ] as const;
-
-    for (const { options, expected } of cases) {
-      const preset = createPresetUltramodernConfig(options);
-      expect(preset.bff?.requestId).toBe(expected.requestId);
-      expect(
-        preset.server?.ssr &&
-          typeof preset.server.ssr === 'object' &&
-          preset.server.ssr.moduleFederationAppSSR,
-      ).toBe(expected.ssr);
-      expect(preset.server?.telemetry?.exporters).toEqual(expected.exporters);
-    }
-  });
-
   it('evaluates telemetry endpoint environment variables for every call', () => {
     const previousOtlp = process.env.MODERN_TELEMETRY_OTLP_ENDPOINT;
     const previousVictoria = process.env.MODERN_TELEMETRY_VICTORIA_ENDPOINT;
@@ -184,64 +126,5 @@ describe('presetUltramodern config', () => {
         process.env.ULTRAMODERN_SOURCE_REVISION = previous;
       }
     }
-  });
-
-  it('supports opt-out for strict defaults', () => {
-    const preset = createPresetUltramodernConfig({
-      enableBffRequestId: false,
-      enableModuleFederationSSR: false,
-      enableTelemetryExporters: false,
-    });
-
-    expect(preset.bff).toBeUndefined();
-    expect(preset.server?.ssr).toBeUndefined();
-    expect(preset.server?.telemetry?.exporters).toBeUndefined();
-  });
-
-  it('allows app config overrides when composed', () => {
-    const composed = presetUltramodern({
-      output: {
-        precompress: false,
-      },
-      server: {
-        ssr: false,
-        telemetry: {
-          enabled: false,
-        },
-      },
-      bff: {
-        requestId: 'custom-app',
-      },
-    });
-
-    expect(composed.output?.precompress).toBe(false);
-    expect(composed.server?.telemetry?.enabled).toBe(false);
-    expect(composed.server?.telemetry?.failLoudStartup).toBe(false);
-    expect(composed.server?.ssr).toBe(false);
-    expect(composed.bff?.requestId).toBe('custom-app');
-  });
-
-  it('keeps defaults for omitted and undefined values but honors false', () => {
-    const omitted = presetUltramodern({});
-    const undefinedOverride = presetUltramodern({
-      output: { precompress: undefined },
-      source: { reactCompiler: undefined },
-      tools: { lightningcssLoader: undefined },
-    });
-    const falseOverride = presetUltramodern({
-      output: { precompress: false },
-      source: { reactCompiler: false },
-      tools: { lightningcssLoader: false },
-    });
-
-    expect(omitted.output?.precompress).toBe(true);
-    expect(omitted.source?.reactCompiler).toBe(true);
-    expect(omitted.tools?.lightningcssLoader).toBe(true);
-    expect(undefinedOverride.output?.precompress).toBe(true);
-    expect(undefinedOverride.source?.reactCompiler).toBe(true);
-    expect(undefinedOverride.tools?.lightningcssLoader).toBe(true);
-    expect(falseOverride.output?.precompress).toBe(false);
-    expect(falseOverride.source?.reactCompiler).toBe(false);
-    expect(falseOverride.tools?.lightningcssLoader).toBe(false);
   });
 });

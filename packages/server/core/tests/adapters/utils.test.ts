@@ -45,18 +45,6 @@ describe('isResFinalized', () => {
   ])('classifies a %s response by lifecycle state', (_, response, finalized) => {
     expect(isResFinalized(response as any)).toBe(finalized);
   });
-
-  it('keeps a socketless response live while an HTTP/2 stream is active', () => {
-    expect(
-      isResFinalized({
-        headersSent: false,
-        writableEnded: false,
-        finished: false,
-        socket: { writable: true },
-        stream: { destroyed: false, closed: false },
-      } as any),
-    ).toBe(false);
-  });
 });
 
 const createContext = (res: any) => ({

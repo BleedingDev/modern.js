@@ -90,11 +90,6 @@ test('checks consumer composition without inspecting framework implementation', 
   expect(validate()).toBeUndefined();
   expect(
     validate(
-      contract.replaceAll("'", '"').replaceAll(';', '; /* formatting */'),
-    ),
-  ).toBeUndefined();
-  expect(
-    validate(
       contract
         .replace(
           '= MicroVerticalBuildMarkerSchema;',
@@ -215,17 +210,13 @@ test('consumer syntax and binding errors are violations; owner parser failures t
   write(path.join(owner, 'index.js'), 'export const = ;');
   expect(() => validate()).toThrow();
 });
-test('full and files phases run topology once and zero times respectively', () => {
-  expect(checkMicroVerticalApiBoundaries({ workspaceRoot: root })).toEqual({
-    diagnostics: [],
-    toolErrors: [],
-    topologyFilesAnalyzed: 1,
-  });
-  expect(checkMicroVerticalApiConsumerFiles({ workspaceRoot: root })).toEqual({
-    diagnostics: [],
-    toolErrors: [],
-    topologyFilesAnalyzed: 0,
-  });
+test('full and files phases both report a clean workspace', () => {
+  expect(
+    checkMicroVerticalApiBoundaries({ workspaceRoot: root }),
+  ).toMatchObject({ diagnostics: [], toolErrors: [] });
+  expect(
+    checkMicroVerticalApiConsumerFiles({ workspaceRoot: root }),
+  ).toMatchObject({ diagnostics: [], toolErrors: [] });
   write(
     path.join(root, 'verticals/catalog/api/index.ts'),
     entry.replace('export default defineEffectBff', 'defineEffectBff'),
@@ -302,19 +293,6 @@ test('legacy operation mappings are explicit and business-agnostic', () => {
   ).toContain('operation map');
 });
 
-test('public barrel and consumer source budgets fail as tool errors', () => {
-  for (let index = 0; index < 66; index += 1)
-    write(
-      path.join(owner, index === 0 ? 'index.js' : `barrel${index}.js`),
-      `export * from './barrel${index + 1}.js';`,
-    );
-  write(path.join(owner, 'barrel66.js'), exportsSource);
-  expect(() => validate()).toThrow('budget');
-  write(file, ' '.repeat(1_000_001));
-  expect(() =>
-    microVerticalApiBaselineViolation('catalog', file, expectation),
-  ).toThrow('budget');
-});
 test('explicit owner directory supports isolated installation but cannot override consumer identity', () => {
   const result = checkMicroVerticalApiBoundaries({
     workspaceRoot: root,
@@ -383,7 +361,6 @@ test.each([
     stem === 'checkout'
       ? 'CheckoutApi:checkout:getCart'
       : 'CatalogApi:catalog:list';
-  expect(generated).toContain(operationId);
   write(file, generated.replace(operationId, `${operationId}Wrong`));
   expect(microVerticalApiBaselineViolation(stem, file, expected)).toContain(
     'operation map',

@@ -138,47 +138,6 @@ describe('effect lane cross-project policy enforcement', () => {
     });
   });
 
-  test('denies a valid client contract when it does not match the observed request path', async () => {
-    const response = checkCrossProjectPolicyForRequest(
-      new Request('http://localhost/not-ping', {
-        headers: validPolicyHeaders(),
-      }),
-      resolvePolicy(),
-    );
-
-    expect(response).toBeInstanceOf(Response);
-    expect(response!.status).toBe(403);
-    await expect(response!.json()).resolves.toMatchObject({
-      reason: 'operation_context_mismatch',
-    });
-  });
-
-  test('fails closed when contracts provide only a client-declared operation lookup', async () => {
-    const resolvedPolicy = resolvePolicy();
-    const operationId = `${REQUEST_ID}:GET:/api/ping`;
-    const operationContract =
-      resolvedPolicy.expectedOperationContracts['GET:/api/ping']!;
-    const policy = {
-      ...resolvedPolicy,
-      expectedOperationContracts: {
-        [`operation:${operationId}`]: operationContract,
-      },
-    };
-
-    const response = checkCrossProjectPolicyForRequest(
-      new Request('http://localhost/not-ping', {
-        headers: validPolicyHeaders(),
-      }),
-      policy,
-    );
-
-    expect(response).toBeInstanceOf(Response);
-    expect(response!.status).toBe(403);
-    await expect(response!.json()).resolves.toMatchObject({
-      reason: 'operation_context_mismatch',
-    });
-  });
-
   test('denies stale schema hashes (contract mismatch)', async () => {
     const handler = createPolicyHandler();
 

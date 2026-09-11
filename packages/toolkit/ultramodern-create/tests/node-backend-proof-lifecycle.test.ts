@@ -145,7 +145,6 @@ test('Node backend proof owns the runtime lifecycle for built MicroVerticals', a
   };
 
   try {
-    assert.equal(typeof proofModule.resolveNodeProofServerMode, 'function');
     assert.equal(proofModule.resolveNodeProofServerMode!({}), 'owned');
     assert.equal(
       proofModule.resolveNodeProofServerMode!({
@@ -160,8 +159,6 @@ test('Node backend proof owns the runtime lifecycle for built MicroVerticals', a
         }),
       /ULTRAMODERN_NODE_PROOF_SERVER_MODE/u,
     );
-    assert.equal(typeof proofModule.startNodeRuntime, 'function');
-    assert.equal(typeof proofModule.stopNodeRuntime, 'function');
     const runtime = await proofModule.startNodeRuntime!(
       {
         id: 'catalog',
@@ -214,8 +211,6 @@ test('Node backend proof passes exact verified container bytes to the loader', a
       manifest: { bytes: Buffer };
     }) => Promise<unknown>;
   };
-  assert.equal(typeof proofModule.fetchBoundArtifact, 'function');
-  assert.equal(typeof proofModule.loadBackendFromVerifiedArtifacts, 'function');
 
   const manifestBytes = Buffer.from(
     JSON.stringify({

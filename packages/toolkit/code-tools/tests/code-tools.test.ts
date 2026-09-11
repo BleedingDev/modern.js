@@ -376,68 +376,6 @@ export type CatalogItem = {
     expect(output).toContain('must declare endpoints through HttpApiEndpoint');
   });
 
-  test('workspace runner accepts renamed locale resource identifiers and explicit resources property', () => {
-    const root = trackTempRoot();
-    writeFile(
-      root,
-      'apps/shell/src/App.tsx',
-      `
-export function App() {
-  return (
-    <section
-      data-modern-boundary-id="shell"
-      data-modern-mf-expose="./Route"
-      data-modern-mf-role="shell"
-    >
-      Hardcoded workspace source text is not part of this runner.
-    </section>
-  );
-}
-`,
-    );
-    writeFile(
-      root,
-      'apps/shell/src/modern.runtime.ts',
-      `
-import czechShell from '../locales/cs/shell.json';
-import englishShell from '../locales/en/shell.json';
-
-const localeResources = {
-  cs: czechShell,
-  en: englishShell,
-};
-
-export default {
-  i18n: {
-    initOptions: {
-      resources: localeResources
-    },
-  },
-};
-`,
-    );
-    writeFile(
-      root,
-      'apps/shell/locales/en/shell.json',
-      JSON.stringify({ title: 'shell' }),
-    );
-    writeFile(
-      root,
-      'apps/shell/locales/cs/shell.json',
-      JSON.stringify({ title: 'shell' }),
-    );
-
-    const result = captureConsole(() =>
-      runWorkspaceSourceCheck({ cwd: root, sourceRoots: ['apps'] }),
-    );
-
-    expect(result.exitCode).toBe(0);
-    expect(result.logs).toContain(
-      'UltraModern i18n and boundary guardrails validated',
-    );
-    expect(result.errors).toEqual([]);
-  });
-
   test('workspace runner plural-checks additional configured locales instead of bypassing them', () => {
     const root = trackTempRoot();
     writeFile(

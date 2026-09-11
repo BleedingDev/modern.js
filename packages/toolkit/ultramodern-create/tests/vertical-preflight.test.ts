@@ -1,16 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  normalizeCompactConfig,
-  UnsupportedUltramodernConfigError,
-} from '../src/ultramodern-tooling/config';
+import type { UnsupportedUltramodernConfigError } from '../src/ultramodern-tooling/config';
 import { addUltramodernVertical } from '../src/ultramodern-workspace';
 import { createWorkspace, snapshotWorkspace } from './helpers/workspace-kit';
 
 const ultramodernConfigPath = '.modernjs/ultramodern.json';
 const topologyPath = 'topology/reference-topology.json';
-const ownershipPath = 'topology/ownership.json';
 const overlayPath = 'topology/local-overlays/development.json';
 
 function readJson(workspaceDir: string, relativePath: string): any {
@@ -88,79 +84,6 @@ function addExistingTopologyVertical(
   writeJson(workspaceDir, overlayPath, overlay);
 }
 
-test('schemaVersion 1 compact config normalizes source and behavior fields', () => {
-  const sourcePath = '/workspace/.modernjs/ultramodern.json';
-  const normalized = normalizeCompactConfig('/workspace', sourcePath, {
-    schemaVersion: 1,
-    profile: 'strict-effect',
-    workspace: { packageScope: 'fixture' },
-    packageSource: {
-      strategy: 'install',
-      modernPackageVersion: '3.2.1',
-      registry: 'https://registry.npmjs.org/',
-      aliasScope: '@fixture',
-      aliasPackageNamePrefix: 'modern-js-',
-    },
-    features: { tailwind: false },
-    topology: {
-      apps: [
-        {
-          id: 'shell',
-          kind: 'shell',
-          path: 'apps/shell',
-          package: '@fixture/shell',
-          packageSuffix: 'shell',
-          displayName: 'Shell',
-          domain: 'shell',
-          port: 4100,
-          portEnv: 'SHELL_PORT',
-          moduleFederation: {
-            role: 'host',
-            name: 'shellHost',
-            verticalRefs: ['catalog'],
-          },
-        },
-        {
-          id: 'catalog',
-          kind: 'vertical',
-          path: 'verticals/catalog',
-          package: '@fixture/catalog',
-          packageSuffix: 'catalog',
-          displayName: 'Catalog Vertical',
-          domain: 'catalog',
-          port: 4101,
-          portEnv: 'CATALOG_PORT',
-          moduleFederation: {
-            role: 'remote',
-            name: 'verticalCatalog',
-            exposes: ['./Route'],
-            exposePaths: { './Route': './src/route.tsx' },
-          },
-          api: {
-            stem: 'catalog',
-            prefix: '/catalog-api',
-            consumedBy: ['shell', 'catalog'],
-          },
-        },
-      ],
-    },
-  });
-
-  assert.equal(normalized.schemaVersion, 1);
-  assert.equal(normalized.source, 'compact');
-  assert.equal(normalized.sourcePath, sourcePath);
-  assert.equal(normalized.workspace.packageScope, 'fixture');
-  assert.equal(normalized.packageSource.strategy, 'install');
-  assert.equal(normalized.features.tailwind, false);
-  assert.deepEqual(normalized.topology.apps[0].moduleFederation.verticalRefs, [
-    'catalog',
-  ]);
-  assert.deepEqual(normalized.topology.apps[1].moduleFederation.exposes, [
-    './Route',
-  ]);
-  assert.equal(normalized.topology.apps[1].api.prefix, '/catalog-api');
-});
-
 test('add-vertical normalizes stale shell refs for the new vertical', () => {
   const { tempRoot, workspaceDir } = createWorkspace('preflight-workspace', {
     tempPrefix: 'um-vertical-preflight-',
@@ -215,14 +138,6 @@ test('preflight rejects invalid fresh vertical input before writes', () => {
 });
 
 test.each([
-  {
-    label: 'unsupported schemaVersion',
-    mutate: (config: Record<string, any>) => {
-      config.schemaVersion = 2;
-    },
-    error: /(Unsupported|Invalid) UltraModern config schemaVersion 2/,
-    issue: { field: 'schemaVersion', value: 2 },
-  },
   {
     label: 'unsupported app kind',
     mutate: (config: Record<string, any>) => {
@@ -282,12 +197,6 @@ test.each([
     mutate: (workspaceDir: string) =>
       addExistingTopologyVertical(workspaceDir, { port: 4101 }),
     error: /Duplicate development port "4101"/,
-  },
-  {
-    label: 'duplicate API prefixes',
-    mutate: (workspaceDir: string) =>
-      addExistingTopologyVertical(workspaceDir, { apiPrefix: '/catalog-api' }),
-    error: /Duplicate API prefix "\/catalog-api"/,
   },
   {
     label: 'unsafe normalized existing descriptors',

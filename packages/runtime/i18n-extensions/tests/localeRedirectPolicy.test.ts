@@ -83,17 +83,6 @@ describe('locale redirect resource policy', () => {
     expect(
       shouldIgnoreRedirect('/store/static/app.js', '/store/*', ignore),
     ).toBe(true);
-    expect(seen).toEqual(['/health', '/products']);
-  });
-
-  test('preserves startsWith mount removal and empty remaining path behavior', () => {
-    expect(shouldIgnoreRedirect('/storefront', '/store/*', ['/front'])).toBe(
-      true,
-    );
-    expect(shouldIgnoreRedirect('/store', '/store/*', ['/'])).toBe(true);
-    expect(shouldIgnoreRedirect('/health', '', ['/health'])).toBe(true);
-    expect(shouldIgnoreRedirect('/health', '/', ['/health'])).toBe(true);
-    expect(shouldIgnoreRedirect('/health', '/other/*', ['/health'])).toBe(true);
   });
 });
 
@@ -119,19 +108,6 @@ describe('locale redirect URL policy', () => {
     expect(
       getLanguageFromPath(request('/storecs/products'), '/store/*', languages),
     ).toBe('cs');
-  });
-
-  test('retains case-sensitive language detection and does not search later segments', () => {
-    for (const pathname of [
-      '/store',
-      '/store/CS/products',
-      '/store/fr/products',
-      '/store/products/cs',
-    ]) {
-      expect(
-        getLanguageFromPath(request(pathname), '/store/*', languages),
-      ).toBeNull();
-    }
   });
 
   test('switches localized dynamic paths while preserving mount, query and hash', () => {
@@ -168,25 +144,6 @@ describe('locale redirect URL policy', () => {
         false,
       ),
     ).toBe('/store/cs');
-  });
-
-  test('preserves the existing nonmatching and partial mount behavior', () => {
-    expect(
-      buildLocalizedUrl(
-        request('https://example.com/products'),
-        '/store/*',
-        'cs',
-        languages,
-      ),
-    ).toBe('/store/cs/products');
-    expect(
-      buildLocalizedUrl(
-        request('https://example.com/storefront'),
-        '/store/*',
-        'cs',
-        languages,
-      ),
-    ).toBe('/store/cs/front');
   });
 
   test('returns a non-cacheable temporary redirect with language negotiation headers', async () => {

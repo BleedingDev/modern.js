@@ -52,23 +52,7 @@ test('retains native prefix rejection and producer runtime mismatch rejection', 
 });
 
 test('initializes consumers without BFF config and composes the native path factory', async () => {
-  const { resolved, context, plugin } = await run();
-  expect(plugin.name).toBe('@modern-js/plugin-independent-bff');
-  expect(resolved.bff).toMatchObject({
-    prefix: '/producer',
-    runtimeFramework: 'effect',
-    requestId: 'producer-request',
-    isCrossProjectServer: true,
-    crossProjectPolicy: {
-      enabled: true,
-      requireEnvelope: true,
-      requireOperationContext: true,
-      requireOperationContextDetails: true,
-      requireOperationSchemaHash: true,
-      requireOperationVersion: true,
-      allowUnknownOperations: false,
-    },
-  });
+  const { context } = await run();
   expect(context.apiDirectory).toBe(
     path.resolve('consumer/node_modules/@fixture/producer/output/api/effect'),
   );

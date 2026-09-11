@@ -17,8 +17,8 @@
  * Delivery), ADR-0020 (Zoned Surface Versioning). See the SPEC §5 mapping
  * table read in reverse.
  *
- * TS constraint: plain types + pure functions only. This file is scanned by
- * `tsgo-boundary.test.ts`; it must never import TypeScript compiler APIs.
+ * TS constraint: plain types + pure functions only; it must never import
+ * TypeScript compiler APIs.
  */
 import type { Ownership, WorkspaceApi, WorkspaceApp } from '../types';
 import type {

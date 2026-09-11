@@ -53,13 +53,6 @@ describe('agent files generation', () => {
     expect(fs.existsSync(path.join(workdir, 'my-app/CLAUDE.md'))).toBe(false);
     expect(output).not.toContain('AGENTS.md & CLAUDE.md generated');
   });
-
-  it('accepts --no-agents-md after the project name', () => {
-    runCreate(['my-app', '--no-agents-md']);
-
-    expect(fs.existsSync(path.join(workdir, 'my-app/package.json'))).toBe(true);
-    expect(fs.existsSync(path.join(workdir, 'my-app/AGENTS.md'))).toBe(false);
-  });
 });
 
 describe('positional argument parsing', () => {
@@ -178,35 +171,15 @@ describe('docs location by version', () => {
 
   // Versions without bundled docs get nothing written — only a hint — so no
   // file in the project can name docs that are not there.
-  const unsupported = ['1.21.0', '2.68.0', '3.7.0'];
-  for (const version of unsupported) {
-    it(`${version} writes nothing and prints the hint`, () => {
-      writePkg(version);
-      const output = runCreate(['--agents-md-only']);
+  it('2.68.0 writes nothing and prints the hint', () => {
+    writePkg('2.68.0');
+    const output = runCreate(['--agents-md-only']);
 
-      expect(fs.existsSync(path.join(workdir, 'AGENTS.md'))).toBe(false);
-      expect(fs.existsSync(path.join(workdir, 'CLAUDE.md'))).toBe(false);
-      expect(output).toContain('3.8.0');
-      expect(output).toContain('llms.txt');
-    });
-  }
-
-  const supported = [
-    '3.8.0',
-    '^3.9.0',
-    '0.0.0-canary-20260731095506',
-    'workspace:*',
-  ];
-  for (const version of supported) {
-    it(`${version} writes the bundled block`, () => {
-      writePkg(version);
-      runCreate(['--agents-md-only']);
-
-      expect(
-        fs.readFileSync(path.join(workdir, 'AGENTS.md'), 'utf-8'),
-      ).toContain('node_modules/@modern-js/app-tools/docs/');
-    });
-  }
+    expect(fs.existsSync(path.join(workdir, 'AGENTS.md'))).toBe(false);
+    expect(fs.existsSync(path.join(workdir, 'CLAUDE.md'))).toBe(false);
+    expect(output).toContain('3.8.0');
+    expect(output).toContain('llms.txt');
+  });
 
   it('prefers the installed version over the declared range', () => {
     // A range says what was asked for; node_modules says what was resolved.

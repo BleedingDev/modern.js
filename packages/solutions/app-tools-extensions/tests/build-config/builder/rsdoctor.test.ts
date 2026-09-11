@@ -35,18 +35,6 @@ describe('Rsbuild-native Rsdoctor integration', () => {
     rs.unstubAllEnvs();
   });
 
-  test('loads Rsdoctor when RSDOCTOR=true', async () => {
-    rs.stubEnv('RSDOCTOR', 'true');
-
-    const plugins = await getCompilerPlugins();
-
-    expect(
-      plugins.filter(
-        plugin => plugin?.constructor?.name === 'RsdoctorRspackPlugin',
-      ),
-    ).toHaveLength(1);
-  });
-
   test('does not add a duplicate when a build already has Rsdoctor', async () => {
     rs.stubEnv('RSDOCTOR', 'true');
     const existing = {

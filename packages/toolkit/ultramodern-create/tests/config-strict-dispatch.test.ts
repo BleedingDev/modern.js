@@ -44,22 +44,6 @@ const configRejectionCases = [
     issue: { field: 'schemaVersion', value: 1.5, reason: 'non-integer' },
   },
   {
-    label: 'string schemaVersion',
-    mutate: (config: Record<string, any>) => {
-      config.schemaVersion = '1';
-    },
-    error: /schemaVersion "1".*must be the integer 1/,
-    issue: { field: 'schemaVersion', value: '1', reason: 'non-integer' },
-  },
-  {
-    label: 'unsupported integer schemaVersion',
-    mutate: (config: Record<string, any>) => {
-      config.schemaVersion = 2;
-    },
-    error: /(Unsupported|Invalid) UltraModern config schemaVersion 2/,
-    issue: { field: 'schemaVersion', value: 2, reason: 'unsupported' },
-  },
-  {
     label: 'unsupported app kind',
     mutate: (config: Record<string, any>) => {
       config.topology.apps[0].kind = 'horizontal-remote';

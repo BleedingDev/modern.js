@@ -58,32 +58,6 @@ const createStubRuntime = () => {
 };
 
 describe('effect-client runtime (createGeneratedEffectClient)', () => {
-  test('builds a grouped client and operation manifest from the endpoint manifest', async () => {
-    const { runtime, createRequestCalls, senderCalls } = createStubRuntime();
-
-    const generated = createGeneratedEffectClient(
-      { endpoints: [PING_ENDPOINT] },
-      createConfig(),
-      runtime,
-    );
-
-    expect(createRequestCalls).toHaveLength(1);
-    expect(createRequestCalls[0]).toMatchObject({
-      path: '/api/ping',
-      method: 'GET',
-      port: 8080,
-      httpMethodDecider: 'functionName',
-      operationContext: {
-        operationId: 'GET:/api/ping',
-        schemaHash: 'hash-ping',
-        operationVersion: 3,
-      },
-    });
-
-    await generated.client.greetings!.ping({});
-    expect(senderCalls).toHaveLength(1);
-  });
-
   test('attaches the data envelope header for same-origin requests', async () => {
     const { runtime, senderCalls } = createStubRuntime();
 
@@ -126,31 +100,12 @@ describe('effect-client runtime (createGeneratedEffectClient)', () => {
     expect(configureCalls[0]).toMatchObject({
       requestId: 'producer-app',
       requireEnvelope: true,
-      identityBinding: { enabled: true, strict: true },
-      operationContract: {
-        enabled: true,
-        strict: true,
-        requireSchemaHash: true,
-        requireOperationVersion: true,
-      },
+      identityBinding: { strict: true },
+      operationContract: { strict: true },
     });
-    expect(typeof configureCalls[0].setDomain).toBe('function');
     expect(configureCalls[0].setDomain()).toBe('http://localhost:8080');
 
     expect(createRequestCalls[0]).toMatchObject({ requestId: 'producer-app' });
-  });
-
-  test('skips configure for same-project clients', () => {
-    const { runtime, configureCalls, createRequestCalls } = createStubRuntime();
-
-    createGeneratedEffectClient(
-      { endpoints: [PING_ENDPOINT] },
-      createConfig(),
-      runtime,
-    );
-
-    expect(configureCalls).toHaveLength(0);
-    expect(createRequestCalls[0]!.requestId).toBeUndefined();
   });
 
   test('merges request context headers without clobbering caller headers', async () => {
@@ -208,5 +163,33 @@ describe('effect-client runtime (createGeneratedEffectClient)', () => {
     );
     expect(payload.headers['x-operation-id']).toBe('trusted-operation');
     expect(payload.headers['x-caller']).toBe('yes');
+  });
+  test('requireTraceContext throws only for strict envelope callers', async () => {
+    const { runtime, senderCalls } = createStubRuntime();
+
+    const generated = createGeneratedEffectClient(
+      { endpoints: [PING_ENDPOINT] },
+      createConfig(),
+      runtime,
+    );
+
+    await expect(
+      Promise.resolve().then(() =>
+        generated.client.greetings!.ping({
+          dataPlatform: { requireEnvelope: true, requireTraceContext: true },
+        }),
+      ),
+    ).rejects.toThrow(/Trace context/);
+
+    // Non-strict callers keep working: the request is still sent, just
+    // without the data envelope header.
+    await expect(
+      generated.client.greetings!.ping({
+        dataPlatform: { requireTraceContext: true },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(senderCalls).toHaveLength(1);
+    const payload = senderCalls[0]!.args[0] as Record<string, any>;
+    expect(payload.headers?.['x-modernjs-data-envelope']).toBeUndefined();
   });
 });

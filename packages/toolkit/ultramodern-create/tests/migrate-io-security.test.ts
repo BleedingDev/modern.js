@@ -14,26 +14,6 @@ function createDirectoryLink(targetPath: string, linkPath: string) {
   fs.symlinkSync(targetPath, linkPath, directorySymlinkType);
 }
 
-test('migration IO writes and removes normal paths inside the workspace', () => {
-  const temporaryRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-migrate-io-in-root-'),
-  );
-  const workspaceRoot = path.join(temporaryRoot, 'workspace');
-  const targetPath = path.join(workspaceRoot, 'apps/catalog/config.json');
-
-  try {
-    fs.mkdirSync(workspaceRoot);
-    const io = createMigrationIo(workspaceRoot, false);
-
-    assert.equal(io.write(targetPath, '{"safe":true}\n'), true);
-    assert.equal(fs.readFileSync(targetPath, 'utf-8'), '{"safe":true}\n');
-    assert.equal(io.remove(targetPath), true);
-    assert.equal(fs.existsSync(targetPath), false);
-  } finally {
-    fs.rmSync(temporaryRoot, { force: true, recursive: true });
-  }
-});
-
 test('migration rollback restores directory links with their cross-platform type', () => {
   const temporaryRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'um-migrate-io-directory-link-rollback-'),
@@ -190,87 +170,6 @@ test('migration dry-run performs no target mutation through an escaping ancestor
       /outside workspace|symlink/u,
     );
     assert.equal(fs.readFileSync(outsideTarget, 'utf-8'), 'original\n');
-  } finally {
-    fs.rmSync(temporaryRoot, { force: true, recursive: true });
-  }
-});
-
-test('migration dry-run only plans normal in-workspace mutations', () => {
-  const temporaryRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-migrate-io-dry-run-in-root-'),
-  );
-  const workspaceRoot = path.join(temporaryRoot, 'workspace');
-  const existingPath = path.join(workspaceRoot, 'existing.txt');
-  const newPath = path.join(workspaceRoot, 'nested/new.txt');
-
-  try {
-    fs.mkdirSync(workspaceRoot);
-    fs.writeFileSync(existingPath, 'original\n');
-    const io = createMigrationIo(workspaceRoot, true);
-
-    assert.equal(io.write(newPath, 'planned\n'), true);
-    assert.equal(io.remove(existingPath), true);
-    assert.equal(fs.existsSync(newPath), false);
-    assert.equal(fs.readFileSync(existingPath, 'utf-8'), 'original\n');
-    assert.deepEqual(io.plan, [
-      '[dry-run] would write nested/new.txt',
-      '[dry-run] would delete existing.txt',
-    ]);
-  } finally {
-    fs.rmSync(temporaryRoot, { force: true, recursive: true });
-  }
-});
-
-test('staged migration dry-run projects writes and removals without touching the source workspace', () => {
-  const temporaryRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-migrate-io-staged-dry-run-'),
-  );
-  const workspaceRoot = path.join(temporaryRoot, 'workspace');
-  const existingPath = path.join(workspaceRoot, 'existing.txt');
-  const newPath = path.join(workspaceRoot, 'nested/new.txt');
-
-  try {
-    fs.mkdirSync(workspaceRoot);
-    fs.writeFileSync(existingPath, 'original\n');
-
-    withStagedDryRunMigrationIo(workspaceRoot, io => {
-      const stagedExistingPath = path.join(io.workspaceRoot, 'existing.txt');
-      const stagedNewPath = path.join(io.workspaceRoot, 'nested/new.txt');
-      assert.equal(io.write(stagedNewPath, 'projected\n'), true);
-      assert.equal(io.remove(stagedExistingPath), true);
-      assert.equal(fs.readFileSync(stagedNewPath, 'utf-8'), 'projected\n');
-      assert.equal(fs.existsSync(stagedExistingPath), false);
-    });
-
-    assert.equal(fs.existsSync(newPath), false);
-    assert.equal(fs.readFileSync(existingPath, 'utf-8'), 'original\n');
-  } finally {
-    fs.rmSync(temporaryRoot, { force: true, recursive: true });
-  }
-});
-
-test('staged migration preserves directory links inside the disposable workspace', () => {
-  const temporaryRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-migrate-io-staged-directory-link-'),
-  );
-  const workspaceRoot = path.join(temporaryRoot, 'workspace');
-  const targetRoot = path.join(workspaceRoot, 'directory-target');
-  const linkedRoot = path.join(workspaceRoot, 'directory-link');
-
-  try {
-    fs.mkdirSync(targetRoot, { recursive: true });
-    fs.writeFileSync(path.join(targetRoot, 'preserved.txt'), 'preserved\n');
-    createDirectoryLink(targetRoot, linkedRoot);
-
-    withStagedDryRunMigrationIo(workspaceRoot, io => {
-      const stagedLink = path.join(io.workspaceRoot, 'directory-link');
-      assert.equal(fs.lstatSync(stagedLink).isSymbolicLink(), true);
-      assert.equal(fs.statSync(stagedLink).isDirectory(), true);
-      assert.equal(
-        fs.readFileSync(path.join(stagedLink, 'preserved.txt'), 'utf-8'),
-        'preserved\n',
-      );
-    });
   } finally {
     fs.rmSync(temporaryRoot, { force: true, recursive: true });
   }

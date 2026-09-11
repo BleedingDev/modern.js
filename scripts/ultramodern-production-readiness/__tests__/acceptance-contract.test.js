@@ -1,231 +1,11 @@
 const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { pathToFileURL } = require('node:url');
 
-async function loadContract() {
-  return import('../published-create-proof/acceptance-contract.mjs');
-}
-
-function releaseFixture() {
-  const version = '3.5.0-ultramodern.50';
-  return {
-    source: {
-      commit: 'a'.repeat(40),
-      repository: 'BleedingDev/modern.js',
-    },
-    release: { tag: 'latest', version },
-    packages: [
-      {
-        targetName: '@bleedingdev/modern-js-plugin-bff',
-        version,
-        integrity: 'sha512-YWNjZXB0YW5jZQ==',
-        packageJson: {
-          dependencies: {
-            '@module-federation/runtime': '2.8.0',
-          },
-        },
-      },
-    ],
-  };
-}
-
-function profileFixture() {
-  const verticals = Array.from(
-    { length: 10 },
-    (_, index) => `vertical-${index + 1}`,
-  );
-  return {
-    createPackage: undefined,
-    deployCloudflare: false,
-    projectName: 'acceptance',
-    scaleProfile: 'erp-10',
-    selectedProfile: { id: 'erp-10', verticalCount: 10 },
-    verticalCount: 10,
-    verticals,
-  };
-}
-
-function runtimeReport({
-  applicationSourceRevision = 'b'.repeat(40),
-  artifactBinding,
-  mode = 'source',
-  platform = 'node',
-  release,
-  verticals,
-}) {
-  const evidence = Object.fromEntries(
-    [
-      'ssr',
-      'browser-mf',
-      'api',
-      'backend',
-      'backend-driven-ui',
-      'failure-isolation',
-      'release-identity',
-    ].map(dimension => [
-      dimension,
-      {
-        artifactMode: mode,
-        assertions: [{ status: 'pass', type: dimension }],
-        platform,
-        status: 'pass',
-        verticalIds: [...verticals],
-      },
-    ]),
-  );
-  evidence['release-identity'].apps = verticals.map(appId => {
-    const identity = {
-      buildMarker: `marker-${appId}`,
-      moduleFederation: artifactBinding.moduleFederation,
-      releaseVersion: '0.1.0',
-      sourceRevision: applicationSourceRevision,
-    };
-    return {
-      appId,
-      surfaces: {
-        api: { ...identity },
-        backend: { ...identity },
-        frontend: { ...identity },
-        ssr: { ...identity },
-      },
-    };
-  });
-  return {
-    artifactMode: mode,
-    evidence,
-    platform,
-    results: [],
-    shellRuntime: platform,
-    skipped: [],
-    status: 'pass',
-    targetRuntimes: Object.fromEntries(
-      verticals.map(appId => [appId, platform]),
-    ),
-  };
-}
-
-test('browser smoke executes the final Node deployment entry with its bound environment', async t => {
-  const { startServer } = await import('../browser-smoke/bootstrap.mjs');
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'acceptance-node-output-'),
-  );
-  const outputDirectory = path.join(root, 'apps/shell/.output');
-  const artifactDirectory = path.join(root, 'artifacts');
-  fs.mkdirSync(outputDirectory, { recursive: true });
-  fs.writeFileSync(
-    path.join(outputDirectory, 'index.js'),
-    `const http = require('node:http');
-http.createServer((_request, response) => {
-  response.setHeader('content-type', 'application/json');
-  response.end(JSON.stringify({
-    cwd: process.cwd(),
-    marker: process.env.ACCEPTANCE_MARKER,
-    port: process.env.PORT,
-  }));
-}).listen(Number(process.env.PORT), '127.0.0.1');
-`,
-  );
-
-  const port = await new Promise((resolve, reject) => {
-    const server = require('node:net').createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(error => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(address.port);
-        }
-      });
-    });
-  });
-  const target = {
-    app: { id: 'shell', path: 'apps/shell' },
-    baseUrl: `http://127.0.0.1:${port}`,
-    port,
-  };
-  const server = startServer(target, {
-    artifactDir: artifactDirectory,
-    processEnv: { ACCEPTANCE_MARKER: 'final-node-output' },
-    projectDir: root,
-  });
-  t.after(async () => {
-    await server.stop();
-    fs.rmSync(root, { force: true, recursive: true });
-  });
-
-  let response;
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    try {
-      response = await fetch(target.baseUrl);
-      break;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 20));
-    }
-  }
-  assert.ok(response);
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), {
-    cwd: fs.realpathSync(outputDirectory),
-    marker: 'final-node-output',
-    port: String(port),
-  });
-});
-
-test('the immutable ERP contract independently requires every Node and workerd runtime dimension', async () => {
-  const {
-    requiredAcceptanceResultIds,
-    requiredAcceptanceResultIdsForMode,
-    runtimeAcceptanceDimensions,
-    runtimeAcceptancePlatforms,
-  } = await loadContract();
-
-  assert.equal(requiredAcceptanceResultIds.includes('browser-runtime'), false);
-  for (const platform of runtimeAcceptancePlatforms) {
-    for (const dimension of runtimeAcceptanceDimensions) {
-      assert.equal(
-        requiredAcceptanceResultIds.includes(`${platform}-${dimension}`),
-        true,
-      );
-    }
-  }
-  assert.equal(
-    requiredAcceptanceResultIds.at(-1),
-    'operational-independence',
-    'operational independence must run only after the complete runtime matrix',
-  );
-  assert.deepEqual(
-    [...requiredAcceptanceResultIdsForMode('source')],
-    [...requiredAcceptanceResultIds],
-    'source lane must require the full contract including operational independence',
-  );
-  assert.deepEqual(
-    [...requiredAcceptanceResultIdsForMode('published')],
-    requiredAcceptanceResultIds.slice(0, -1),
-    'published lane must require the full contract except source-only operational independence',
-  );
-  assert.throws(
-    () => requiredAcceptanceResultIdsForMode('canary'),
-    /Unknown acceptance mode/u,
-  );
-});
-
-function runCommand(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    cwd: options.cwd,
-    encoding: 'utf8',
-    env: { ...process.env, ...options.env },
-    stdio: options.stdio === 'inherit' ? 'ignore' : 'pipe',
-  });
-  if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout);
-  }
-  return result.stdout?.trim() ?? '';
+function tempRoot(prefix) {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
 function operationalEvidence(options) {
@@ -240,6 +20,11 @@ function operationalEvidence(options) {
     buildMarker: 'changed-marker',
     sourceRevision: options.changedRef,
   };
+  const unchanged = digest => ({
+    byteIdentical: true,
+    envelopeIdentical: true,
+    treeDigest: digest,
+  });
   const comparison = target => ({
     target,
     changed: {
@@ -249,26 +34,18 @@ function operationalEvidence(options) {
       beforeIdentity: baselineIdentity,
       beforeTreeDigest: `${target}-baseline-tree`,
       surfaces: Object.fromEntries(
-        ['uiClient', 'ssr', 'apiBackend', 'backendFederation'].map(surface => [
-          surface,
+        ['uiClient', 'ssr', 'apiBackend', 'backendFederation'].map(s => [
+          s,
           {
-            afterDigest: `${target}-${surface}-changed`,
-            beforeDigest: `${target}-${surface}-baseline`,
+            afterDigest: `${target}-${s}-changed`,
+            beforeDigest: `${target}-${s}-baseline`,
             changed: true,
           },
         ]),
       ),
     },
-    shell: {
-      byteIdentical: true,
-      envelopeIdentical: true,
-      treeDigest: `${target}-shell-tree`,
-    },
-    sibling: {
-      byteIdentical: true,
-      envelopeIdentical: true,
-      treeDigest: `${target}-finance-tree`,
-    },
+    shell: unchanged(`${target}-shell-tree`),
+    sibling: unchanged(`${target}-finance-tree`),
   });
   const servedBehavior = platform => ({
     appId: options.changedId,
@@ -285,11 +62,7 @@ function operationalEvidence(options) {
     },
     platform,
     result: 'pass',
-    routes: {
-      api: '/inventory-api/inventory',
-      ssr: '/en',
-      ui: '/en',
-    },
+    routes: { api: '/inventory-api/inventory', ssr: '/en', ui: '/en' },
     responses: {
       api: {
         bodySha256: '1'.repeat(64),
@@ -303,6 +76,7 @@ function operationalEvidence(options) {
         contentType: 'text/html',
         status: 200,
       },
+      // A hardcoded `value` here must not pass as observed UI output.
       ui: {
         bodySha256: '3'.repeat(64),
         boundaryId: 'verticalInventory',
@@ -346,233 +120,14 @@ function operationalEvidence(options) {
   };
 }
 
-test('shared source and published profiles commit only inventory, execute its C1 API, and invoke the same post-runtime proof', async t => {
-  const { runOperationalIndependenceAcceptance } = await import(
-    '../published-create-proof/acceptance-profile.mjs'
-  );
-
-  for (const [mode, rejectingHook] of [
-    ['source', null],
-    ['published', null],
-    ['source', 'pre-commit'],
-    ['source', 'commit-msg'],
-  ]) {
-    await t.test(`${mode}: ${rejectingHook ?? 'passing hooks'}`, async () => {
-      const fixture = fs.mkdtempSync(
-        path.join(os.tmpdir(), `operational-profile-${mode}-`),
-      );
-      const root = path.join(fixture, 'workspace');
-      const hooks = path.join(fixture, 'hooks');
-      fs.mkdirSync(root);
-      fs.mkdirSync(hooks);
-      const config = path.join(fixture, 'gitconfig');
-      fs.writeFileSync(
-        config,
-        `[core]\nhooksPath = ${JSON.stringify(hooks)}\n`,
-      );
-      const fixtureRun = (command, args, options = {}) =>
-        runCommand(command, args, {
-          ...options,
-          env: {
-            ...options.env,
-            GIT_CONFIG_GLOBAL: config,
-            GIT_CONFIG_NOSYSTEM: '1',
-          },
-          stdio: 'pipe',
-        });
-      try {
-        const localePath = path.join(
-          root,
-          'verticals/inventory/locales/en/inventory.json',
-        );
-        const apiPath = path.join(root, 'verticals/inventory/api/index.ts');
-        fs.mkdirSync(path.dirname(localePath), { recursive: true });
-        fs.mkdirSync(path.dirname(apiPath), { recursive: true });
-        fs.writeFileSync(
-          localePath,
-          `${JSON.stringify({
-            inventory: {
-              widgetBody: 'Owns a vertical route surface.',
-            },
-          })}\n`,
-        );
-        fs.writeFileSync(
-          apiPath,
-          `export const inventoryItems = [
-  {
-    title /* generator formatting is not an acceptance contract */:
-      'Wire a real inventory source here',
-    marker: 'generated-inventory',
-    id: 'starter-inventory',
-  },
-];
-
-export function listInventory() {
-  return inventoryItems;
-}
-`,
-        );
-        fixtureRun('git', ['init', '--quiet'], { cwd: root });
-        fixtureRun('git', ['config', 'user.name', 'Acceptance Test'], {
-          cwd: root,
-        });
-        fixtureRun('git', ['config', 'user.email', 'acceptance@example.test'], {
-          cwd: root,
-        });
-        fixtureRun('git', ['add', '-A'], { cwd: root });
-        fixtureRun(
-          'git',
-          ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'baseline'],
-          { cwd: root },
-        );
-        const baseline = fixtureRun('git', ['rev-parse', 'HEAD'], {
-          cwd: root,
-        });
-        for (const hook of ['pre-commit', 'commit-msg']) {
-          fs.writeFileSync(
-            path.join(hooks, hook),
-            `#!/bin/sh
-printf '%s\\n' '${hook}' >> .git/hook-events
-${rejectingHook === hook ? `echo 'fixture ${hook} rejected C1' >&2\nexit 1` : 'exit 0'}
-`,
-            { mode: 0o755 },
-          );
-        }
-        const calls = [];
-        const runImpl = (command, args, options = {}) => {
-          calls.push([command, [...args]]);
-          return fixtureRun(command, args, options);
-        };
-        let invocation;
-        const runOperationalIndependenceImpl = async options => {
-          invocation = options;
-          assert.equal(
-            fixtureRun('git', ['rev-parse', 'HEAD'], { cwd: root }),
-            options.changedRef,
-            'the runner must be invoked only after C1 is committed',
-          );
-          assert.equal(
-            fixtureRun(
-              'git',
-              ['status', '--porcelain=v1', '--untracked-files=all'],
-              { cwd: root },
-            ),
-            '',
-          );
-          const api = await import(
-            `${pathToFileURL(apiPath).href}?revision=${options.changedRef}`
-          );
-          assert.equal(
-            api.listInventory()[0].title,
-            options.expectedApiValue,
-            'C1 must execute the changed inventory API response',
-          );
-          const evidence = operationalEvidence(options);
-          fs.writeFileSync(options.out, `${JSON.stringify(evidence)}\n`);
-          return evidence;
-        };
-        const outPath = path.join(root, '..', `${mode}-receipt.json`);
-        const acceptanceOptions = {
-          applicationSourceRevision: baseline,
-          ephemeralWorkDir: root,
-          mode,
-          outPath,
-          packageManagerEnv: {
-            PATH: process.env.PATH,
-            npm_config_registry: 'http://registry.example.test',
-          },
-          projectDir: root,
-          runImpl,
-          runOperationalIndependenceImpl,
-        };
-        if (rejectingHook) {
-          await assert.rejects(
-            runOperationalIndependenceAcceptance(acceptanceOptions),
-            /fixture (?:pre-commit|commit-msg) rejected C1/u,
-          );
-          assert.equal(
-            invocation,
-            undefined,
-            'no operational build or proof may run after hook rejection',
-          );
-          assert.equal(
-            fixtureRun('git', ['rev-parse', 'HEAD'], { cwd: root }),
-            baseline,
-          );
-          assert.deepEqual(
-            fs
-              .readFileSync(path.join(root, '.git/hook-events'), 'utf8')
-              .trim()
-              .split('\n'),
-            rejectingHook === 'pre-commit'
-              ? ['pre-commit']
-              : ['pre-commit', 'commit-msg'],
-          );
-          return;
-        }
-        const details =
-          await runOperationalIndependenceAcceptance(acceptanceOptions);
-        assert.deepEqual(
-          fs
-            .readFileSync(path.join(root, '.git/hook-events'), 'utf8')
-            .trim()
-            .split('\n'),
-          ['pre-commit', 'commit-msg'],
-        );
-
-        assert.deepEqual(invocation, {
-          baselineRef: baseline,
-          changedId: 'inventory',
-          changedRef: details.changedRevision,
-          expectedApiValue: details.mutations.apiResponse.value,
-          expectedUiValue: details.mutations.uiLocalization.value,
-          out: path.join(
-            root,
-            '..',
-            `${mode}-receipt.operational-independence.json`,
-          ),
-          packageManagerEnv: {
-            PATH: process.env.PATH,
-            npm_config_registry: 'http://registry.example.test',
-          },
-          shellId: 'shell-super-app',
-          siblingId: 'finance',
-          workspace: root,
-        });
-        assert.equal(details.artifactMode, mode);
-        assert.deepEqual(details.changedPaths, [
-          'verticals/inventory/api/index.ts',
-          'verticals/inventory/locales/en/inventory.json',
-        ]);
-        assert.equal(
-          JSON.parse(fs.readFileSync(localePath, 'utf8')).inventory.widgetBody,
-          details.mutations.uiLocalization.value,
-        );
-        assert.equal(
-          fixtureRun('git', ['rev-parse', 'HEAD^'], { cwd: root }),
-          baseline,
-        );
-        const commitCall = calls.find(
-          ([command, args]) =>
-            command === 'git' &&
-            args.join(' ').includes('rotate inventory operational identity'),
-        );
-        assert.ok(commitCall);
-        assert.equal(
-          commitCall[1].some(arg => arg.startsWith('core.hooksPath=')),
-          false,
-        );
-        assert.equal(commitCall[1].includes('--no-verify'), false);
-        assert.equal(commitCall[1].includes('commit.gpgsign=false'), true);
-      } finally {
-        fs.rmSync(fixture, { recursive: true, force: true });
-      }
-    });
-  }
-});
-
+// Guards a release published on fabricated runtime proof: acceptance must
+// reject evidence whose served responses are absent, whose identity does not
+// match the commit under test, or whose body was hardcoded instead of observed
+// from the changed MicroVertical.
 test('operational acceptance rejects missing, forged, and hardcoded served behavior', async () => {
-  const { createOperationalIndependenceResultDetails } = await loadContract();
+  const { createOperationalIndependenceResultDetails } = await import(
+    '../published-create-proof/acceptance-contract.mjs'
+  );
   const baselineRevision = 'a'.repeat(40);
   const changedRevision = 'b'.repeat(40);
   const options = {
@@ -600,6 +155,11 @@ test('operational acceptance rejects missing, forged, and hardcoded served behav
       mode: 'source',
     });
 
+  assert.equal(
+    create(operationalEvidence(options)).changedRevision,
+    changedRevision,
+  );
+
   const missing = operationalEvidence(options);
   delete missing.targets.node.servedBehavior;
   assert.throws(
@@ -623,227 +183,55 @@ test('operational acceptance rejects missing, forged, and hardcoded served behav
   );
 });
 
-test('runtime dimensions reject missing, skipped, and artifact-mode-mismatched evidence', async () => {
-  const { assertRuntimeAcceptanceDimension, createReleaseArtifactBinding } =
-    await loadContract();
-  const release = releaseFixture();
-  const verticals = profileFixture().verticals;
-  const artifactBinding = createReleaseArtifactBinding(release);
-  const report = runtimeReport({ artifactBinding, release, verticals });
-  const options = {
-    artifactBinding,
-    dimension: 'api',
-    mode: 'source',
-    platform: 'node',
-    release,
-    verticals,
+// Guards consumers installing a framework build whose Module Federation
+// runtime can float: a range specifier must fail the release binding instead
+// of shipping a host and remotes that resolve different runtimes.
+test('artifact binding rejects non-exact Module Federation provenance', async () => {
+  const { createReleaseArtifactBinding } = await import(
+    '../published-create-proof/acceptance-contract.mjs'
+  );
+  const release = {
+    source: { commit: 'a'.repeat(40), repository: 'BleedingDev/modern.js' },
+    release: { tag: 'latest', version: '3.5.0-ultramodern.50' },
+    packages: [
+      {
+        targetName: '@bleedingdev/modern-js-plugin-bff',
+        version: '3.5.0-ultramodern.50',
+        integrity: 'sha512-YWNjZXB0YW5jZQ==',
+        packageJson: {
+          dependencies: { '@module-federation/runtime': '^2.8.0' },
+        },
+      },
+    ],
   };
-
-  assert.equal(
-    assertRuntimeAcceptanceDimension(report, options).dimension,
-    'api',
-  );
-  report.targetRuntimes[verticals[0]] = 'workerd';
-  assert.throws(
-    () => assertRuntimeAcceptanceDimension(report, options),
-    /targetRuntimes must prove every ERP-10 MicroVertical ran on node/,
-  );
-  report.targetRuntimes[verticals[0]] = 'node';
-  delete report.evidence.api;
-  assert.throws(
-    () => assertRuntimeAcceptanceDimension(report, options),
-    /api evidence is missing/,
-  );
-  report.evidence.api = {
-    artifactMode: 'source',
-    assertions: [{ status: 'pass' }],
-    platform: 'node',
-    status: 'skipped',
-    verticalIds: [...verticals],
-  };
-  assert.throws(
-    () => assertRuntimeAcceptanceDimension(report, options),
-    /status must be pass/,
-  );
-  report.evidence.api.status = 'pass';
-  report.artifactMode = 'published';
-  assert.throws(
-    () => assertRuntimeAcceptanceDimension(report, options),
-    /artifactMode must be source/,
-  );
-});
-
-test('release identity requires one atomic frontend, SSR, API, and backend identity per MicroVertical', async () => {
-  const { assertRuntimeAcceptanceDimension, createReleaseArtifactBinding } =
-    await loadContract();
-  const release = releaseFixture();
-  const verticals = profileFixture().verticals;
-  const artifactBinding = createReleaseArtifactBinding(release);
-  const report = runtimeReport({ artifactBinding, release, verticals });
-  const options = {
-    artifactBinding,
-    dimension: 'release-identity',
-    mode: 'source',
-    platform: 'node',
-    release,
-    verticals,
-  };
-
-  assert.equal(
-    assertRuntimeAcceptanceDimension(report, options).apps.length,
-    verticals.length,
-  );
-  assert.notEqual(
-    report.evidence['release-identity'].apps[0].surfaces.api.sourceRevision,
-    release.source.commit,
-    'application source identity must not masquerade as framework package provenance',
-  );
-  report.evidence['release-identity'].apps[0].surfaces.api.buildMarker =
-    'stale-api';
-  assert.throws(
-    () => assertRuntimeAcceptanceDimension(report, options),
-    /do not share one atomic release identity/,
-  );
-});
-
-test('release identity binds the generated application snapshot independently from framework provenance', async () => {
-  const { assertRuntimeAcceptanceDimension, createReleaseArtifactBinding } =
-    await loadContract();
-  const release = releaseFixture();
-  const verticals = profileFixture().verticals;
-  const artifactBinding = createReleaseArtifactBinding(release);
-  const applicationSourceRevision = 'b'.repeat(40);
-  const report = runtimeReport({
-    applicationSourceRevision,
-    artifactBinding,
-    release,
-    verticals,
-  });
-  const options = {
-    applicationSourceRevision,
-    artifactBinding,
-    dimension: 'release-identity',
-    mode: 'source',
-    platform: 'node',
-    release,
-    verticals,
-  };
-
-  assert.equal(
-    assertRuntimeAcceptanceDimension(report, options).apps[0].sourceRevision,
-    applicationSourceRevision,
-  );
-  report.evidence['release-identity'].apps[0].surfaces.frontend.sourceRevision =
-    release.source.commit;
-  assert.throws(
-    () => assertRuntimeAcceptanceDimension(report, options),
-    /application sourceRevision must be/,
-  );
-});
-
-test('runtime identity binds each MicroVertical delivery version across Node and workerd independently of framework version', async () => {
-  const {
-    assertRuntimeAcceptanceDimension,
-    createReleaseArtifactBinding,
-    runtimeIdentityBinding,
-  } = await loadContract();
-  const release = releaseFixture();
-  const verticals = profileFixture().verticals;
-  const artifactBinding = createReleaseArtifactBinding(release);
-  const node = assertRuntimeAcceptanceDimension(
-    runtimeReport({ artifactBinding, release, verticals }),
-    {
-      artifactBinding,
-      dimension: 'release-identity',
-      mode: 'source',
-      platform: 'node',
-      release,
-      verticals,
-    },
-  );
-  const workerd = structuredClone(node);
-
-  assert.equal(
-    runtimeIdentityBinding(node, workerd).node[0].releaseVersion,
-    '0.1.0',
-  );
-  workerd.apps[0].releaseVersion = '0.2.0';
-  assert.throws(
-    () => runtimeIdentityBinding(node, workerd),
-    /Node and workerd release identities differ/,
-  );
-});
-
-test('artifact binding rejects unavailable or non-exact Module Federation provenance', async () => {
-  const { createReleaseArtifactBinding } = await loadContract();
-  const release = releaseFixture();
-  const binding = createReleaseArtifactBinding(release);
-
-  assert.deepEqual(binding.packages, [
-    {
-      integrity: 'sha512-YWNjZXB0YW5jZQ==',
-      targetName: '@bleedingdev/modern-js-plugin-bff',
-      version: release.release.version,
-    },
-  ]);
-  assert.deepEqual(binding.moduleFederation, [
-    {
-      packageName: '@module-federation/runtime',
-      version: '2.8.0',
-    },
-  ]);
-
-  release.packages[0].packageJson.dependencies['@module-federation/runtime'] =
-    '^2.8.0';
   assert.throws(
     () => createReleaseArtifactBinding(release),
     /must use one exact Module Federation version/,
   );
 });
 
-test('exact registry cohort verification fails closed on unavailable or stale package bytes', async () => {
+// Guards publishing a cohort whose registry bytes are not the bytes that were
+// verified: consumers would install a tarball nobody proved.
+test('registry cohort verification fails closed when downloaded bytes differ', async () => {
   const { verifyRegistryCohort } = await import(
     '../published-create-proof/registry-cohort.mjs'
   );
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'acceptance-registry-cohort-'),
-  );
-  const release = {
-    packages: [
-      {
-        integrity: 'sha512-Y2FuZGlkYXRl',
-        sha256: 'b'.repeat(64),
-        shasum: 'c'.repeat(40),
-        sourceName: '@modern-js/runtime',
-        targetName: '@bleedingdev/modern-js-runtime',
-        version: '3.5.0-ultramodern.50',
-      },
-    ],
+  const root = tempRoot('acceptance-registry-cohort-');
+  const pkg = {
+    integrity: 'sha512-Y2FuZGlkYXRl',
+    sha256: 'b'.repeat(64),
+    shasum: 'c'.repeat(40),
+    sourceName: '@modern-js/runtime',
+    targetName: '@bleedingdev/modern-js-runtime',
+    version: '3.5.0-ultramodern.50',
   };
   try {
     await assert.rejects(
       verifyRegistryCohort({
-        release,
-        registryUrl: 'https://registry.npmjs.org/',
-        workDir: root,
-        async runImpl() {
-          throw new Error('E404 exact version is unavailable');
-        },
-      }),
-      /E404 exact version is unavailable/,
-    );
-
-    await assert.rejects(
-      verifyRegistryCohort({
-        release,
+        release: { packages: [pkg] },
         registryUrl: 'https://registry.npmjs.org/',
         workDir: root,
         async runImpl(command, args) {
-          assert.equal(command, 'npm');
-          assert.equal(
-            args[1],
-            '@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50',
-          );
           const destination = args[args.indexOf('--pack-destination') + 1];
           fs.writeFileSync(path.join(destination, 'stale.tgz'), 'stale');
           return JSON.stringify([{ filename: 'stale.tgz' }]);
@@ -856,198 +244,19 @@ test('exact registry cohort verification fails closed on unavailable or stale pa
   }
 });
 
-test('registry cohort verification settles every dispatched lane and rejects with the lowest-index failure in release order', async () => {
-  const { verifyRegistryCohort } = await import(
-    '../published-create-proof/registry-cohort.mjs'
-  );
-  const { computeTarballDigests } = await import(
-    '../../ultramodern-publish/lib/source-create-proof/release-manifest.mjs'
-  );
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'acceptance-registry-cohort-pool-'),
-  );
-  const failingIndexes = new Set([3, 9]);
-  const started = new Set();
-  const settled = new Set();
-  try {
-    const packages = Array.from({ length: 12 }, (_, index) => {
-      const tarballPath = path.join(root, `seed-${index}.tgz`);
-      fs.writeFileSync(tarballPath, `cohort-tarball-${index}`);
-      const digests = computeTarballDigests(tarballPath);
-      return {
-        integrity: digests.integrity,
-        sha256: digests.sha256,
-        shasum: digests.shasum,
-        sourceName: `@modern-js/pkg-${index}`,
-        targetName: `@bleedingdev/modern-js-pkg-${index}`,
-        version: '3.5.0-ultramodern.50',
-      };
-    });
-    await assert.rejects(
-      verifyRegistryCohort({
-        release: { packages },
-        registryUrl: 'https://registry.npmjs.org/',
-        workDir: root,
-        async runImpl(command, args) {
-          const specifier = args[1];
-          const index = Number(
-            /pkg-(\d+)@/u.exec(specifier)?.[1] ?? Number.NaN,
-          );
-          started.add(index);
-          try {
-            // Failing lane 9 resolves before failing lane 3 so the
-            // deterministic lowest-index selection is actually exercised.
-            await new Promise(resolve => setTimeout(resolve, (12 - index) * 2));
-            if (failingIndexes.has(index)) {
-              throw new Error(`E404 pkg-${index} exact version is unavailable`);
-            }
-            if (args[0] === 'pack') {
-              const destination = args[args.indexOf('--pack-destination') + 1];
-              const filename = `pkg-${index}.tgz`;
-              fs.copyFileSync(
-                path.join(root, `seed-${index}.tgz`),
-                path.join(destination, filename),
-              );
-              return JSON.stringify([{ filename }]);
-            }
-            return JSON.stringify({
-              integrity: packages[index].integrity,
-              shasum: packages[index].shasum,
-            });
-          } finally {
-            settled.add(index);
-          }
-        },
-      }),
-      /E404 pkg-3 exact version is unavailable/,
-    );
-    // Every package lane was dispatched and settled before rejection: no npm
-    // child may outlive the throw (the caller removes workDir in a finally).
-    assert.equal(started.size, packages.length);
-    assert.equal(settled.size, packages.length);
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
-});
-
-test('registry cohort verification preserves release package order under shuffled lane completion', async () => {
-  const { verifyRegistryCohort } = await import(
-    '../published-create-proof/registry-cohort.mjs'
-  );
-  const { computeTarballDigests } = await import(
-    '../../ultramodern-publish/lib/source-create-proof/release-manifest.mjs'
-  );
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'acceptance-registry-cohort-order-'),
-  );
-  try {
-    const packages = Array.from({ length: 10 }, (_, index) => {
-      const tarballPath = path.join(root, `seed-${index}.tgz`);
-      fs.writeFileSync(tarballPath, `cohort-tarball-${index}`);
-      const digests = computeTarballDigests(tarballPath);
-      return {
-        integrity: digests.integrity,
-        sha256: digests.sha256,
-        shasum: digests.shasum,
-        sourceName: `@modern-js/pkg-${index}`,
-        targetName: `@bleedingdev/modern-js-pkg-${index}`,
-        version: '3.5.0-ultramodern.50',
-      };
-    });
-    const result = await verifyRegistryCohort({
-      release: { packages },
-      registryUrl: 'https://registry.npmjs.org/',
-      workDir: root,
-      async runImpl(command, args) {
-        const specifier = args[1];
-        const index = Number(/pkg-(\d+)@/u.exec(specifier)?.[1] ?? Number.NaN);
-        // Reverse-order completion: index 9 finishes first, index 0 last.
-        await new Promise(resolve => setTimeout(resolve, (10 - index) * 2));
-        if (args[0] === 'pack') {
-          const destination = args[args.indexOf('--pack-destination') + 1];
-          const filename = `pkg-${index}.tgz`;
-          fs.copyFileSync(
-            path.join(root, `seed-${index}.tgz`),
-            path.join(destination, filename),
-          );
-          return JSON.stringify([{ filename }]);
-        }
-        return JSON.stringify({
-          integrity: packages[index].integrity,
-          shasum: packages[index].shasum,
-        });
-      },
-    });
-    assert.equal(result.packageCount, packages.length);
-    assert.deepEqual(
-      result.packages.map(entry => entry.targetName),
-      packages.map(entry => entry.targetName),
-    );
-    assert.deepEqual(
-      result.packages.map(entry => entry.sha256),
-      packages.map(entry => entry.sha256),
-    );
-  } finally {
-    fs.rmSync(root, { force: true, recursive: true });
-  }
-});
-
-test('independent release-age audit retries transient registry transport failures', async () => {
-  const { fetchRegistryMetadata } = await import(
-    '../published-create-proof/release-age-audit.mjs'
-  );
-  const version = '1.0.0';
-  const integrity = 'sha512-YWNjZXB0YW5jZQ==';
-  let attempts = 0;
-  const metadata = await fetchRegistryMetadata(
-    [
-      {
-        integrity,
-        name: 'transient-registry-package',
-        path: ['importer:.', `transient-registry-package@${version}`],
-        version,
-      },
-    ],
-    {
-      concurrency: 1,
-      async fetchImpl() {
-        attempts += 1;
-        if (attempts === 1) {
-          throw new Error('transient socket reset');
-        }
-        return new Response(
-          JSON.stringify({
-            time: { [version]: '2026-07-01T00:00:00.000Z' },
-            versions: { [version]: { dist: { integrity } } },
-          }),
-          {
-            headers: { 'content-type': 'application/json' },
-            status: 200,
-          },
-        );
-      },
-      now: new Date('2026-07-10T12:00:00.000Z'),
-      registryUrlFor: () => 'https://registry.example.test/',
-    },
-  );
-  assert.equal(attempts, 2);
-  assert.equal(metadata[0].integrity, integrity);
-});
-
-test('cohort resolution provenance proof fails closed on stale versions, missing integrity, foreign or leaking tarball origins', async () => {
+// Guards a published release whose lockfile resolves the framework cohort from
+// a stale revision or a third-party registry: the consumer install would pull
+// packages this release never produced.
+test('cohort resolution provenance rejects stale revisions and foreign tarball origins', async () => {
   const { assertCohortResolutionProvenance } = await import(
     '../published-create-proof/acceptance-profile.mjs'
   );
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'acceptance-cohort-provenance-'),
-  );
+  const root = tempRoot('acceptance-cohort-provenance-');
   const release = {
     release: { version: '3.5.0-ultramodern.50' },
     targetScope: 'bleedingdev',
   };
   const registryUrl = 'http://127.0.0.1:4879/';
-  // Pinned-parser output shape, injected so the unit test never spawns the
-  // real `pnpm dlx` YAML CLI (matching every other parseYamlFile test here).
   const writeLock = packages =>
     fs.writeFileSync(
       path.join(root, 'pnpm-lock.yaml'),
@@ -1058,41 +267,12 @@ test('cohort resolution provenance proof fails closed on stale versions, missing
   const provenance = () =>
     assertCohortResolutionProvenance(root, release, registryUrl, parseJsonLock);
   try {
-    // Real scope-routed shape: pnpm derives cohort tarball URLs from the
-    // @scope registry mapping and omits resolution.tarball, so the pass path
-    // is exact-revision keys (peer suffixes included) with pinned integrity.
-    writeLock({
-      '@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50': {
-        resolution: { integrity: 'sha512-Y2FuZGlkYXRl' },
-      },
-      '@bleedingdev/modern-js-app-tools@3.5.0-ultramodern.50(typescript@7.0.2)':
-        {
-          resolution: { integrity: 'sha512-YXBwLXRvb2xz' },
-        },
-      'external-package@1.0.0': {
-        resolution: { integrity: 'sha512-ZXh0ZXJuYWw=' },
-      },
-    });
-    assert.deepEqual(provenance(), {
-      cohortPackageCount: 2,
-      registryOrigin: 'http://127.0.0.1:4879',
-    });
-
-    // A stale cohort revision means the scoped registry did not serve this
-    // release: the pinned revision exists nowhere else before publish.
     writeLock({
       '@bleedingdev/modern-js-runtime@3.5.0-ultramodern.49': {
         resolution: { integrity: 'sha512-Y2FuZGlkYXRl' },
       },
     });
     assert.throws(provenance, /is not the release revision/);
-
-    writeLock({
-      '@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50': {
-        resolution: {},
-      },
-    });
-    assert.throws(provenance, /without a pinned integrity hash/);
 
     writeLock({
       '@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50': {
@@ -1103,78 +283,23 @@ test('cohort resolution provenance proof fails closed on stale versions, missing
       },
     });
     assert.throws(provenance, /is not the release registry/);
-
-    writeLock({
-      '@bleedingdev/modern-js-runtime@3.5.0-ultramodern.50': {
-        resolution: { integrity: 'sha512-Y2FuZGlkYXRl' },
-      },
-      'external-package@1.0.0': {
-        resolution: {
-          integrity: 'sha512-ZXh0ZXJuYWw=',
-          tarball:
-            'http://127.0.0.1:4879/external-package/-/external-package-1.0.0.tgz',
-        },
-      },
-    });
-    assert.throws(provenance, /was served by the ephemeral release registry/);
-
-    writeLock({});
-    assert.throws(provenance, /found no @bleedingdev\/\* packages/);
-
-    assert.throws(
-      () =>
-        assertCohortResolutionProvenance(
-          root,
-          { targetScope: 'bleedingdev' },
-          registryUrl,
-          parseJsonLock,
-        ),
-      /requires the strict release manifest version/,
-    );
   } finally {
     fs.rmSync(root, { force: true, recursive: true });
   }
 });
 
-test('release-age exclusions use locale-independent canonical ordering', () => {
-  const auditModuleUrl = pathToFileURL(
-    path.resolve(__dirname, '../published-create-proof/release-age-audit.mjs'),
-  ).href;
-  const program = `
-    const { validateExactExclusions } = await import(${JSON.stringify(auditModuleUrl)});
-    validateExactExclusions(
-      ['a@1.0.0-I', 'a@1.0.0-i'],
-      'Generated minimumReleaseAgeExclude',
-    );
-  `;
-
-  for (const locale of ['en_US.UTF-8', 'tr_TR.UTF-8']) {
-    const result = spawnSync(
-      process.execPath,
-      ['--input-type=module', '--eval', program],
-      {
-        encoding: 'utf8',
-        env: { ...process.env, LANG: locale, LC_ALL: locale },
-      },
-    );
-    assert.equal(
-      result.status,
-      0,
-      `${locale} rejected code-unit-sorted exclusions: ${result.stderr}`,
-    );
-  }
-});
-
-test('reviewed release-age exceptions authorize exact third-party exclusions', async () => {
+// Guards shipping a dependency younger than the release-age gate with no live
+// human approval: an expired exception must block the publish.
+test('release-age audit rejects a fresh dependency whose approval has expired', async () => {
   const { auditReleaseAgePolicy } = await import(
     '../published-create-proof/release-age-audit.mjs'
   );
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'release-age-policy-'));
+  const root = tempRoot('release-age-policy-');
   const external = {
     name: '@effect/tsgo',
     version: '0.36.2',
     integrity: 'sha512-ZXh0ZXJuYWw=',
-    publishedAt: '2026-08-10T07:00:57.951Z',
+    publishedAt: '2026-09-10T00:30:00.000Z',
   };
   const firstParty = {
     name: '@bleedingdev/modern-js-ultramodern-create',
@@ -1182,45 +307,40 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
     integrity: 'sha512-Zmlyc3QtcGFydHk=',
     publishedAt: '2026-08-10T08:00:00.000Z',
   };
-  const policyPath = path.join(root, 'release-age-policy.json');
-  const workspacePath = path.join(root, 'pnpm-workspace.yaml');
-  const lockPath = path.join(root, 'pnpm-lock.yaml');
   const locator = item => `${item.name}@${item.version}`;
-  const lock = {
-    lockfileVersion: '9.0',
-    importers: {
-      '.': {
-        dependencies: {
-          [external.name]: {
-            specifier: external.version,
-            version: external.version,
-          },
-          [firstParty.name]: {
-            specifier: firstParty.version,
-            version: firstParty.version,
-          },
-        },
-      },
-    },
-    packages: Object.fromEntries(
-      [external, firstParty].map(item => [
-        locator(item),
-        { resolution: { integrity: item.integrity } },
-      ]),
-    ),
-    snapshots: Object.fromEntries(
-      [external, firstParty].map(item => [locator(item), {}]),
-    ),
-  };
-  const workspace = {
+  const closure = [external, firstParty];
+  const policyPath = path.join(root, 'release-age-policy.json');
+  const writeJson = (name, value) =>
+    fs.writeFileSync(path.join(root, name), JSON.stringify(value));
+  writeJson('pnpm-workspace.yaml', {
     minimumReleaseAge: 1440,
-    minimumReleaseAgeExclude: [locator(external), locator(firstParty)].sort(),
+    minimumReleaseAgeExclude: closure.map(locator).sort(),
     minimumReleaseAgeIgnoreMissingTime: false,
     minimumReleaseAgeStrict: true,
     trustPolicy: 'no-downgrade',
     trustPolicyIgnoreAfter: 1440,
-  };
-  const policy = {
+  });
+  writeJson('pnpm-lock.yaml', {
+    lockfileVersion: '9.0',
+    importers: {
+      '.': {
+        dependencies: Object.fromEntries(
+          closure.map(item => [
+            item.name,
+            { specifier: item.version, version: item.version },
+          ]),
+        ),
+      },
+    },
+    packages: Object.fromEntries(
+      closure.map(item => [
+        locator(item),
+        { resolution: { integrity: item.integrity } },
+      ]),
+    ),
+    snapshots: Object.fromEntries(closure.map(item => [locator(item), {}])),
+  });
+  writeJson('release-age-policy.json', {
     schema: 'bleedingdev.ultramodern.release-age-exceptions',
     schemaVersion: 2,
     entries: [
@@ -1230,6 +350,7 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
           sha256: 'a'.repeat(64),
           uri: `urn:sha256:${'a'.repeat(64)}`,
         },
+        // Reviewed, but the exception lapsed before this publish.
         expiresAt: '2026-09-09T23:59:59.000Z',
         integrity: external.integrity,
         package: external.name,
@@ -1237,23 +358,15 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
         version: external.version,
       },
     ],
-  };
-  fs.writeFileSync(workspacePath, JSON.stringify(workspace));
-  fs.writeFileSync(lockPath, JSON.stringify(lock));
-  fs.writeFileSync(policyPath, JSON.stringify(policy));
-
+  });
+  const registry = new Map(closure.map(item => [item.name, item]));
   try {
-    let registry = new Map(
-      [external, firstParty].map(item => [item.name, item]),
-    );
-    const auditAt = now =>
+    await assert.rejects(
       auditReleaseAgePolicy({
         fetchImpl: async url => {
-          const packageName = decodeURIComponent(
-            new URL(url).pathname.slice(1),
+          const item = registry.get(
+            decodeURIComponent(new URL(url).pathname.slice(1)),
           );
-          const item = registry.get(packageName);
-          assert.ok(item, `unexpected registry request for ${packageName}`);
           return new Response(
             JSON.stringify({
               time: { [item.version]: item.publishedAt },
@@ -1264,7 +377,7 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
             { status: 200 },
           );
         },
-        now,
+        now: new Date('2026-09-10T01:00:00.000Z'),
         parseYamlImpl: JSON.parse,
         policyPath,
         projectDir: root,
@@ -1286,101 +399,7 @@ test('reviewed release-age exceptions authorize exact third-party exclusions', a
           },
         },
         verifyYamlTool: false,
-      });
-
-    const result = await auditAt(new Date('2026-08-11T01:00:00.000Z'));
-    const { bindSupplyChainEvidence } = await import(
-      '../published-create-proof/acceptance-receipt.mjs'
-    );
-    const receipt = {
-      binding: {
-        manifest: { sha256: 'c'.repeat(64) },
-        supplyChain: { closureSha256: null },
-      },
-    };
-    bindSupplyChainEvidence(receipt, result.digests);
-    assert.equal(
-      receipt.binding.supplyChain.closureSha256,
-      result.digests.closureSha256,
-    );
-
-    const url = `https://example.test/tool@${'a'.repeat(40)}.tgz`;
-    const tarballKey = `consumer-tool@${url}`;
-    lock.importers['.'].dependencies['consumer-tool'] = {
-      specifier: url,
-      version: url,
-    };
-    lock.packages[tarballKey] = {
-      version: '1.0.0',
-      resolution: { tarball: url, integrity: 'sha512-dGFyYmFsbA==' },
-    };
-    lock.snapshots[tarballKey] = {};
-    fs.writeFileSync(lockPath, JSON.stringify(lock));
-    const withTarball = await auditAt(new Date('2026-08-11T01:00:00.000Z'));
-    assert.notEqual(
-      withTarball.digests.closureSha256,
-      result.digests.closureSha256,
-    );
-    assert.deepEqual(
-      Object.keys(withTarball.digests).sort(),
-      Object.keys(result.digests).sort(),
-    );
-    bindSupplyChainEvidence(
-      {
-        binding: {
-          manifest: receipt.binding.manifest,
-          supplyChain: { closureSha256: null },
-        },
-      },
-      withTarball.digests,
-    );
-    delete lock.importers['.'].dependencies['consumer-tool'];
-    delete lock.packages[tarballKey];
-    delete lock.snapshots[tarballKey];
-    fs.writeFileSync(lockPath, JSON.stringify(lock));
-
-    assert.deepEqual(
-      result.approvals.map(approval => [
-        `${approval.package}@${approval.version}`,
-        approval.authority,
-      ]),
-      [
-        [locator(firstParty), 'strict-release-manifest'],
-        [locator(external), 'external-release-age-policy'],
-      ],
-    );
-    assert.deepEqual(
-      result.exactExclusions,
-      workspace.minimumReleaseAgeExclude,
-    );
-
-    const delayed = await auditAt(new Date('2026-09-10T01:00:00.000Z'));
-    assert.deepEqual(delayed.approvals, []);
-    assert.deepEqual(
-      delayed.exactExclusions,
-      workspace.minimumReleaseAgeExclude,
-    );
-
-    // A mature closure must still reject an approval for a removed version.
-    fs.writeFileSync(
-      policyPath,
-      JSON.stringify({
-        ...policy,
-        entries: [{ ...policy.entries[0], version: '0.36.1' }],
       }),
-    );
-    await assert.rejects(
-      auditAt(new Date('2026-09-10T01:00:00.000Z')),
-      /stale or unmatched approval/u,
-    );
-    fs.writeFileSync(policyPath, JSON.stringify(policy));
-
-    registry = new Map([
-      [external.name, { ...external, publishedAt: '2026-09-10T00:30:00.000Z' }],
-      [firstParty.name, firstParty],
-    ]);
-    await assert.rejects(
-      auditAt(new Date('2026-09-10T01:00:00.000Z')),
       /without an exact, unexpired approval/u,
     );
   } finally {

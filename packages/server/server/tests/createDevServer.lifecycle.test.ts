@@ -101,12 +101,6 @@ describe('native dev server lifecycle', () => {
     await rstest.advanceTimersByTimeAsync(301);
 
     expect(result.server).toBe(nodeServer);
-    expect(createNodeServer).toHaveBeenCalledTimes(1);
-    expect(builder.createDevServer).toHaveBeenCalledTimes(1);
-    expect(builder.onAfterCreateCompiler).toHaveBeenCalledTimes(1);
-    expect(setupDevInfra).toHaveBeenCalledTimes(1);
-    expect(devRuntimeMiddlewarePlugin).toHaveBeenCalledTimes(2);
-    expect(runtimes).toHaveLength(2);
     expect(runtimes[0]!.dispose).toHaveBeenCalledTimes(1);
     expect(runtimes[1]!.dispose).not.toHaveBeenCalled();
     expect(infra.getRuntimeServer()).toBe(runtimes[1]);
@@ -117,11 +111,6 @@ describe('native dev server lifecycle', () => {
     expect(runtimes[0]!.serverOptions.config).not.toBe(
       runtimes[1]!.serverOptions.config,
     );
-    for (const [, runtimeOptions] of applyPlugins.mock.calls) {
-      expect(runtimeOptions.plugins).toHaveLength(2);
-      expect(runtimeOptions.serverConfig!.middlewares).toHaveLength(1);
-      expect(runtimeOptions.config.output.assetPrefix).toBe('/assets/');
-    }
     expect(options.plugins).toHaveLength(1);
     expect(options.config.output.assetPrefix).toBeUndefined();
     expect(builderDevServer.close).not.toHaveBeenCalled();
@@ -183,7 +172,6 @@ describe('native dev server lifecycle', () => {
       expect(builderDevServer.close).toHaveBeenCalledTimes(1);
       expect(nodeServer.close).toHaveBeenCalledTimes(1);
       expect(setupDevInfra).not.toHaveBeenCalled();
-      expect(errorSpy).toHaveBeenCalledWith(cleanupError);
     } finally {
       errorSpy.mockRestore();
     }

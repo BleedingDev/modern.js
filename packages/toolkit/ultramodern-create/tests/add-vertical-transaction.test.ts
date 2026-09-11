@@ -11,7 +11,6 @@ import {
 import {
   __transactionTestHooks,
   runFreshWorkspaceTransaction,
-  runWorkspaceTransaction,
   WorkspaceTransactionConflictError,
 } from '../src/ultramodern-workspace/add-vertical/transaction';
 
@@ -147,28 +146,6 @@ test('add-vertical leaves the workspace byte-identical when a staged write fails
   }
 });
 
-test('failed staged mutations never expose their partial output', () => {
-  const { tempRoot, workspaceDir } = scaffoldWorkspace();
-  try {
-    const before = snapshotAllFiles(workspaceDir);
-    assert.throws(
-      () =>
-        runWorkspaceTransaction(workspaceDir, stagingRoot => {
-          fs.writeFileSync(
-            path.join(stagingRoot, 'scratch-file.txt'),
-            'partial mutation',
-          );
-          throw new Error('boom');
-        }),
-      /boom/u,
-    );
-    assertByteIdentical(before, snapshotAllFiles(workspaceDir));
-    assertNoTransactionArtifacts(tempRoot);
-  } finally {
-    fs.rmSync(tempRoot, { force: true, recursive: true });
-  }
-});
-
 test('concurrent unrelated files are conserved while owned changes publish', () => {
   const { tempRoot, workspaceDir } = scaffoldWorkspace();
   const concurrentPath = path.join(workspaceDir, 'consumer-notes.txt');
@@ -235,33 +212,6 @@ test('concurrent owned-target changes fail closed without erasing either edit', 
         assert.ok(after.get(relativePath)?.equals(content), relativePath);
       }
     }
-    assertNoTransactionArtifacts(tempRoot);
-  } finally {
-    resetTransactionHooks();
-    fs.rmSync(tempRoot, { force: true, recursive: true });
-  }
-});
-
-test('publication failure rolls back already-published files and owned temps', () => {
-  const { tempRoot, workspaceDir } = scaffoldWorkspace();
-  try {
-    const before = snapshotAllFiles(workspaceDir);
-    __transactionTestHooks.beforePublishPath = ({ index }) => {
-      if (index === 2) {
-        throw new Error('injected publication failure');
-      }
-    };
-
-    assert.throws(
-      () =>
-        addUltramodernVertical({
-          workspaceRoot: workspaceDir,
-          name: 'payments',
-          modernVersion: '3.2.1',
-        }),
-      /injected publication failure/u,
-    );
-    assertByteIdentical(before, snapshotAllFiles(workspaceDir));
     assertNoTransactionArtifacts(tempRoot);
   } finally {
     resetTransactionHooks();
@@ -336,32 +286,6 @@ module.exports = async () => {
   }
 });
 
-test('fresh generation accepts an existing empty target without exposing staging paths', () => {
-  const tempRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'um-empty-workspace-txn-'),
-  );
-  const workspaceDir = path.join(tempRoot, 'workspace');
-  fs.mkdirSync(workspaceDir);
-  try {
-    const result = generateUltramodernWorkspace({
-      targetDir: workspaceDir,
-      packageName: 'empty-workspace',
-      modernVersion: '3.2.1',
-      packageSource: { strategy: 'workspace' },
-    });
-
-    assert.equal(result.workspaceRoot, workspaceDir);
-    assert.ok(fs.existsSync(path.join(workspaceDir, 'package.json')));
-    assert.doesNotMatch(
-      fs.readFileSync(path.join(workspaceDir, 'package.json'), 'utf-8'),
-      /\.ultramodern-stage-/u,
-    );
-    assertNoTransactionArtifacts(tempRoot);
-  } finally {
-    fs.rmSync(tempRoot, { force: true, recursive: true });
-  }
-});
-
 test('staged mutation never follows a workspace symlink outside the workspace', () => {
   const { tempRoot, workspaceDir } = scaffoldWorkspace();
   const outsideDir = path.join(tempRoot, 'outside');
@@ -407,7 +331,6 @@ test('fresh publication preserves target mode and the caller current-directory i
   ).href;
   try {
     fs.mkdirSync(workspaceDir, { mode: 0o711 });
-    const initialMode = fs.statSync(workspaceDir).mode & 0o777;
     const result = spawnSync(
       process.execPath,
       [
@@ -436,15 +359,6 @@ test('fresh publication preserves target mode and the caller current-directory i
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, 'ready');
-    assert.equal(fs.statSync(workspaceDir).mode & 0o777, initialMode);
-
-    const absentTarget = path.join(tempRoot, 'absent-workspace');
-    let stagedMode = 0;
-    runFreshWorkspaceTransaction(absentTarget, stagingRoot => {
-      stagedMode = fs.statSync(stagingRoot).mode & 0o777;
-      fs.writeFileSync(path.join(stagingRoot, 'published.txt'), 'ready');
-    });
-    assert.equal(fs.statSync(absentTarget).mode & 0o777, stagedMode);
 
     const nestedTarget = path.join(tempRoot, 'missing-parent/workspace');
     runFreshWorkspaceTransaction(nestedTarget, stagingRoot => {

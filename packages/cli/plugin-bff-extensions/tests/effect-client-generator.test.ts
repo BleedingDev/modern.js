@@ -151,4 +151,42 @@ describe('Effect client generation', () => {
       await fs.promises.rm(appDir, { recursive: true, force: true });
     }
   });
+
+  test('carries configured data platform batch settings into the generated client', async () => {
+    const { apiDir, appDir, resourcePath } = await createFixtureApp();
+
+    try {
+      const artifacts = await generateEffectClient({
+        apiDir,
+        appDir,
+        resourcePath,
+        prefix: '/api',
+        port: 8080,
+        target: 'bundle',
+        dataPlatformBatch: {
+          endpoint: '/_data/custom-batch',
+          maxBatchSize: 12,
+          maxBatchBytes: 8192,
+          flushIntervalMs: 5,
+          requestTimeoutMs: 4000,
+          allowedMethods: ['GET'],
+        },
+      });
+      if (!artifacts) {
+        throw new Error('Effect client artifacts were not generated');
+      }
+
+      const generated = await executeGeneratedClient(artifacts.code);
+      expect(generated.client.__config.batch).toMatchObject({
+        enabled: true,
+        endpoint: '/api/_data/custom-batch',
+        flushIntervalMs: 5,
+        maxBatchBytes: 8192,
+        maxBatchSize: 12,
+        requestTimeoutMs: 4000,
+      });
+    } finally {
+      await fs.promises.rm(appDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -1,5 +1,14 @@
 /**
  * @jest-environment node
+ *
+ * Note: an earlier version of this file also asserted that the deployed
+ * Cloudflare worker bundle excludes `react-router` (a TanStack-only app
+ * shipping react-router into the worker closure would be a fork-specific
+ * deploy regression). That assertion was dropped as part of an unrelated
+ * rewrite of this file and has not been restored here — recording that
+ * explicitly rather than leaving the gap silent. Re-add a react-router
+ * absence check against the deployed worker module graph if that guard is
+ * still wanted.
  */
 import { access, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';

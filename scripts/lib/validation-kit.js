@@ -11,7 +11,7 @@ const { readJsonFile } = require('./fs-kit');
 
 /**
  * Placeholder tokens rejected by gate validators. Union of the historical
- * mv-ci-hardening and release-gates lists.
+ * gate-validator lists.
  */
 const PLACEHOLDER_VALUES = new Set([
   'tbd',

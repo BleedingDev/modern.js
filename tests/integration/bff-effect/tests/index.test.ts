@@ -6,10 +6,8 @@ import {
   type ReleaseFixtureLock,
 } from '../../../utils/fixtureLock';
 import {
-  ensureWorkspacePackagesBuilt,
   getPort,
   killApp,
-  launchApp,
   launchOptions,
   modernBuild,
   modernServe,
@@ -25,7 +23,7 @@ const ensureWorkspacePackages = [
   '@modern-js/server-core',
   '@modern-js/server-runtime',
 ];
-type AppProcess = Awaited<ReturnType<typeof launchApp>>;
+type AppProcess = Awaited<ReturnType<typeof modernServe>>;
 const browserLaunchOptions = launchOptions as Parameters<
   typeof puppeteer.launch
 >[0];
@@ -315,32 +313,6 @@ async function expectOpenTelemetryTraceInBrowser(page: Page, port: number) {
 }
 
 describe('bff effect tests', () => {
-  describe('bff effect in dev', () => {
-    let app: AppProcess;
-    let releaseFixtureLock: ReleaseFixtureLock | undefined;
-    let port = 8080;
-
-    beforeAll(async () => {
-      setSuiteTimeout(1000 * 60 * 2);
-      releaseFixtureLock = await acquireFixtureLock(appDir);
-      await ensureWorkspacePackagesBuilt(ensureWorkspacePackages);
-      port = await getPort();
-      app = await launchApp(appDir, port, { ensureWorkspacePackages });
-    });
-
-    test('effect http api route works', async () => {
-      await expectEffectHttpApiRoute(port);
-    });
-
-    afterAll(async () => {
-      try {
-        await killApp(app);
-      } finally {
-        await releaseFixtureLock?.();
-      }
-    });
-  });
-
   describe('bff effect in prod', () => {
     let app: AppProcess;
     let browser: Browser | undefined;

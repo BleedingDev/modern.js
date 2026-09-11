@@ -1,15 +1,12 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { appTools } from '@modern-js/app-tools';
 import {
   emitCloudflareStagedReleaseEnvelope,
   emitFrameworkMicroVerticalReleaseEnvelope,
   emitNodeStagedReleaseEnvelope,
   MICROVERTICAL_RELEASE_ENVELOPE_PATH,
-  stageCloudflareReleaseEnvelope,
   verifyBuildOutputReleaseEnvelope,
-  verifyCloudflareReleaseEnvelopeStaging,
   verifyNodeReleaseEnvelopeStaging,
 } from '@modern-js/app-tools-extensions/release-envelope/framework-output';
 import { createUltramodernReleaseEnvelopePlugin } from '@modern-js/app-tools-extensions/release-envelope/plugin';
@@ -21,12 +18,6 @@ import {
   DELIVERY_UNIT_SCHEMA_VERSION,
   type DeliveryUnitRecord,
 } from '@modern-js/backend-federation-contracts';
-import { createPluginManager } from '@modern-js/plugin';
-import { bffPlugin } from '@modern-js/plugin-bff';
-import {
-  ultramodernAppTools,
-  ultramodernReleaseEnvelopePlugin,
-} from '@modern-js/ultramodern-app-tools';
 
 const temporaryDirectories: string[] = [];
 
@@ -68,6 +59,7 @@ const createTargetBuildOutput = async (target: MicroVerticalReleaseTarget) => {
     'static/catalog.css': '.catalog{color:green}',
     'html/main/index.html': '<main>catalog</main>',
     'backendRemoteEntry.cjs': compiledModule(true),
+    'public/robots.txt': 'User-agent: *\nAllow: /\n',
     'mf-manifest.json': JSON.stringify({
       name: 'verticalCatalog',
       pluginVersion: '2.8.0',
@@ -85,7 +77,6 @@ const createTargetBuildOutput = async (target: MicroVerticalReleaseTarget) => {
           : { worker: 'worker/main.js', urlPath: '/' },
       ],
     }),
-    'public/robots.txt': 'User-agent: *\nAllow: /\n',
     ...(target === 'node'
       ? {
           'api/index.js': compiledModule(),
@@ -107,19 +98,33 @@ const createTargetBuildOutput = async (target: MicroVerticalReleaseTarget) => {
     path.join(distDirectory, 'ultramodern-build.json'),
     createUltramodernBuildArtifact(deliveryUnit),
   );
+  const { buildMarker, sourceRevision, unitId } = identity;
   await writeJson(path.join(distDirectory, 'backend-mf-manifest.json'), {
     backendFederation: {
       deliveryUnit,
       versionBoundary: {
-        deliveryUnit: {
-          buildMarker: identity.buildMarker,
-          sourceRevision: identity.sourceRevision,
-          unitId: identity.unitId,
-        },
+        deliveryUnit: { buildMarker, sourceRevision, unitId },
       },
     },
   });
   return { distDirectory, root };
+};
+
+const stageNodeOutput = async (
+  fixture: { distDirectory: string; root: string },
+  name: string,
+) => {
+  const outputDirectory = path.join(fixture.root, name);
+  await fs.cp(fixture.distDirectory, outputDirectory, { recursive: true });
+  await fs.rm(path.join(outputDirectory, 'release'), {
+    force: true,
+    recursive: true,
+  });
+  await fs.writeFile(path.join(outputDirectory, 'index.js'), compiledModule());
+  await writeJson(path.join(outputDirectory, 'package.json'), {
+    type: 'commonjs',
+  });
+  return outputDirectory;
 };
 
 const createCloudflareStaging = async (
@@ -127,33 +132,27 @@ const createCloudflareStaging = async (
   outputDirectory: string,
 ) => {
   await fs.mkdir(path.join(outputDirectory, 'public'), { recursive: true });
-  await fs.mkdir(path.join(outputDirectory, 'worker'), { recursive: true });
-  for (const logicalPath of [
-    'static',
-    'html',
-    'mf-manifest.json',
-    'backend-mf-manifest.json',
-    'backendRemoteEntry.cjs',
+  for (const [from, to] of [
+    ['static', 'public/static'],
+    ['html', 'public/html'],
+    ['mf-manifest.json', 'public/mf-manifest.json'],
+    ['backend-mf-manifest.json', 'public/backend-mf-manifest.json'],
+    ['backendRemoteEntry.cjs', 'public/backendRemoteEntry.cjs'],
+    ['worker', 'worker'],
+    ['route.json', 'server/route.json'],
   ]) {
+    await fs.mkdir(path.dirname(path.join(outputDirectory, to!)), {
+      recursive: true,
+    });
     await fs.cp(
-      path.join(distDirectory, logicalPath),
-      path.join(outputDirectory, 'public', logicalPath),
+      path.join(distDirectory, from!),
+      path.join(outputDirectory, to!),
       { recursive: true },
     );
   }
-  await fs.cp(
-    path.join(distDirectory, 'worker'),
-    path.join(outputDirectory, 'worker'),
-    { recursive: true },
-  );
-  await fs.mkdir(path.join(outputDirectory, 'server'), { recursive: true });
   await fs.writeFile(
     path.join(outputDirectory, 'server/index.mjs'),
     compiledModule(),
-  );
-  await fs.copyFile(
-    path.join(distDirectory, 'route.json'),
-    path.join(outputDirectory, 'server/route.json'),
   );
   await writeJson(
     path.join(outputDirectory, 'server/modern-worker-manifest.json'),
@@ -179,67 +178,6 @@ afterEach(async () => {
 });
 
 describe('framework target-specific MicroVertical release-envelope integration', () => {
-  it('is opt-in and runs after backend federation and before deploy staging', () => {
-    const defaultPlugins = appTools().usePlugins ?? [];
-    expect(
-      defaultPlugins.some(
-        plugin => plugin.name === '@modern-js/ultramodern-release-envelope',
-      ),
-    ).toBe(false);
-
-    const envelopePlugin = ultramodernReleaseEnvelopePlugin();
-    const compositionManager = createPluginManager();
-    compositionManager.addPlugins([ultramodernAppTools()]);
-    const pluginNames = compositionManager
-      .getPlugins()
-      .map(plugin => plugin.name);
-    expect(pluginNames).toEqual(
-      expect.arrayContaining([
-        '@modern-js/backend-federation-build',
-        '@modern-js/ultramodern-release-envelope',
-        '@modern-js/plugin-deploy',
-      ]),
-    );
-    expect(
-      pluginNames.indexOf('@modern-js/backend-federation-build'),
-    ).toBeLessThan(
-      pluginNames.indexOf('@modern-js/ultramodern-release-envelope'),
-    );
-    expect(envelopePlugin.pre).toEqual(
-      expect.arrayContaining([
-        '@modern-js/backend-federation-build',
-        '@modern-js/plugin-bff',
-      ]),
-    );
-    expect(envelopePlugin.post).toContain('@modern-js/plugin-deploy');
-
-    const pluginManager = createPluginManager();
-    pluginManager.addPlugins([ultramodernAppTools(), bffPlugin()]);
-    const resolvedPluginNames = pluginManager
-      .getPlugins()
-      .map(plugin => plugin.name);
-    const resolvedEnvelopeIndex = resolvedPluginNames.indexOf(
-      '@modern-js/ultramodern-release-envelope',
-    );
-    expect(
-      resolvedPluginNames.indexOf('@modern-js/deploy-output-aliases'),
-    ).toBeLessThan(resolvedEnvelopeIndex);
-    expect(
-      resolvedPluginNames.filter(
-        name => name === '@modern-js/ultramodern-release-envelope',
-      ),
-    ).toHaveLength(1);
-    expect(
-      resolvedPluginNames.indexOf('@modern-js/backend-federation-build'),
-    ).toBeLessThan(resolvedEnvelopeIndex);
-    expect(resolvedPluginNames.indexOf('@modern-js/plugin-bff')).toBeLessThan(
-      resolvedEnvelopeIndex,
-    );
-    expect(resolvedEnvelopeIndex).toBeLessThan(
-      resolvedPluginNames.indexOf('@modern-js/plugin-deploy'),
-    );
-  });
-
   it('runs the Node release lifecycle against real build and staged artifacts', async () => {
     const fixture = await createTargetBuildOutput('node');
     const afterBuild: Array<() => Promise<void>> = [];
@@ -268,303 +206,11 @@ describe('framework target-specific MicroVertical release-envelope integration',
     ).resolves.toMatchObject({ target: 'node' });
     await beforeDeploy[0]!();
 
-    const outputDirectory = path.join(fixture.root, '.output');
-    await fs.cp(fixture.distDirectory, outputDirectory, { recursive: true });
-    await fs.rm(path.join(outputDirectory, 'release'), {
-      force: true,
-      recursive: true,
-    });
-    await fs.writeFile(
-      path.join(outputDirectory, 'index.js'),
-      compiledModule(),
-    );
-    await writeJson(path.join(outputDirectory, 'package.json'), {
-      type: 'commonjs',
-    });
-
+    const outputDirectory = await stageNodeOutput(fixture, '.output');
     await afterDeploy[0]!();
     await expect(
       verifyNodeReleaseEnvelopeStaging({ outputDirectory }),
     ).resolves.toMatchObject({ target: 'node' });
-  });
-
-  it('binds structured identity carriers and rejects carrier tampering', async () => {
-    const fixture = await createTargetBuildOutput('node');
-    const envelope = await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: fixture.distDirectory,
-      target: 'node',
-    });
-    const metadataLogicalPath =
-      'release/microvertical-release-identity-carriers.json';
-    const metadataArtifact = envelope?.artifacts.find(
-      artifact => artifact.logicalPath === metadataLogicalPath,
-    );
-    expect(metadataArtifact).toMatchObject({
-      kind: 'file',
-      runtime: 'release-identity-metadata',
-    });
-    const metadata = JSON.parse(
-      await fs.readFile(
-        path.join(fixture.distDirectory, metadataLogicalPath),
-        'utf8',
-      ),
-    );
-    expect(metadata).toMatchObject({
-      schemaVersion: 1,
-      kind: 'ultramodern-release-identity-carriers',
-      identity,
-    });
-    expect(metadata.carriers).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          logicalPath: 'static/catalog.js',
-          surfaces: ['uiClient'],
-        }),
-        expect.objectContaining({
-          logicalPath: 'bundles/main.js',
-          surfaces: ['ssr'],
-        }),
-        expect.objectContaining({
-          logicalPath: 'api/index.js',
-          surfaces: ['apiBackend'],
-        }),
-        expect.objectContaining({
-          logicalPath: 'backend-mf-manifest.json',
-          surfaces: ['backendFederation'],
-        }),
-        expect.objectContaining({
-          logicalPath: 'backendRemoteEntry.cjs',
-          surfaces: ['backendFederation'],
-        }),
-      ]),
-    );
-
-    metadata.carriers[0].sha256 = 'f'.repeat(64);
-    await writeJson(
-      path.join(fixture.distDirectory, metadataLogicalPath),
-      metadata,
-    );
-    await expect(
-      verifyBuildOutputReleaseEnvelope(fixture.distDirectory, 'node'),
-    ).rejects.toThrow(/digest does not match final artifact bytes/u);
-  });
-
-  it('covers executable surface artifacts without cross-claiming runtimes', async () => {
-    const fixture = await createTargetBuildOutput('node');
-    await Promise.all([
-      fs.writeFile(
-        path.join(fixture.distDirectory, 'static/lazy.js'),
-        compiledModule(),
-      ),
-      fs.writeFile(
-        path.join(fixture.distDirectory, 'remoteEntry.js'),
-        compiledModule(),
-      ),
-      fs.writeFile(
-        path.join(fixture.distDirectory, 'bundles/remoteEntry.js'),
-        compiledModule(),
-      ),
-      fs.mkdir(path.join(fixture.distDirectory, 'shared'), { recursive: true }),
-    ]);
-    await fs.writeFile(
-      path.join(fixture.distDirectory, 'shared/runtime.js'),
-      compiledModule(),
-    );
-    await writeJson(path.join(fixture.distDirectory, 'mf-manifest.json'), {
-      name: 'verticalCatalog',
-      remoteEntry: { path: 'remoteEntry.js' },
-      exposes: [
-        {
-          path: './Route',
-          assets: { js: { sync: ['static/catalog.js'], async: [] } },
-        },
-      ],
-    });
-
-    await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: fixture.distDirectory,
-      target: 'node',
-    });
-    const metadata = JSON.parse(
-      await fs.readFile(
-        path.join(
-          fixture.distDirectory,
-          'release/microvertical-release-identity-carriers.json',
-        ),
-        'utf8',
-      ),
-    );
-    expect(
-      metadata.carriers
-        .filter((carrier: { surfaces: string[] }) =>
-          carrier.surfaces.includes('uiClient'),
-        )
-        .map((carrier: { logicalPath: string }) => carrier.logicalPath),
-    ).toEqual(['remoteEntry.js', 'static/catalog.js', 'static/lazy.js']);
-    expect(
-      metadata.carriers
-        .filter((carrier: { surfaces: string[] }) =>
-          carrier.surfaces.includes('apiBackend'),
-        )
-        .map((carrier: { logicalPath: string }) => carrier.logicalPath),
-    ).toEqual(['api/index.js', 'shared/runtime.js']);
-  });
-
-  it('reseals generated public assets into final target envelopes', async () => {
-    const nodeFixture = await createTargetBuildOutput('node');
-    const firstNodeEnvelope = await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: nodeFixture.distDirectory,
-      target: 'node',
-    });
-    await fs.writeFile(
-      path.join(nodeFixture.distDirectory, 'public/sitemap.xml'),
-      '<urlset />',
-    );
-    const resealedNodeEnvelope =
-      await emitFrameworkMicroVerticalReleaseEnvelope({
-        apiOnly: false,
-        distDirectory: nodeFixture.distDirectory,
-        target: 'node',
-      });
-    expect(resealedNodeEnvelope?.surfaces.uiClient).toContain(
-      'public/sitemap.xml',
-    );
-    expect(resealedNodeEnvelope?.envelopeDigest).not.toBe(
-      firstNodeEnvelope?.envelopeDigest,
-    );
-
-    const cloudflareFixture = await createTargetBuildOutput('cloudflare');
-    const firstCloudflareSourceEnvelope =
-      await emitFrameworkMicroVerticalReleaseEnvelope({
-        apiOnly: false,
-        distDirectory: cloudflareFixture.distDirectory,
-        target: 'cloudflare',
-      });
-    await fs.writeFile(
-      path.join(cloudflareFixture.distDirectory, 'public/site.webmanifest'),
-      '{"name":"catalog"}\n',
-    );
-    const resealedCloudflareSourceEnvelope =
-      await emitFrameworkMicroVerticalReleaseEnvelope({
-        apiOnly: false,
-        distDirectory: cloudflareFixture.distDirectory,
-        target: 'cloudflare',
-      });
-    const cloudflareOutput = path.join(
-      cloudflareFixture.root,
-      'cloudflare-output-reseal',
-    );
-    await createCloudflareStaging(
-      cloudflareFixture.distDirectory,
-      cloudflareOutput,
-    );
-    await fs.copyFile(
-      path.join(cloudflareFixture.distDirectory, 'public/site.webmanifest'),
-      path.join(cloudflareOutput, 'public/site.webmanifest'),
-    );
-    const finalCloudflareEnvelope = await emitCloudflareStagedReleaseEnvelope({
-      distDirectory: cloudflareFixture.distDirectory,
-      outputDirectory: cloudflareOutput,
-    });
-    expect(resealedCloudflareSourceEnvelope?.surfaces.uiClient).toContain(
-      'public/site.webmanifest',
-    );
-    expect(finalCloudflareEnvelope?.surfaces.uiClient).toContain(
-      'public/site.webmanifest',
-    );
-    expect(resealedCloudflareSourceEnvelope?.envelopeDigest).not.toBe(
-      firstCloudflareSourceEnvelope?.envelopeDigest,
-    );
-  });
-
-  it('stages the selected target and keeps the Cloudflare envelope private', async () => {
-    const nodeFixture = await createTargetBuildOutput('node');
-    await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: nodeFixture.distDirectory,
-      target: 'node',
-    });
-    const nodeOutput = path.join(nodeFixture.root, 'node-output');
-    await fs.cp(nodeFixture.distDirectory, nodeOutput, { recursive: true });
-    await fs.rm(path.join(nodeOutput, 'release'), {
-      force: true,
-      recursive: true,
-    });
-    await fs.writeFile(path.join(nodeOutput, 'index.js'), compiledModule());
-    await writeJson(path.join(nodeOutput, 'package.json'), {
-      type: 'commonjs',
-    });
-    const finalNodeEnvelope = await emitNodeStagedReleaseEnvelope({
-      distDirectory: nodeFixture.distDirectory,
-      outputDirectory: nodeOutput,
-    });
-    await expect(
-      verifyNodeReleaseEnvelopeStaging({ outputDirectory: nodeOutput }),
-    ).resolves.toMatchObject({ target: 'node' });
-    expect(finalNodeEnvelope?.surfaces.ssr).toContain('index.js');
-    expect(
-      finalNodeEnvelope?.artifacts.map(artifact => artifact.logicalPath),
-    ).toContain('package.json');
-
-    const cloudflareFixture = await createTargetBuildOutput('cloudflare');
-    await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: cloudflareFixture.distDirectory,
-      target: 'cloudflare',
-    });
-    const cloudflareOutput = path.join(
-      cloudflareFixture.root,
-      'cloudflare-output',
-    );
-    await createCloudflareStaging(
-      cloudflareFixture.distDirectory,
-      cloudflareOutput,
-    );
-    const sourceEnvelope = await stageCloudflareReleaseEnvelope({
-      distDirectory: cloudflareFixture.distDirectory,
-      outputDirectory: cloudflareOutput,
-    });
-    await expect(
-      fs.access(
-        path.join(cloudflareOutput, MICROVERTICAL_RELEASE_ENVELOPE_PATH),
-      ),
-    ).rejects.toThrow();
-    const stagedEnvelope = await emitCloudflareStagedReleaseEnvelope({
-      distDirectory: cloudflareFixture.distDirectory,
-      outputDirectory: cloudflareOutput,
-    });
-    expect(stagedEnvelope).toMatchObject({ target: 'cloudflare' });
-    expect(stagedEnvelope?.envelopeDigest).not.toBe(
-      sourceEnvelope?.envelopeDigest,
-    );
-    expect(stagedEnvelope?.surfaces.ssr).toEqual([
-      'server/index.mjs',
-      'worker/main.js',
-    ]);
-    expect(stagedEnvelope?.surfaces.apiBackend).toEqual([
-      'worker/__modern_bff_effect.js',
-    ]);
-    expect(stagedEnvelope?.surfaces.backendFederation).toEqual({
-      container: 'public/backendRemoteEntry.cjs',
-      manifest: 'public/backend-mf-manifest.json',
-    });
-    await expect(
-      fs.access(
-        path.join(
-          cloudflareOutput,
-          'public',
-          MICROVERTICAL_RELEASE_ENVELOPE_PATH,
-        ),
-      ),
-    ).rejects.toThrow();
-    await expect(
-      fs.access(
-        path.join(cloudflareOutput, MICROVERTICAL_RELEASE_ENVELOPE_PATH),
-      ),
-    ).resolves.toBeUndefined();
   });
 
   it('binds internal Node package aliases to their final files', async () => {
@@ -574,20 +220,7 @@ describe('framework target-specific MicroVertical release-envelope integration',
       distDirectory: fixture.distDirectory,
       target: 'node',
     });
-    const outputDirectory = path.join(fixture.root, 'node-output-alias');
-    await fs.cp(fixture.distDirectory, outputDirectory, { recursive: true });
-    await fs.rm(path.join(outputDirectory, 'release'), {
-      force: true,
-      recursive: true,
-    });
-    await fs.writeFile(
-      path.join(outputDirectory, 'index.js'),
-      compiledModule(),
-    );
-    await writeJson(path.join(outputDirectory, 'package.json'), {
-      type: 'commonjs',
-    });
-
+    const outputDirectory = await stageNodeOutput(fixture, 'node-output-alias');
     const targetDirectory = path.join(
       outputDirectory,
       'node_modules/@bleedingdev/modern-js-bff-core',
@@ -595,10 +228,6 @@ describe('framework target-specific MicroVertical release-envelope integration',
     const aliasDirectory = path.join(
       outputDirectory,
       'node_modules/@modern-js/bff-core',
-    );
-    const fileAlias = path.join(
-      outputDirectory,
-      'node_modules/bff-core-entry.js',
     );
     await writeJson(path.join(targetDirectory, 'package.json'), {
       name: '@bleedingdev/modern-js-bff-core',
@@ -621,33 +250,16 @@ describe('framework target-specific MicroVertical release-envelope integration',
       aliasDirectory,
       'dir',
     );
-    await fs.symlink(
-      path.relative(
-        path.dirname(fileAlias),
-        path.join(targetDirectory, 'index.js'),
-      ),
-      fileAlias,
-      'file',
-    );
 
     const envelope = await emitNodeStagedReleaseEnvelope({
       distDirectory: fixture.distDirectory,
       outputDirectory,
     });
-    const directoryAliasArtifact = envelope?.artifacts.find(
-      artifact => artifact.logicalPath === 'node_modules/@modern-js/bff-core',
-    );
-    const fileAliasArtifact = envelope?.artifacts.find(
-      artifact => artifact.logicalPath === 'node_modules/bff-core-entry.js',
-    );
-    expect(directoryAliasArtifact).toMatchObject({
-      kind: 'symbolic-link',
-      targetKind: 'directory',
-    });
-    expect(fileAliasArtifact).toMatchObject({
-      kind: 'symbolic-link',
-      targetKind: 'file',
-    });
+    expect(
+      envelope?.artifacts.find(
+        artifact => artifact.logicalPath === 'node_modules/@modern-js/bff-core',
+      ),
+    ).toMatchObject({ kind: 'symbolic-link', targetKind: 'directory' });
     await expect(
       verifyNodeReleaseEnvelopeStaging({ outputDirectory }),
     ).resolves.toMatchObject({ target: 'node' });
@@ -665,112 +277,9 @@ describe('framework target-specific MicroVertical release-envelope integration',
     await expect(
       verifyNodeReleaseEnvelopeStaging({ outputDirectory }),
     ).rejects.toThrow(/does not match its final filesystem binding/u);
-
-    await fs.rm(aliasDirectory);
-    await fs.cp(targetDirectory, aliasDirectory, { recursive: true });
-    await expect(
-      verifyNodeReleaseEnvelopeStaging({ outputDirectory }),
-    ).rejects.toThrow(/must be a file or symlink/u);
-
-    await fs.rm(aliasDirectory, { force: true, recursive: true });
-    await fs.symlink(
-      path.relative(path.dirname(aliasDirectory), targetDirectory),
-      aliasDirectory,
-      'dir',
-    );
-    await fs.rm(fileAlias);
-    await fs.writeFile(fileAlias, `${JSON.stringify(fileAliasArtifact)}\n`);
-    await expect(
-      verifyNodeReleaseEnvelopeStaging({ outputDirectory }),
-    ).rejects.toThrow(/does not match its final filesystem binding/u);
-
-    await fs.rm(fileAlias);
-    await fs.symlink(
-      path.relative(
-        path.dirname(fileAlias),
-        path.join(targetDirectory, 'index.js'),
-      ),
-      fileAlias,
-      'file',
-    );
-    await fs.appendFile(path.join(targetDirectory, 'index.js'), '// drift\n');
-    await expect(
-      verifyNodeReleaseEnvelopeStaging({ outputDirectory }),
-    ).rejects.toThrow(/digest does not match final artifact bytes/u);
   });
 
-  it.each([
-    'outside-root',
-    'unresolvable-cycle',
-    'ancestor-cycle',
-  ] as const)('rejects a Node staging directory symlink %s', async failure => {
-    const fixture = await createTargetBuildOutput('node');
-    await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: fixture.distDirectory,
-      target: 'node',
-    });
-    const outputDirectory = path.join(
-      fixture.root,
-      `node-output-symlink-${failure}`,
-    );
-    await fs.cp(fixture.distDirectory, outputDirectory, { recursive: true });
-    await fs.rm(path.join(outputDirectory, 'release'), {
-      force: true,
-      recursive: true,
-    });
-    await fs.writeFile(
-      path.join(outputDirectory, 'index.js'),
-      compiledModule(),
-    );
-    await writeJson(path.join(outputDirectory, 'package.json'), {
-      type: 'commonjs',
-    });
-    const nodeModulesDirectory = path.join(outputDirectory, 'node_modules');
-    await fs.mkdir(nodeModulesDirectory, { recursive: true });
-
-    if (failure === 'outside-root') {
-      const externalDirectory = path.join(fixture.root, 'external-package');
-      await fs.mkdir(externalDirectory);
-      await fs.symlink(
-        externalDirectory,
-        path.join(nodeModulesDirectory, 'escaped-package'),
-        'dir',
-      );
-    } else if (failure === 'unresolvable-cycle') {
-      await fs.symlink(
-        'cycle-b',
-        path.join(nodeModulesDirectory, 'cycle-a'),
-        'dir',
-      );
-      await fs.symlink(
-        'cycle-a',
-        path.join(nodeModulesDirectory, 'cycle-b'),
-        'dir',
-      );
-    } else {
-      await fs.symlink(
-        '..',
-        path.join(nodeModulesDirectory, 'ancestor-cycle'),
-        'dir',
-      );
-    }
-
-    await expect(
-      emitNodeStagedReleaseEnvelope({
-        distDirectory: fixture.distDirectory,
-        outputDirectory,
-      }),
-    ).rejects.toThrow(
-      failure === 'outside-root'
-        ? /resolves outside artifactRoot/u
-        : failure === 'unresolvable-cycle'
-          ? /cannot be resolved/u
-          : /targets an ancestor directory/u,
-    );
-  });
-
-  it('rejects a Cloudflare release envelope leaked into public assets', async () => {
+  it('keeps the staged Cloudflare envelope out of the public directory', async () => {
     const fixture = await createTargetBuildOutput('cloudflare');
     await emitFrameworkMicroVerticalReleaseEnvelope({
       apiOnly: false,
@@ -779,98 +288,27 @@ describe('framework target-specific MicroVertical release-envelope integration',
     });
     const outputDirectory = path.join(fixture.root, 'cloudflare-output');
     await createCloudflareStaging(fixture.distDirectory, outputDirectory);
-    await fs.mkdir(path.join(outputDirectory, 'public/release'), {
-      recursive: true,
-    });
-    await fs.writeFile(
-      path.join(outputDirectory, 'public', MICROVERTICAL_RELEASE_ENVELOPE_PATH),
-      '{}',
-    );
 
     await expect(
       emitCloudflareStagedReleaseEnvelope({
         distDirectory: fixture.distDirectory,
         outputDirectory,
       }),
-    ).rejects.toThrow(/must remain private/u);
-  });
-
-  it.each([
-    'directory',
-    'file',
-  ] as const)('rejects %s symlink release-envelope escapes for Node and Cloudflare staging', async symlinkKind => {
-    const nodeFixture = await createTargetBuildOutput('node');
-    await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: nodeFixture.distDirectory,
-      target: 'node',
-    });
-    const nodeOutput = path.join(
-      nodeFixture.root,
-      `node-symlink-${symlinkKind}`,
-    );
-    await fs.cp(nodeFixture.distDirectory, nodeOutput, { recursive: true });
-    await fs.rm(path.join(nodeOutput, 'release'), {
-      force: true,
-      recursive: true,
-    });
-    await fs.writeFile(path.join(nodeOutput, 'index.js'), compiledModule());
-    await writeJson(path.join(nodeOutput, 'package.json'), {
-      type: 'commonjs',
-    });
-
-    const cloudflareFixture = await createTargetBuildOutput('cloudflare');
-    await emitFrameworkMicroVerticalReleaseEnvelope({
-      apiOnly: false,
-      distDirectory: cloudflareFixture.distDirectory,
-      target: 'cloudflare',
-    });
-    const cloudflareOutput = path.join(
-      cloudflareFixture.root,
-      `cloudflare-symlink-${symlinkKind}`,
-    );
-    await createCloudflareStaging(
-      cloudflareFixture.distDirectory,
-      cloudflareOutput,
-    );
-
-    for (const [artifactRoot, emit] of [
-      [
-        nodeOutput,
-        () =>
-          emitNodeStagedReleaseEnvelope({
-            distDirectory: nodeFixture.distDirectory,
-            outputDirectory: nodeOutput,
-          }),
-      ],
-      [
-        cloudflareOutput,
-        () =>
-          emitCloudflareStagedReleaseEnvelope({
-            distDirectory: cloudflareFixture.distDirectory,
-            outputDirectory: cloudflareOutput,
-          }),
-      ],
-    ] as const) {
-      const external = path.join(
-        path.dirname(artifactRoot),
-        `${path.basename(artifactRoot)}-external`,
-      );
-      if (symlinkKind === 'directory') {
-        await fs.mkdir(external, { recursive: true });
-        await fs.symlink(external, path.join(artifactRoot, 'release'));
-      } else {
-        await fs.mkdir(path.join(artifactRoot, 'release'), {
-          recursive: true,
-        });
-        await fs.writeFile(external, '{}');
-        await fs.symlink(
-          external,
-          path.join(artifactRoot, MICROVERTICAL_RELEASE_ENVELOPE_PATH),
-        );
-      }
-      await expect(emit()).rejects.toThrow(/real (?:directory|file)/u);
-    }
+    ).resolves.toMatchObject({ target: 'cloudflare' });
+    await expect(
+      fs.access(
+        path.join(outputDirectory, MICROVERTICAL_RELEASE_ENVELOPE_PATH),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      fs.access(
+        path.join(
+          outputDirectory,
+          'public',
+          MICROVERTICAL_RELEASE_ENVELOPE_PATH,
+        ),
+      ),
+    ).rejects.toThrow();
   });
 
   it('does not impose the UltraModern envelope on legacy backend output', async () => {

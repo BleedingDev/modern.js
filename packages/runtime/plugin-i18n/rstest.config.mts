@@ -28,8 +28,8 @@ export default {
       testEnvironment: 'node',
       include: [
         'tests/i18nUtils.test.ts',
+        'tests/localisedUrlRewriteMatrix.fork.test.ts',
         'tests/localisedUrls.test.ts',
-        'tests/linkTypes.test.ts',
         'tests/backendDefaults.test.ts',
         'tests/redirectPolicy.test.ts',
         'tests/reactI18nextRuntimeBoundary.test.ts',

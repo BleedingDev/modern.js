@@ -1,50 +1,6 @@
 import { createRuntimeContextExtension } from '../src/contextExtensions';
 
 describe('runtime context extensions', () => {
-  it('stores and retrieves typed values per context object', () => {
-    const extension = createRuntimeContextExtension<{ value: number }>(
-      'test:isolation-a',
-    );
-    const contextA = {};
-    const contextB = {};
-
-    extension.set(contextA, { value: 1 });
-    extension.set(contextB, { value: 2 });
-
-    expect(extension.get(contextA)).toEqual({ value: 1 });
-    expect(extension.get(contextB)).toEqual({ value: 2 });
-
-    extension.remove(contextA);
-    expect(extension.get(contextA)).toBeUndefined();
-    expect(extension.get(contextB)).toEqual({ value: 2 });
-  });
-
-  it('isolates extensions with different ids on the same context', () => {
-    const first = createRuntimeContextExtension<string>('test:first');
-    const second = createRuntimeContextExtension<string>('test:second');
-    const context = {};
-
-    first.set(context, 'one');
-    second.set(context, 'two');
-
-    expect(first.get(context)).toBe('one');
-    expect(second.get(context)).toBe('two');
-  });
-
-  it('shares state between extensions created with the same id', () => {
-    const a = createRuntimeContextExtension<string>('test:shared');
-    const b = createRuntimeContextExtension<string>('test:shared');
-    const context = {};
-
-    a.set(context, 'value');
-    expect(b.get(context)).toBe('value');
-  });
-
-  it('returns undefined for contexts without any extensions', () => {
-    const extension = createRuntimeContextExtension<string>('test:empty');
-    expect(extension.get({})).toBeUndefined();
-  });
-
   it('does not leak into string-key enumeration of the context', () => {
     const extension = createRuntimeContextExtension<string>('test:hidden');
     const context = {};

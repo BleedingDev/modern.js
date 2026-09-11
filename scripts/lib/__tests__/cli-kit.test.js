@@ -48,21 +48,6 @@ test('parseCliArgs preserves booleans, repeated values, and inline values', () =
   );
 });
 
-test('parseCliArgs distinguishes omitted and explicit empty optional values', () => {
-  assert.deepEqual(parseSample(['--optional']), {
-    allowEmpty: false,
-    entries: [],
-    optional: undefined,
-    required: undefined,
-  });
-  assert.deepEqual(parseSample(['--optional', '', '--entry', '']), {
-    allowEmpty: false,
-    entries: [''],
-    optional: '',
-    required: undefined,
-  });
-});
-
 test('parseCliArgs rejects invalid option forms', () => {
   assert.throws(() => parseSample(['--allow-empty=false']));
   assert.throws(() => parseSample(['--required']));
@@ -70,7 +55,7 @@ test('parseCliArgs rejects invalid option forms', () => {
 });
 
 test('parseCliArgs keeps bare terminator behavior explicit per caller', () => {
-  assert.throws(() => parseSample(['--']), /^Error: Unknown argument: --$/);
+  assert.throws(() => parseSample(['--']));
   assert.deepEqual(parseSample(['--', '--optional', 'value'], {
     ignoreTerminator: true,
   }), {

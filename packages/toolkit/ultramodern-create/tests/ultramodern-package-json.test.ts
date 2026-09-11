@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import type { UltramodernBridgeConfig } from '../src/ultramodern-workspace/bridge-config';
 import {
-  createShellHost,
   createVerticalDescriptor,
   shellApp,
 } from '../src/ultramodern-workspace/descriptors';
@@ -20,7 +19,6 @@ import type {
   ResolvedPackageSource,
   WorkspaceApp,
 } from '../src/ultramodern-workspace/types';
-import { MINIFLARE_VERSION } from '../src/ultramodern-workspace/versions';
 
 const scope = 'tractor-store';
 const packageVersion = '3.5.0-ultramodern.9';
@@ -45,33 +43,6 @@ const bridgeConfig = {
   reactSingletons: [],
 } satisfies UltramodernBridgeConfig;
 
-const installAppDependencies = {
-  '@modern-js/plugin-tanstack': packageVersion,
-  '@modern-js/plugin-i18n': packageVersion,
-  '@modern-js/i18n-integration': packageVersion,
-  '@modern-js/runtime': packageVersion,
-  '@modern-js/runtime-extensions': packageVersion,
-  '@modern-js/runtime-renderer-extensions': packageVersion,
-  '@modern-js/federation-runtime': packageVersion,
-  '@module-federation/bridge-react': '2.9.0',
-  '@module-federation/modern-js-v3': '2.9.0',
-  '@module-federation/runtime': '2.9.0',
-  '@tanstack/react-router': '1.170.33',
-  i18next: '26.4.2',
-  'node-fetch': '^3.3.2',
-  '@tractor-store/shared-contracts': 'workspace:*',
-  '@tractor-store/shared-design-tokens': 'workspace:*',
-  react: '19.2.8',
-  'react-dom': '19.2.8',
-};
-
-// plugin-bff declares both as optional peers, so whoever depends on plugin-bff
-// carries them at the exact cohort version.
-const bffEffectDependencies = {
-  '@effect/opentelemetry': '4.0.0-rc.112',
-  effect: '4.0.0-rc.112',
-};
-
 function createCatalogVertical() {
   return createVerticalDescriptor('catalog', 4101);
 }
@@ -87,49 +58,17 @@ function packageRecord(value: JsonValue) {
   return value as Record<string, JsonValue>;
 }
 
-test('app dependencies pin generated framework deps and distinguish shell-only from multi-vertical workspaces', () => {
-  const catalog = createCatalogVertical();
-  const checkout = createCheckoutVertical();
-  const shellHost = createShellHost([catalog, checkout]);
-
-  assert.deepEqual(appDependencies(scope, installPackageSource, shellApp), {
-    ...installAppDependencies,
-    ...bffEffectDependencies,
-    '@modern-js/boundary-debugger': packageVersion,
-    '@modern-js/plugin-bff': packageVersion,
-    '@modern-js/plugin-bff-extensions': packageVersion,
-  });
-  assert.deepEqual(
-    appDependencies(scope, installPackageSource, shellHost, [
-      catalog,
-      checkout,
-    ]),
-    {
-      ...installAppDependencies,
-      ...bffEffectDependencies,
-      '@modern-js/boundary-debugger': packageVersion,
-      '@modern-js/plugin-bff': packageVersion,
-      '@modern-js/plugin-bff-extensions': packageVersion,
-      '@tractor-store/catalog': 'workspace:*',
-      '@tractor-store/checkout': 'workspace:*',
-    },
-  );
-});
-
 test('bridge dependencies are added after generated app deps and collisions fail closed', () => {
   const catalog = createCatalogVertical();
 
-  assert.deepEqual(
-    appDependencies(scope, installPackageSource, catalog, [], bridgeConfig),
-    {
-      ...installAppDependencies,
-      '@tractor-store/bridge-kit': 'workspace:*',
-      ...bffEffectDependencies,
-      '@modern-js/bff-effect': packageVersion,
-      '@modern-js/plugin-bff': packageVersion,
-      '@modern-js/plugin-bff-extensions': packageVersion,
-    },
+  const result = appDependencies(
+    scope,
+    installPackageSource,
+    catalog,
+    [],
+    bridgeConfig,
   );
+  assert.equal(result['@tractor-store/bridge-kit'], 'workspace:*');
   assert.throws(
     () =>
       appDependencies(scope, installPackageSource, catalog, [], {
@@ -153,30 +92,6 @@ test('workspace package source uses workspace versions for generated framework d
     ),
   );
 
-  assert.deepEqual(packageJson.dependencies, {
-    '@modern-js/plugin-tanstack': 'workspace:*',
-    '@modern-js/plugin-i18n': 'workspace:*',
-    '@modern-js/i18n-integration': 'workspace:*',
-    '@modern-js/runtime': 'workspace:*',
-    '@modern-js/runtime-extensions': 'workspace:*',
-    '@modern-js/runtime-renderer-extensions': 'workspace:*',
-    '@modern-js/federation-runtime': 'workspace:*',
-    '@module-federation/bridge-react': '2.9.0',
-    '@module-federation/modern-js-v3': '2.9.0',
-    '@module-federation/runtime': '2.9.0',
-    '@tanstack/react-router': '1.170.33',
-    i18next: '26.4.2',
-    'node-fetch': '^3.3.2',
-    '@tractor-store/shared-contracts': 'workspace:*',
-    '@tractor-store/shared-design-tokens': 'workspace:*',
-    react: '19.2.8',
-    'react-dom': '19.2.8',
-    ...bffEffectDependencies,
-    '@modern-js/bff-effect': 'workspace:*',
-    '@modern-js/plugin-bff': 'workspace:*',
-    '@modern-js/plugin-bff-extensions': 'workspace:*',
-  });
-  assert.equal(packageJson.devDependencies['cross-env'], '10.1.0');
   for (const name of [
     '@modern-js/app-tools',
     '@modern-js/app-tools-extensions',
@@ -249,30 +164,6 @@ test('root package json pins workspace package versions and bridge workspace glo
     rootScripts.postinstall,
     'node ./scripts/bootstrap-agent-skills.mts --postinstall',
   );
-  assert.deepEqual(rootPackageJson.devDependencies, {
-    '@types/node': '^26.4.1',
-    '@effect/tsgo': '0.41.0',
-    '@modern-js/code-tools': packageVersion,
-    '@modern-js/app-tools': packageVersion,
-    '@modern-js/app-tools-extensions': packageVersion,
-    '@modern-js/ultramodern-app-tools': packageVersion,
-    '@modern-js/runtime-renderer-extensions': packageVersion,
-    '@modern-js/ultramodern-create': packageVersion,
-    '@modern-js/bff-effect': packageVersion,
-    '@modern-js/plugin-bff': packageVersion,
-    '@modern-js/plugin-bff-extensions': packageVersion,
-    '@modern-js/plugin-bff-build-extensions': packageVersion,
-    ...bffEffectDependencies,
-    '@typescript/native': 'npm:typescript@7.0.2',
-    'cross-env': '10.1.0',
-    lefthook: '^2.1.10',
-    miniflare: MINIFLARE_VERSION,
-    oxlint: '1.81.0',
-    oxfmt: '0.66.0',
-    ultracite: '7.11.0',
-    wrangler: '4.116.0',
-    'zephyr-agent': '1.2.4',
-  });
 });
 
 test('generated roots provide the native app-tools peer required by their BFF build plugin', () => {

@@ -1,49 +1,4 @@
 import assert from 'node:assert/strict';
-import { updateModernDependencies } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
-
-test('migration updates declared extension packages throughout the authenticated cohort', () => {
-  const source = {
-    strategy: 'install' as const,
-    modernPackageVersion: '3.9.0-ultramodern.4',
-    aliasScope: 'bleedingdev',
-    aliasPackageNamePrefix: 'modern-js-',
-  };
-  const cohort = {
-    packages: [
-      {
-        sourceName: '@modern-js/app-tools-extensions',
-        targetName: '@bleedingdev/modern-js-app-tools-extensions',
-        version: source.modernPackageVersion,
-      },
-    ],
-  };
-  for (const section of [
-    'dependencies',
-    'devDependencies',
-    'peerDependencies',
-    'optionalDependencies',
-  ]) {
-    const manifest = {
-      [section]: {
-        '@modern-js/app-tools-extensions':
-          'npm:@bleedingdev/modern-js-app-tools-extensions@3.9.0-ultramodern.2',
-        '@bleedingdev/modern-js-app-tools-extensions': '3.9.0-ultramodern.2',
-        '@modern-js/codesmith': '2.6.9',
-        'consumer-tool': '1.2.3',
-      },
-    };
-    assert.equal(updateModernDependencies(manifest, source, cohort), true);
-    assert.deepEqual(manifest[section], {
-      '@modern-js/app-tools-extensions':
-        'npm:@bleedingdev/modern-js-app-tools-extensions@3.9.0-ultramodern.4',
-      '@bleedingdev/modern-js-app-tools-extensions': '3.9.0-ultramodern.4',
-      '@modern-js/codesmith': '2.6.9',
-      'consumer-tool': '1.2.3',
-    });
-    assert.equal(updateModernDependencies(manifest, source, cohort), false);
-  }
-});
-
 import { parseUltramodernReleaseCohort } from '../src/ultramodern-release-cohort';
 import { updateSameContractDependencies } from '../src/ultramodern-tooling/commands/migrate-strict-effect/package-cohort';
 import {
@@ -182,350 +137,6 @@ test('net delta rejects a target subprocess changing consumer source or unprepar
   );
 });
 
-import { shellApp } from '../src/ultramodern-workspace/descriptors';
-import type { WorkspaceApp } from '../src/ultramodern-workspace/types';
-
-test('historical migration registers app providers by declared surface and preserves consumer dependency sections', () => {
-  const source = {
-    strategy: 'workspace' as const,
-    modernPackageVersion: 'workspace:*',
-  };
-  const cases: Array<{ app?: WorkspaceApp; runtime: string[] }> = [
-    {
-      app: shellApp,
-      runtime: [
-        '@modern-js/federation-runtime',
-        '@modern-js/boundary-debugger',
-        '@modern-js/plugin-bff-extensions',
-        '@modern-js/runtime-renderer-extensions',
-        '@modern-js/i18n-integration',
-      ],
-    },
-    {
-      app: { ...shellApp, kind: 'vertical', surfaceProfile: 'ui-only' },
-      runtime: [
-        '@modern-js/federation-runtime',
-        '@modern-js/runtime-renderer-extensions',
-        '@modern-js/i18n-integration',
-      ],
-    },
-    {
-      app: { ...shellApp, kind: 'vertical', surfaceProfile: 'api-only' },
-      runtime: [
-        '@modern-js/runtime-renderer-extensions',
-        '@modern-js/i18n-integration',
-      ],
-    },
-    { runtime: [] },
-  ];
-  for (const { app, runtime } of cases) {
-    const manifest: Record<string, any> = {
-      dependencies: { consumer: '^1.2.3' },
-      devDependencies: { 'consumer-tool': '^2.3.4' },
-      peerDependencies: { 'consumer-peer': '^3.4.5' },
-      optionalDependencies: { 'consumer-optional': '^4.5.6' },
-      scripts: { custom: 'consumer --keep' },
-    };
-    updateModernDependencies(manifest, source, undefined, { app });
-    assert.deepEqual(manifest.dependencies, {
-      consumer: '^1.2.3',
-      ...Object.fromEntries(runtime.map(name => [name, 'workspace:*'])),
-    });
-    assert.deepEqual(manifest.devDependencies, {
-      'consumer-tool': '^2.3.4',
-      ...(app
-        ? {
-            '@modern-js/ultramodern-app-tools': 'workspace:*',
-            '@modern-js/app-tools-extensions': 'workspace:*',
-          }
-        : {}),
-    });
-    assert.deepEqual(manifest.peerDependencies, { 'consumer-peer': '^3.4.5' });
-    assert.deepEqual(manifest.optionalDependencies, {
-      'consumer-optional': '^4.5.6',
-    });
-    assert.deepEqual(manifest.scripts, { custom: 'consumer --keep' });
-    assert.equal(
-      updateModernDependencies(manifest, source, undefined, { app }),
-      false,
-    );
-  }
-});
-
-test('historical app provider registration rejects an incomplete target cohort before changing the manifest', () => {
-  const source = {
-    strategy: 'install' as const,
-    modernPackageVersion: '3.9.0-ultramodern.4',
-    aliasScope: 'bleedingdev',
-    aliasPackageNamePrefix: 'modern-js-',
-  };
-  const manifest = { dependencies: { consumer: '^1.2.3' } };
-  assert.throws(
-    () =>
-      updateModernDependencies(
-        manifest,
-        source,
-        { packages: [] },
-        { app: shellApp },
-      ),
-    /absent from the authenticated target cohort/,
-  );
-  assert.deepEqual(manifest, { dependencies: { consumer: '^1.2.3' } });
-});
-
-test('historical BFF build adoption authenticates providers without adding build tooling to shared runtime packages', () => {
-  const source = {
-    strategy: 'install' as const,
-    modernPackageVersion: '3.9.0-ultramodern.4',
-  };
-  const app = { ...shellApp };
-  const providers = [
-    '@modern-js/ultramodern-app-tools',
-    '@modern-js/app-tools-extensions',
-    '@modern-js/runtime-renderer-extensions',
-    '@modern-js/i18n-integration',
-    '@modern-js/federation-runtime',
-    '@modern-js/boundary-debugger',
-    '@modern-js/plugin-bff-extensions',
-  ];
-  const packages = providers.map(sourceName => ({
-    sourceName,
-    targetName: sourceName,
-    version: source.modernPackageVersion,
-  }));
-  const manifest: Record<string, any> = {
-    dependencies: {
-      '@modern-js/plugin-bff': '3.9.0-ultramodern.3',
-      consumer: 'keep',
-    },
-  };
-  const original = structuredClone(manifest);
-  assert.throws(
-    () => updateModernDependencies(manifest, source, { packages }, { app }),
-    /plugin-bff-build-extensions is absent from the authenticated target cohort/u,
-  );
-  assert.deepEqual(manifest, original);
-  packages.push({
-    sourceName: '@modern-js/plugin-bff-build-extensions',
-    targetName: '@modern-js/plugin-bff-build-extensions',
-    version: source.modernPackageVersion,
-  });
-  assert.equal(
-    updateModernDependencies(manifest, source, { packages }, { app }),
-    true,
-  );
-  assert.equal(
-    manifest.devDependencies['@modern-js/plugin-bff-build-extensions'],
-    source.modernPackageVersion,
-  );
-  assert.equal(
-    manifest.dependencies['@modern-js/plugin-bff'],
-    source.modernPackageVersion,
-  );
-  assert.equal(manifest.dependencies.consumer, 'keep');
-  assert.equal(
-    updateModernDependencies(manifest, source, { packages }, { app }),
-    false,
-  );
-
-  const shared = {
-    dependencies: { '@modern-js/plugin-bff': '3.9.0-ultramodern.3' },
-  };
-  assert.equal(updateModernDependencies(shared, source, { packages }), true);
-  assert.deepEqual(shared, {
-    dependencies: { '@modern-js/plugin-bff': source.modernPackageVersion },
-  });
-});
-
-test('historical roots authenticate the required native peer before adopting its alias', () => {
-  const source = {
-    strategy: 'install' as const,
-    modernPackageVersion: '3.9.0-ultramodern.5',
-    aliasScope: 'bleedingdev',
-    aliasPackageNamePrefix: 'modern-js-',
-  };
-  const provider = '@modern-js/app-tools';
-  const packages = [
-    provider,
-    '@modern-js/runtime-renderer-extensions',
-    '@modern-js/plugin-bff-build-extensions',
-    '@modern-js/plugin-bff-extensions',
-  ].map(sourceName => ({
-    sourceName,
-    targetName: sourceName.replace('@modern-js/', '@bleedingdev/modern-js-'),
-    version: source.modernPackageVersion,
-  }));
-  const original = {
-    modernjs: { workspace: 'ultramodern-superapp', consumer: 'keep' },
-    devDependencies: {
-      '@modern-js/plugin-bff':
-        'npm:@bleedingdev/modern-js-plugin-bff@3.8.2-ultramodern.12',
-      'consumer-tool': '^2.0.0',
-    },
-    dependencies: { consumer: '^1.0.0' },
-    scripts: { custom: 'consumer --keep' },
-    pnpm: { overrides: { consumer: '^1.0.0' } },
-  };
-  for (const rejected of [
-    packages.filter(item => item.sourceName !== provider),
-    packages.map(item =>
-      item.sourceName === provider
-        ? { ...item, version: '3.8.2-ultramodern.12' }
-        : item,
-    ),
-  ]) {
-    const manifest = structuredClone(original);
-    assert.throws(
-      () => updateModernDependencies(manifest, source, { packages: rejected }),
-      /app-tools is absent from the authenticated target cohort/u,
-    );
-    assert.deepEqual(manifest, original);
-  }
-  const manifest: Record<string, any> = structuredClone(original);
-  assert.equal(updateModernDependencies(manifest, source, { packages }), true);
-  assert.equal(
-    manifest.devDependencies[provider],
-    'npm:@bleedingdev/modern-js-app-tools@3.9.0-ultramodern.5',
-  );
-  assert.equal(
-    manifest.devDependencies['consumer-tool'],
-    original.devDependencies['consumer-tool'],
-  );
-  for (const field of ['modernjs', 'dependencies', 'scripts', 'pnpm'] as const)
-    assert.deepEqual(manifest[field], original[field]);
-  assert.equal(updateModernDependencies(manifest, source, { packages }), false);
-  const unrelated = { devDependencies: { 'consumer-tool': '^2.0.0' } };
-  assert.equal(
-    updateModernDependencies(unrelated, source, { packages }),
-    false,
-  );
-  assert.deepEqual(unrelated, {
-    devDependencies: { 'consumer-tool': '^2.0.0' },
-  });
-});
-
-test('same-contract BFF cohort updates only declared dependencies and never adopts the build plugin', () => {
-  const source = cohort('3.9.0-ultramodern.3');
-  const target = cohort('3.9.0-ultramodern.4');
-  for (const item of [source, target]) {
-    item.packages.push({
-      sourceName: '@modern-js/plugin-bff',
-      targetName: '@bleedingdev/modern-js-plugin-bff',
-      version: item.release.version,
-    });
-    item.aliases['@modern-js/plugin-bff'] = '@bleedingdev/modern-js-plugin-bff';
-  }
-  target.packages.push({
-    sourceName: '@modern-js/plugin-bff-build-extensions',
-    targetName: '@bleedingdev/modern-js-plugin-bff-build-extensions',
-    version: target.release.version,
-  });
-  target.aliases['@modern-js/plugin-bff-build-extensions'] =
-    '@bleedingdev/modern-js-plugin-bff-build-extensions';
-  target.packages.push({
-    sourceName: '@modern-js/app-tools',
-    targetName: '@bleedingdev/modern-js-app-tools',
-    version: target.release.version,
-  });
-  target.aliases['@modern-js/app-tools'] = '@bleedingdev/modern-js-app-tools';
-  const manifest = {
-    modernjs: { workspace: 'ultramodern-superapp' },
-    dependencies: {
-      '@modern-js/plugin-bff':
-        'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.3',
-    },
-  };
-  assert.deepEqual(updateSameContractDependencies(manifest, source, target), [
-    {
-      section: 'dependencies',
-      name: '@modern-js/plugin-bff',
-      value: 'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.4',
-    },
-  ]);
-  assert.deepEqual(manifest, {
-    modernjs: { workspace: 'ultramodern-superapp' },
-    dependencies: {
-      '@modern-js/plugin-bff':
-        'npm:@bleedingdev/modern-js-plugin-bff@3.9.0-ultramodern.4',
-    },
-  });
-});
-
-test('i18n descriptor adoption authenticates the target and preserves native packages and consumer selections', () => {
-  const source = {
-    strategy: 'install' as const,
-    modernPackageVersion: '3.9.0-ultramodern.4',
-    aliasScope: 'bleedingdev',
-    aliasPackageNamePrefix: 'modern-js-',
-  };
-  const integration = '@modern-js/i18n-integration';
-  const packages = [
-    '@modern-js/ultramodern-app-tools',
-    '@modern-js/app-tools-extensions',
-    '@modern-js/runtime-renderer-extensions',
-    '@modern-js/federation-runtime',
-    '@modern-js/boundary-debugger',
-    '@modern-js/plugin-bff-extensions',
-    integration,
-  ].map(sourceName => ({
-    sourceName,
-    targetName: sourceName.replace('@modern-js/', '@bleedingdev/modern-js-'),
-    version: source.modernPackageVersion,
-  }));
-  const manifest: Record<string, any> = {
-    dependencies: {
-      '@modern-js/plugin-i18n': '3.8.2',
-      i18next: 'consumer-version',
-    },
-    scripts: { custom: 'consumer-script' },
-  };
-  for (const rejected of [
-    packages.filter(item => item.sourceName !== integration),
-    packages.map(item =>
-      item.sourceName === integration ? { ...item, version: '3.8.2' } : item,
-    ),
-  ]) {
-    const original = structuredClone(manifest);
-    assert.throws(
-      () =>
-        updateModernDependencies(
-          manifest,
-          source,
-          { packages: rejected },
-          { app: shellApp },
-        ),
-      /i18n-integration is absent from the authenticated target cohort/u,
-    );
-    assert.deepEqual(manifest, original);
-  }
-  assert.equal(
-    updateModernDependencies(manifest, source, { packages }, { app: shellApp }),
-    true,
-  );
-  assert.equal(
-    manifest.dependencies[integration],
-    'npm:@bleedingdev/modern-js-i18n-integration@3.9.0-ultramodern.4',
-  );
-  assert.equal(
-    manifest.dependencies['@modern-js/plugin-i18n'],
-    'npm:@bleedingdev/modern-js-plugin-i18n@3.9.0-ultramodern.4',
-  );
-  assert.equal(manifest.dependencies.i18next, 'consumer-version');
-  assert.deepEqual(manifest.scripts, { custom: 'consumer-script' });
-  assert.equal(
-    updateModernDependencies(manifest, source, { packages }, { app: shellApp }),
-    false,
-  );
-  const unrelated = { dependencies: { i18next: 'consumer-version' } };
-  assert.equal(
-    updateModernDependencies(unrelated, source, { packages }),
-    false,
-  );
-  assert.deepEqual(unrelated, {
-    dependencies: { i18next: 'consumer-version' },
-  });
-});
-
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -562,141 +173,137 @@ test('release-age YAML edits touch only authenticated sequence scalar values', (
     );
 });
 
-test.each([
-  false,
-  true,
-])('native same-contract classifier accepts only exact cohort policy advancement and repeats without writes with consumer formatting %s', consumerFormatting => {
-  const { tempRoot, workspaceDir } = createWorkspace('cohort-policy');
-  try {
-    const validatorPath = path.join(
-      workspaceDir,
-      'scripts/validate-ultramodern-workspace.mts',
-    );
-    linkWorkspaceFormatterDependencies(workspaceDir);
-    if (consumerFormatting) {
-      const fixture = JSON.parse(
-        fs.readFileSync(
-          path.join(__dirname, 'fixtures/migration-runtime-historical-4.json'),
-          'utf8',
-        ),
-      ) as { files: Array<{ path: string; content: string }> };
-      const formatter = fixture.files.find(
-        file => file.path === 'oxfmt.config.ts',
-      )!;
-      fs.writeFileSync(
-        path.join(workspaceDir, formatter.path),
-        formatter.content,
-      );
-    }
-    const nativePaths = Object.keys(snapshotWorkspace(workspaceDir)).filter(
-      file =>
-        file === 'scripts/validate-ultramodern-workspace.mts' ||
-        file.endsWith('/shared/ultramodern-build.ts'),
-    );
-    const formatted = spawnSync(
-      process.execPath,
-      [
-        path.resolve(__dirname, '../node_modules/oxfmt/bin/oxfmt'),
-        '--write',
-        ...nativePaths,
-      ],
-      { cwd: workspaceDir, encoding: 'utf8' },
-    );
-    assert.equal(
-      formatted.status,
-      0,
-      `${formatted.stdout}\n${formatted.stderr}`,
-    );
+function setupNativeCohortWorkspace(name: string) {
+  const { tempRoot, workspaceDir } = createWorkspace(name);
+  const validatorPath = path.join(
+    workspaceDir,
+    'scripts/validate-ultramodern-workspace.mts',
+  );
+  linkWorkspaceFormatterDependencies(workspaceDir);
+  const nativePaths = Object.keys(snapshotWorkspace(workspaceDir)).filter(
+    file =>
+      file === 'scripts/validate-ultramodern-workspace.mts' ||
+      file.endsWith('/shared/ultramodern-build.ts'),
+  );
+  const formatted = spawnSync(
+    process.execPath,
+    [
+      path.resolve(__dirname, '../node_modules/oxfmt/bin/oxfmt'),
+      '--write',
+      ...nativePaths,
+    ],
+    { cwd: workspaceDir, encoding: 'utf8' },
+  );
+  assert.equal(formatted.status, 0, `${formatted.stdout}\n${formatted.stderr}`);
 
-    const source = cohort('3.9.0-ultramodern.5');
-    const target = cohort('3.9.0-ultramodern.6');
-    const packageSource = {
-      strategy: 'install' as const,
-      modernPackageVersion: source.release.version,
-      aliasScope: 'bleedingdev',
-      aliasPackageNamePrefix: 'modern-js-',
-    };
-    const compactPath = path.join(workspaceDir, '.modernjs/ultramodern.json');
-    const raw = JSON.parse(fs.readFileSync(compactPath, 'utf8'));
-    raw.packageSource = packageSource;
-    fs.writeFileSync(compactPath, JSON.stringify(raw, null, 2) + '\n');
-    const rootPath = path.join(workspaceDir, 'package.json');
-    const root = JSON.parse(fs.readFileSync(rootPath, 'utf8'));
-    root.modernjs.packageSource = {
-      strategy: 'install',
-      config: './.modernjs/ultramodern.json',
-    };
-    fs.writeFileSync(rootPath, JSON.stringify(root, null, 2) + '\n');
-    fs.writeFileSync(
-      path.join(workspaceDir, '.modernjs/release-cohort.json'),
-      JSON.stringify(source, null, 2) + '\n',
-    );
-    for (const [relative, content] of Object.entries(
-      snapshotWorkspace(workspaceDir),
-    )) {
-      if (!relative.endsWith('package.json')) continue;
-      const manifest = JSON.parse(content);
-      for (const section of [
-        'dependencies',
-        'devDependencies',
-        'peerDependencies',
-        'optionalDependencies',
-      ]) {
-        if (manifest[section]?.['@modern-js/runtime']) {
-          manifest[section]['@modern-js/runtime'] =
-            `npm:@bleedingdev/modern-js-runtime@${source.release.version}`;
-        }
+  const source = cohort('3.9.0-ultramodern.5');
+  const target = cohort('3.9.0-ultramodern.6');
+  const packageSource = {
+    strategy: 'install' as const,
+    modernPackageVersion: source.release.version,
+    aliasScope: 'bleedingdev',
+    aliasPackageNamePrefix: 'modern-js-',
+  };
+  const compactPath = path.join(workspaceDir, '.modernjs/ultramodern.json');
+  const raw = JSON.parse(fs.readFileSync(compactPath, 'utf8'));
+  raw.packageSource = packageSource;
+  fs.writeFileSync(compactPath, JSON.stringify(raw, null, 2) + '\n');
+  const rootPath = path.join(workspaceDir, 'package.json');
+  const root = JSON.parse(fs.readFileSync(rootPath, 'utf8'));
+  root.modernjs.packageSource = {
+    strategy: 'install',
+    config: './.modernjs/ultramodern.json',
+  };
+  fs.writeFileSync(rootPath, JSON.stringify(root, null, 2) + '\n');
+  fs.writeFileSync(
+    path.join(workspaceDir, '.modernjs/release-cohort.json'),
+    JSON.stringify(source, null, 2) + '\n',
+  );
+  for (const [relative, content] of Object.entries(
+    snapshotWorkspace(workspaceDir),
+  )) {
+    if (!relative.endsWith('package.json')) continue;
+    const manifest = JSON.parse(content);
+    for (const section of [
+      'dependencies',
+      'devDependencies',
+      'peerDependencies',
+      'optionalDependencies',
+    ]) {
+      if (manifest[section]?.['@modern-js/runtime']) {
+        manifest[section]['@modern-js/runtime'] =
+          `npm:@bleedingdev/modern-js-runtime@${source.release.version}`;
       }
-      fs.writeFileSync(
-        path.join(workspaceDir, relative),
-        `${JSON.stringify(manifest, null, 2)}\n`,
-      );
     }
-    updateGeneratedPnpmWorkspacePolicy(
-      createMigrationIo(workspaceDir, false),
-      packageSource,
-      { releaseCohort: source },
-    );
-    const policyPath = path.join(workspaceDir, 'pnpm-workspace.yaml');
-    const originalPolicy = fs.readFileSync(policyPath, 'utf8');
-    const comment =
-      '# authored policy comment: @bleedingdev/modern-js-runtime@3.9.0-ultramodern.5\r\n';
     fs.writeFileSync(
-      policyPath,
-      comment + originalPolicy.replaceAll('\n', '\r\n'),
+      path.join(workspaceDir, relative),
+      `${JSON.stringify(manifest, null, 2)}\n`,
     );
-    const before = snapshotWorkspace(workspaceDir);
-    const prepareStaged = (installedSource: typeof source) =>
-      runWorkspaceTransaction(workspaceDir, stage => {
-        assert.notEqual(stage, workspaceDir);
-        assert.equal(fs.existsSync(path.join(stage, 'node_modules')), false);
-        assert.equal(
-          fs.readFileSync(path.join(stage, 'oxfmt.config.ts'), 'utf8'),
-          fs.readFileSync(path.join(workspaceDir, 'oxfmt.config.ts'), 'utf8'),
-        );
-        return prepareSameContractUpdate(
-          createMigrationIo(stage, false, workspaceDir),
-          JSON.parse(
-            fs.readFileSync(
-              path.join(stage, '.modernjs/ultramodern.json'),
-              'utf8',
-            ),
+  }
+  updateGeneratedPnpmWorkspacePolicy(
+    createMigrationIo(workspaceDir, false),
+    packageSource,
+    { releaseCohort: source },
+  );
+  const policyPath = path.join(workspaceDir, 'pnpm-workspace.yaml');
+  const originalPolicy = fs.readFileSync(policyPath, 'utf8');
+  const comment =
+    '# authored policy comment: @bleedingdev/modern-js-runtime@3.9.0-ultramodern.5\r\n';
+  fs.writeFileSync(
+    policyPath,
+    comment + originalPolicy.replaceAll('\n', '\r\n'),
+  );
+  const before = snapshotWorkspace(workspaceDir);
+  const prepareStaged = (installedSource: typeof source) =>
+    runWorkspaceTransaction(workspaceDir, stage => {
+      assert.notEqual(stage, workspaceDir);
+      assert.equal(fs.existsSync(path.join(stage, 'node_modules')), false);
+      assert.equal(
+        fs.readFileSync(path.join(stage, 'oxfmt.config.ts'), 'utf8'),
+        fs.readFileSync(path.join(workspaceDir, 'oxfmt.config.ts'), 'utf8'),
+      );
+      return prepareSameContractUpdate(
+        createMigrationIo(stage, false, workspaceDir),
+        JSON.parse(
+          fs.readFileSync(
+            path.join(stage, '.modernjs/ultramodern.json'),
+            'utf8',
           ),
-          { ...packageSource, modernPackageVersion: target.release.version },
-          target,
-          installedSource,
-        );
-      });
-    const plan = prepareStaged(source);
+        ),
+        { ...packageSource, modernPackageVersion: target.release.version },
+        target,
+        installedSource,
+      );
+    });
+  return {
+    tempRoot,
+    workspaceDir,
+    validatorPath,
+    source,
+    target,
+    packageSource,
+    before,
+    originalPolicy,
+    comment,
+    policyPath,
+    raw,
+    prepareStaged,
+  };
+}
+
+test('native same-contract classifier accepts only exact cohort policy advancement and repeats without writes', () => {
+  const ctx = setupNativeCohortWorkspace('cohort-policy');
+  try {
+    const plan = ctx.prepareStaged(ctx.source);
     assert.equal(plan.classification, 'same-contract', plan.reason);
-    assert.deepEqual(snapshotWorkspace(workspaceDir), before);
+    assert.deepEqual(snapshotWorkspace(ctx.workspaceDir), ctx.before);
     const write = plan.writes.find(item => item.path === 'pnpm-workspace.yaml');
     assert.ok(write);
     assert.deepEqual(write.pointers, ['/minimumReleaseAgeExclude']);
     assert.equal(
       write.content,
-      comment +
-        originalPolicy
+      ctx.comment +
+        ctx.originalPolicy
           .replace(
             '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.5',
             '@bleedingdev/modern-js-runtime@3.9.0-ultramodern.6',
@@ -706,62 +313,86 @@ test.each([
     assert.ok(
       plan.writes.every(item => !/\.(?:[cm]?[jt]sx?)$/.test(item.path)),
     );
-    const alteredPolicy = yaml.load(before['pnpm-workspace.yaml']) as Record<
-      string,
-      unknown
-    >;
+
+    for (const item of plan.writes)
+      fs.writeFileSync(path.join(ctx.workspaceDir, item.path), item.content);
+    const repeated = ctx.prepareStaged(ctx.target);
+    assert.equal(repeated.classification, 'same-contract', repeated.reason);
+    assert.deepEqual(repeated.writes, []);
+  } finally {
+    fs.rmSync(ctx.tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('native same-contract classifier falls back to historical migration when the policy shape is incompatible or the validator is authored', () => {
+  const ctx = setupNativeCohortWorkspace('cohort-policy-ownership');
+  try {
+    const plan = ctx.prepareStaged(ctx.source);
+    assert.equal(plan.classification, 'same-contract', plan.reason);
+
+    const alteredPolicy = yaml.load(
+      ctx.before['pnpm-workspace.yaml'],
+    ) as Record<string, unknown>;
     delete alteredPolicy.trustPolicy;
-    fs.writeFileSync(policyPath, yaml.dump(alteredPolicy));
+    fs.writeFileSync(ctx.policyPath, yaml.dump(alteredPolicy));
     const incompatible = prepareSameContractUpdate(
-      createMigrationIo(workspaceDir, true),
-      raw,
-      { ...packageSource, modernPackageVersion: target.release.version },
-      target,
-      source,
+      createMigrationIo(ctx.workspaceDir, true),
+      ctx.raw,
+      {
+        ...ctx.packageSource,
+        modernPackageVersion: ctx.target.release.version,
+      },
+      ctx.target,
+      ctx.source,
     );
     assert.equal(incompatible.classification, 'historical-migration');
-    fs.writeFileSync(policyPath, before['pnpm-workspace.yaml']);
+    fs.writeFileSync(ctx.policyPath, ctx.before['pnpm-workspace.yaml']);
     assert.throws(
       () =>
         prepareSameContractUpdate(
-          createMigrationIo(workspaceDir, true),
-          raw,
-          { ...packageSource, modernPackageVersion: target.release.version },
-          target,
-          target,
+          createMigrationIo(ctx.workspaceDir, true),
+          ctx.raw,
+          {
+            ...ctx.packageSource,
+            modernPackageVersion: ctx.target.release.version,
+          },
+          ctx.target,
+          ctx.target,
         ),
       /installed source cohort/,
     );
+
     for (const item of plan.writes)
-      fs.writeFileSync(path.join(workspaceDir, item.path), item.content);
-    const repeated = prepareStaged(target);
-    assert.equal(repeated.classification, 'same-contract', repeated.reason);
-    assert.deepEqual(repeated.writes, []);
+      fs.writeFileSync(path.join(ctx.workspaceDir, item.path), item.content);
     const authoredValidator =
-      fs.readFileSync(validatorPath, 'utf8') +
+      fs.readFileSync(ctx.validatorPath, 'utf8') +
       "\nexport const consumerValidationPolicy = 'keep';\n";
-    fs.writeFileSync(validatorPath, authoredValidator);
-    const authoredBefore = snapshotWorkspace(workspaceDir);
-    const authoredPlan = prepareStaged(target);
+    fs.writeFileSync(ctx.validatorPath, authoredValidator);
+    const authoredBefore = snapshotWorkspace(ctx.workspaceDir);
+    const authoredPlan = ctx.prepareStaged(ctx.target);
     assert.equal(authoredPlan.classification, 'historical-migration');
     assert.match(authoredPlan.reason, /validator/);
-    assert.deepEqual(snapshotWorkspace(workspaceDir), authoredBefore);
+    assert.deepEqual(snapshotWorkspace(ctx.workspaceDir), authoredBefore);
+
     const file = (content: string) => ({
       content: Buffer.from(content),
       mode: 0o644,
     });
+    const write = plan.writes.find(
+      item => item.path === 'pnpm-workspace.yaml',
+    )!;
     assert.throws(
       () =>
         assertSameContractDelta(plan, [
           {
             relativePath: 'pnpm-workspace.yaml',
-            before: file(before['pnpm-workspace.yaml']),
+            before: file(ctx.before['pnpm-workspace.yaml']),
             after: file(write.content + 'trustPolicy: off\n'),
           },
         ]),
       /unapproved change/,
     );
   } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    fs.rmSync(ctx.tempRoot, { recursive: true, force: true });
   }
 });

@@ -272,11 +272,6 @@ describe('ultramodern boundary debugger browser overlay', () => {
       ).not.toBeNull();
     });
 
-    const overlay = document.querySelector(
-      '[data-modern-boundary-overlay-label="Checkout"]',
-    ) as HTMLElement;
-    expect(overlay.style.width).toBe('160px');
-
     rects.set('late-checkout', new DOMRect(24, 48, 220, 56));
     const boundaryObserver = resizeObservers.find(observer =>
       observer.elements.has(boundary),
@@ -292,6 +287,43 @@ describe('ultramodern boundary debugger browser overlay', () => {
       ) as HTMLElement | null;
       expect(resizedOverlay?.style.width).toBe('220px');
       expect(resizedOverlay?.style.height).toBe('56px');
+    });
+  });
+  test('renders non-intrusive overlays naming the boundary owner and exposed module', async () => {
+    let WrappedApp: React.ComponentType | undefined;
+    ultramodernBoundaryDebuggerPlugin({
+      enabledByDefault: true,
+      metadata: {
+        appId: 'shell',
+        boundaries: [
+          { appId: 'checkout', label: 'Checkout', mfName: 'verticalCheckout' },
+        ],
+        schemaVersion: 1,
+      },
+    }).setup?.({
+      wrapRoot(factory: (App: React.ComponentType) => React.ComponentType) {
+        WrappedApp = factory(() => (
+          <main>
+            <section
+              data-modern-boundary-id="verticalCheckout"
+              data-modern-mf-expose="./Controls"
+              data-testid="checkout-control"
+            />
+          </main>
+        ));
+      },
+    } as any);
+    const App = WrappedApp!;
+    render(<App />);
+
+    await waitFor(() => {
+      const overlay = document.querySelector(
+        '[data-modern-boundary-overlay-label="Checkout"]',
+      ) as HTMLElement | null;
+      expect(overlay?.style.position).toBe('fixed');
+      expect(overlay?.style.pointerEvents).toBe('none');
+      expect(overlay?.textContent).toContain('Checkout');
+      expect(overlay?.textContent).toContain('./Controls');
     });
   });
 });

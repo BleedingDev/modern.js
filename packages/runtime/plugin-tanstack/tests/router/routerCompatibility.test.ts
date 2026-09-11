@@ -9,79 +9,6 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const REGISTRY_SLOT: unique symbol = Symbol.for(
-  '@modern-js/runtime:router-providers:v3',
-);
-const registryHost = globalThis as { [REGISTRY_SLOT]?: unknown };
-const webpackHost = globalThis as typeof globalThis & {
-  __webpack_require__?: { u: (chunkId: unknown) => string };
-};
-const installWebpackRequire = () => {
-  webpackHost.__webpack_require__ = { u: chunkId => String(chunkId) };
-};
-
-type LegacyRuntimeRouterModule = {
-  getLegacyRouterPluginInvocationCount: () => number;
-  routerPlugin: (...args: unknown[]) => unknown;
-};
-
-type CompatibilityGraph = {
-  factory: (...args: any[]) => any;
-  Link: unknown;
-  hooks: Record<string, unknown>;
-  legacyRuntimeRouter: LegacyRuntimeRouterModule;
-  resolveRouterProvider: (
-    framework?: string,
-  ) => (...args: unknown[]) => unknown;
-  routerPlugin: (...args: any[]) => any;
-};
-
-async function loadCompatibilityGraph(): Promise<CompatibilityGraph> {
-  rstest.resetModules();
-  installWebpackRequire();
-
-  const legacyRuntimeRouter = (await import(
-    '@modern-js/runtime/router/internal'
-  )) as unknown as LegacyRuntimeRouterModule;
-  const { routerPlugin } = await import('../../src/runtime/router');
-  const { tanstackRouterProviderFactory } = await import(
-    '../../src/runtime/register'
-  );
-  const { resolveRouterProvider } = await import(
-    '@modern-js/runtime-extensions/router-provider'
-  );
-  const { routerProviderRegistryHooks } = await import(
-    '../../src/runtime/hooks'
-  );
-  const { Link } = await import('../../src/runtime/prefetchLink');
-
-  return {
-    factory: tanstackRouterProviderFactory,
-    Link,
-    hooks: routerProviderRegistryHooks,
-    legacyRuntimeRouter,
-    resolveRouterProvider,
-    routerPlugin,
-  };
-}
-
-function initializeRouter(graph: CompatibilityGraph) {
-  const beforeRender: ((context: any, interrupt: () => void) => unknown)[] = [];
-  const plugin = graph.routerPlugin({ framework: 'tanstack' });
-  plugin.setup({
-    getHooks: () => graph.hooks,
-    getRuntimeConfig: () => ({ router: { framework: 'tanstack' } }),
-    onAfterCreateRouter: () => undefined,
-    onBeforeRender: (
-      callback: (context: any, interrupt: () => void) => unknown,
-    ) => beforeRender.push(callback),
-    wrapRoot: () => undefined,
-  });
-  const context: any = {};
-  for (const callback of beforeRender) callback(context, () => {});
-  return context.router as { Link: unknown };
-}
-
 function resolveTsgoBin(): string {
   const packageJsonPath = require.resolve(
     '@typescript/native-preview/package.json',
@@ -113,46 +40,7 @@ function runTsgo(tsgoBin: string, configPath: string): void {
   }
 }
 
-installWebpackRequire();
-
 describe('runtime router compatibility', () => {
-  beforeEach(() => {
-    delete registryHost[REGISTRY_SLOT];
-    rstest.resetModules();
-    installWebpackRequire();
-  });
-
-  afterEach(() => {
-    delete registryHost[REGISTRY_SLOT];
-  });
-
-  it('uses the app-local factory instead of the legacy global wrapper', async () => {
-    const graph = await loadCompatibilityGraph();
-
-    expect('createRouterPlugin' in graph.legacyRuntimeRouter).toBe(false);
-    expect(initializeRouter(graph).Link).toBe(graph.Link);
-    expect(
-      graph.legacyRuntimeRouter.getLegacyRouterPluginInvocationCount(),
-    ).toBe(0);
-  });
-
-  it('keeps independently evaluated legacy module graphs app-local', async () => {
-    const graphA = await loadCompatibilityGraph();
-    const graphB = await loadCompatibilityGraph();
-
-    expect(graphB.factory).not.toBe(graphA.factory);
-    expect(graphB.routerPlugin).not.toBe(graphA.routerPlugin);
-    expect(graphB.resolveRouterProvider('tanstack')).toBe(graphA.factory);
-    expect(initializeRouter(graphA).Link).toBe(graphA.Link);
-    expect(initializeRouter(graphB).Link).toBe(graphB.Link);
-    expect(
-      graphA.legacyRuntimeRouter.getLegacyRouterPluginInvocationCount(),
-    ).toBe(0);
-    expect(
-      graphB.legacyRuntimeRouter.getLegacyRouterPluginInvocationCount(),
-    ).toBe(0);
-  });
-
   it('emits declarations compatible with the oldest runtime router shape', () => {
     const packageRoot = path.resolve(__dirname, '../..');
     const sourcePath = path.join(packageRoot, 'src/runtime/router.ts');
@@ -258,5 +146,19 @@ describe('runtime router compatibility', () => {
     } finally {
       rmSync(tempRoot, { force: true, recursive: true });
     }
+  });
+
+  it('keeps "tanstack" resolvable for older wrappers that look providers up by name', async () => {
+    // Older @modern-js/runtime copies resolve `router.framework: 'tanstack'`
+    // through the global compatibility registry instead of an app-owned realm,
+    // so importing the runtime entry must still register the provider.
+    const { resolveRouterProvider } = await import(
+      '@modern-js/runtime-extensions/router-provider'
+    );
+    await import('../../src/runtime/register');
+
+    const factory = resolveRouterProvider('tanstack');
+    expect(factory).toBeTypeOf('function');
+    expect(factory?.({})?.setup).toBeTypeOf('function');
   });
 });

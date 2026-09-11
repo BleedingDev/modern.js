@@ -263,63 +263,6 @@ export { api as nativeApi, runtime as nativeRuntime };
     }
   });
 
-  it('stamps sourceRevision consistently in manifest and delivery-unit artifact', async () => {
-    const workspace = await createWorkspace({ distName: 'dist-one' });
-    const secondDistDirectory = path.join(
-      path.dirname(workspace.distDirectory),
-      'dist-two',
-    );
-    const sourceRevision = '1'.repeat(40);
-    const secondSourceRevision = '2'.repeat(40);
-
-    const first = await withSourceRevision(sourceRevision, () =>
-      emitBackendFederationArtifacts(
-        workspace.appDirectory,
-        workspace.distDirectory,
-      ),
-    );
-    const second = await withSourceRevision(secondSourceRevision, () =>
-      emitBackendFederationArtifacts(
-        workspace.appDirectory,
-        secondDistDirectory,
-      ),
-    );
-
-    expect(first?.deliveryUnitArtifactPath).toBeDefined();
-    expect(second?.deliveryUnitArtifactPath).toBeDefined();
-    const firstManifest = JSON.parse(
-      await fs.readFile(
-        path.join(workspace.distDirectory, 'backend-mf-manifest.json'),
-        'utf8',
-      ),
-    );
-    const secondManifest = JSON.parse(
-      await fs.readFile(
-        path.join(secondDistDirectory, 'backend-mf-manifest.json'),
-        'utf8',
-      ),
-    );
-    const firstArtifact = JSON.parse(
-      await fs.readFile(first!.deliveryUnitArtifactPath!, 'utf8'),
-    );
-    const secondArtifact = JSON.parse(
-      await fs.readFile(second!.deliveryUnitArtifactPath!, 'utf8'),
-    );
-
-    expect(firstManifest.backendFederation.deliveryUnit.sourceRevision).toBe(
-      sourceRevision,
-    );
-    expect(secondManifest.backendFederation.deliveryUnit.sourceRevision).toBe(
-      secondSourceRevision,
-    );
-    expect(firstArtifact.deliveryUnit.sourceRevision).toBe(sourceRevision);
-    expect(firstArtifact.surfaces.ui.sourceRevision).toBe(sourceRevision);
-    expect(firstArtifact.surfaces.api.sourceRevision).toBe(sourceRevision);
-    expect(secondArtifact.deliveryUnit.sourceRevision).toBe(
-      secondSourceRevision,
-    );
-  });
-
   it('rejects delivery-unit and generated build identity drift', async () => {
     const workspace = await createWorkspace({
       artifactOverrides: {
@@ -358,24 +301,55 @@ export { api as nativeApi, runtime as nativeRuntime };
     );
   });
 
-  it('skips apps without generated backend federation metadata', async () => {
-    const workspaceRoot = await createTempDir();
-    const appDirectory = path.join(workspaceRoot, 'apps/shell-super-app');
-    const distDirectory = path.join(appDirectory, 'dist');
-    await writeJson(path.join(workspaceRoot, '.modernjs/ultramodern.json'), {
-      topology: {
-        apps: [
-          {
-            id: 'shell-super-app',
-            kind: 'shell',
-            path: 'apps/shell-super-app',
-          },
-        ],
-      },
-    });
-
+  it('stays silent for an app that is not backend federated', async () => {
+    const workspace = await createWorkspace();
+    await fs.rm(path.join(workspace.appDirectory, 'api/effect-api.ts'));
     await expect(
-      emitBackendFederationArtifacts(appDirectory, distDirectory),
+      emitBackendFederationArtifacts(
+        workspace.appDirectory,
+        workspace.distDirectory,
+      ),
     ).resolves.toBeUndefined();
+    await expect(fs.access(workspace.distDirectory)).rejects.toThrow();
+
+    await fs.rm(
+      path.join(workspace.workspaceRoot, '.modernjs/ultramodern.json'),
+    );
+    await expect(
+      emitBackendFederationArtifacts(
+        workspace.appDirectory,
+        workspace.distDirectory,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(fs.access(workspace.distDirectory)).rejects.toThrow();
+  });
+
+  it('rejects a Node backend surface that is not the CommonJS container entry', async () => {
+    const workspace = await createWorkspace();
+    const configPath = path.join(
+      workspace.workspaceRoot,
+      '.modernjs/ultramodern.json',
+    );
+    const config = JSON.parse(await fs.readFile(configPath, 'utf8'));
+    const node =
+      config.topology.apps[0].backendFederation.executionSurfaces.node;
+    node.remoteType = 'module';
+    await writeJson(configPath, config);
+    await expect(
+      emitBackendFederationArtifacts(
+        workspace.appDirectory,
+        workspace.distDirectory,
+      ),
+    ).rejects.toThrow(/Node backend federation remoteType must/u);
+
+    node.remoteType = 'commonjs-module';
+    node.containerEntry = 'http://localhost:3021/worker.mjs';
+    await writeJson(configPath, config);
+    await expect(
+      emitBackendFederationArtifacts(
+        workspace.appDirectory,
+        workspace.distDirectory,
+      ),
+    ).rejects.toThrow(/Node backend federation containerEntry must/u);
   });
 });

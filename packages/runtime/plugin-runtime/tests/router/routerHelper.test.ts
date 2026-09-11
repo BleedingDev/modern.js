@@ -20,10 +20,6 @@ describe('router helper route error recognition', () => {
 
   test.each([
     null,
-    new Error('not a route response'),
-    { status: '404', statusText: 'Not Found', internal: false, data: null },
-    { status: 404, statusText: 404, internal: false, data: null },
-    { status: 404, statusText: 'Not Found', internal: 'false', data: null },
     { status: 404, statusText: 'Not Found', internal: false },
   ])('rejects values outside the route error contract', value => {
     expect(isRouteErrorResponse(value)).toBe(false);

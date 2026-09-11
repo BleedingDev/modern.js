@@ -1,9 +1,12 @@
 import {
   classifyModuleFederationFallback,
-  emitModuleFederationFallbackTelemetry,
+  consumeSurface,
+  createLastKnownGoodProvider,
+  type DiscoveryResult,
   ModuleFederationRemoteComponentContractError,
   ModuleFederationRemoteLoadError,
   ModuleFederationRemoteLoadTimeoutError,
+  type ResolvedDeliveryUnit,
 } from '../../src/module-federation';
 
 describe('module federation degraded telemetry', () => {
@@ -39,91 +42,70 @@ describe('module federation degraded telemetry', () => {
       ),
     ).toBe('remote-unavailable');
   });
+});
 
-  test('posts a classified fallback signal with trust fields only when requested', async () => {
-    const fetchImpl = rs.fn(async () => new Response('ok', { status: 202 }));
+const cartUnit = (): ResolvedDeliveryUnit => ({
+  unitId: 'acme/checkout',
+  buildMarker: 'bm-1',
+  sourceRevision: 'rev-1',
+  baselineCohortId: 'cohort-1',
+  surfaces: [
+    {
+      surfaceId: 'cart',
+      kind: 'component',
+      locations: [
+        {
+          platform: 'browser-mf-manifest',
+          manifestUrl: 'https://cdn/mf-manifest.json',
+        },
+      ],
+    },
+  ],
+  compatibility: { status: 'compatible', baselineCohortId: 'cohort-1' },
+});
 
-    await expect(
-      emitModuleFederationFallbackTelemetry(
-        {
-          appName: 'crm-shell',
-          classification: 'network',
-          entry: 'https://erp.example.com/remoteEntry.js',
-          error: new Error('failed to fetch chunk'),
-          exportName: 'default',
-          metadata: {
-            compatibility: {
-              '@tanstack/react-router': '1.170.15',
-            },
-          },
-          phase: 'load',
-          remote: 'remote/Widget',
-          runtimeDigest: 'digest-crm-v1',
-        },
-        {
-          authToken: 'runtime-token',
-          endpoint: '/_modern/contract-gates/runtime-fallback',
-          fetchImpl,
-        },
-      ),
-    ).resolves.toEqual({
-      dispatched: true,
-      posted: true,
-      postStatus: 202,
+const offline: DiscoveryResult = {
+  ok: false,
+  error: {
+    code: 'provider-unavailable',
+    ref: 'acme/checkout#cart',
+    message: 'offline',
+  },
+};
+
+describe('degraded remote consumption', () => {
+  test('an unavailable remote renders the fallback instead of throwing', async () => {
+    const value = await consumeSurface<string>({
+      ref: 'acme/checkout#cart',
+      env: 'prod',
+      appName: 'shell',
+      classification: 'noncritical',
+      provider: { name: 'offline', resolve: () => offline },
+      load: () => 'live',
+      degraded: () => 'fallback-ui',
     });
 
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
-    expect(url).toBe('/_modern/contract-gates/runtime-fallback');
-    expect(init.method).toBe('POST');
-    expect(
-      (init.headers as Headers).get('x-modernjs-runtime-signal-token'),
-    ).toBe('runtime-token');
-    expect(JSON.parse(String(init.body))).toMatchObject({
-      appName: 'crm-shell',
-      entry: 'https://erp.example.com/remoteEntry.js',
-      eventName: 'modernjs:mf-runtime-fallback',
-      phase: 'load',
-      reason: 'network',
-      runtimeDigest: 'digest-crm-v1',
-      schemaVersion: 1,
-      metadata: {
-        classification: 'network',
-        compatibility: {
-          '@tanstack/react-router': '1.170.15',
-        },
-        errorName: 'Error',
-        errorMessage: 'failed to fetch chunk',
-        exportName: 'default',
-        remote: 'remote/Widget',
-        runtimeDigest: 'digest-crm-v1',
-        status: 'degraded',
-      },
-    });
+    expect(value).toBe('fallback-ui');
   });
 
-  test('emits recovery events without mutating runtime fallback gates by default', async () => {
-    const fetchImpl = rs.fn(async () => new Response('ok', { status: 202 }));
-
-    await expect(
-      emitModuleFederationFallbackTelemetry(
-        {
-          appName: 'crm-shell',
-          classification: 'remote-unavailable',
-          phase: 'recover',
-          remote: 'remote/Widget',
-          status: 'recovered',
+  test('last-known-good serves the previous record marked degraded', async () => {
+    let calls = 0;
+    const lkg = createLastKnownGoodProvider({
+      provider: {
+        name: 'scripted',
+        resolve: () => {
+          calls += 1;
+          return calls === 1 ? { ok: true, unit: cartUnit() } : offline;
         },
-        {
-          fetchImpl,
-        },
-      ),
-    ).resolves.toEqual({
-      dispatched: true,
-      posted: false,
+      },
     });
-    expect(fetchImpl).not.toHaveBeenCalled();
+    const ref = { unitId: 'acme/checkout', surfaceId: 'cart' };
+
+    await lkg.resolve(ref, 'prod');
+    const served = await lkg.resolve(ref, 'prod');
+
+    expect(served.ok).toBe(true);
+    expect(served.ok && served.unit.buildMarker).toBe('bm-1');
+    expect(served.ok && served.unit.compatibility.status).toBe('degraded');
   });
 });

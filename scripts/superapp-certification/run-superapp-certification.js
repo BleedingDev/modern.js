@@ -83,33 +83,22 @@ function command(id, commandName, args, options = {}) {
   };
 }
 
-function artifactDir(outDir, name) {
-  return path.join(outDir, 'artifacts', name);
-}
-
-function certificationCommands(profile, outDir) {
+function certificationCommands(profile) {
   const rstestArgs = ['exec', 'rstest', 'run', '-c', 'rstest.config.mts'];
   // Keep the profile option as a compatibility label for existing callers,
   // but run one real generated-app acceptance path for every profile. The
-  // former portfolio smoke/security/stress/chaos/nightly selections either
-  // exercised deleted suites or only asserted fixture-authored metadata.
+  // former deploy-certification suite (and the portfolio smoke/security/
+  // stress/chaos/nightly selections before it) exercised deleted or
+  // fixture-authored-only assertions; this points at the live cross-remote
+  // MF suite in test/index.test.ts instead.
   return [
     command(
       'superapp-mf-certification',
       'pnpm',
-      [
-        ...rstestArgs,
-        'integration/routes-tanstack-mf/test/deploy-certification.test.ts',
-      ],
+      [...rstestArgs, 'integration/routes-tanstack-mf/test/index.test.ts'],
       {
         cwd: path.join(repoRoot, 'tests'),
-        env: {
-          SUPERAPP_MF_CERTIFICATION: '1',
-          SUPERAPP_MF_CERTIFICATION_ARTIFACT_DIR: artifactDir(
-            outDir,
-            'mf-certification',
-          ),
-        },
+        env: {},
         profile,
       },
     ),
@@ -336,7 +325,7 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const commands = options.driftOnly
     ? []
-    : certificationCommands(options.profile, options.outDir);
+    : certificationCommands(options.profile);
   const commandResults = runCommands(commands, options);
   const mergeConflictCheck = runMergeConflictCheck(options);
   const summary = writeSummary(

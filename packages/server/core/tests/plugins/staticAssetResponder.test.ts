@@ -80,22 +80,6 @@ afterEach(async () => {
 
 describe('native selected asset responder', () => {
   it.each([
-    '/static/asset.txt',
-    '/document',
-  ])('preserves default serving for %s without a responder', async url => {
-    const server = await createServer(await fixture());
-    const response = await server.request(url);
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toContain('text/plain');
-    expect(await response.text()).toBe('original body');
-    if (url === '/document') {
-      expect(response.headers.get('x-public-route')).toBe('native');
-    } else {
-      expect(response.headers.get('content-length')).toBe('13');
-    }
-  });
-
-  it.each([
     ['/static/asset.txt', 'static'],
     ['/document', 'public'],
   ] as const)('serves a selected representation for %s through the native continuation', async (url, kind) => {

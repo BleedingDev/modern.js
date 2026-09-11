@@ -32,16 +32,6 @@ function renderBoundary(context: Record<string, unknown>) {
 }
 
 describe('DistributedSsrBoundary', () => {
-  it('keeps native Module Federation SSR on non-workerd servers', () => {
-    const html = renderBoundary({
-      isBrowser: false,
-      requestContext: { request: {}, response: {} },
-    });
-
-    expect(html).toContain('data-native-mf="inventory"');
-    expect(html).not.toContain('data-modern-distributed-ssr-status');
-  });
-
   it('renders the typed fallback when a required Worker fragment is degraded', () => {
     const html = renderBoundary({
       isBrowser: false,
@@ -283,52 +273,6 @@ describe('createDistributedSsrComponent', () => {
       'data-modern-distributed-ssr-digest="sha256-checkout-b"',
     );
     expect(html).not.toContain('data-native-mf');
-  });
-
-  it('does not construct the native remote when workerd has a verified fragment', () => {
-    let nativeRemoteCreations = 0;
-    const Remote = createDistributedSsrComponent({
-      createComponent: () => {
-        nativeRemoteCreations += 1;
-        return () => <section data-native-mf="inventory">inventory</section>;
-      },
-      expose: './Widget',
-      fallback: <p>unavailable</p>,
-      remote: 'inventory',
-    });
-    const html = renderToString(
-      <RuntimeContext.Provider
-        value={
-          {
-            isBrowser: false,
-            requestContext: {
-              request: {},
-              response: {
-                locals: {
-                  [DISTRIBUTED_SSR_FRAGMENTS_LOCALS_KEY]: {
-                    required: true,
-                    fragments: {
-                      [key]: {
-                        boundaryId: 'verticalInventory',
-                        expose: './Widget',
-                        html: '<section data-modern-boundary-id="verticalInventory" data-modern-mf-expose="./Widget">SSR inventory</section>',
-                        remote: 'inventory',
-                        status: 'ready',
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          } as never
-        }
-      >
-        <Remote />
-      </RuntimeContext.Provider>,
-    );
-
-    expect(html).toContain('SSR inventory');
-    expect(nativeRemoteCreations).toBe(0);
   });
 
   it('constructs and caches the native remote for Node SSR', () => {

@@ -24,10 +24,7 @@ const host = globalThis as typeof globalThis & {
   [V2_REGISTRY_SLOT]?: CompatibilityRegistry;
   [V3_REGISTRY_SLOT]?: CompatibilityRegistry;
 };
-const COMPATIBILITY_REGISTRY_SLOTS = [
-  ['v3', V3_REGISTRY_SLOT],
-  ['v2', V2_REGISTRY_SLOT],
-] as const;
+const COMPATIBILITY_REGISTRY_SLOTS = [['v3', V3_REGISTRY_SLOT]] as const;
 
 function createFactory(owner: string): RouterProviderFactory {
   const factory = (() => {

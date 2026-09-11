@@ -92,8 +92,8 @@ The fork has one live composition lane and two router lanes:
 
 | Composition | Coverage |
 | --- | --- |
-| TanStack single app + Effect BFF + string SSR | `tests/integration/superapp-portfolio` (including the folded MegaERP approval/chat flows) + `superapp-browser-matrix` runtime-matrix tests |
-| TanStack + Module Federation host/remotes (incl. the `moduleFederationAppSSR: true` runtime contract — `tests/tanstack-mf-contract.test.ts:281` — and remote-loader reliability) | `tests/integration/routes-tanstack-mf` |
+| TanStack single app + Effect BFF + string SSR | `tests/integration/superapp-portfolio` (including the folded MegaERP approval/chat flows) + `superapp-portfolio/tests/browser-runtime-matrix.test.ts` runtime-matrix tests |
+| TanStack + Module Federation host/remotes (incl. the `moduleFederationAppSSR: true` runtime contract — `test/index.test.ts`'s `maps MF loader redirects and notFound responses through TanStack SSR` and `publishes the live MF manifest ABI used by native remotes` cases — and remote-loader reliability) | `tests/integration/routes-tanstack-mf` |
 | react-router + app-level MF SSR + i18n (the suite that asserts the `MODERN_MF_APP_SSR` env marker, `test/app-level-ssr-serve.test.ts:46`) | `tests/integration/i18n/mf` |
 
 ## 5. Constraints

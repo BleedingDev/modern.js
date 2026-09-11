@@ -120,6 +120,17 @@ describe('backend federation contract validation matrix', () => {
     expect(errorPaths(result.errors)).toEqual(['deliveryUnit.unitId']);
   });
 
+  it('rejects identity strings that trim to empty', () => {
+    const result = validateDeliveryUnitIdentity({
+      unitId: '   ',
+      buildMarker: 'checkout-build',
+      sourceRevision: 'workspace',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(errorPaths(result.errors)).toEqual(['deliveryUnit.unitId']);
+  });
+
   it('rejects a missing manifest delivery-unit identity field', () => {
     const manifest = createValidManifest();
     delete manifestDeliveryUnit(manifest).unitId;
@@ -232,5 +243,17 @@ describe('backend federation contract validation matrix', () => {
       message: 'must match artifact.deliveryUnit.buildMarker.',
     });
     expect(isUltramodernBuildArtifact(driftedArtifact)).toBe(false);
+  });
+
+  it('accepts the singular metadata expose emitted by backend federation codegen', () => {
+    const manifest = createValidManifest();
+    const metadata = manifest.backendFederation as unknown as MutableRecord;
+
+    delete (manifest as unknown as MutableRecord).exposes;
+    metadata.expose = BACKEND_FEDERATION_EFFECT_EXPOSE;
+
+    expect(
+      validateBackendFederationManifest(manifest, manifestValidationOptions),
+    ).toEqual({ ok: true, errors: [] });
   });
 });

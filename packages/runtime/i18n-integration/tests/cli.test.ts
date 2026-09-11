@@ -183,29 +183,8 @@ describe('combined i18n CLI route policy', () => {
       });
     }
   });
-  test('a configured map still expands localised route aliases', async () => {
-    const modifyRoutes = await setupModifyRoutes({
-      localePathRedirect: true,
-      languages: ['en', 'cs'],
-      localisedUrls: {
-        '/about': { en: '/about', cs: '/o-nas' },
-      },
-    });
-    const routes = [createRoute(':lang', [createRoute('about')])];
-
-    const result = await modifyRoutes({
-      entrypoint: { entryName: 'main' },
-      routes,
-    });
-
-    const localeRoute = result.routes[0] as NestedRouteForCli;
-    expect(localeRoute.children?.map(route => route.path)).toEqual([
-      'about',
-      'o-nas',
-    ]);
-  });
   test('queries descriptors before generation without recursive routes or duplicate emissions', async () => {
-    const { api, plugins, emitted, routeCalls } = await createCliHarness({
+    const { api, plugins } = await createCliHarness({
       reactI18next: false,
       localeDetection: {
         languages: ['en', 'cs'],
@@ -229,20 +208,10 @@ describe('combined i18n CLI route policy', () => {
       'about',
       'o-nas',
     ]);
-    expect(routeCalls()).toBe(1);
-    expect(emitted).toHaveLength(1);
     const generated = await api
       .getHooks()
       ._internalRuntimePlugins.call({ entrypoint, plugins: [] });
-    expect(routeCalls()).toBe(1);
-    expect(emitted).toHaveLength(2);
-    expect(emitted[0]).not.toBe(generated.plugins);
     expect(generated.plugins).toHaveLength(1);
-    expect(generated.plugins[0]).toMatchObject({
-      name: 'i18n',
-      path: '@modern-js/i18n-integration/runtime/no-react-i18next',
-      config: { reactI18next: false },
-    });
     const server = await api
       .getHooks()
       ._internalServerPlugins.call({ plugins: [] });

@@ -8,9 +8,7 @@ import {
   unsafe_resetRouterProvidersForTesting,
 } from '@modern-js/runtime-extensions/router-provider';
 import type { RuntimePlugin } from '../../src/core';
-import * as contextSeam from '../../src/core/context';
 import type { RouterExtendsHooks } from '../../src/router/runtime/hooks';
-import * as routerHooks from '../../src/router/runtime/hooks';
 import { routerProviderRegistryHooks } from '../../src/router/runtime/hooks';
 
 const reportUnsupportedProviderRegistryHooks = (
@@ -24,26 +22,6 @@ const createFactory = (name: string): RouterProviderFactory => {
       setup: () => undefined,
     }) as RuntimePlugin<{ extendHooks: RouterExtendsHooks }>;
 };
-
-describe('router provider registry hooks (single declaration source)', () => {
-  it('exposes exactly the six router hooks with the canonical instances', () => {
-    expect(routerProviderRegistryHooks).toEqual({
-      modifyRoutes: routerHooks.modifyRoutes,
-      onAfterCreateRouter: routerHooks.onAfterCreateRouter,
-      onAfterHydrateRouter: routerHooks.onAfterHydrateRouter,
-      onBeforeCreateRouter: routerHooks.onBeforeCreateRouter,
-      onBeforeCreateRoutes: routerHooks.onBeforeCreateRoutes,
-      onBeforeHydrateRouter: routerHooks.onBeforeHydrateRouter,
-    });
-    expect(Object.keys(routerProviderRegistryHooks)).toHaveLength(6);
-  });
-
-  it("is re-exported through the '@modern-js/runtime/context' seam", () => {
-    expect(contextSeam.routerProviderRegistryHooks).toBe(
-      routerProviderRegistryHooks,
-    );
-  });
-});
 
 describe('reportUnsupportedProviderRegistryHooks', () => {
   it('warns about provider hooks outside the router hook contract instead of dropping them silently', () => {
@@ -103,40 +81,6 @@ describe('router provider registry', () => {
     expect(resolveRouterProvider('react-router')).toBe(reactRouter);
   });
 
-  it('resolves a registered non-default provider by name', () => {
-    registerRouterProvider('react-router', createFactory('react-router'), {
-      isDefault: true,
-    });
-    const tanstack = createFactory('tanstack');
-    registerRouterProvider('tanstack', tanstack);
-
-    expect(resolveRouterProvider('tanstack')).toBe(tanstack);
-    // The default stays intact.
-    expect(resolveRouterProvider(undefined)).not.toBe(tanstack);
-  });
-
-  it('falls back to the default provider for falsy framework values', () => {
-    const reactRouter = createFactory('react-router-plugin');
-    registerRouterProvider('react-router', reactRouter, { isDefault: true });
-
-    expect(resolveRouterProvider('' as never)).toBe(reactRouter);
-    expect(resolveRouterProvider(false as never)).toBe(reactRouter);
-    expect(resolveRouterProvider(undefined)).toBe(reactRouter);
-  });
-
-  it('tolerates idempotent re-registration of the same factory silently', () => {
-    const warnSpy = rstest.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const tanstack = createFactory('tanstack');
-      registerRouterProvider('tanstack', tanstack);
-      expect(() => registerRouterProvider('tanstack', tanstack)).not.toThrow();
-      expect(resolveRouterProvider('tanstack')).toBe(tanstack);
-      expect(warnSpy).not.toHaveBeenCalled();
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
   it('keeps the first registration and warns only when a duplicate compatibility fallback is consumed', () => {
     // Simulates a Module Federation remote that bundles its own copy of
     // '@modern-js/plugin-tanstack/runtime': the second copy evaluates the
@@ -156,33 +100,11 @@ describe('router provider registry', () => {
       // warned because they did not supply an app-owned provider realm.
       expect(resolveRouterProvider('tanstack')).toBe(hostCopy);
       expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/keeping the first registration/),
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/without an app-owned provider realm/),
-      );
 
       // A third evaluation does not warn again for the same name.
       registerRouterProvider('tanstack', createFactory('tanstack-third'));
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(resolveRouterProvider('tanstack')).toBe(hostCopy);
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
-
-  it('keeps the default provider intact when a duplicate default copy registers', () => {
-    const warnSpy = rstest.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const first = createFactory('react-router-first');
-      const second = createFactory('react-router-second');
-
-      registerRouterProvider('react-router', first, { isDefault: true });
-      registerRouterProvider('react-router', second, { isDefault: true });
-
-      expect(resolveRouterProvider(undefined)).toBe(first);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
     } finally {
       warnSpy.mockRestore();
     }

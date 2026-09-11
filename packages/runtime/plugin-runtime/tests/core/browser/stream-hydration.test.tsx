@@ -1,3 +1,8 @@
+// @rstest-environment happy-dom
+
+// Fork-owned coverage guard (FORK-DIVERGENCE.md: "Verify matching SSR/client
+// useId tree paths and label targets"). Keeps the streaming-SSR hydration id
+// case out of the upstream-owned tests/core/browser/hydrate.test.tsx.
 import { SSR_HYDRATION_ID_PREFIX } from '@modern-js/utils/universal/constants';
 import { type ReactElement, Suspense, useId } from 'react';
 import { renderToString } from 'react-dom/server';
@@ -5,67 +10,59 @@ import { hydrateRoot } from '../../../src/core/browser/hydrate';
 import { getInitialContext } from '../../../src/core/context/runtime';
 import { createRenderStreaming } from '../../../src/core/server/stream/shared';
 
-function LabelledInput() {
-  const id = useId();
-  return (
-    <>
-      <label htmlFor={id}>Name</label>
-      <input id={id} />
-    </>
+// The stream hydrate path inserts an empty `{null}` sibling to mirror the SSR
+// StreamServerRootWrapper end-marker. Drop it and React's useId tree paths
+// diverge, so every streaming-SSR app hydrates with mismatched id/for pairs.
+test('stream hydration tree keeps the server-generated ids', async () => {
+  const Labelled = () => {
+    const id = useId();
+    return (
+      <>
+        <label htmlFor={id}>Name</label>
+        <input id={id} />
+      </>
+    );
+  };
+  const tree = (
+    <Suspense fallback={null}>
+      <Labelled />
+      <Labelled />
+    </Suspense>
   );
-}
+  const render = (element: ReactElement) =>
+    renderToString(element, { identifierPrefix: SSR_HYDRATION_ID_PREFIX });
 
-describe('streaming SSR hydration tree', () => {
-  afterEach(() => {
-    rstest.unstubAllGlobals();
-  });
+  let serverHtml = '';
+  await createRenderStreaming(
+    Promise.resolve(async (_request, rootElement) => {
+      serverHtml = render(rootElement);
+      return new ReadableStream({ start: c => c.close() });
+    }),
+  )(new Request('http://localhost/'), tree, {
+    config: { ssr: { mode: 'stream' } },
+    resource: { entryName: 'main', htmlTemplate: '' },
+    runtimeContext: getInitialContext(false),
+    onTiming: rstest.fn(),
+    onError: rstest.fn(),
+  } as any);
 
-  test('preserves React-generated IDs and label targets during hydration', async () => {
-    const App = (
-      <Suspense fallback={null}>
-        <LabelledInput />
-        <LabelledInput />
-      </Suspense>
-    );
-    let serverHtml = '';
-    const renderStreaming = createRenderStreaming(
-      Promise.resolve(async (_request, rootElement) => {
-        serverHtml = renderToString(rootElement, {
-          identifierPrefix: SSR_HYDRATION_ID_PREFIX,
-        });
-        return new ReadableStream({
-          start(controller) {
-            controller.close();
-          },
-        });
-      }),
-    );
-    await renderStreaming(new Request('http://localhost/'), App, {
-      config: { ssr: { mode: 'stream' } },
-      resource: { entryName: 'main', htmlTemplate: '' },
-      runtimeContext: getInitialContext(false),
-      onTiming: rstest.fn(),
-      onError: rstest.fn(),
-    } as Parameters<typeof renderStreaming>[2]);
-
-    rstest.stubGlobal('window', {
-      _SSR_DATA: { mode: 'stream', renderLevel: 2 },
-    });
-    let hydrationHtml = '';
+  (window as any)._SSR_DATA = { mode: 'stream', renderLevel: 2 };
+  let clientHtml = '';
+  try {
     await hydrateRoot(
-      App,
+      tree,
       getInitialContext(true),
       rstest.fn(),
-      async (rootElement: ReactElement) => {
-        hydrationHtml = renderToString(rootElement, {
-          identifierPrefix: SSR_HYDRATION_ID_PREFIX,
-        });
+      async (el: ReactElement) => {
+        clientHtml = render(el);
         return {} as HTMLElement;
       },
     );
+  } finally {
+    delete (window as any)._SSR_DATA;
+  }
 
-    const attributes = (html: string) => html.match(/(?:id|for)="[^"]+"/g);
-    expect(attributes(serverHtml)).toHaveLength(4);
-    expect(attributes(hydrationHtml)).toEqual(attributes(serverHtml));
-  });
+  const ids = (html: string) => html.match(/(?:id|for)="[^"]+"/g);
+  expect(ids(serverHtml)).toHaveLength(4);
+  expect(ids(clientHtml)).toEqual(ids(serverHtml));
 });

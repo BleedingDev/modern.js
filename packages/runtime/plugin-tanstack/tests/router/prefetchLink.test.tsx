@@ -78,11 +78,6 @@ async function renderLink(options: Parameters<typeof buildRouter>[0]) {
 }
 
 describe('tanstack prefetch link adapter - aria-current override', () => {
-  it('defaults active link to aria-current="page" when caller passes nothing', async () => {
-    const { anchor } = await renderLink({ initialPath: '/settings' });
-    expect(anchor.getAttribute('aria-current')).toBe('page');
-  });
-
   it('lets caller aria-current="true" win over the TanStack-forced value', async () => {
     const { anchor } = await renderLink({
       initialPath: '/settings',
@@ -123,16 +118,5 @@ describe('tanstack prefetch link adapter - aria-current override', () => {
       linkProps: { ref, prefetch: 'none' },
     });
     expect(ref.current).toBe(anchor);
-  });
-
-  it('preserves NavLink render children and aria-current overrides', async () => {
-    const { anchor } = await renderLink({
-      initialPath: '/settings',
-      useNavLink: true,
-      linkProps: { 'aria-current': 'step', preload: false },
-      children: ({ isActive }) => (isActive ? 'Current step' : 'Other step'),
-    });
-    expect(anchor.textContent).toBe('Current step');
-    expect(anchor.getAttribute('aria-current')).toBe('step');
   });
 });

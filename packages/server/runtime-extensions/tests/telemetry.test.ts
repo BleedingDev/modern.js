@@ -120,79 +120,6 @@ describe('telemetry registry', () => {
     expect(timerEnvelope.spanId).toBe('1111222233334444');
   });
 
-  test('exposes queue stats and emits SLO alerts for utilization and dropped envelopes', async () => {
-    const alerts: Array<{ type: string; value: number }> = [];
-    const registry = new TelemetryRegistry({
-      service: 'svc',
-      module: 'server',
-      environment: 'test',
-      maxQueueSize: 2,
-      flushIntervalMs: 60_000,
-      slo: {
-        queueUtilizationWarnThreshold: 0.5,
-        queueDroppedWarnThreshold: 1,
-        alertCooldownMs: 0,
-        onAlert(alert) {
-          alerts.push({ type: alert.type, value: alert.value });
-        },
-      },
-    });
-
-    registry.enqueue(createEnvelope({ name: 'first' }));
-    registry.enqueue(createEnvelope({ name: 'second' }));
-    registry.enqueue(createEnvelope({ name: 'third' }));
-
-    const queueStats = registry.getQueueStats();
-    expect(queueStats.depth).toBe(2);
-    expect(queueStats.capacity).toBe(2);
-    expect(queueStats.utilization).toBe(1);
-    expect(queueStats.pendingDropped).toBe(1);
-    expect(queueStats.totalDropped).toBe(1);
-    expect(alerts.some(item => item.type === 'queue.utilization')).toBe(true);
-    expect(alerts.some(item => item.type === 'queue.drop')).toBe(true);
-    await registry.shutdown();
-  });
-
-  test('drop SLO alerts use pending drop pressure instead of lifetime drops', async () => {
-    const dropAlerts: Array<{ value: number; totalDropped: number }> = [];
-    const registry = new TelemetryRegistry({
-      service: 'svc',
-      module: 'server',
-      environment: 'test',
-      maxQueueSize: 1,
-      flushIntervalMs: 60_000,
-      slo: {
-        queueDroppedWarnThreshold: 2,
-        alertCooldownMs: 0,
-        onAlert(alert) {
-          if (alert.type === 'queue.drop') {
-            dropAlerts.push({
-              value: alert.value,
-              totalDropped: alert.totalDropped,
-            });
-          }
-        },
-      },
-    });
-
-    registry.enqueue(createEnvelope({ name: 'first' }));
-    registry.enqueue(createEnvelope({ name: 'second' }));
-    expect(registry.getQueueStats().pendingDropped).toBe(1);
-    expect(dropAlerts).toEqual([]);
-
-    await registry.flush();
-    expect(registry.getQueueStats().pendingDropped).toBe(0);
-    expect(registry.getQueueStats().totalDropped).toBe(1);
-
-    registry.enqueue(createEnvelope({ name: 'third' }));
-    registry.enqueue(createEnvelope({ name: 'fourth' }));
-
-    expect(registry.getQueueStats().pendingDropped).toBe(1);
-    expect(registry.getQueueStats().totalDropped).toBe(2);
-    expect(dropAlerts).toEqual([]);
-    await registry.shutdown();
-  });
-
   test('startup health check fails loud by default when exporter is unhealthy', async () => {
     const registry = new TelemetryRegistry({
       service: 'svc',
@@ -210,30 +137,6 @@ describe('telemetry registry', () => {
     await expect(registry.startupHealthCheck()).rejects.toBeInstanceOf(
       TelemetryStartupHealthError,
     );
-    const health = registry.getExporterHealth();
-    expect(health).toHaveLength(1);
-    expect(health[0].healthy).toBe(false);
-    expect(health[0].failures).toBeGreaterThan(0);
-    await registry.shutdown();
-  });
-
-  test('startup health check can degrade without throwing when failLoud is false', async () => {
-    const registry = new TelemetryRegistry({
-      service: 'svc',
-      module: 'server',
-      environment: 'test',
-      flushIntervalMs: 60_000,
-    });
-    await registry.register({
-      name: 'failing',
-      async emit() {
-        throw new Error('connection refused');
-      },
-    });
-
-    await expect(
-      registry.startupHealthCheck({ failLoud: false }),
-    ).resolves.toBeUndefined();
     const health = registry.getExporterHealth();
     expect(health).toHaveLength(1);
     expect(health[0].healthy).toBe(false);

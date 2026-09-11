@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import React from 'react';
-import { Link, NavLink } from '../../src/runtime/prefetchLink';
+import { Link } from '../../src/runtime/prefetchLink';
 
 type CapturedOptions = {
   preload?: unknown;
@@ -27,20 +27,20 @@ describe('tanstack prefetch link adapter - preload mapping', () => {
     mockReturnProps = { href: '/settings' };
   });
 
-  it.each([
-    { expected: 'intent', preload: 'intent' },
-    { expected: false, preload: false },
-  ])('preserves an explicit $expected preload override', ({
-    expected,
-    preload,
-  }) => {
+  it('preserves an explicit false preload override', () => {
     render(
-      <Link to="/settings" prefetch="render" preload={preload}>
+      <Link to="/settings" prefetch="render" preload={false}>
         Settings
       </Link>,
     );
 
-    expect(capturedOptions[0]?.preload).toBe(expected);
+    expect(capturedOptions[0]?.preload).toBe(false);
+  });
+
+  it('defaults to viewport preload when no prefetch is given', () => {
+    render(<Link to="/settings">Settings</Link>);
+
+    expect(capturedOptions[0]?.preload).toBe('viewport');
   });
 
   it('maps none prefetch to disabled TanStack preload', () => {
@@ -53,24 +53,11 @@ describe('tanstack prefetch link adapter - preload mapping', () => {
     expect(capturedOptions[0]?.preload).toBe(false);
   });
 
-  it('forwards a supported prefetch mode to TanStack preload', () => {
+  it('lets explicit preload re-enable prefetch=none', () => {
     render(
-      <Link to="/settings" prefetch="intent">
+      <Link to="/settings" prefetch="none" preload="render">
         Settings
       </Link>,
-    );
-
-    expect(capturedOptions[0]?.preload).toBe('intent');
-  });
-
-  it.each([
-    Link,
-    NavLink,
-  ])('lets explicit preload re-enable prefetch=none', Component => {
-    render(
-      <Component to="/settings" prefetch="none" preload="render">
-        Settings
-      </Component>,
     );
 
     expect(capturedOptions.map(o => o.preload)).toEqual(['render']);

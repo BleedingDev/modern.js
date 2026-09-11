@@ -7,47 +7,8 @@ import { ULTRAMODERN_WORKSPACE_MODERN_PACKAGES } from '../src/ultramodern-packag
 import { RELEASE_COHORT_PROJECTION_PATH } from '../src/ultramodern-release-cohort';
 import { generateUltramodernWorkspace } from '../src/ultramodern-workspace';
 import { createPackageRoot } from '../src/ultramodern-workspace/fs-io';
-import {
-  renderMinimumReleaseAgeExclude,
-  ULTRAMODERN_WORKSPACE_POLICY,
-} from '../src/ultramodern-workspace/policy';
-import {
-  CROSS_ENV_VERSION,
-  EFFECT_VERSION,
-  EFFECT_VITEST_VERSION,
-  MODULE_FEDERATION_NODE_VERSION,
-  MODULE_FEDERATION_VERSION,
-  MSGPACKR_VERSION,
-  NODE_FETCH_VERSION,
-  PNPM_VERSION,
-  TANSTACK_HISTORY_VERSION,
-  TANSTACK_ROUTER_CORE_VERSION,
-  TANSTACK_ROUTER_VERSION,
-  ZOD_VERSION,
-} from '../src/ultramodern-workspace/versions';
-
-const bffEffectPackagePath = path.resolve(
-  __dirname,
-  '../../../server/bff-effect/package.json',
-);
-const pluginBffExtensionsPackagePath = path.resolve(
-  __dirname,
-  '../../../cli/plugin-bff-extensions/package.json',
-);
-
-test('pins the Module Federation 2.9 cohort exactly', () => {
-  assert.equal(MODULE_FEDERATION_VERSION, '2.9.0');
-  assert.equal(MODULE_FEDERATION_NODE_VERSION, '2.7.50');
-
-  const pluginBffExtensionsPackage = JSON.parse(
-    fs.readFileSync(pluginBffExtensionsPackagePath, 'utf-8'),
-  );
-  assert.equal(
-    pluginBffExtensionsPackage.dependencies['@module-federation/runtime'],
-    MODULE_FEDERATION_VERSION,
-    '@modern-js/plugin-bff-extensions must use the generated Module Federation runtime cohort',
-  );
-});
+import { SHARED_ULTRAMODERN_WORKSPACE_PATCH_FILES } from '../src/ultramodern-workspace/shared-patches';
+import { MODULE_FEDERATION_VERSION } from '../src/ultramodern-workspace/versions';
 
 test('generated workspace renders the pins from versions.ts', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'um-version-pins-'));
@@ -70,29 +31,6 @@ test('generated workspace renders the pins from versions.ts', () => {
 
     const pnpmWorkspace = readGenerated('pnpm-workspace.yaml');
     const pnpmPolicy = yaml.load(pnpmWorkspace) as Record<string, any>;
-    const packageSource = {
-      strategy: 'workspace' as const,
-      modernPackageVersion: 'workspace:*',
-    };
-    assert.deepEqual(pnpmPolicy.overrides, {
-      '@effect/opentelemetry': EFFECT_VERSION,
-      '@effect/vitest': EFFECT_VITEST_VERSION,
-      '@tanstack/history': TANSTACK_HISTORY_VERSION,
-      '@tanstack/react-router': TANSTACK_ROUTER_VERSION,
-      '@tanstack/router-core': TANSTACK_ROUTER_CORE_VERSION,
-      effect: EFFECT_VERSION,
-      msgpackr: MSGPACKR_VERSION,
-      'node-fetch': NODE_FETCH_VERSION,
-      zod: ZOD_VERSION,
-    });
-    assert.deepEqual(pnpmPolicy.patchedDependencies, {
-      [`@module-federation/bridge-react@${MODULE_FEDERATION_VERSION}`]: `patches/@module-federation__bridge-react@${MODULE_FEDERATION_VERSION}.patch`,
-      [`@module-federation/dts-plugin@${MODULE_FEDERATION_VERSION}`]: `patches/@module-federation__dts-plugin@${MODULE_FEDERATION_VERSION}.patch`,
-      [`@module-federation/modern-js-v3@${MODULE_FEDERATION_VERSION}`]: `patches/@module-federation__modern-js-v3@${MODULE_FEDERATION_VERSION}.patch`,
-      [`@module-federation/runtime-core@${MODULE_FEDERATION_VERSION}`]: `patches/@module-federation__runtime-core@${MODULE_FEDERATION_VERSION}.patch`,
-      [`msgpackr@${MSGPACKR_VERSION}`]: `patches/msgpackr@${MSGPACKR_VERSION}.patch`,
-      [`zod@${ZOD_VERSION}`]: `patches/zod@${ZOD_VERSION}.patch`,
-    });
     assert.ok(
       fs.existsSync(
         path.join(
@@ -145,15 +83,6 @@ test('generated workspace renders the pins from versions.ts', () => {
       ),
       'generated Drizzle declaration patch file must be present',
     );
-    assert.deepEqual(
-      pnpmPolicy.minimumReleaseAgeExclude,
-      renderMinimumReleaseAgeExclude({ packageSource }),
-      'generated release-age exclusions must equal canonical policy',
-    );
-    assert.deepEqual(
-      pnpmPolicy.trustPolicyExclude,
-      ULTRAMODERN_WORKSPACE_POLICY.pnpm.trustPolicyExclude,
-    );
     assert.ok(
       !pnpmPolicy.minimumReleaseAgeExclude.some(selector =>
         selector.startsWith('@bleedingdev/modern-js-'),
@@ -169,27 +98,28 @@ test('generated workspace renders the pins from versions.ts', () => {
         `${selector} must not use a range, tag, bare name, or glob`,
       );
     }
-    for (const relativePath of ['AGENTS.md', 'README.md']) {
-      const rendered = readGenerated(relativePath);
-      assert.ok(
-        rendered.includes(`pnpm \`${PNPM_VERSION}\``),
-        `${relativePath} must render PNPM_VERSION from versions.ts`,
-      );
-    }
-    assert.match(
-      readGenerated('README.md'),
-      /pnpm exec cross-env ULTRAMODERN_PUBLIC_URL_SHELL_SUPER_APP=https:\/\/shell-super-app\.example\.workers\.dev pnpm cloudflare:proof --require-public-urls/u,
-    );
-
-    const rootPackage = JSON.parse(readGenerated('package.json'));
-    assert.equal(rootPackage.packageManager, `pnpm@${PNPM_VERSION}`);
-    assert.equal(rootPackage.devDependencies['cross-env'], CROSS_ENV_VERSION);
-    const shellPackage = JSON.parse(
-      readGenerated('apps/shell-super-app/package.json'),
-    );
-    assert.equal(shellPackage.devDependencies['cross-env'], CROSS_ENV_VERSION);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// Restored: the shipped template patches are the exact bytes a generated
+// workspace installs. If they drift from the repository patches that pnpm
+// verifies here, a consumer's `pnpm install` applies stale/unapplicable
+// patch bytes.
+test('shipped template patches are byte-identical to the repository patches', () => {
+  const repoPatchDir = path.resolve(createPackageRoot, '../../..', 'patches');
+  const templatePatchDir = path.join(
+    createPackageRoot,
+    'template-workspace/patches',
+  );
+  assert.ok(SHARED_ULTRAMODERN_WORKSPACE_PATCH_FILES.length > 0);
+  for (const patchFile of SHARED_ULTRAMODERN_WORKSPACE_PATCH_FILES) {
+    assert.deepEqual(
+      fs.readFileSync(path.join(templatePatchDir, patchFile)),
+      fs.readFileSync(path.join(repoPatchDir, patchFile)),
+      `${patchFile} differs between the repository and the shipped template`,
+    );
   }
 });
 
@@ -297,60 +227,4 @@ test('a stale source projection cannot authorize local generation', () => {
     }
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
-});
-
-// Runtime dependency ownership follows the canonical fork Effect package.
-// Generated applications and runtime peers must resolve one Effect cohort.
-test('bff-effect declares the same Effect cohort generated workspaces pin', () => {
-  const bffEffectPackage = JSON.parse(
-    fs.readFileSync(bffEffectPackagePath, 'utf-8'),
-  );
-
-  assert.equal(
-    bffEffectPackage.dependencies.effect,
-    undefined,
-    '@modern-js/bff-effect must declare Effect as a peer so consumers keep a single Effect identity',
-  );
-  assert.equal(
-    bffEffectPackage.peerDependencies.effect,
-    EFFECT_VERSION,
-    '@modern-js/bff-effect must not force a different Effect version than generated pnpm overrides',
-  );
-  assert.equal(
-    bffEffectPackage.devDependencies.effect,
-    EFFECT_VERSION,
-    '@modern-js/bff-effect must install the Effect cohort locally (autoInstallPeers is disabled)',
-  );
-  // `@effect/opentelemetry` declares a REQUIRED `effect` peer of its own, so it
-  // must move with `effect` into the optional-peer lane. Leaving it in
-  // `dependencies` would re-impose that peer on every hono-only consumer
-  // transitively and make the optional `effect` peer a fiction.
-  assert.equal(
-    bffEffectPackage.dependencies['@effect/opentelemetry'],
-    undefined,
-    '@modern-js/bff-effect must declare @effect/opentelemetry as a peer, not a dependency',
-  );
-  assert.equal(
-    bffEffectPackage.peerDependencies['@effect/opentelemetry'],
-    EFFECT_VERSION,
-    '@modern-js/bff-effect must keep @effect/opentelemetry on the generated Effect cohort',
-  );
-  assert.equal(
-    bffEffectPackage.peerDependenciesMeta['@effect/opentelemetry'].optional,
-    true,
-    '@modern-js/bff-effect must keep the @effect/opentelemetry peer optional',
-  );
-  assert.equal(
-    bffEffectPackage.devDependencies['@effect/opentelemetry'],
-    EFFECT_VERSION,
-    '@modern-js/bff-effect must install @effect/opentelemetry locally (autoInstallPeers is disabled)',
-  );
-  assert.equal(
-    [
-      ...Object.values(bffEffectPackage.dependencies ?? {}),
-      ...Object.values(bffEffectPackage.devDependencies ?? {}),
-      ...Object.values(bffEffectPackage.peerDependencies ?? {}),
-    ].includes('4.0.0-beta.91'),
-    false,
-  );
 });

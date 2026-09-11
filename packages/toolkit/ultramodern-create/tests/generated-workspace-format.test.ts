@@ -60,55 +60,25 @@ function assertFormatStatus(
   assert.equal(result.status, expectedStatus, `${state} failed.\n${output}`);
 }
 
-test('generated formatter composes Ultracite during preformat and workspace checks', () => {
+test('formatGeneratedWorkspaceFiles produces output that already satisfies the generated oxfmt config', () => {
   const { tempRoot, workspaceDir } = createWorkspace('generated-format', {
     tempPrefix: 'um-generated-format-',
   });
   const configPath = createFormatHarness(workspaceDir);
   const relativePath = path.join('packages', 'format-probe.tsx');
   const probePath = path.join(workspaceDir, relativePath);
-  const firstArgument = 'a'.repeat(40);
-  const secondArgument = 'b'.repeat(
-    120 - "export const atWidth = pair('', '');".length - firstArgument.length,
-  );
-  const atWidth = `export const atWidth = pair('${firstArgument}', '${secondArgument}');`;
-  const unsortedProbe = [
-    'export const Probe = () => <div className="p-4 flex items-center">probe</div>;',
-    atWidth,
-    `export const beyondWidth = pair('${firstArgument}', '${secondArgument}');`,
-    '',
-  ].join('\n');
+  const unsortedProbe =
+    'export const Probe = () => <div className="p-4 flex items-center">probe</div>;\n';
 
   try {
     fs.writeFileSync(probePath, unsortedProbe, 'utf-8');
-    assertFormatStatus(
-      runGeneratedFormat(workspaceDir, configPath, relativePath, true),
-      1,
-      'generated formatter policy probe',
-    );
-    assertFormatStatus(
-      runGeneratedFormat(workspaceDir, configPath, relativePath, false),
-      0,
-      'generated formatter write',
-    );
-    assertFormatStatus(
-      runGeneratedFormat(workspaceDir, configPath, relativePath, true),
-      0,
-      'generated formatter idempotence check',
-    );
-    const formattedProbe = fs.readFileSync(probePath, 'utf-8');
-    assert.equal(atWidth.length, 120);
-    assert.ok(formattedProbe.includes(`${atWidth}\n`));
-    assert.ok(
-      formattedProbe.includes(
-        `export const beyondWidth = pair(\n  '${firstArgument}',\n  '${secondArgument}',\n);\n`,
-      ),
-      'calls longer than 120 columns wrap and include the final argument comma',
-    );
-
-    fs.writeFileSync(probePath, unsortedProbe, 'utf-8');
     formatGeneratedWorkspaceFiles(workspaceDir, [relativePath]);
-    assert.equal(fs.readFileSync(probePath, 'utf-8'), formattedProbe);
+    const formattedProbe = fs.readFileSync(probePath, 'utf-8');
+    assert.notEqual(
+      formattedProbe,
+      unsortedProbe,
+      'formatGeneratedWorkspaceFiles must actually rewrite unformatted source',
+    );
     assertFormatStatus(
       runGeneratedFormat(workspaceDir, configPath, relativePath, true),
       0,

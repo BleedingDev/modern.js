@@ -89,3 +89,7 @@ jobs:
       - name: Test - Adapter Rstest
         if: ${{steps.skip-ci.outputs.RESULT != 'true'}}
         run: cd ./tests && mise exec -- pnpm run test:rstest-adapter
+
+      - name: Test - Published package surfaces
+        if: ${{steps.skip-ci.outputs.RESULT != 'true'}}
+        run: cd ./tests && mise exec -- pnpm run test:utils

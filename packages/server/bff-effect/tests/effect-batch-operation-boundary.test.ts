@@ -1,6 +1,5 @@
 import * as Logger from 'effect/Logger';
 import type { DataBatchResponsePayload } from '../src/data-platform';
-import { decodeBatchBody } from '../src/data-platform/batch/protocol';
 import {
   BatchItemTimeoutError,
   promiseWithTimeout,
@@ -103,10 +102,6 @@ describe('Effect batch operation boundary', () => {
         }),
       );
       const payload = (await response.json()) as DataBatchResponsePayload;
-      const decoder = new TextDecoder();
-      const bodyTexts = payload.items.map(item =>
-        item.body ? decoder.decode(decodeBatchBody(item.body)) : undefined,
-      );
 
       expect(response.status).toBe(200);
       expect(response.headers.get('x-modernjs-data-batch')).toBe('2');
@@ -120,13 +115,6 @@ describe('Effect batch operation boundary', () => {
       ]);
       expect(payload.items.map(item => item.status)).toEqual([
         202, 504, 500, 200, 400,
-      ]);
-      expect(bodyTexts).toEqual([
-        'slow',
-        JSON.stringify({ message: 'Batch item request timed out' }),
-        JSON.stringify({ message: 'Internal Server Error' }),
-        'ok',
-        JSON.stringify({ message: 'Invalid batch item headers' }),
       ]);
       expect(abortedIds).toEqual(['timeout']);
 

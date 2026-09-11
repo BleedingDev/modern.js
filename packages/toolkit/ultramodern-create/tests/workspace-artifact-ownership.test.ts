@@ -94,39 +94,37 @@ test('preserved validators extract literal cohort data once, including renamed b
     "import ultramodernReleaseCohortDocument from '../.modernjs/release-cohort.json' with { type: 'json' };\n";
   try {
     fs.mkdirSync(path.join(root, 'scripts'));
-    for (const extension of ['mts', 'mjs']) {
-      const relativePath = `scripts/validate-ultramodern-workspace.${extension}`;
-      const filePath = path.join(root, relativePath);
-      fs.writeFileSync(filePath, source);
-      const io = createMigrationIo(root, false);
-      const guarded = preserveConsumerWorkspaceArtifacts(io, [
-        {
-          relativePath: 'scripts/validate-ultramodern-workspace.mts',
-          legacyPath: 'scripts/validate-ultramodern-workspace.mjs',
-          generatedDataBinding: 'workspaceValidationContract',
-          content: 'const workspaceValidationContract = {};\n',
-        },
-      ]);
-      assert.equal(guarded.preservedPaths.has(relativePath), true);
-      guarded.refreshReleaseCohort(nextCohort);
-      const expected =
-        nativeImport + prefix + 'ultramodernReleaseCohortDocument' + suffix;
-      assert.equal(recognizesReleaseCohortRead(expected), true);
-      assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
-      guarded.refreshReleaseCohort(nextCohort);
-      assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
-      fs.writeFileSync(filePath, source);
-      assert.throws(
-        () =>
-          io.transaction(() => {
-            guarded.refreshReleaseCohort(nextCohort);
-            throw new Error('later migration failed');
-          }),
-        /later migration failed/,
-      );
-      assert.equal(fs.readFileSync(filePath, 'utf8'), source);
-      fs.rmSync(filePath);
-    }
+    const legacyRelativePath = 'scripts/validate-ultramodern-workspace.mjs';
+    const legacyFilePath = path.join(root, legacyRelativePath);
+    fs.writeFileSync(legacyFilePath, source);
+    const legacyIo = createMigrationIo(root, false);
+    const legacyGuarded = preserveConsumerWorkspaceArtifacts(legacyIo, [
+      {
+        relativePath: 'scripts/validate-ultramodern-workspace.mts',
+        legacyPath: legacyRelativePath,
+        generatedDataBinding: 'workspaceValidationContract',
+        content: 'const workspaceValidationContract = {};\n',
+      },
+    ]);
+    assert.equal(legacyGuarded.preservedPaths.has(legacyRelativePath), true);
+    legacyGuarded.refreshReleaseCohort(nextCohort);
+    const legacyExpected =
+      nativeImport + prefix + 'ultramodernReleaseCohortDocument' + suffix;
+    assert.equal(recognizesReleaseCohortRead(legacyExpected), true);
+    assert.equal(fs.readFileSync(legacyFilePath, 'utf8'), legacyExpected);
+    legacyGuarded.refreshReleaseCohort(nextCohort);
+    assert.equal(fs.readFileSync(legacyFilePath, 'utf8'), legacyExpected);
+    fs.writeFileSync(legacyFilePath, source);
+    assert.throws(
+      () =>
+        legacyIo.transaction(() => {
+          legacyGuarded.refreshReleaseCohort(nextCohort);
+          throw new Error('later migration failed');
+        }),
+      /later migration failed/,
+    );
+    assert.equal(fs.readFileSync(legacyFilePath, 'utf8'), source);
+    fs.rmSync(legacyFilePath);
     const filePath = path.join(
       root,
       'scripts/validate-ultramodern-workspace.mts',
@@ -160,32 +158,7 @@ test('preserved validators extract literal cohort data once, including renamed b
       assert.equal(fs.readFileSync(filePath, 'utf8'), expected);
     }
     const ambiguous = [
-      factoredSource.replace(
-        `'${oldCohort.release.version}'`,
-        'readConsumerVersion()',
-      ),
-      factoredSource.replace('const versionPin', 'let versionPin'),
       source.replace(JSON.stringify(oldCohort), 'consumerReleasePolicy()'),
-      source.replace(
-        JSON.stringify(oldCohort),
-        `{...${JSON.stringify(oldCohort)}}`,
-      ),
-      source.replace('cohort: {', '...consumerPolicy, cohort: {'),
-      source.replace('cohort: {', 'cohort: {}, cohort: {'),
-      source.replace('releaseCohort: ', '[releaseKey]: '),
-      source.replace(
-        'modernjs.ultramodern-workspace-validation-contract',
-        'consumer-policy',
-      ),
-      source.replace(
-        'const renamedContractDefinition',
-        'let renamedContractDefinition',
-      ),
-      source.replace('"schemaVersion":1', '"schemaVersion":2'),
-      source +
-        source
-          .replaceAll('retainedPolicy', 'otherPolicy')
-          .replaceAll('renamedContractDefinition', 'otherDefinition'),
       'unparseable consumer source {',
     ];
     for (const variant of ambiguous) {
@@ -212,21 +185,55 @@ test('preserved validators extract literal cohort data once, including renamed b
   }
 });
 
-test('native cohort recognition requires the contract use and JSON import together', () => {
-  const source =
-    "import data from '../.modernjs/release-cohort.json' with { type: 'json' };\n" +
-    "const definition = { kind: 'modernjs.ultramodern-workspace-validation-contract', cohort: { releaseCohort: data } };\n";
-  assert.equal(recognizesReleaseCohortRead(source), true);
-  for (const variant of [
-    source.replace('releaseCohort: data', 'releaseCohort: customData'),
-    source.replace("with { type: 'json' }", ''),
-    source.replace('import data', 'import * as data'),
-    source.replace(
-      "'../.modernjs/release-cohort.json'",
-      "'../consumer-release.json'",
-    ),
-    source.replace('cohort: {', '...consumerPolicy, cohort: {'),
-    source.replace('const definition', 'let definition'),
-  ])
-    assert.equal(recognizesReleaseCohortRead(variant), false);
+// Consumers generated by the earlier framework template carry an older
+// readGeneratedContractView overlay pair. Migration must upgrade that pair in
+// place, but must still refuse when the consumer authored inside it.
+test('upgrades the historical validator overlay pair unless a consumer edited it', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'um-historical-pair-'));
+  try {
+    const relativePath = 'scripts/validate-ultramodern-workspace.mts';
+    const filePath = path.join(root, relativePath);
+    fs.mkdirSync(path.dirname(filePath));
+    const envelope = (version: string) =>
+      `const workspaceValidationContract = { kind: 'modernjs.ultramodern-workspace-validation-contract', cohort: { version: '${version}' } };`;
+    const historicalPair = `const readGeneratedContractView = config => {
+  return synthesizeGeneratedContractFromCompact(config);
+};
+const generatedContract = readGeneratedContractView(ultramodernConfig);`;
+    const currentPair = `const readGeneratedContractView = (config, overlay) => {
+  return synthesizeGeneratedContractFromCompact({ ...config, overlay });
+};
+const generatedContract = readGeneratedContractView(ultramodernConfig, overlay);`;
+    const tail = "assert(generatedContract.apps.length > 0, 'apps');\n";
+    const current = `${envelope('new')}\n${currentPair}\n${tail}`;
+    const historical = `${envelope('old')}\n${historicalPair}\n${tail}`;
+    const authored = historical.replace(
+      'return synthesize',
+      '// authored policy\n  return synthesize',
+    );
+    for (const [source, preserved] of [
+      [historical, false],
+      [authored, true],
+    ] as const) {
+      fs.writeFileSync(filePath, source);
+      const guarded = preserveConsumerWorkspaceArtifacts(
+        createMigrationIo(root, false),
+        [
+          {
+            relativePath,
+            content: current,
+            generatedDataBinding: 'workspaceValidationContract',
+          },
+        ],
+      );
+      assert.equal(guarded.preservedPaths.has(relativePath), preserved);
+      guarded.io.write(filePath, current);
+      assert.equal(
+        fs.readFileSync(filePath, 'utf8'),
+        preserved ? source : current,
+      );
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

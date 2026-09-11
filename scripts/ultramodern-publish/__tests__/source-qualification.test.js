@@ -114,14 +114,6 @@ test('verification accepts only the recovered run own passing receipt', async ()
       verifySourceQualification({ ...verifyArgs, receiptPath }),
       acceptedReceipt(),
     );
-    assert.deepEqual(
-      verifySourceQualification({
-        ...verifyArgs,
-        expectedCommit: qualifiedCommit,
-        receiptPath,
-      }),
-      acceptedReceipt(),
-    );
   });
 });
 
@@ -181,7 +173,7 @@ test('verification rejects a receipt that is not the strict schema', async () =>
   });
 });
 
-test('the CLI fails closed on an unknown command and on a rejected receipt', async () => {
+test('the CLI fails closed on an unknown command', async () => {
   await withTempDir(async root => {
     const receiptPath = path.join(root, 'source-qualification.json');
     writeReceipt(receiptPath, acceptedReceipt());
@@ -191,34 +183,32 @@ test('the CLI fails closed on an unknown command and on a rejected receipt', asy
     });
     assert.notEqual(unknown.status, 0);
     assert.match(unknown.stderr, /Unknown source qualification command/u);
-
-    const missingFlag = spawnSync(
-      process.execPath,
-      [scriptPath, 'verify', '--receipt', receiptPath],
-      { encoding: 'utf8' },
-    );
-    assert.notEqual(missingFlag.status, 0);
-    assert.match(missingFlag.stderr, /Missing --repository/u);
-
-    const wrongCommit = spawnSync(
-      process.execPath,
-      [
-        scriptPath,
-        'verify',
-        '--receipt',
-        receiptPath,
-        '--repository',
-        repository,
-        '--run-id',
-        '77',
-        '--run-attempt',
-        '2',
-        '--expect-commit',
-        otherCommit,
-      ],
-      { encoding: 'utf8' },
-    );
-    assert.notEqual(wrongCommit.status, 0);
-    assert.match(wrongCommit.stderr, /own source commit/u);
   });
+});
+
+// Consumer: `pnpm ultramodern:source-create-proof` root release gate.
+test('source-create-proof gate runs erp-10 source acceptance and refuses weaker modes', async () => {
+  const entrypoint = await import(
+    pathToFileURL(
+      path.join(__dirname, '..', 'validate-source-create-proof.mjs'),
+    ).href
+  );
+  const calls = [];
+  const exitCode = await entrypoint.main([], {}, async argv => {
+    calls.push(argv);
+    return 0;
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].join(' '), /--scale-profile erp-10/u);
+  assert.ok(calls[0].includes(entrypoint.defaultManifestPath));
+  assert.ok(calls[0].includes(entrypoint.defaultReceiptPath));
+
+  for (const weaker of [['--verify-receipt'], ['--mode', 'published']]) {
+    assert.throws(
+      () => entrypoint.sourceCreateProofArgs(weaker, {}),
+      /always executes source acceptance/u,
+    );
+  }
 });

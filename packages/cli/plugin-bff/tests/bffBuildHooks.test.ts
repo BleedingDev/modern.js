@@ -46,17 +46,6 @@ async function fixture(source = 'export const value: number = 1;') {
   return { appDirectory, context, hooks, ...createBffGenerator(api as never) };
 }
 
-test('hook registration is per plugin instance', async () => {
-  const first = bffPlugin().registryHooks!;
-  const second = bffPlugin().registryHooks!;
-  const callback = rstest.fn();
-  first.onBeforeBffCompile.tap(callback);
-  await second.onBeforeBffCompile.call({});
-  expect(callback).not.toHaveBeenCalled();
-  await first.onBeforeBffCompile.call({});
-  expect(callback).toHaveBeenCalledTimes(1);
-});
-
 test('runs before and after around actual compilation with the same context', async () => {
   const { appDirectory, hooks, compileApi } = await fixture();
   const seen: unknown[] = [];

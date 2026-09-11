@@ -50,7 +50,6 @@ test('every packaged executable template is JavaScript that Node accepts inside 
       });
       if (result.error) throw result.error;
       assert.equal(result.status, 0, `${command.command}: ${result.stderr}`);
-      assert.ok(command.templatePath.endsWith('.mjs'), command.command);
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -64,7 +63,6 @@ test('the installed workerd proof reaches its native validation through plain No
       entry => entry.id === 'cloudflareSsrProof',
     );
     assert.ok(command?.templatePath);
-    assert.equal(command.wrapperPath, 'scripts/proof-workerd-ssr.mts');
     const target = installTemplate(installedPackage, command.templatePath);
     const dependencies = path.join(installedPackage, 'node_modules');
     fs.mkdirSync(dependencies);

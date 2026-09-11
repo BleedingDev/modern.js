@@ -1,12 +1,11 @@
 // Consumer: publish-bleedingdev.yml authenticated outcome handoff.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { pathToFileURL } = require('node:url');
 const {
   createOperationalAcceptanceReceiptFixture,
 } = require('../../ultramodern-production-readiness/__tests__/support/operational-acceptance-fixture.js');
@@ -24,66 +23,40 @@ const publicationRunAttempt = 2;
 const outcomeRunAttempt = 3;
 const producerArtifactIdentity = `run-${runId}-attempt-${producerRunAttempt}`;
 const producerRunIdentity = `github:${source.repository}:run:${runId}:attempt:${producerRunAttempt}`;
+const createSourceName = '@modern-js/ultramodern-create';
+const createTargetName = '@bleedingdev/modern-js-ultramodern-create';
+const i18nTarget = '@bleedingdev/modern-js-i18n-utils';
 
 async function outcomeApi() {
   return import('../publish-outcome.mjs');
 }
 
-async function createEvidenceFixture({
-  createSourceName = '@modern-js/ultramodern-create',
-  createTargetName = '@bleedingdev/modern-js-ultramodern-create',
-  includePublishedOperationalEvidence = false,
-  includeTractorFormattingEvidence = true,
-  receiptApiOverride,
-  releaseArtifactsApiOverride,
-  releaseManifestApiOverride,
-  releaseRepoRoot = repoRoot,
-  sourceIdentity = source,
-} = {}) {
+// Builds the exact on-disk evidence set the publish workflow hands to
+// createPublishOutcome: release artifacts, a source-mode and a published-mode
+// acceptance receipt, and a passing Tractor downstream acceptance report.
+async function createEvidenceFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-outcome-'));
-  const releaseDir = path.join(root, 'release');
+  const at = (...parts) => path.join(root, ...parts);
+  const releaseDir = at('release');
   const manifestPath = path.join(releaseDir, 'manifest.json');
-  const manifestDigestPath = path.join(releaseDir, 'manifest.json.sha256');
-  const cohortDigestPath = path.join(releaseDir, 'cohort.sha256');
   const receiptPath = path.join(releaseDir, 'acceptance-receipt.json');
-  const operationalEvidencePath = path.join(
-    root,
+  const operationalEvidencePath = at(
     'acceptance-receipt.operational-independence.json',
   );
-  const publishedReceiptPath = path.join(
-    root,
-    'published-acceptance-receipt.json',
-  );
-  const publishedOperationalEvidencePath = path.join(
-    root,
-    'published-acceptance-receipt.operational-independence.json',
-  );
-  const tractorReportPath = path.join(
-    root,
-    'tractor-downstream-acceptance.json',
-  );
-  const outPath = path.join(root, 'publish-outcome.json');
-  const [
-    currentReleaseArtifactsApi,
-    currentReleaseManifestApi,
-    currentReceiptApi,
-    constants,
-  ] = await Promise.all([
-    import('../prepare-bleedingdev-packages.mjs'),
-    import('../lib/source-create-proof/release-manifest.mjs'),
-    import(
-      '../../ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs'
-    ),
-    import('../lib/prepare-bleedingdev-packages/constants.mjs'),
-  ]);
-  const releaseArtifactsApi =
-    releaseArtifactsApiOverride ?? currentReleaseArtifactsApi;
-  const releaseManifestApi =
-    releaseManifestApiOverride ?? currentReleaseManifestApi;
-  const receiptApi = receiptApiOverride ?? currentReceiptApi;
+  const publishedReceiptPath = at('published-acceptance-receipt.json');
+  const tractorReportPath = at('tractor-downstream-acceptance.json');
+  const [releaseArtifactsApi, releaseManifestApi, receiptApi, constants] =
+    await Promise.all([
+      import('../prepare-bleedingdev-packages.mjs'),
+      import('../lib/source-create-proof/release-manifest.mjs'),
+      import(
+        '../../ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs'
+      ),
+      import('../lib/prepare-bleedingdev-packages/constants.mjs'),
+    ]);
   const aliases = {
     [createSourceName]: createTargetName,
-    '@modern-js/i18n-utils': '@bleedingdev/modern-js-i18n-utils',
+    '@modern-js/i18n-utils': i18nTarget,
   };
   const exportsMap = {
     '.': './index.js',
@@ -93,7 +66,7 @@ async function createEvidenceFixture({
   const definitions = [
     {
       dependencies: {
-        '@modern-js/i18n-utils': `npm:${aliases['@modern-js/i18n-utils']}@${release.version}`,
+        '@modern-js/i18n-utils': `npm:${i18nTarget}@${release.version}`,
         '@module-federation/runtime': '2.8.0',
       },
       exports: exportsMap,
@@ -104,18 +77,22 @@ async function createEvidenceFixture({
     {
       dependencies: {},
       sourceName: '@modern-js/i18n-utils',
-      targetName: aliases['@modern-js/i18n-utils'],
+      targetName: i18nTarget,
     },
   ];
   const packages = definitions.map(definition => {
-    const packageDir = path.join(
-      root,
+    const packageDir = at(
       'staged',
       definition.targetName.replaceAll('/', '__'),
     );
     fs.mkdirSync(packageDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(packageDir, 'package.json'),
+    const write = (relativePath, contents) => {
+      const filePath = path.join(packageDir, relativePath);
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, contents);
+    };
+    write(
+      'package.json',
       `${JSON.stringify({
         dependencies: definition.dependencies,
         exports: definition.exports,
@@ -125,19 +102,14 @@ async function createEvidenceFixture({
         version: release.version,
       })}\n`,
     );
-    fs.writeFileSync(
-      path.join(packageDir, 'index.js'),
-      'module.exports = {};\n',
-    );
+    write('index.js', 'module.exports = {};\n');
     if (definition.sourceName === createSourceName) {
       for (const relativePath of constants.createTemplateRequiredFiles) {
-        const filePath = path.join(packageDir, relativePath);
-        fs.mkdirSync(path.dirname(filePath), { recursive: true });
-        fs.writeFileSync(filePath, 'fixture\n');
+        write(relativePath, 'fixture\n');
       }
     }
     return {
-      packageDir: path.relative(releaseRepoRoot, packageDir),
+      packageDir: path.relative(repoRoot, packageDir),
       sourceName: definition.sourceName,
       targetName: definition.targetName,
       version: release.version,
@@ -148,7 +120,7 @@ async function createEvidenceFixture({
     command: execFileSync,
     outDir: releaseDir,
     packages,
-    source: sourceIdentity,
+    source,
     tag: release.tag,
     tools: { node: process.version, npm: 'fixture-npm', pnpm: 'fixture-pnpm' },
     version: release.version,
@@ -157,7 +129,6 @@ async function createEvidenceFixture({
     manifestPath,
   });
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  const cohortDigest = manifest.cohortDigest;
   const manifestSha256 = acceptanceRelease.manifestSha256;
   const createReceipt = async (mode, targetPath, evidencePath) => {
     const receipt = receiptApi.createAcceptanceReceipt({
@@ -196,27 +167,17 @@ async function createEvidenceFixture({
     });
     await createOperationalAcceptanceReceiptFixture({
       evidencePath,
-      legacyOperationalSummary: receiptApiOverride !== undefined,
+      legacyOperationalSummary: false,
       receipt,
       receiptApi,
     });
     fs.writeFileSync(targetPath, `${JSON.stringify(receipt)}\n`);
   };
   await createReceipt('source', receiptPath, operationalEvidencePath);
-  await createReceipt(
-    'published',
-    publishedReceiptPath,
-    includePublishedOperationalEvidence
-      ? publishedOperationalEvidencePath
-      : undefined,
-  );
+  await createReceipt('published', publishedReceiptPath, undefined);
+
   const tractorBaselineRevision = 'cb6974e31bc919c86ae5bb86044409f0f1e036d5';
   const verticalIds = ['checkout', 'decide', 'explore'];
-  const boundaryCandidates = {
-    checkout: ['checkout', 'verticalCheckout'],
-    decide: ['decide', 'verticalDecide'],
-    explore: ['explore', 'verticalExplore'],
-  };
   const nativeSearch = {
     cartRoute: '/en/cart?sku=EX-01',
     productRoute: '/en/tractors/example?sku=EX-01',
@@ -232,8 +193,25 @@ async function createEvidenceFixture({
     runtimeInteractionCount: 4,
     status: 'visible-ui-contract',
   };
+  const routes = [
+    '/en/tractors',
+    '/en/tractors/example?sku=EX-01',
+    '/en/cart?sku=EX-01',
+    '/en/checkout',
+    '/en/checkout/thank-you',
+  ];
+  const passed = (id, detail) => ({ detail, id, status: 'passed' });
   const assertions = types => types.map(type => ({ status: 'pass', type }));
-  const nodeSsrResult = (appId, noJavaScriptType) => {
+  const workflowCheck = platform =>
+    passed(`${platform}-visible-tractor-workflow`, {
+      assertionCount: routes.length,
+      nativeSearch,
+      platform,
+      routes,
+      ui: visibleUi,
+    });
+  const ssrResult = (appId, noJavaScriptType) => {
+    const shell = appId === 'shell-super-app';
     const httpAssertionTypes = [
       'ssr-route',
       'ui-marker-html',
@@ -246,34 +224,29 @@ async function createEvidenceFixture({
       'no-js-ssr-css-root-marker',
       'no-js-stylesheet-href-dedupe',
       'no-js-ssr-failed-responses',
-      ...(receiptApiOverride ? ['no-js-screenshot'] : []),
       noJavaScriptType,
-      ...(appId === 'shell-super-app'
-        ? ['no-js-shell-composition-boundary']
-        : []),
+      ...(shell ? ['no-js-shell-composition-boundary'] : []),
     ];
     const noJavaScriptAssertions = assertions(noJavaScriptAssertionTypes);
-    if (appId === 'shell-super-app') {
-      noJavaScriptAssertions.find(
-        assertion => assertion.type === 'no-js-distributed-ssr-route',
-      ).route = '/en/tractors/example';
-      Object.assign(
-        noJavaScriptAssertions.find(
-          assertion => assertion.type === 'no-js-shell-composition-boundary',
-        ),
-        {
-          declaredRemoteIds: verticalIds,
-          matchedRemoteBoundaries: verticalIds.map(remoteId => ({
-            boundaryId: remoteId,
+    if (shell) {
+      const find = type =>
+        noJavaScriptAssertions.find(assertion => assertion.type === type);
+      find('no-js-distributed-ssr-route').route = '/en/tractors/example';
+      Object.assign(find('no-js-shell-composition-boundary'), {
+        declaredRemoteIds: verticalIds,
+        matchedRemoteBoundaries: verticalIds.map(remoteId => ({
+          boundaryId: remoteId,
+          remoteId,
+        })),
+        triedRemoteBoundaries: verticalIds.map(remoteId => ({
+          matchedBoundaryId: remoteId,
+          remoteId,
+          triedBoundaryIds: [
             remoteId,
-          })),
-          triedRemoteBoundaries: verticalIds.map(remoteId => ({
-            matchedBoundaryId: remoteId,
-            remoteId,
-            triedBoundaryIds: boundaryCandidates[remoteId],
-          })),
-        },
-      );
+            `vertical${remoteId[0].toUpperCase()}${remoteId.slice(1)}`,
+          ],
+        })),
+      });
     }
     return {
       appId,
@@ -286,118 +259,59 @@ async function createEvidenceFixture({
   fs.writeFileSync(
     tractorReportPath,
     `${JSON.stringify({
+      // The contract requires every check id, exactly once, in this order.
       checks: [
-        {
-          detail: {
-            createPackage: `${createTargetName}@${release.version}`,
+        passed('exact-create-migration', {
+          createPackage: `${createTargetName}@${release.version}`,
+          version: release.version,
+        }),
+        passed('exact-cohort', {
+          dependencyObservationCount: 1,
+          generatedCohort: {
+            packageCount: definitions.length,
+            projectionSchema: 'bleedingdev.ultramodern.release-cohort',
+            projectionSchemaVersion: 1,
             version: release.version,
           },
-          id: 'exact-create-migration',
-          status: 'passed',
-        },
-        {
-          detail: {
-            dependencyObservationCount: 1,
-            generatedCohort: {
-              packageCount: definitions.length,
-              projectionSchema: 'bleedingdev.ultramodern.release-cohort',
-              projectionSchemaVersion: 1,
-              version: release.version,
-            },
-          },
-          id: 'exact-cohort',
-          status: 'passed',
-        },
+        }),
         ...[
           'install---frozen-lockfile',
-          ...(includeTractorFormattingEvidence ? ['format'] : []),
+          'format',
           'check',
           'promotable-application-source',
           'build',
           'node:proof',
-        ].map(id => ({ detail: { id }, id, status: 'passed' })),
-        {
-          detail: {
-            appIds: verticalIds,
-            resultCount: verticalIds.length,
-            status: 'pass',
-          },
-          id: 'node-backend-federation-executed',
-          status: 'passed',
-        },
-        {
-          detail: {
-            appCount: verticalIds.length + 1,
-            distributedSsrRoute: '/en/tractors/example',
-            results: [
-              ...verticalIds.map(appId =>
-                nodeSsrResult(appId, 'no-js-ssr-ui-marker'),
-              ),
-              nodeSsrResult('shell-super-app', 'no-js-distributed-ssr-route'),
-            ],
-            status: 'pass',
-          },
-          id: 'node-server-rendered-ssr-executed',
-          status: 'passed',
-        },
-        {
-          detail: {
-            assertionCount: 5,
-            nativeSearch,
-            platform: 'node',
-            routes: [
-              '/en/tractors',
-              '/en/tractors/example?sku=EX-01',
-              '/en/cart?sku=EX-01',
-              '/en/checkout',
-              '/en/checkout/thank-you',
-            ],
-            ui: visibleUi,
-          },
-          id: 'node-visible-tractor-workflow',
-          status: 'passed',
-        },
-        {
-          detail: { id: 'cloudflare:build' },
-          id: 'cloudflare:build',
-          status: 'passed',
-        },
-        {
-          detail: {
-            assertionCount: 5,
-            nativeSearch,
-            platform: 'workerd',
-            routes: [
-              '/en/tractors',
-              '/en/tractors/example?sku=EX-01',
-              '/en/cart?sku=EX-01',
-              '/en/checkout',
-              '/en/checkout/thank-you',
-            ],
-            ui: visibleUi,
-          },
-          id: 'workerd-visible-tractor-workflow',
-          status: 'passed',
-        },
-        {
-          detail: {
-            node: nativeSearch,
-            workerd: nativeSearch,
-          },
-          id: 'native-tanstack-search',
-          status: 'passed',
-        },
-        {
-          detail: { node: visibleUi, workerd: visibleUi },
-          id: 'visible-tractor-ui',
-          status: 'passed',
-        },
+        ].map(id => passed(id, { id })),
+        passed('node-backend-federation-executed', {
+          appIds: verticalIds,
+          resultCount: verticalIds.length,
+          status: 'pass',
+        }),
+        passed('node-server-rendered-ssr-executed', {
+          appCount: verticalIds.length + 1,
+          distributedSsrRoute: '/en/tractors/example',
+          results: [
+            ...verticalIds.map(appId =>
+              ssrResult(appId, 'no-js-ssr-ui-marker'),
+            ),
+            ssrResult('shell-super-app', 'no-js-distributed-ssr-route'),
+          ],
+          status: 'pass',
+        }),
+        workflowCheck('node'),
+        passed('cloudflare:build', { id: 'cloudflare:build' }),
+        workflowCheck('workerd'),
+        passed('native-tanstack-search', {
+          node: nativeSearch,
+          workerd: nativeSearch,
+        }),
+        passed('visible-tractor-ui', { node: visibleUi, workerd: visibleUi }),
       ],
       mode: 'published',
       release: {
-        cohortDigest,
+        cohortDigest: manifest.cohortDigest,
         manifestSha256,
-        sourceRevision: sourceIdentity.commit,
+        sourceRevision: source.commit,
         version: release.version,
       },
       schema: 'bleedingdev.ultramodern.tractor-downstream-acceptance',
@@ -407,16 +321,14 @@ async function createEvidenceFixture({
     })}\n`,
   );
   return {
-    cohortDigestPath,
-    manifestDigestPath,
+    cohortDigestPath: path.join(releaseDir, 'cohort.sha256'),
+    manifestDigestPath: path.join(releaseDir, 'manifest.json.sha256'),
     manifestPath,
     operationalEvidencePath,
-    outPath,
-    publishedOperationalEvidencePath,
+    outPath: at('publish-outcome.json'),
     publishedReceiptPath,
     receiptPath,
     root,
-    source: sourceIdentity,
     tractorBaselineRevision,
     tractorReportPath,
     tractorReportSha256: digest(fs.readFileSync(tractorReportPath)),
@@ -429,13 +341,13 @@ function createOptions(fixture, artifactName, dryRun) {
     artifactName,
     dryRun,
     producerArtifactIdentity,
-    publicationRunAttempt,
     producerRunAttempt,
     producerRunIdentity,
-    repository: fixture.source.repository,
+    publicationRunAttempt,
+    repository: source.repository,
     runAttempt: outcomeRunAttempt,
     runId,
-    sourceCommit: fixture.source.commit,
+    sourceCommit: source.commit,
     tag: release.tag,
     version: release.version,
   };
@@ -448,36 +360,8 @@ function createOptions(fixture, artifactName, dryRun) {
   return options;
 }
 
-function populateDownloadedOutcome(fixture, artifactDir) {
-  fs.mkdirSync(artifactDir);
-  const files = [
-    [fixture.cohortDigestPath, 'cohort.sha256'],
-    [fixture.manifestDigestPath, 'manifest.json.sha256'],
-    [fixture.manifestPath, 'manifest.json'],
-    [
-      fixture.operationalEvidencePath,
-      'acceptance-receipt.operational-independence.json',
-    ],
-    [fixture.outPath, 'publish-outcome.json'],
-    [fixture.publishedReceiptPath, 'published-acceptance-receipt.json'],
-    [fixture.receiptPath, 'acceptance-receipt.json'],
-    [fixture.tractorReportPath, 'tractor-downstream-acceptance.json'],
-  ];
-  if (fs.existsSync(fixture.publishedOperationalEvidencePath)) {
-    files.push([
-      fixture.publishedOperationalEvidencePath,
-      'published-acceptance-receipt.operational-independence.json',
-    ]);
-  }
-  for (const [sourcePath, name] of files) {
-    fs.copyFileSync(sourcePath, path.join(artifactDir, name));
-  }
-  fs.cpSync(
-    path.join(path.dirname(fixture.manifestPath), 'tarballs'),
-    path.join(artifactDir, 'tarballs'),
-    { recursive: true },
-  );
-}
+const outcomeArtifactName = api =>
+  api.publishOutcomeArtifactName({ runAttempt: outcomeRunAttempt, runId });
 
 function artifact(id, name, overrides = {}) {
   return {
@@ -489,412 +373,116 @@ function artifact(id, name, overrides = {}) {
   };
 }
 
-test('dry-run and real publication emit the same strict bound outcome schema', async () => {
+test('a dry run never claims published acceptance evidence', async t => {
   const api = await outcomeApi();
-  const artifactName = api.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
+  const name = outcomeArtifactName(api);
+  const fixture = await createEvidenceFixture();
+  t.after(() => fs.rmSync(fixture.root, { force: true, recursive: true }));
 
-  for (const dryRun of [true, false]) {
-    const fixture = await createEvidenceFixture();
-    try {
-      const outcome = api.createPublishOutcome(
-        createOptions(fixture, artifactName, dryRun),
-      );
-      assert.equal(outcome.schema, api.publishOutcomeSchema);
-      assert.equal(outcome.schemaVersion, api.publishOutcomeSchemaVersion);
-      assert.equal(outcome.artifactName, artifactName);
-      assert.equal(outcome.dryRun, dryRun);
-      assert.deepEqual(outcome.source, source);
-      assert.deepEqual(outcome.release, release);
-      assert.deepEqual(outcome.workflowRun, {
-        attempt: outcomeRunAttempt,
-        id: runId,
-      });
-      assert.deepEqual(
-        outcome.publication,
-        dryRun ? null : { runAttempt: publicationRunAttempt },
-      );
-      assert.deepEqual(outcome.producer, {
-        artifactIdentity: producerArtifactIdentity,
-        runAttempt: producerRunAttempt,
-        runIdentity: producerRunIdentity,
-      });
-      assert.deepEqual(outcome.evidence.prepublishAcceptance, {
-        evidencePath: 'acceptance-receipt.operational-independence.json',
-        receiptPath: 'acceptance-receipt.json',
-      });
-      assert.deepEqual(
-        outcome.evidence.publishedAcceptance,
-        dryRun
-          ? null
-          : {
-              evidencePath: null,
-              receiptPath: 'published-acceptance-receipt.json',
-            },
-      );
-      assert.equal(
-        JSON.stringify(outcome.evidence).includes('receiptSha256'),
-        false,
-      );
-      assert.equal(
-        JSON.stringify(outcome.evidence).includes('operationalEvidenceSha256'),
-        false,
-      );
-    } finally {
-      fs.rmSync(fixture.root, { force: true, recursive: true });
-    }
-  }
+  const dry = api.createPublishOutcome(createOptions(fixture, name, true));
+  assert.equal(dry.dryRun, true);
+  assert.equal(dry.publication, null);
+  assert.equal(dry.evidence.publishedAcceptance, null);
+
+  const real = api.createPublishOutcome(createOptions(fixture, name, false));
+  assert.equal(real.dryRun, false);
+  assert.deepEqual(real.publication, { runAttempt: publicationRunAttempt });
+  assert.equal(
+    real.evidence.publishedAcceptance.receiptPath,
+    'published-acceptance-receipt.json',
+  );
 });
 
-test('backfill reconstructs schema-v6 outcomes with the archived current-source create contract', async () => {
-  let currentSourceCommit;
-  try {
-    currentSourceCommit = execFileSync(
-      'git',
-      ['stash', 'create', 'publish-outcome-source-test'],
-      { encoding: 'utf8' },
-    ).trim();
-  } catch {}
-  currentSourceCommit ||= execFileSync('git', ['rev-parse', 'HEAD'], {
-    encoding: 'utf8',
-  }).trim();
-  const fixture = await createEvidenceFixture({
-    sourceIdentity: { ...source, commit: currentSourceCommit },
-  });
-  const artifactDir = path.join(fixture.root, 'downloaded-outcome');
+test('non-dry outcome fails closed without passing published acceptance evidence', async t => {
   const api = await outcomeApi();
-  const { verifyPublishOutcomeAtSourceCommit } = await import(
-    '../backfill-change-record.mjs'
-  );
-  const artifactName = api.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
-  const outcome = api.createPublishOutcome(
-    createOptions(fixture, artifactName, false),
-  );
-  populateDownloadedOutcome(fixture, artifactDir);
-  const backfillOptions = {
-    commit: currentSourceCommit,
-    runAttempt: outcomeRunAttempt,
-    runId,
-    version: release.version,
-  };
-  try {
-    assert.deepEqual(
-      verifyPublishOutcomeAtSourceCommit(
-        outcome,
-        artifactDir,
-        { name: artifactName },
-        backfillOptions,
-      ),
-      outcome,
-    );
+  const name = outcomeArtifactName(api);
+  const fixture = await createEvidenceFixture();
+  t.after(() => fs.rmSync(fixture.root, { force: true, recursive: true }));
 
-    fs.writeFileSync(
-      path.join(
-        artifactDir,
-        'published-acceptance-receipt.operational-independence.json',
-      ),
-      '{}\n',
-    );
-    assert.throws(
-      () =>
-        verifyPublishOutcomeAtSourceCommit(
-          outcome,
-          artifactDir,
-          { name: artifactName },
-          backfillOptions,
-        ),
-      /does not match its schema operational evidence profile/u,
-    );
-    fs.unlinkSync(
-      path.join(
-        artifactDir,
-        'published-acceptance-receipt.operational-independence.json',
-      ),
-    );
-
-    fs.rmSync(path.join(fixture.root, 'source-validator'), {
-      force: true,
-      recursive: true,
-    });
-    fs.rmSync(path.join(fixture.root, 'source-validator.tar'), { force: true });
-    fs.rmSync(path.join(fixture.root, 'reconstructed-publish-outcome.json'), {
-      force: true,
-    });
-    const tampered = structuredClone(outcome);
-    tampered.evidence.manifestSha256 = 'f'.repeat(64);
-    assert.throws(
-      () =>
-        verifyPublishOutcomeAtSourceCommit(
-          tampered,
-          artifactDir,
-          { name: artifactName },
-          backfillOptions,
-        ),
-      /does not match the exact source validator reconstruction/u,
-    );
-  } finally {
-    fs.rmSync(fixture.root, { force: true, recursive: true });
-  }
-});
-
-test('backfill reconstructs schema-v4 outcomes with the archived historical create contract', async () => {
-  const historicalRef = 'ultramodern-v3.8.2-ultramodern.3';
-  const historicalCommit = execFileSync(
-    'git',
-    ['rev-parse', `${historicalRef}^{commit}`],
-    { encoding: 'utf8' },
-  ).trim();
-  const historicalRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'publish-outcome-v4-source-'),
+  const missing = createOptions(fixture, name, false);
+  delete missing.publishedReceiptPath;
+  assert.throws(
+    () => api.createPublishOutcome(missing),
+    /requires published and Tractor acceptance evidence/u,
   );
-  const sourceArchivePath = path.join(historicalRoot, 'scripts.tar');
+
+  const missingTractor = createOptions(fixture, name, false);
+  delete missingTractor.tractorBaselineRevision;
+  delete missingTractor.tractorReportPath;
+  delete missingTractor.tractorReportSha256;
+  assert.throws(
+    () => api.createPublishOutcome(missingTractor),
+    /requires published and Tractor acceptance evidence/u,
+  );
+
+  const publishedSource = fs.readFileSync(fixture.publishedReceiptPath, 'utf8');
+  const rehearsal = JSON.parse(publishedSource);
+  rehearsal.mode = 'source';
   fs.writeFileSync(
-    sourceArchivePath,
-    execFileSync(
-      'git',
-      ['archive', '--format=tar', historicalCommit, 'scripts'],
-      { encoding: null, maxBuffer: 128 * 1024 * 1024 },
+    fixture.publishedReceiptPath,
+    `${JSON.stringify(rehearsal)}\n`,
+  );
+  assert.throws(
+    () => api.createPublishOutcome(createOptions(fixture, name, false)),
+    /Acceptance receipt mode must be published/u,
+  );
+
+  // ACC-1: a published receipt cannot smuggle the source-only
+  // operational-independence result back into the contract.
+  const smuggled = JSON.parse(publishedSource);
+  const sourceReceipt = JSON.parse(
+    fs.readFileSync(fixture.receiptPath, 'utf8'),
+  );
+  smuggled.results.push(
+    sourceReceipt.results.find(
+      result => result.id === 'operational-independence',
     ),
   );
-  execFileSync('tar', ['-xf', sourceArchivePath, '-C', historicalRoot], {
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
-  const historicalReceiptApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-production-readiness/published-create-proof/acceptance-receipt.mjs',
-        ),
-      ),
-    )
+  fs.writeFileSync(
+    fixture.publishedReceiptPath,
+    `${JSON.stringify(smuggled)}\n`,
   );
-  const historicalReleaseArtifactsApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-publish/lib/prepare-bleedingdev-packages/release-artifacts.mjs',
-        ),
-      ),
-    )
+  assert.throws(
+    () => api.createPublishOutcome(createOptions(fixture, name, false)),
+    /every required result exactly once/u,
   );
-  const historicalReleaseManifestApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-publish/lib/source-create-proof/release-manifest.mjs',
-        ),
-      ),
-    )
-  );
-  const historicalOutcomeApi = await import(
-    pathToFileURL(
-      fs.realpathSync(
-        path.join(
-          historicalRoot,
-          'scripts/ultramodern-publish/publish-outcome.mjs',
-        ),
-      ),
-    )
-  );
-  const fixture = await createEvidenceFixture({
-    createSourceName: '@modern-js/create',
-    createTargetName: '@bleedingdev/modern-js-create',
-    includePublishedOperationalEvidence: true,
-    // This archived contract predates the explicit formatter lifecycle step.
-    includeTractorFormattingEvidence: false,
-    receiptApiOverride: historicalReceiptApi,
-    releaseArtifactsApiOverride: historicalReleaseArtifactsApi,
-    releaseManifestApiOverride: historicalReleaseManifestApi,
-    releaseRepoRoot: historicalRoot,
-    sourceIdentity: { ...source, commit: historicalCommit },
-  });
-  const artifactDir = path.join(fixture.root, 'downloaded-outcome');
-  const artifactName = historicalOutcomeApi.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
-  const outcome = historicalOutcomeApi.createPublishOutcome(
-    createOptions(fixture, artifactName, false),
-  );
-  populateDownloadedOutcome(fixture, artifactDir);
-  const { verifyPublishOutcomeAtSourceCommit } = await import(
-    '../backfill-change-record.mjs'
-  );
-  try {
-    assert.equal(outcome.schemaVersion, 4);
-    assert.deepEqual(
-      verifyPublishOutcomeAtSourceCommit(
-        outcome,
-        artifactDir,
-        { name: artifactName },
-        {
-          commit: historicalCommit,
-          runAttempt: outcomeRunAttempt,
-          runId,
-          version: release.version,
-        },
-      ),
-      outcome,
-    );
-    fs.unlinkSync(
-      path.join(
-        artifactDir,
-        'published-acceptance-receipt.operational-independence.json',
-      ),
-    );
-    assert.throws(
-      () =>
-        verifyPublishOutcomeAtSourceCommit(
-          outcome,
-          artifactDir,
-          { name: artifactName },
-          {
-            commit: historicalCommit,
-            runAttempt: outcomeRunAttempt,
-            runId,
-            version: release.version,
-          },
-        ),
-      /does not match its schema operational evidence profile/u,
-    );
-  } finally {
-    fs.rmSync(fixture.root, { force: true, recursive: true });
-    fs.rmSync(historicalRoot, { force: true, recursive: true });
-  }
 });
 
-test('non-dry outcome fails closed without passing published acceptance evidence', async () => {
+test('publish outcome rejects tampered receipt, operational evidence, and Tractor proof', async () => {
   const api = await outcomeApi();
-  const artifactName = api.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
-  const fixture = await createEvidenceFixture();
-  try {
-    const missing = createOptions(fixture, artifactName, false);
-    delete missing.publishedReceiptPath;
-    assert.throws(
-      () => api.createPublishOutcome(missing),
-      /requires published and Tractor acceptance evidence/u,
-    );
-
-    const missingTractor = createOptions(fixture, artifactName, false);
-    delete missingTractor.tractorBaselineRevision;
-    delete missingTractor.tractorReportPath;
-    delete missingTractor.tractorReportSha256;
-    assert.throws(
-      () => api.createPublishOutcome(missingTractor),
-      /requires published and Tractor acceptance evidence/u,
-    );
-
-    const publishedReceiptSource = fs.readFileSync(
-      fixture.publishedReceiptPath,
-      'utf8',
-    );
-    const receipt = JSON.parse(publishedReceiptSource);
-    receipt.mode = 'source';
-    fs.writeFileSync(
-      fixture.publishedReceiptPath,
-      `${JSON.stringify(receipt)}\n`,
-    );
-    assert.throws(
-      () =>
-        api.createPublishOutcome(createOptions(fixture, artifactName, false)),
-      /Acceptance receipt mode must be published/u,
-    );
-
-    // ACC-1: a published receipt cannot smuggle the source-only
-    // operational-independence result back into the contract.
-    const smuggled = JSON.parse(publishedReceiptSource);
-    const sourceReceipt = JSON.parse(
-      fs.readFileSync(fixture.receiptPath, 'utf8'),
-    );
-    smuggled.results.push(
-      sourceReceipt.results.find(
-        result => result.id === 'operational-independence',
-      ),
-    );
-    fs.writeFileSync(
-      fixture.publishedReceiptPath,
-      `${JSON.stringify(smuggled)}\n`,
-    );
-    assert.throws(
-      () =>
-        api.createPublishOutcome(createOptions(fixture, artifactName, false)),
-      /every required result exactly once/u,
-    );
-  } finally {
-    fs.rmSync(fixture.root, { force: true, recursive: true });
-  }
-});
-
-test('publish outcome rejects incomplete receipt, operational evidence, and Tractor proof', async () => {
-  const api = await outcomeApi();
-  const artifactName = api.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
+  const name = outcomeArtifactName(api);
+  const rewrite = (filePath, mutate) => {
+    const value = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    mutate(value);
+    fs.writeFileSync(filePath, `${JSON.stringify(value)}\n`);
+  };
   const cases = [
     {
-      label: 'forged receipt artifact binding',
-      mutate(fixture) {
-        const receipt = JSON.parse(
-          fs.readFileSync(fixture.receiptPath, 'utf8'),
-        );
-        const nonCreatePackage = receipt.binding.artifacts.packages.find(
-          item => item.targetName !== receipt.binding.create.targetName,
-        );
-        assert.ok(nonCreatePackage);
-        nonCreatePackage.integrity = 'sha512-Zm9yZ2Vk';
-        fs.writeFileSync(fixture.receiptPath, `${JSON.stringify(receipt)}\n`);
-      },
+      label: 'forged tarball integrity in the receipt binding',
+      mutate: fixture =>
+        rewrite(fixture.receiptPath, receipt => {
+          const forged = receipt.binding.artifacts.packages.find(
+            item => item.targetName !== receipt.binding.create.targetName,
+          );
+          assert.ok(forged);
+          forged.integrity = 'sha512-Zm9yZ2Vk';
+        }),
       pattern: /binding does not match the strict release manifest/u,
     },
     {
-      label: 'foreign producer receipt',
-      mutate(fixture) {
-        const receipt = JSON.parse(
-          fs.readFileSync(fixture.receiptPath, 'utf8'),
-        );
-        receipt.binding.runIdentity = 'github:foreign/repo:run:999:attempt:1';
-        fs.writeFileSync(fixture.receiptPath, `${JSON.stringify(receipt)}\n`);
-      },
-      pattern:
-        /(?:run identity must be|binding does not match the strict release manifest)/u,
-    },
-    {
       label: 'tampered operational evidence',
-      mutate(fixture) {
-        const evidence = JSON.parse(
-          fs.readFileSync(fixture.operationalEvidencePath, 'utf8'),
-        );
-        evidence.result = 'fail';
-        fs.writeFileSync(
-          fixture.operationalEvidencePath,
-          `${JSON.stringify(evidence)}\n`,
-        );
-      },
+      mutate: fixture =>
+        rewrite(fixture.operationalEvidencePath, evidence => {
+          evidence.result = 'fail';
+        }),
       pattern: /missing, skipped, or not passing/u,
     },
     {
       label: 'otherwise complete source-mode rehearsal report',
-      mutate(fixture) {
-        const report = JSON.parse(
-          fs.readFileSync(fixture.tractorReportPath, 'utf8'),
-        );
-        report.mode = 'source';
-        fs.writeFileSync(
-          fixture.tractorReportPath,
-          `${JSON.stringify(report)}\n`,
-        );
+      mutate: fixture => {
+        rewrite(fixture.tractorReportPath, report => {
+          report.mode = 'source';
+        });
         fixture.tractorReportSha256 = digest(
           fs.readFileSync(fixture.tractorReportPath),
         );
@@ -905,10 +493,9 @@ test('publish outcome rejects incomplete receipt, operational evidence, and Trac
   for (const { label, mutate, pattern } of cases) {
     const fixture = await createEvidenceFixture();
     try {
-      await mutate(fixture);
+      mutate(fixture);
       assert.throws(
-        () =>
-          api.createPublishOutcome(createOptions(fixture, artifactName, false)),
+        () => api.createPublishOutcome(createOptions(fixture, name, false)),
         pattern,
         label,
       );
@@ -918,84 +505,67 @@ test('publish outcome rejects incomplete receipt, operational evidence, and Trac
   }
 });
 
-test('artifact discovery accepts one current outcome across all API pages', async () => {
+test('publish outcome refuses evidence bound to another release or digest', async t => {
+  const api = await outcomeApi();
+  const fixture = await createEvidenceFixture();
+  t.after(() => fs.rmSync(fixture.root, { force: true, recursive: true }));
+  const options = createOptions(fixture, outcomeArtifactName(api), true);
+  assert.throws(
+    () =>
+      api.createPublishOutcome({
+        ...options,
+        version: '3.8.2-ultramodern.999',
+      }),
+    /Release manifest does not match the expected source and version/u,
+  );
+  const foreignDigest = path.join(fixture.root, 'foreign-digest');
+  fs.writeFileSync(foreignDigest, `${'0'.repeat(64)}\n`);
+  assert.throws(
+    () =>
+      api.createPublishOutcome({
+        ...options,
+        manifestDigestPath: foreignDigest,
+      }),
+    /Detached release manifest digest is invalid/u,
+  );
+});
+
+test('artifact discovery selects the current outcome and otherwise fails closed', async () => {
   const api = await outcomeApi();
   const previousName = api.publishOutcomeArtifactName({
     runAttempt: publicationRunAttempt,
     runId,
   });
-  const expectedName = api.publishOutcomeArtifactName({
+  const expectedName = outcomeArtifactName(api);
+  const options = {
+    completedAt: '2026-07-10T10:01:00Z',
     runAttempt: outcomeRunAttempt,
     runId,
-  });
+  };
   const selected = api.selectPublishOutcomeArtifact(
     [
       { artifacts: [artifact(1, 'unrelated'), artifact(2, previousName)] },
       { artifacts: [artifact(3, expectedName)] },
     ],
-    {
-      completedAt: '2026-07-10T10:01:00Z',
-      runAttempt: outcomeRunAttempt,
-      runId,
-    },
+    options,
   );
   assert.equal(selected.id, 3);
   assert.equal(selected.name, expectedName);
-});
 
-test('artifact discovery fails closed for missing and cross-page duplicate outcomes', async () => {
-  const api = await outcomeApi();
-  const expectedName = api.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
-  const options = {
-    completedAt: '2026-07-10T10:01:00Z',
-    runAttempt: outcomeRunAttempt,
-    runId,
-  };
-
-  assert.throws(
-    () => api.selectPublishOutcomeArtifact([{ artifacts: [] }], options),
-    /found 0/u,
-  );
-  assert.throws(
-    () =>
-      api.selectPublishOutcomeArtifact(
-        [
-          { artifacts: [artifact(1, expectedName)] },
-          { artifacts: [artifact(2, expectedName)] },
-        ],
-        options,
-      ),
-    /found 2/u,
-  );
-});
-
-test('artifact discovery fails closed for malformed, delayed, expired, and name-drift evidence', async () => {
-  const api = await outcomeApi();
-  const expectedName = api.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
-  const options = {
-    completedAt: '2026-07-10T10:01:00Z',
-    runAttempt: outcomeRunAttempt,
-    runId,
-  };
   const cases = [
-    [[{ artifacts: 'not-an-array' }], /artifacts must be an array/u],
+    [[{ artifacts: [] }], /found 0/u],
     [
-      [{ artifacts: [{ expired: false, id: 1, name: expectedName }] }],
-      /created_at must be an ISO timestamp/u,
+      [
+        { artifacts: [artifact(1, expectedName)] },
+        { artifacts: [artifact(2, expectedName)] },
+      ],
+      /found 2/u,
     ],
     [
       [
         {
           artifacts: [
-            artifact(1, expectedName, {
-              created_at: '2026-07-10T10:02:00Z',
-            }),
+            artifact(1, expectedName, { created_at: '2026-07-10T10:02:00Z' }),
           ],
         },
       ],
@@ -1018,35 +588,62 @@ test('artifact discovery fails closed for malformed, delayed, expired, and name-
   }
 });
 
-test('canonical artifact verification retains outcome-specific expected identity and digest paths', async t => {
-  const api = await outcomeApi();
-  const fixture = await createEvidenceFixture();
-  t.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
-  const artifactName = api.publishOutcomeArtifactName({
-    runAttempt: outcomeRunAttempt,
-    runId,
-  });
-  const options = createOptions(fixture, artifactName, true);
-  for (const overrides of [
-    { sourceCommit: 'f'.repeat(40) },
-    { version: '3.8.2-ultramodern.999' },
-    { tag: 'other-tag' },
-    {
-      repository: 'foreign/repository',
-      producerRunIdentity: `github:foreign/repository:run:${runId}:attempt:${producerRunAttempt}`,
-    },
-  ]) {
-    assert.throws(
-      () => api.createPublishOutcome({ ...options, ...overrides }),
-      /Release manifest does not match the expected source and version/u,
+test('Tractor evidence binder refuses a rehearsal report and binds the published one', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tractor-evidence-'));
+  try {
+    const tractorRef = `${'0'.repeat(39)}1`;
+    const reportPath = path.join(
+      root,
+      '.modern/production-readiness/tractor-downstream-acceptance.json',
     );
-  }
-  const foreignDigest = path.join(fixture.root, 'foreign-digest');
-  fs.writeFileSync(foreignDigest, `${'0'.repeat(64)}\n`);
-  for (const field of ['manifestDigestPath', 'cohortDigestPath']) {
-    assert.throws(
-      () => api.createPublishOutcome({ ...options, [field]: foreignDigest }),
-      /Detached release (?:manifest|cohort) digest is invalid/u,
+    fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+    const write = mode =>
+      fs.writeFileSync(
+        reportPath,
+        `${JSON.stringify({ mode, tractor: { baselineRevision: tractorRef } })}\n`,
+      );
+    const bind = outputPath =>
+      spawnSync(
+        process.execPath,
+        [
+          path.join(
+            repoRoot,
+            'scripts/ultramodern-publish/bind-tractor-acceptance-evidence.mjs',
+          ),
+        ],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: outputPath,
+            GITHUB_RUN_ATTEMPT: '3',
+            TRACTOR_REF: tractorRef,
+          },
+        },
+      );
+
+    write('published');
+    const publishedOutput = path.join(root, 'published-output');
+    const published = bind(publishedOutput);
+    assert.equal(published.status, 0, published.stderr || published.stdout);
+    assert.equal(
+      fs.readFileSync(publishedOutput, 'utf8'),
+      [
+        `artifact_name=ultramodern-tractor-downstream-acceptance-${tractorRef}-attempt-3`,
+        `baseline_revision=${tractorRef}`,
+        `report_sha256=${digest(fs.readFileSync(reportPath))}`,
+        '',
+      ].join('\n'),
     );
+
+    write('source');
+    const rehearsalOutput = path.join(root, 'rehearsal-output');
+    const rehearsal = bind(rehearsalOutput);
+    assert.notEqual(rehearsal.status, 0);
+    assert.match(rehearsal.stderr, /found source/u);
+    assert.equal(fs.existsSync(rehearsalOutput), false);
+  } finally {
+    fs.rmSync(root, { force: true, recursive: true });
   }
 });

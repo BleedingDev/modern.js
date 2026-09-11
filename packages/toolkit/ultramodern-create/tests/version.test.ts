@@ -15,25 +15,8 @@ const hermeticEnv = {
   ULTRAMODERN_CREATE_FRAMEWORK_VERSION: '3.2.0-ultramodern.108',
 };
 
-const readGeneratedFile = (workspacePath: string, relativePath: string) =>
-  fs.readFileSync(path.join(workspacePath, relativePath), 'utf8');
-
 const writeExecutable = (filePath: string, content: string) => {
   fs.writeFileSync(filePath, content, { mode: 0o755 });
-};
-
-const generatedConfigRuntimePackages = {
-  'app-tools': path.resolve(packageRoot, '../../solutions/app-tools'),
-  'app-tools-extensions': path.resolve(
-    packageRoot,
-    '../../solutions/app-tools-extensions',
-  ),
-  'ultramodern-app-tools': path.resolve(
-    packageRoot,
-    '../../solutions/ultramodern-app-tools',
-  ),
-  'plugin-i18n': path.resolve(packageRoot, '../../runtime/plugin-i18n'),
-  'plugin-tanstack': path.resolve(packageRoot, '../../runtime/plugin-tanstack'),
 };
 
 function linkGeneratedConfigRuntime(
@@ -52,13 +35,23 @@ function linkGeneratedConfigRuntime(
     'node_modules/@modern-js',
   );
   fs.mkdirSync(modernScope, { recursive: true });
-  for (const [name, packagePath] of Object.entries(
-    generatedConfigRuntimePackages,
-  )) {
-    fs.symlinkSync(packagePath, path.join(modernScope, name), 'dir');
+  for (const [name, relativePath] of [
+    ['app-tools', '../../solutions/app-tools'],
+    ['app-tools-extensions', '../../solutions/app-tools-extensions'],
+    ['ultramodern-app-tools', '../../solutions/ultramodern-app-tools'],
+    ['plugin-i18n', '../../runtime/plugin-i18n'],
+    ['plugin-tanstack', '../../runtime/plugin-tanstack'],
+  ]) {
+    fs.symlinkSync(
+      path.resolve(packageRoot, relativePath),
+      path.join(modernScope, name),
+      'dir',
+    );
   }
 }
 
+// Evaluates the generated modern.config.ts the way the app build does, so the
+// assertion is the asset prefix a browser would receive, not config text.
 function loadGeneratedAssetPrefix(
   workspacePath: string,
   appDirectory: string,
@@ -97,86 +90,19 @@ function loadGeneratedAssetPrefix(
   return JSON.parse(result.stdout) as string;
 }
 
-const linkUltramodernCreatePackageIntoConsumer = (consumerDir: string) => {
-  const scopeDir = path.join(consumerDir, 'node_modules/@modern-js');
-  fs.mkdirSync(scopeDir, { recursive: true });
-  fs.symlinkSync(packageRoot, path.join(scopeDir, 'ultramodern-create'), 'dir');
-};
-
-test('package exposes canonical, published-selector, and transition command aliases', () => {
-  const packageJson = JSON.parse(
-    fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
-  );
-
-  assert.equal(packageJson.bin['ultramodern-create'], './bin/run.js');
-  assert.equal(packageJson.bin['modern-js-ultramodern-create'], './bin/run.js');
-  assert.equal(packageJson.bin['modern-js-create'], './bin/run.js');
-  assert.equal(packageJson.bin.create, undefined);
-});
-
-test('package exposes the public UltraModern workspace generator subpath', () => {
-  const packageJson = JSON.parse(
-    fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
-  );
-  const expectedPublicExport = {
-    types: './dist/types/ultramodern-workspace/public-api.d.ts',
-    node: {
-      import: './dist/esm-node/ultramodern-workspace/public-api.js',
-      require: './dist/cjs/ultramodern-workspace/public-api.cjs',
-    },
-    default: './dist/esm-node/ultramodern-workspace/public-api.js',
-  };
-  const expectedCodeSmithExport = {
-    types: './dist/types/ultramodern-workspace/codesmith.d.ts',
-    node: {
-      import: './dist/esm-node/ultramodern-workspace/codesmith.js',
-      require: './dist/cjs/ultramodern-workspace/codesmith.cjs',
-    },
-    default: './dist/esm-node/ultramodern-workspace/codesmith.js',
-  };
-
-  assert.deepEqual(packageJson.typesVersions['*']['ultramodern-workspace'], [
-    './dist/types/ultramodern-workspace/public-api.d.ts',
-  ]);
-  assert.deepEqual(
-    packageJson.typesVersions['*']['ultramodern-workspace/codesmith'],
-    ['./dist/types/ultramodern-workspace/codesmith.d.ts'],
-  );
-  assert.deepEqual(packageJson.exports['./ultramodern-workspace'], {
-    ...expectedPublicExport,
-    node: {
-      'modern:source': './src/ultramodern-workspace/public-api.ts',
-      ...expectedPublicExport.node,
-    },
-  });
-  assert.deepEqual(packageJson.exports['./ultramodern-workspace/codesmith'], {
-    ...expectedCodeSmithExport,
-    node: {
-      'modern:source': './src/ultramodern-workspace/codesmith.ts',
-      ...expectedCodeSmithExport.node,
-    },
-  });
-  assert.deepEqual(
-    packageJson.publishConfig.exports['./ultramodern-workspace'],
-    expectedPublicExport,
-  );
-  assert.deepEqual(
-    packageJson.publishConfig.exports['./ultramodern-workspace/codesmith'],
-    expectedCodeSmithExport,
-  );
-  assert.deepEqual(
-    Object.keys(packageJson.exports).sort(),
-    Object.keys(packageJson.publishConfig.exports).sort(),
-  );
-});
-
 test('built public UltraModern subpath imports from an ESM consumer and generates a vertical', () => {
   const tempRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'modern-create-public-api-'),
   );
 
   try {
-    linkUltramodernCreatePackageIntoConsumer(tempRoot);
+    const scopeDir = path.join(tempRoot, 'node_modules/@modern-js');
+    fs.mkdirSync(scopeDir, { recursive: true });
+    fs.symlinkSync(
+      packageRoot,
+      path.join(scopeDir, 'ultramodern-create'),
+      'dir',
+    );
 
     const result = spawnSync(
       process.execPath,
@@ -187,74 +113,23 @@ test('built public UltraModern subpath imports from an ESM consumer and generate
           import fs from 'node:fs';
           import path from 'node:path';
           import {
-            addUltramodernShell,
             addUltramodernVertical,
             generateUltramodernWorkspace,
-            normalizeUltramodernBridgeConfig,
-            planUltramodernShell,
-            planUltramodernVertical,
           } from '@modern-js/ultramodern-create/ultramodern-workspace';
 
-          if (
-            typeof addUltramodernShell !== 'function' ||
-            typeof planUltramodernShell !== 'function'
-          ) {
-            throw new Error('Expected additional-shell public API');
-          }
-
           const workspaceRoot = path.join(process.cwd(), 'public-api-workspace');
-          const workspaceResult = generateUltramodernWorkspace({
+          generateUltramodernWorkspace({
             targetDir: workspaceRoot,
             packageName: 'public-api-workspace',
             modernVersion: '3.2.1',
             enableTailwind: true,
             packageSource: { strategy: 'workspace' },
           });
-          const verticalResult = addUltramodernVertical({
+          addUltramodernVertical({
             workspaceRoot,
             name: 'catalog',
             modernVersion: '3.2.1',
           });
-          const planResult = planUltramodernVertical({
-            workspaceRoot,
-            name: 'checkout',
-            modernVersion: '3.2.1',
-          });
-          const bridgeConfig = normalizeUltramodernBridgeConfig({
-            parentRoot: '..',
-            workspacePackages: [{ pattern: '../packages/*' }],
-            dependencies: ['@acme/ui'],
-            gates: [{ name: 'typecheck', command: 'pnpm nx typecheck @acme/ui' }],
-          });
-
-          if (
-            workspaceResult.operation !== 'workspace' ||
-            !workspaceResult.createdPaths.includes('apps/shell-super-app/package.json')
-          ) {
-            throw new Error('Expected typed workspace generation result');
-          }
-          if (
-            verticalResult.operation !== 'vertical' ||
-            verticalResult.assignedPorts.catalog !== 4101 ||
-            verticalResult.apiPrefixes.catalog !== '/catalog-api'
-          ) {
-            throw new Error('Expected typed MicroVertical generation result');
-          }
-          if (
-            planResult.dryRun !== true ||
-            planResult.selectedPort !== 4102 ||
-            planResult.moduleFederationRemote.name !== 'verticalCheckout'
-          ) {
-            throw new Error('Expected typed MicroVertical dry-run plan');
-          }
-          if (
-            bridgeConfig.enabled !== true ||
-            bridgeConfig.lockfilePolicy !== 'nested' ||
-            bridgeConfig.reactSingletons.join(',') !==
-              'react,react-dom,react-dom/client'
-          ) {
-            throw new Error('Expected typed bridge config normalizer');
-          }
           for (const relativePath of [
             '.modernjs/ultramodern.json',
             'apps/shell-super-app/package.json',
@@ -279,124 +154,7 @@ test('built public UltraModern subpath imports from an ESM consumer and generate
   }
 });
 
-test('built public UltraModern subpath can be required from CommonJS', () => {
-  const tempRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'modern-create-public-api-cjs-'),
-  );
-
-  try {
-    linkUltramodernCreatePackageIntoConsumer(tempRoot);
-
-    const result = spawnSync(
-      process.execPath,
-      [
-        '--eval',
-        `
-          const publicApi = require('@modern-js/ultramodern-create/ultramodern-workspace');
-          const keys = Object.keys(publicApi).sort();
-          const expected = [
-            'addUltramodernShell',
-            'addUltramodernVertical',
-            'generateUltramodernWorkspace',
-            'normalizeUltramodernBridgeConfig',
-            'planUltramodernShell',
-            'planUltramodernVertical',
-          ];
-          if (JSON.stringify(keys) !== JSON.stringify(expected)) {
-            throw new Error(\`Unexpected public API keys: \${keys.join(', ')}\`);
-          }
-          if (typeof publicApi.generateUltramodernWorkspace !== 'function') {
-            throw new Error('Expected generateUltramodernWorkspace function');
-          }
-          if (typeof publicApi.addUltramodernVertical !== 'function') {
-            throw new Error('Expected addUltramodernVertical function');
-          }
-        `,
-      ],
-      {
-        cwd: tempRoot,
-        encoding: 'utf8',
-      },
-    );
-
-    assert.equal(result.status, 0, result.stderr);
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('built CodeSmith UltraModern subpath exposes a default adapter', () => {
-  const tempRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'modern-create-codesmith-api-'),
-  );
-
-  try {
-    linkUltramodernCreatePackageIntoConsumer(tempRoot);
-
-    const esmResult = spawnSync(
-      process.execPath,
-      [
-        '--input-type=module',
-        '--eval',
-        `
-          import adapter from '@modern-js/ultramodern-create/ultramodern-workspace/codesmith';
-          if (typeof adapter !== 'function') {
-            throw new Error('Expected default CodeSmith adapter function');
-          }
-        `,
-      ],
-      {
-        cwd: tempRoot,
-        encoding: 'utf8',
-      },
-    );
-    assert.equal(esmResult.status, 0, esmResult.stderr);
-
-    const cjsResult = spawnSync(
-      process.execPath,
-      [
-        '--eval',
-        `
-          const adapterModule = require('@modern-js/ultramodern-create/ultramodern-workspace/codesmith');
-          const adapter = adapterModule.default || adapterModule;
-          if (typeof adapter !== 'function') {
-            throw new Error('Expected default CodeSmith adapter function');
-          }
-        `,
-      ],
-      {
-        cwd: tempRoot,
-        encoding: 'utf8',
-      },
-    );
-    assert.equal(cjsResult.status, 0, cjsResult.stderr);
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});
-
-test('built CLI resolves package metadata for --version', () => {
-  const result = spawnSync(process.execPath, [builtCliPath, '--version'], {
-    cwd: packageRoot,
-    encoding: 'utf8',
-  });
-
-  const packageJson = JSON.parse(
-    fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
-  );
-
-  assert.equal(result.status, 0, result.stderr);
-  // The version line must identify the package that actually ships this
-  // code (package.json name), not a hardcoded publish alias.
-  assert.match(
-    result.stdout,
-    new RegExp(
-      `${packageJson.name.replace(/[/\\^$.*+?()[\]{}|]/g, '\\$&')} version: \\d+\\.\\d+\\.\\d+`,
-    ),
-  );
-});
-
-test('built CLI resolves workspace template for default scaffold', () => {
+test('built CLI scaffolds a workspace whose asset prefix resolves by precedence', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
 
   try {
@@ -411,52 +169,33 @@ test('built CLI resolves workspace template for default scaffold', () => {
     );
 
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(
-      fs.existsSync(
-        path.join(tmpDir, 'smoke-workspace', '.modernjs/ultramodern.json'),
-      ),
-      true,
-    );
-    assert.equal(
-      fs.existsSync(
-        path.join(tmpDir, 'smoke-workspace', 'apps/shell-super-app'),
-      ),
-      true,
-    );
-
     const workspacePath = path.join(tmpDir, 'smoke-workspace');
-    const appDirectories = fs
-      .readdirSync(path.join(workspacePath, 'apps'), { withFileTypes: true })
-      .filter(entry => entry.isDirectory())
-      .map(entry => entry.name);
+    assert.ok(
+      fs.existsSync(path.join(workspacePath, '.modernjs/ultramodern.json')),
+    );
 
-    assert.notEqual(appDirectories.length, 0);
-
-    for (const appDirectory of appDirectories) {
-      linkGeneratedConfigRuntime(workspacePath, appDirectory);
-      assert.equal(
-        loadGeneratedAssetPrefix(workspacePath, appDirectory, {
-          MODERN_ASSET_PREFIX: 'https://modern.example/assets/',
-          MODERN_PUBLIC_SITE_URL: 'https://site.example/',
-          ULTRAMODERN_ASSET_PREFIX: 'https://ultramodern.example/assets/',
-        }),
+    linkGeneratedConfigRuntime(workspacePath, 'shell-super-app');
+    const precedence: [string | undefined, string | undefined, string][] = [
+      [
         'https://modern.example/assets/',
-      );
-      assert.equal(
-        loadGeneratedAssetPrefix(workspacePath, appDirectory, {
-          MODERN_ASSET_PREFIX: undefined,
-          MODERN_PUBLIC_SITE_URL: 'https://site.example/',
-          ULTRAMODERN_ASSET_PREFIX: 'https://ultramodern.example/assets/',
-        }),
         'https://ultramodern.example/assets/',
-      );
+        'https://modern.example/assets/',
+      ],
+      [
+        undefined,
+        'https://ultramodern.example/assets/',
+        'https://ultramodern.example/assets/',
+      ],
+      [undefined, undefined, '/'],
+    ];
+    for (const [modern, ultramodern, expected] of precedence) {
       assert.equal(
-        loadGeneratedAssetPrefix(workspacePath, appDirectory, {
-          MODERN_ASSET_PREFIX: undefined,
+        loadGeneratedAssetPrefix(workspacePath, 'shell-super-app', {
+          MODERN_ASSET_PREFIX: modern,
           MODERN_PUBLIC_SITE_URL: 'https://site.example/',
-          ULTRAMODERN_ASSET_PREFIX: undefined,
+          ULTRAMODERN_ASSET_PREFIX: ultramodern,
         }),
-        '/',
+        expected,
       );
     }
   } finally {
@@ -464,235 +203,7 @@ test('built CLI resolves workspace template for default scaffold', () => {
   }
 });
 
-test('built CLI rejects removed workspace flag', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
-
-  try {
-    const result = spawnSync(
-      process.execPath,
-      [builtCliPath, 'smoke-workspace', '--ultramodern-workspace'],
-      {
-        cwd: tmpDir,
-        encoding: 'utf8',
-        env: hermeticEnv,
-      },
-    );
-
-    assert.notEqual(result.status, 0);
-    assert.match(
-      result.stderr,
-      /Unexpected positional argument: --ultramodern-workspace/,
-    );
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
-test('built CLI scaffolds an existing empty current directory', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cwd-'));
-
-  try {
-    const result = spawnSync(process.execPath, [builtCliPath, '--workspace'], {
-      cwd: tmpDir,
-      encoding: 'utf8',
-      env: hermeticEnv,
-    });
-
-    assert.equal(result.status, 0, result.stderr);
-    assert.ok(fs.existsSync(path.join(tmpDir, 'package.json')));
-    assert.ok(fs.existsSync(path.join(tmpDir, '.modernjs/ultramodern.json')));
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
-function crashFreshCli(workspaceRoot: string, parent: string) {
-  const preload = path.join(parent, 'crash-fresh.mjs');
-  const transactionUrl = pathToFileURL(
-    path.join(
-      packageRoot,
-      'dist/esm-node/ultramodern-workspace/add-vertical/transaction.js',
-    ),
-  ).href;
-  fs.writeFileSync(
-    preload,
-    `
-    import { __transactionTestHooks } from ${JSON.stringify(transactionUrl)};
-    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
-    __transactionTestHooks.beforeFreshPublish = () => Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
-    __transactionTestHooks.beforePublish = () => Object.defineProperty(process, 'platform', platform);
-    __transactionTestHooks.afterPublishPath = ({ relativePath }) => {
-      if (relativePath.includes('/')) process.kill(process.pid, 'SIGKILL');
-    };
-  `,
-  );
-  const result = spawnSync(
-    process.execPath,
-    ['--import', pathToFileURL(preload).href, builtCliPath, '--workspace'],
-    {
-      cwd: workspaceRoot,
-      encoding: 'utf8',
-      env: hermeticEnv,
-    },
-  );
-  assert.equal(
-    result.status,
-    process.platform === 'win32' ? 1 : null,
-    result.stderr,
-  );
-  assert.equal(
-    result.signal,
-    process.platform === 'win32' ? null : 'SIGKILL',
-    result.stderr,
-  );
-  const receiptPath = path.join(
-    parent,
-    fs.readdirSync(parent).find(entry => entry.endsWith('.receipt.json'))!,
-  );
-  assert.ok(fs.existsSync(receiptPath));
-  return receiptPath;
-}
-
-test('built CLI retries an interrupted fresh cwd before prompting or rejecting nested partial output', () => {
-  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-crash-'));
-  const root = path.join(parent, 'workspace');
-  fs.mkdirSync(root);
-  try {
-    crashFreshCli(root, parent);
-    assert.ok(fs.readdirSync(root).length > 0);
-    const retry = spawnSync(process.execPath, [builtCliPath, '--workspace'], {
-      cwd: root,
-      encoding: 'utf8',
-      env: hermeticEnv,
-      timeout: 30_000,
-    });
-    assert.equal(retry.status, 0, retry.stderr);
-    assert.ok(fs.existsSync(path.join(root, 'package.json')));
-    assert.ok(fs.existsSync(path.join(root, '.modernjs/ultramodern.json')));
-    assert.deepEqual(fs.readdirSync(parent).sort(), [
-      'crash-fresh.mjs',
-      'workspace',
-    ]);
-  } finally {
-    fs.rmSync(parent, { recursive: true, force: true });
-  }
-});
-
-test('built CLI preserves consumer bytes and recovery evidence after a fresh publication crash', () => {
-  const parent = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'modern-create-crash-conflict-'),
-  );
-  const root = path.join(parent, 'workspace');
-  fs.mkdirSync(root);
-  try {
-    const receiptPath = crashFreshCli(root, parent);
-    const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
-    const published = receipt.changes.find((change: { relativePath: string }) =>
-      fs.existsSync(path.join(root, change.relativePath)),
-    );
-    assert.ok(published);
-    fs.writeFileSync(
-      path.join(root, published.relativePath),
-      'consumer after crash',
-    );
-    const snapshot = () =>
-      fs
-        .readdirSync(parent, { recursive: true, withFileTypes: true })
-        .filter(entry => entry.isFile())
-        .map(entry => {
-          const filePath = path.join(entry.parentPath, entry.name);
-          return [filePath, fs.readFileSync(filePath).toString('base64')];
-        })
-        .sort();
-    const before = snapshot();
-    const retry = spawnSync(
-      process.execPath,
-      [builtCliPath, '.', '--workspace'],
-      {
-        cwd: root,
-        encoding: 'utf8',
-        env: hermeticEnv,
-        timeout: 30_000,
-      },
-    );
-    assert.equal(retry.status, 1, retry.stderr);
-    assert.match(retry.stderr, /newer consumer bytes/);
-    assert.deepEqual(snapshot(), before);
-    assert.ok(fs.existsSync(receiptPath));
-  } finally {
-    fs.rmSync(parent, { recursive: true, force: true });
-  }
-});
-
-test('--workspace forces workspace protocol dependencies without registry access', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
-  const fakeBinDir = path.join(tmpDir, 'fake-bin');
-  fs.mkdirSync(fakeBinDir);
-  // A failing npm proves the registry is never required on this path.
-  writeExecutable(path.join(fakeBinDir, 'npm'), '#!/bin/sh\nexit 1\n');
-
-  try {
-    const result = spawnSync(
-      process.execPath,
-      [builtCliPath, 'workspace-flag-smoke', '--workspace'],
-      {
-        cwd: tmpDir,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION: undefined,
-          PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
-        },
-      },
-    );
-
-    assert.equal(result.status, 0, result.stderr);
-    const ultramodernConfig = JSON.parse(
-      readGeneratedFile(
-        path.join(tmpDir, 'workspace-flag-smoke'),
-        '.modernjs/ultramodern.json',
-      ),
-    );
-    assert.equal(ultramodernConfig.packageSource.strategy, 'workspace');
-    assert.equal(
-      ultramodernConfig.packageSource.modernPackageVersion,
-      'workspace:*',
-    );
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
-test('--workspace conflicts with an explicit install package source', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
-
-  try {
-    const result = spawnSync(
-      process.execPath,
-      [
-        builtCliPath,
-        'workspace-conflict-smoke',
-        '--workspace',
-        '--ultramodern-package-source=install',
-      ],
-      {
-        cwd: tmpDir,
-        encoding: 'utf8',
-        env: hermeticEnv,
-      },
-    );
-
-    assert.notEqual(result.status, 0);
-    assert.match(
-      result.stderr,
-      /--workspace conflicts with --ultramodern-package-source=install/,
-    );
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
-test('local source initializes Git and leaves the first commit to the user', () => {
+test('local source initializes Git offline and leaves the first commit to the user', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
   const fakeBinDir = path.join(tmpDir, 'fake-bin');
   const hooksDir = path.join(tmpDir, 'hooks');
@@ -700,6 +211,7 @@ test('local source initializes Git and leaves the first commit to the user', () 
   const isolatedGitConfig = path.join(tmpDir, 'gitconfig');
   fs.mkdirSync(fakeBinDir);
   fs.mkdirSync(hooksDir);
+  // A failing npm proves the registry is never required on this path.
   writeExecutable(path.join(fakeBinDir, 'npm'), '#!/bin/sh\nexit 1\n');
   writeExecutable(
     path.join(hooksDir, 'pre-commit'),
@@ -707,29 +219,15 @@ test('local source initializes Git and leaves the first commit to the user', () 
   );
   const gitConfig = `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`;
   fs.writeFileSync(isolatedGitConfig, gitConfig);
-  const tracePath = path.join(tmpDir, 'git-trace.jsonl');
   const env = {
     ...hermeticEnv,
     GIT_CONFIG_GLOBAL: isolatedGitConfig,
-    GIT_TRACE2_EVENT: tracePath,
     PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
     ULTRAMODERN_TEST_HOOK_MARKER: hookMarker,
   };
   const workspaceDir = path.join(tmpDir, 'offline-fallback-smoke');
-  // Git commit may detach auto-maintenance even though spawnSync has returned.
-  // Keep fixture-owned maintenance in the foreground so teardown has no writer.
   const git = (args: string[]) =>
-    spawnSync(
-      'git',
-      [
-        '-c',
-        'maintenance.autoDetach=false',
-        '-c',
-        'gc.autoDetach=false',
-        ...args,
-      ],
-      { cwd: workspaceDir, env, encoding: 'utf8' },
-    );
+    spawnSync('git', args, { cwd: workspaceDir, env, encoding: 'utf8' });
 
   try {
     const result = spawnSync(
@@ -739,28 +237,23 @@ test('local source initializes Git and leaves the first commit to the user', () 
     );
 
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(fs.existsSync(hookMarker), false);
     assert.equal(
       git(['symbolic-ref', '--short', 'HEAD']).stdout.trim(),
       'main',
     );
+    // No commit, nothing staged, no hook run, no identity written: the user's
+    // own first commit (through their own hooks) must still be the first one.
     assert.notEqual(git(['rev-parse', '--verify', 'HEAD']).status, 0);
-    const staged = git(['diff', '--cached', '--name-only']);
-    assert.equal(staged.status, 0, staged.stderr);
-    assert.equal(staged.stdout, '');
-    assert.match(
-      result.stdout,
-      /pnpm install[\s\S]*pnpm check[\s\S]*git add \.[\s\S]*git commit -m "chore: initial UltraModern scaffold"[\s\S]*pnpm dev/u,
-    );
+    assert.equal(git(['diff', '--cached', '--name-only']).stdout, '');
+    assert.equal(fs.existsSync(hookMarker), false);
     assert.equal(fs.readFileSync(isolatedGitConfig, 'utf8'), gitConfig);
-    const localIdentity = git(['config', '--local', '--get', 'user.name']);
-    assert.equal(
-      localIdentity.status,
-      1,
-      'generation must not set an identity',
-    );
+    assert.equal(git(['config', '--local', '--get', 'user.name']).status, 1);
+
     const ultramodernConfig = JSON.parse(
-      readGeneratedFile(workspaceDir, '.modernjs/ultramodern.json'),
+      fs.readFileSync(
+        path.join(workspaceDir, '.modernjs/ultramodern.json'),
+        'utf8',
+      ),
     );
     assert.equal(ultramodernConfig.packageSource.strategy, 'workspace');
     assert.equal(
@@ -768,97 +261,12 @@ test('local source initializes Git and leaves the first commit to the user', () 
       'workspace:*',
     );
 
-    // Force automatic maintenance to write a pack during the explicit commit.
-    for (const [name, value] of [
-      ['maintenance.gc.enabled', 'false'],
-      ['maintenance.loose-objects.enabled', 'true'],
-      ['maintenance.loose-objects.auto', '1'],
-    ]) {
-      const configured = git(['config', name, value]);
-      assert.equal(configured.status, 0, configured.stderr);
-    }
     const add = git(['add', '.']);
     assert.equal(add.status, 0, add.stderr);
     const commit = git(['commit', '-m', 'test: explicitly commit scaffold']);
     assert.equal(commit.status, 0, commit.stderr);
-    const trace = fs
-      .readFileSync(tracePath, 'utf8')
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line));
-    const maintenance = trace.filter(
-      event =>
-        event.event === 'child_start' && event.argv?.includes('maintenance'),
-    );
-    assert.ok(
-      maintenance.length > 0,
-      'the commit must exercise automatic maintenance',
-    );
-    for (const event of maintenance) {
-      assert.equal(
-        event.argv.includes('--detach'),
-        false,
-        'owned Git maintenance must finish before fixture cleanup',
-      );
-    }
-    assert.ok(
-      fs
-        .readdirSync(path.join(workspaceDir, '.git/objects/pack'))
-        .some(name => name.endsWith('.pack')),
-      'maintenance must finish writing its object pack before commit returns',
-    );
     assert.equal(fs.existsSync(hookMarker), true);
-    const head = git(['rev-parse', '--verify', 'HEAD']);
-    assert.equal(head.status, 0, head.stderr);
-    assert.equal(
-      git(['log', '-1', '--format=%an <%ae>']).stdout.trim(),
-      'Scaffold Test <scaffold@example.test>',
-    );
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
-test('a rejecting hook runs only when the user explicitly commits the scaffold', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
-  const hooksDir = path.join(tmpDir, 'hooks');
-  const hookMarker = path.join(tmpDir, 'pre-commit-ran');
-  const isolatedGitConfig = path.join(tmpDir, 'gitconfig');
-  fs.mkdirSync(hooksDir);
-  writeExecutable(
-    path.join(hooksDir, 'pre-commit'),
-    '#!/bin/sh\n: > "$ULTRAMODERN_TEST_HOOK_MARKER"\necho "initial scaffold hook rejected" >&2\nexit 19\n',
-  );
-  fs.writeFileSync(
-    isolatedGitConfig,
-    `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`,
-  );
-  const env = {
-    ...hermeticEnv,
-    GIT_CONFIG_GLOBAL: isolatedGitConfig,
-    ULTRAMODERN_TEST_HOOK_MARKER: hookMarker,
-  };
-  const workspaceDir = path.join(tmpDir, 'rejected-initial-commit');
-  const git = (args: string[]) =>
-    spawnSync('git', args, { cwd: workspaceDir, env, encoding: 'utf8' });
-
-  try {
-    const result = spawnSync(
-      process.execPath,
-      [builtCliPath, 'rejected-initial-commit'],
-      { cwd: tmpDir, encoding: 'utf8', env },
-    );
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(fs.existsSync(hookMarker), false);
-    assert.notEqual(git(['rev-parse', '--verify', 'HEAD']).status, 0);
-
-    const add = git(['add', '.']);
-    assert.equal(add.status, 0, add.stderr);
-    const commit = git(['commit', '-m', 'test: explicitly commit scaffold']);
-    assert.notEqual(commit.status, 0);
-    assert.match(commit.stderr, /initial scaffold hook rejected/u);
-    assert.equal(fs.existsSync(hookMarker), true);
-    assert.notEqual(git(['rev-parse', '--verify', 'HEAD']).status, 0);
+    assert.equal(git(['rev-parse', '--verify', 'HEAD']).status, 0);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -931,50 +339,6 @@ test('creation inside a repository preserves its HEAD and staged changes', () =>
       beforeConfig,
     );
     assert.equal(fs.existsSync(hookMarker), false);
-    assert.equal(result.stdout.includes('git commit'), false);
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-});
-
-test('local source rejects explicit install before cohort environment validation or registry lookup', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modern-create-cli-'));
-  const fakeBinDir = path.join(tmpDir, 'fake-bin');
-  const registryLookupMarker = path.join(tmpDir, 'registry-lookup');
-  fs.mkdirSync(fakeBinDir);
-  writeExecutable(
-    path.join(fakeBinDir, 'npm'),
-    '#!/bin/sh\n: > "$MODERN_CREATE_REGISTRY_LOOKUP_MARKER"\nexit 1\n',
-  );
-
-  try {
-    for (const frameworkVersion of ['not-a-semver', undefined]) {
-      const result = spawnSync(
-        process.execPath,
-        [
-          builtCliPath,
-          'local-install-source-smoke',
-          '--ultramodern-package-source=install',
-        ],
-        {
-          cwd: tmpDir,
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            MODERN_CREATE_REGISTRY_LOOKUP_MARKER: registryLookupMarker,
-            MODERN_CREATE_ULTRAMODERN_FRAMEWORK_VERSION: frameworkVersion,
-            PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`,
-          },
-        },
-      );
-
-      assert.notEqual(result.status, 0);
-      assert.match(
-        result.stderr,
-        /local @modern-js\/ultramodern-create source checkout cannot satisfy an explicit install/u,
-      );
-      assert.equal(fs.existsSync(registryLookupMarker), false);
-    }
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

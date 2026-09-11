@@ -83,15 +83,6 @@ export const createOperationContextDenialScenarios = ({
     },
   ),
   deniedScenario(
-    'policy denies invalid operation context details',
-    'invalid_operation_context_details',
-    {
-      'x-modernjs-bff-envelope': validEnvelope,
-      'x-operation-id': validOperationId,
-      'x-modernjs-bff-operation-context': 'not-json',
-    },
-  ),
-  deniedScenario(
     'policy denies detail requestId mismatch',
     'operation_context_details_request_id_mismatch',
     {

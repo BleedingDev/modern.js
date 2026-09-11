@@ -312,3 +312,85 @@ test('horizontal remote is components-only and retains delivery-unit identity', 
     assert.ok(unit && unit.surfaces.every(surface => surface.kind !== 'api'));
   });
 });
+
+test('generated delivery-unit surfaces are grammar-valid and classified by kind', () => {
+  withWorkspace(dir => {
+    const unit = add(dir, 'checkout').deliveryUnits?.find(item =>
+      item.unitId.endsWith('/checkout'),
+    );
+    assert.ok(unit, 'expected a delivery unit for the generated vertical');
+    for (const surface of unit.surfaces) {
+      // SurfaceRef grammar: MF expose keys such as `./Route` must be
+      // sanitized before they reach a consumer of the generation result.
+      assert.match(surface.surfaceId, /^[A-Za-z0-9._-]+$/u, surface.surfaceId);
+    }
+    assert.ok(
+      unit.surfaces.some(surface => surface.kind === 'route'),
+      'expected a route surface',
+    );
+    assert.ok(
+      unit.surfaces.some(surface => surface.kind === 'component'),
+      'expected a component surface',
+    );
+    const api = unit.surfaces.find(surface => surface.kind === 'api');
+    assert.equal(api?.kind === 'api' && api.protocol, 'rest');
+    assert.deepEqual(api?.locations, [
+      { platform: 'http', address: '/checkout-api' },
+    ]);
+  });
+});
+
+// Restored: the RPC probe above proves the RPC protocol boots, but the DEFAULT
+// (REST) MicroVertical API had no surviving proof that it actually serves a
+// request through its generated shared contract.
+test('generated REST vertical serves a request through its shared contract', () => {
+  withWorkspace(dir => {
+    add(dir, 'catalog');
+    const installed = path.resolve(
+      __dirname,
+      '../../../../node_modules/.pnpm/node_modules',
+    );
+    const modules = path.join(dir, 'node_modules');
+    fs.mkdirSync(path.join(modules, '@preset-workspace'), { recursive: true });
+    for (const entry of fs.readdirSync(installed)) {
+      fs.symlinkSync(
+        path.join(installed, entry),
+        path.join(modules, entry),
+        'junction',
+      );
+    }
+    fs.symlinkSync(
+      path.join(dir, 'packages/shared-contracts'),
+      path.join(modules, '@preset-workspace/shared-contracts'),
+      'junction',
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        pathToFileURL(
+          path.resolve(__dirname, '../node_modules/tsx/dist/loader.mjs'),
+        ).href,
+        '--input-type=module',
+        '--eval',
+        `const loaded = await import('./api/index.ts');
+const runtime = loaded.default?.default ?? loaded.default;
+const webHandler = runtime.createHandler();
+try {
+  const response = await webHandler.handler(new Request('https://catalog.example/catalog?limit=1'));
+  process.stdout.write('\\n__RESULT__' + JSON.stringify({ status: response.status, body: await response.json() }));
+} finally {
+  await webHandler.dispose();
+}`,
+      ],
+      { cwd: path.join(dir, 'verticals/catalog'), encoding: 'utf-8' },
+    );
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    const response = JSON.parse(result.stdout.split('__RESULT__').at(-1) ?? '');
+    assert.equal(response.status, 200);
+    assert.deepEqual(
+      response.body.items.map((item: { id: string }) => item.id),
+      ['starter-catalog'],
+    );
+  }, 'um-rest-serve-');
+});

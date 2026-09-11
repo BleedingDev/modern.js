@@ -1,55 +1,36 @@
-import { describe, expect, test } from '@rstest/core';
+// Fork-owned coverage guard (FORK-DIVERGENCE.md: "Retain native Link target
+// normalization, splat separator/percent encoding and search normalization
+// cases"). Keeps them out of the upstream-owned tests/link.test.tsx.
 import {
   interpolateRouteParams,
   normalizeSearch,
 } from '../src/runtime/linkHelpers';
 
-describe('native link target normalization', () => {
-  test('splat params preserve separators and percent-encode each segment', () => {
+describe('Link query and splat normalization', () => {
+  test('encodes splat segments without escaping the path separator', () => {
+    // Each segment is encoded separately, so `/` stays a path separator.
     expect(
       interpolateRouteParams('/files/*', { '*': 'resume drafts/Q1 deck.pdf' }),
     ).toBe('/files/resume%20drafts/Q1%20deck.pdf');
   });
-  const searchScenarios: Array<{
-    name: string;
-    search: Parameters<typeof normalizeSearch>[0];
-    searchFromTo: string;
-    expected: ReturnType<typeof normalizeSearch>;
-  }> = [
-    {
-      name: 'object array values are preserved',
-      search: { tag: ['boots', 'sale'], page: 2 },
-      searchFromTo: '?ignored=1',
-      expected: {
-        searchString: '?tag=boots&tag=sale&page=2',
-        searchObject: { tag: ['boots', 'sale'], page: '2' },
-      },
-    },
-    {
-      name: 'target query arrays are preserved',
-      search: undefined,
-      searchFromTo: '?tag=boots&tag=sale&page=2',
-      expected: {
-        searchString: '?tag=boots&tag=sale&page=2',
-        searchObject: { tag: ['boots', 'sale'], page: '2' },
-      },
-    },
-    {
-      name: 'empty search clears the target query',
-      search: '',
-      searchFromTo: '?tag=boots&tag=sale',
-      expected: {
-        searchString: '',
-        searchObject: undefined,
-      },
-    },
-  ];
 
-  for (const scenario of searchScenarios) {
-    test(`normalizes search: ${scenario.name}`, () => {
-      expect(normalizeSearch(scenario.search, scenario.searchFromTo)).toEqual(
-        scenario.expected,
-      );
+  test('builds the Link query from object, target and empty search props', () => {
+    // Array values repeat the key instead of collapsing to "boots,sale".
+    expect(
+      normalizeSearch({ tag: ['boots', 'sale'], page: 2 }, '?ignored=1'),
+    ).toEqual({
+      searchString: '?tag=boots&tag=sale&page=2',
+      searchObject: { tag: ['boots', 'sale'], page: '2' },
     });
-  }
+    // No search prop: the target's own query survives, arrays included.
+    expect(normalizeSearch(undefined, '?tag=boots&tag=sale&page=2')).toEqual({
+      searchString: '?tag=boots&tag=sale&page=2',
+      searchObject: { tag: ['boots', 'sale'], page: '2' },
+    });
+    // An explicit empty search clears the target's query.
+    expect(normalizeSearch('', '?tag=boots&tag=sale')).toEqual({
+      searchString: '',
+      searchObject: undefined,
+    });
+  });
 });

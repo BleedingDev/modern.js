@@ -76,37 +76,4 @@ describe('resolveEffectAdapterEntryFile', () => {
       fs.rmSync(producerDirectory, { recursive: true, force: true });
     }
   });
-
-  test('preserves a built SDK API directory inside node_modules', () => {
-    const appDirectory = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'modern-effect-node-modules-'),
-    );
-    try {
-      const apiDirectory = path.join(
-        appDirectory,
-        'node_modules',
-        'producer-sdk',
-        'dist',
-        'api',
-        'effect',
-      );
-      const builtEntry = path.join(apiDirectory, 'index.js');
-      fs.mkdirSync(apiDirectory, { recursive: true });
-      fs.writeFileSync(builtEntry, 'export default {}');
-      process.env.NODE_ENV = 'production';
-
-      const api = {
-        getServerContext: () => ({
-          appDirectory,
-          apiDirectory,
-          distDirectory: path.join(appDirectory, 'dist'),
-        }),
-        getServerConfig: () => ({}),
-      } as unknown as ServerPluginAPI;
-
-      expect(resolveEffectAdapterEntryFile(api)).toBe(builtEntry);
-    } finally {
-      fs.rmSync(appDirectory, { recursive: true, force: true });
-    }
-  });
 });

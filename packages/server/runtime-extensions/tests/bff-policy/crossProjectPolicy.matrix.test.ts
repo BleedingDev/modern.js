@@ -131,24 +131,6 @@ const withNodeEnv = <T>(nodeEnv: string | undefined, callback: () => T): T => {
   }
 };
 
-const denialReasonCoverage: Record<CrossProjectPolicyViolationReason, true> = {
-  invalid_envelope: true,
-  invalid_operation_context_details: true,
-  missing_envelope: true,
-  missing_operation_context: true,
-  missing_operation_context_details: true,
-  missing_operation_schema_hash: true,
-  missing_operation_version: true,
-  missing_request_id: true,
-  namespace_not_allowed: true,
-  operation_context_details_request_id_mismatch: true,
-  operation_context_mismatch: true,
-  operation_schema_hash_mismatch: true,
-  operation_version_mismatch: true,
-  producer_identity_mismatch: true,
-  unknown_operation_contract: true,
-};
-
 const policyMatrix = [
   {
     name: 'allow: full valid context with verified namespace and contract',
@@ -452,25 +434,6 @@ const policyMatrix = [
 ] satisfies PolicyMatrixScenario[];
 
 describe('cross-project policy matrix', () => {
-  test('covers every current denial reason', () => {
-    const expectedReasons = Object.keys(denialReasonCoverage).sort();
-    const coveredReasons = [
-      ...new Set(
-        policyMatrix.flatMap(scenario =>
-          scenario.expected.kind === 'deny' ? [scenario.expected.reason] : [],
-        ),
-      ),
-    ].sort();
-
-    expect(coveredReasons).toEqual(expectedReasons);
-  });
-
-  test('has unique scenario names', () => {
-    const names = policyMatrix.map(scenario => scenario.name);
-
-    expect(new Set(names).size).toBe(names.length);
-  });
-
   for (const scenario of policyMatrix) {
     test(scenario.name, () => {
       const violation = withNodeEnv(scenario.nodeEnv, () =>

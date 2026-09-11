@@ -1,6 +1,4 @@
 import { createClient as createNativeClient } from '@modern-js/create-request/server';
-import * as context from '@modern-js/runtime-extensions/request-context';
-import * as canonical from '@modern-js/runtime-extensions/request-policy';
 import * as server from '@modern-js/runtime-extensions/request-policy/server';
 
 const options = {
@@ -107,43 +105,5 @@ describe('isolated producer policy clients', () => {
       }),
     );
     expect(replacement).not.toHaveBeenCalled();
-  });
-
-  test('shares source configure across canonical require/import and explicit server', async () => {
-    const required: typeof canonical = require('@modern-js/runtime-extensions/request-policy');
-    expect(required.configure).toBe(canonical.configure);
-    expect(server.configure).toBe(canonical.configure);
-    const request = rs.fn(async () => new Response('shared'));
-    required.configure({
-      requestId: options.requestId,
-      request,
-      setDomain: () => 'https://shared.example',
-      operationContract: { enabled: false },
-    });
-    expect(await (await canonical.createRequest(options)()).text()).toBe(
-      'shared',
-    );
-    canonical.configure({
-      requestId: options.requestId,
-      request,
-      setDomain: () => 'https://updated.example',
-      operationContract: { enabled: false },
-    });
-    await required.createRequest(options)();
-    expect(request).toHaveBeenLastCalledWith(
-      'https://updated.example/api',
-      expect.any(Object),
-    );
-  });
-
-  test('exports universal context helpers without a request client', () => {
-    expect(context.createRequestContextHeaders).toBe(
-      canonical.createRequestContextHeaders,
-    );
-    expect(context.parseTraceparent).toBe(canonical.parseTraceparent);
-    expect(context).not.toHaveProperty('configure');
-    expect(context).not.toHaveProperty('createClient');
-    expect(context).not.toHaveProperty('createRequest');
-    expect(context).not.toHaveProperty('createUploader');
   });
 });

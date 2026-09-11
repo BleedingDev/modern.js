@@ -18,6 +18,9 @@ const { runtimeContext } = runtime.run({
   plugins: [i18nPlugin({})],
 });
 
+const HOST_ONLY_INVENTORY_COPY = 'inventory copy owned only by the shell';
+const HOST_ONLY_SHELL_COPY = 'private shell copy';
+
 const remoteResources = {
   cs: {
     inventory: {
@@ -43,7 +46,9 @@ function InventoryCopy() {
   return (
     <p data-testid="inventory-copy">
       {modernI18n.t('inventory.widgetBody')}|
-      {reactI18n.t('inventory.widgetBody')}|{String(sharesScopedInstance)}
+      {reactI18n.t('inventory.widgetBody')}|{String(sharesScopedInstance)}|
+      {modernI18n.t('inventory.hostOnly')}|{modernI18n.t('shell:private')}|
+      {reactI18n.t('inventory.hostOnly')}|{reactI18n.t('shell:private')}
     </p>
   );
 }
@@ -95,13 +100,17 @@ async function createHostI18n() {
     resources: {
       cs: {
         inventory: {
+          'inventory.hostOnly': HOST_ONLY_INVENTORY_COPY,
           'inventory.widgetBody': 'stale host Czech copy',
         },
+        shell: { private: HOST_ONLY_SHELL_COPY },
       },
       en: {
         inventory: {
+          'inventory.hostOnly': HOST_ONLY_INVENTORY_COPY,
           'inventory.widgetBody': 'stale host English copy',
         },
+        shell: { private: HOST_ONLY_SHELL_COPY },
       },
     },
     supportedLngs: ['en', 'cs'],
@@ -122,21 +131,25 @@ test('hydrates remote-owned copy and follows the host language', async () => {
   });
 
   await act(async () => undefined);
-  expect(
-    container.querySelector('[data-testid="inventory-copy"]')?.textContent,
-  ).toBe(
-    'C1 inventory surface owned by the MicroVertical.|C1 inventory surface owned by the MicroVertical.|true',
+  const inventoryText = () =>
+    container.querySelector('[data-testid="inventory-copy"]')?.textContent;
+  expect(inventoryText()).toContain(
+    'C1 inventory surface owned by the MicroVertical.|C1 inventory surface owned by the MicroVertical.|true|',
   );
+  expect(inventoryText()).not.toContain(HOST_ONLY_INVENTORY_COPY);
+  expect(inventoryText()).not.toContain(HOST_ONLY_SHELL_COPY);
 
   await act(async () => {
     (container.querySelector('button') as HTMLButtonElement).click();
   });
-  expect(
-    container.querySelector('[data-testid="inventory-copy"]')?.textContent,
-  ).toBe(
-    'C1 skladová plocha vlastněná MicroVerticalem.|C1 skladová plocha vlastněná MicroVerticalem.|true',
+  expect(inventoryText()).toContain(
+    'C1 skladová plocha vlastněná MicroVerticalem.|C1 skladová plocha vlastněná MicroVerticalem.|true|',
   );
+  expect(inventoryText()).not.toContain(HOST_ONLY_INVENTORY_COPY);
+  expect(inventoryText()).not.toContain(HOST_ONLY_SHELL_COPY);
   expect(clientI18n.t('inventory.widgetBody')).toBe('stale host Czech copy');
+  expect(clientI18n.t('inventory.hostOnly')).toBe(HOST_ONLY_INVENTORY_COPY);
+  expect(clientI18n.t('shell:private')).toBe(HOST_ONLY_SHELL_COPY);
   expect(hydrationErrors).toEqual([]);
 
   await act(async () => root.unmount());

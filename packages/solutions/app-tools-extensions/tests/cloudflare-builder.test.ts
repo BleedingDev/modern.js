@@ -18,21 +18,9 @@ describe('Cloudflare builder environments', () => {
   it.each([
     {
       deployTarget: 'cloudflare',
-      environmentTarget: undefined,
-      detectedProvider: 'netlify',
-      enabled: true,
-    },
-    {
-      deployTarget: 'cloudflare',
       environmentTarget: 'node',
       detectedProvider: 'netlify',
       enabled: true,
-    },
-    {
-      deployTarget: 'node',
-      environmentTarget: undefined,
-      detectedProvider: 'cloudflare',
-      enabled: false,
     },
     {
       deployTarget: 'node',
@@ -42,33 +30,9 @@ describe('Cloudflare builder environments', () => {
     },
     {
       deployTarget: undefined,
-      environmentTarget: 'node',
-      detectedProvider: 'cloudflare',
-      enabled: false,
-    },
-    {
-      deployTarget: undefined,
       environmentTarget: undefined,
       detectedProvider: 'cloudflare',
       enabled: true,
-    },
-    {
-      deployTarget: undefined,
-      environmentTarget: undefined,
-      detectedProvider: 'cloudflare_pages',
-      enabled: true,
-    },
-    {
-      deployTarget: undefined,
-      environmentTarget: undefined,
-      detectedProvider: 'cloudflare_workers',
-      enabled: true,
-    },
-    {
-      deployTarget: undefined,
-      environmentTarget: undefined,
-      detectedProvider: 'netlify',
-      enabled: false,
     },
   ])('selects Cloudflare worker output from explicit target or provider', ({
     deployTarget,

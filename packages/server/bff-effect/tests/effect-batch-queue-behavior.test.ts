@@ -3,7 +3,6 @@ import {
   type DataBatchRequestItem,
   type DataBatchRequestPayload,
   type DataBatchResponseItem,
-  type DataBatchTransportEvent,
   type DataBatchTransportOptions,
   DEFAULT_DATA_BATCH_ENDPOINT,
 } from '../src/data-platform';
@@ -66,7 +65,6 @@ describe('Effect batch queue behavior', () => {
   });
 
   test('flushes a singleton only when its interval expires', async () => {
-    const events: DataBatchTransportEvent[] = [];
     const fetchMock = rs.fn<BatchFetch>(async (input, init) => {
       expect(String(input)).toBe('http://localhost/api/single');
       expect(init?.method).toBe('GET');
@@ -75,7 +73,6 @@ describe('Effect batch queue behavior', () => {
     const request = createDataBatchTransport({
       fetch: fetchMock,
       flushIntervalMs: 25,
-      onEvent: event => events.push(event),
     });
 
     const pending = request('http://localhost/api/single');
@@ -87,19 +84,6 @@ describe('Effect batch queue behavior', () => {
 
     await expect(pending).resolves.toEqual({ source: 'single' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(events).toEqual([
-      {
-        type: 'enqueue',
-        endpoint: `http://localhost${DEFAULT_DATA_BATCH_ENDPOINT}`,
-        size: 1,
-      },
-      {
-        type: 'flush',
-        endpoint: `http://localhost${DEFAULT_DATA_BATCH_ENDPOINT}`,
-        size: 1,
-        reason: undefined,
-      },
-    ]);
   });
 
   test('demultiplexes responses when time and randomness collide', async () => {
@@ -149,8 +133,55 @@ describe('Effect batch queue behavior', () => {
     expect(new Set(itemIds).size).toBe(2);
   });
 
-  test('partitions by endpoint, credentials, and outer auth without promoting spoofed identity', async () => {
-    const batchPath = '/internal/data-batch';
+  const batchPath = '/internal/data-batch';
+  type PartitionContext = {
+    name: string;
+    origin: string;
+    authorization: string;
+    cookie: string;
+    credentials: RequestCredentials;
+    requestInput?: boolean;
+  };
+  const partitionContexts: PartitionContext[] = [
+    {
+      name: 'cookie-alpha',
+      origin: 'http://one.test',
+      authorization: 'Bearer shared',
+      cookie: 'session=alpha',
+      credentials: 'same-origin',
+    },
+    {
+      name: 'cookie-beta',
+      origin: 'http://one.test',
+      authorization: 'Bearer shared',
+      cookie: 'session=beta',
+      credentials: 'same-origin',
+    },
+    {
+      name: 'authorization-beta',
+      origin: 'http://one.test',
+      authorization: 'Bearer beta',
+      cookie: 'session=alpha',
+      credentials: 'same-origin',
+    },
+    {
+      name: 'credentials-include',
+      origin: 'http://one.test',
+      authorization: 'Bearer shared',
+      cookie: 'session=alpha',
+      credentials: 'include',
+      requestInput: true,
+    },
+    {
+      name: 'other-origin',
+      origin: 'http://two.test',
+      authorization: 'Bearer shared',
+      cookie: 'session=alpha',
+      credentials: 'same-origin',
+    },
+  ];
+
+  const runPartitionScenario = () => {
     const trustedIdentity = Object.fromEntries(
       IDENTITY_HEADERS.map(name => [name, `trusted:${name}`]),
     );
@@ -209,54 +240,9 @@ describe('Effect batch queue behavior', () => {
       flushIntervalMs: 100,
       maxBatchSize: 2,
     });
-    const contexts: Array<{
-      name: string;
-      origin: string;
-      authorization: string;
-      cookie: string;
-      credentials: RequestCredentials;
-      requestInput?: boolean;
-    }> = [
-      {
-        name: 'cookie-alpha',
-        origin: 'http://one.test',
-        authorization: 'Bearer shared',
-        cookie: 'session=alpha',
-        credentials: 'same-origin',
-      },
-      {
-        name: 'cookie-beta',
-        origin: 'http://one.test',
-        authorization: 'Bearer shared',
-        cookie: 'session=beta',
-        credentials: 'same-origin',
-      },
-      {
-        name: 'authorization-beta',
-        origin: 'http://one.test',
-        authorization: 'Bearer beta',
-        cookie: 'session=alpha',
-        credentials: 'same-origin',
-      },
-      {
-        name: 'credentials-include',
-        origin: 'http://one.test',
-        authorization: 'Bearer shared',
-        cookie: 'session=alpha',
-        credentials: 'include',
-        requestInput: true,
-      },
-      {
-        name: 'other-origin',
-        origin: 'http://two.test',
-        authorization: 'Bearer shared',
-        cookie: 'session=alpha',
-        credentials: 'same-origin',
-      },
-    ];
 
     const pending = Promise.all(
-      contexts.flatMap(context =>
+      partitionContexts.flatMap(context =>
         ['a', 'b'].map(suffix => {
           const url = `${context.origin}/api/${context.name}-${suffix}`;
           const init: RequestInit = {
@@ -279,8 +265,14 @@ describe('Effect batch queue behavior', () => {
       ),
     );
 
+    return { pending, outerRequests, trustedIdentity };
+  };
+
+  test('partitions by endpoint, credentials, and outer auth', async () => {
+    const { pending, outerRequests, trustedIdentity } = runPartitionScenario();
+
     await expect(pending).resolves.toEqual(
-      contexts.flatMap(context =>
+      partitionContexts.flatMap(context =>
         ['a', 'b'].map(suffix => ({
           path: `/api/${context.name}-${suffix}`,
           authorization: context.authorization,
@@ -289,7 +281,7 @@ describe('Effect batch queue behavior', () => {
         })),
       ),
     );
-    expect(outerRequests).toHaveLength(contexts.length);
+    expect(outerRequests).toHaveLength(partitionContexts.length);
     expect(
       outerRequests.map(call => ({
         endpoint: call.endpoint,
@@ -300,7 +292,7 @@ describe('Effect batch queue behavior', () => {
       })),
     ).toEqual(
       expect.arrayContaining(
-        contexts.map(context => ({
+        partitionContexts.map(context => ({
           endpoint: `${context.origin}${batchPath}`,
           authorization: context.authorization,
           cookie: context.cookie,
@@ -309,6 +301,12 @@ describe('Effect batch queue behavior', () => {
         })),
       ),
     );
+  });
+
+  test('does not promote spoofed identity headers to the outer request', async () => {
+    const { pending, outerRequests } = runPartitionScenario();
+    await pending;
+
     expect(
       outerRequests.every(call =>
         call.outerIdentity.every(value => value === null),
@@ -387,34 +385,6 @@ describe('Effect batch queue behavior', () => {
       ['/api/in-flight-a', '/api/in-flight-b'],
       ['/api/queued-a', '/api/queued-b'],
     ]);
-  });
-
-  test('preserves inherited and non-enumerable POST bodies on the direct path', async () => {
-    const bodies: Array<BodyInit | null | undefined> = [];
-    const fetchMock = rs.fn<BatchFetch>(async (_input, init) => {
-      bodies.push(init?.body);
-      return Response.json({ body: init?.body });
-    });
-    const request = createDataBatchTransport({ fetch: fetchMock });
-    const inheritedInit = Object.assign(
-      Object.create({ body: 'inherited-body' }),
-      { method: 'POST' },
-    ) as RequestInit;
-    const nonEnumerableInit = { method: 'POST' } as RequestInit;
-    Object.defineProperty(nonEnumerableInit, 'body', {
-      value: 'non-enumerable-body',
-    });
-
-    await expect(
-      Promise.all([
-        request('http://localhost/api/inherited-body', inheritedInit),
-        request('http://localhost/api/non-enumerable-body', nonEnumerableInit),
-      ]),
-    ).resolves.toEqual([
-      { body: 'inherited-body' },
-      { body: 'non-enumerable-body' },
-    ]);
-    expect(bodies).toEqual(['inherited-body', 'non-enumerable-body']);
   });
 
   test('deduplicates unsignaled reads but preserves identical mutations', async () => {

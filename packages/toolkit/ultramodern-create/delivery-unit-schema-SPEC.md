@@ -2,8 +2,8 @@
 
 Status: **defined, unwired** (MicroVertical plan task W4). Nothing in the
 generator, normalizer, or runtime imports these types; no emitted output
-changes. The v1 down-projection is a pure, tested function that no generation
-path calls.
+changes. The v1 down-projection is a pure function that no generation path
+calls.
 
 Binding vocabulary: root [`CONTEXT.md`](../../../../../../CONTEXT.md),
 [ADR-0019](../../../../../../docs/super-app-rfc-adr/ADR-0019-federated-loading-unified-delivery.md)
@@ -11,8 +11,7 @@ Binding vocabulary: root [`CONTEXT.md`](../../../../../../CONTEXT.md),
 [ADR-0020](../../../../../../docs/super-app-rfc-adr/ADR-0020-zoned-surface-versioning.md)
 (Zoned Surface Versioning).
 
-Contracts live in [`types.ts`](./types.ts). Tests:
-[`../../../tests/delivery-unit-schema.test.ts`](../../../tests/delivery-unit-schema.test.ts).
+Contracts live in [`types.ts`](./types.ts).
 
 ## 1. Shapes
 
