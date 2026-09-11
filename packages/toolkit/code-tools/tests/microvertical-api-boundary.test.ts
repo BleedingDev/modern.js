@@ -20,6 +20,17 @@ export const catalogFoundationApi = HttpApi.make('CatalogFoundationApi').add(Htt
 export const catalogApi = HttpApi.make('CatalogApi').addHttpApi(catalogFoundationApi);
 export const catalogOperationContexts = { readiness: createMicroVerticalOperationContext({method: 'GET', operationId: 'CatalogApi:/catalog/readiness', routePath: '/catalog/readiness'}) } as const;
 export const catalogApiContract = { apiPrefix: '/catalog-api', basePath: '/catalog-api/catalog', ownerId: 'catalog', readinessPath: '/catalog-api/catalog/readiness' } as const;`;
+/** A sub-API whose group uses every non-endpoint Effect combinator. */
+const prefixedSearchApi =
+  () => `import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
+import { CatalogAnnotation, CatalogAuthMiddleware } from '../middleware.ts';
+export const catalogSearchApi = HttpApi.make('CatalogSearchApi').add(
+  HttpApiGroup.make('catalogSearch')
+    .add(HttpApiEndpoint.post('execute', '/catalog/search', { success: Schema.Unknown }))
+    .middleware(CatalogAuthMiddleware)
+    .prefix('/search')
+    .annotate(CatalogAnnotation, 'value'),
+);`;
 const pascal = (name: string) =>
   `${name.slice(0, 1).toUpperCase()}${name.slice(1)}`;
 /** A root contract that composes two sub-APIs from sibling modules. */
@@ -152,6 +163,93 @@ test('still rejects an unbounded endpoint reached through an import', () => {
     `export { catalogCommandsApi } from './catalog-commands.ts';`,
   );
   expect(validate(composed)).toContain('bounded native endpoint declarations');
+});
+
+test('accepts Effect combinators that add no endpoints, and applies prefix', () => {
+  write(
+    path.join(root, 'verticals/catalog/shared/apis/catalog-search.ts'),
+    prefixedSearchApi(),
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/catalog-commands.ts'),
+    subApi('catalogCommandsApi', 'catalogCommands', '/catalog/commands'),
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/index.ts'),
+    `export { catalogCommandsApi } from './catalog-commands.ts';`,
+  );
+  // `searchPath` only matches a route the traversal actually prefixed, so this
+  // fails if `.prefix` were merely tolerated and not applied.
+  expect(
+    validate(
+      composed.replace(
+        `readinessPath: '/catalog-api/catalog/readiness' } as const;`,
+        `readinessPath: '/catalog-api/catalog/readiness', searchPath: '/catalog-api/search/catalog/search' } as const;`,
+      ),
+    ),
+  ).toBeUndefined();
+});
+
+test('still rejects a chain combinator Effect does not define', () => {
+  write(
+    path.join(root, 'verticals/catalog/shared/apis/catalog-search.ts'),
+    prefixedSearchApi().replace(
+      `.annotate(CatalogAnnotation, 'value')`,
+      '.decorate(CatalogAnnotation)',
+    ),
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/catalog-commands.ts'),
+    subApi('catalogCommandsApi', 'catalogCommands', '/catalog/commands'),
+  );
+  write(
+    path.join(root, 'verticals/catalog/shared/commands/index.ts'),
+    `export { catalogCommandsApi } from './catalog-commands.ts';`,
+  );
+  expect(validate(composed)).toContain('bounded native endpoint declarations');
+});
+
+test('resolves a generated client that composes per-operation modules', () => {
+  const clientFile = path.join(
+    root,
+    'verticals/catalog/src/api/catalog-client.ts',
+  );
+  write(
+    path.join(root, 'verticals/catalog/src/api/catalog-search-client.ts'),
+    `import { Effect, makeEffectHttpApiClient } from '@modern-js/bff-effect/effect-client'; import { catalogApi } from '../../shared/api.ts'; export const searchClient = makeEffectHttpApiClient(catalogApi);`,
+  );
+  // The aggregate module re-exports the operation clients instead of calling
+  // the factory itself; the governed surface is still fully present.
+  write(
+    clientFile,
+    `export { searchClient } from './catalog-search-client.ts';`,
+  );
+  expect(
+    checkMicroVerticalApiConsumerFiles({ workspaceRoot: root }).diagnostics,
+  ).toEqual([]);
+
+  write(clientFile, `export const client = undefined;`);
+  expect(
+    checkMicroVerticalApiConsumerFiles({
+      workspaceRoot: root,
+    }).diagnostics.join('\n'),
+  ).toContain('must call makeEffectHttpApiClient(...)');
+});
+
+test('parses .ts as TypeScript without JSX and .tsx with JSX', () => {
+  write(
+    path.join(root, 'verticals/catalog/modern.config.ts'),
+    `const whenEnabled = <Configuration>(enabled: boolean, configuration: Configuration) =>\n  enabled ? configuration : undefined;\nexport default whenEnabled(true, {});\n`,
+  );
+  write(
+    path.join(root, 'verticals/catalog/src/components/catalog-widget.tsx'),
+    `export default function CatalogWidget() {\n  return <span>catalog</span>;\n}\n`,
+  );
+  expect(
+    checkMicroVerticalApiConsumerFiles({
+      workspaceRoot: root,
+    }).diagnostics.join('\n'),
+  ).not.toContain('invalid source syntax');
 });
 
 test('checks consumer composition without inspecting framework implementation', () => {
