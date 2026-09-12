@@ -31,6 +31,25 @@ export class UltramodernNativeTypeChecker {
 
   async check(): Promise<void> {
     const { configFile, build } = this.options;
+    if (!build) {
+      const config = JSON.parse(
+        await this.run(['--showConfig', '--project', configFile]),
+      ) as { references?: { path: string }[] };
+      // Project mode consumes referenced declarations but never builds them.
+      // Prepare only the references using their own emit contracts, then keep
+      // the app itself in no-emit mode. This also refreshes stale declarations.
+      if (config.references?.length) {
+        await this.run([
+          '--build',
+          ...config.references.map(reference =>
+            path.resolve(path.dirname(configFile), reference.path),
+          ),
+          '--stopBuildOnErrors',
+          '--pretty',
+          'false',
+        ]);
+      }
+    }
     const args = build
       ? ['--build', configFile, '--stopBuildOnErrors']
       : ['--project', configFile, '--noEmit'];
