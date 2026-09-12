@@ -52,40 +52,6 @@ async function waitForAppReady(url: string, maxRetries = 60) {
   );
 }
 
-// TEMPORARY CI DIAGNOSTIC - remove before merge.
-async function logFederationReachability(remote: number, remoteTwo: number) {
-  const dns = await import('node:dns');
-  try {
-    const addresses = await dns.promises.lookup('localhost', { all: true });
-    console.log(`[mf-diagnostic] localhost -> ${JSON.stringify(addresses)}`);
-  } catch (error) {
-    console.log(`[mf-diagnostic] localhost lookup failed: ${String(error)}`);
-  }
-  for (const port of [remote, remoteTwo]) {
-    for (const host of ['localhost', '127.0.0.1', '[::1]']) {
-      for (const suffix of ['/mf-manifest.json', '/@mf-types.zip']) {
-        const url = `http://${host}:${port}${suffix}`;
-        const startedAt = Date.now();
-        try {
-          const res = await fetch(url, {
-            signal: AbortSignal.timeout(5000),
-          });
-          await res.arrayBuffer();
-          console.log(
-            `[mf-diagnostic] ${url} -> ${res.status} in ${Date.now() - startedAt}ms`,
-          );
-        } catch (error) {
-          console.log(
-            `[mf-diagnostic] ${url} -> ${(error as Error).name}: ${
-              (error as Error).message
-            } in ${Date.now() - startedAt}ms`,
-          );
-        }
-      }
-    }
-  }
-}
-
 const remoteDir = path.resolve(__dirname, '../mf-remote');
 const remoteTwoDir = path.resolve(__dirname, '../mf-remote-2');
 const hostDir = path.resolve(__dirname, '../mf-host');
@@ -790,15 +756,6 @@ describe('routes-tanstack-mf', () => {
     await waitForAppReady(
       `http://localhost:${ports.remoteTwo}/mf-manifest.json`,
     );
-
-    // TEMPORARY CI DIAGNOSTIC - remove before merge.
-    // The host's client compilation blocks on the Module Federation dts
-    // plugin's remote-type download (`ConsumeTypesPlugin` awaits it inside
-    // `processAssets`). Each download aborts only on its own 60s timeout, so
-    // if these URLs hang rather than answer, the compile stalls for minutes
-    // and the host never prints a readiness marker. Record what the host is
-    // about to talk to, over both name and literal address.
-    await logFederationReachability(ports.remote, ports.remoteTwo);
 
     hostApp = await launchApp(hostDir, ports.host, { env });
     await waitForAppReady(`http://localhost:${ports.host}/`);
