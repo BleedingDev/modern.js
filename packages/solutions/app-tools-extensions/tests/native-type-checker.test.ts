@@ -67,13 +67,37 @@ test('checks and rebuilds referenced projects without overriding their emit cont
   }
 });
 
-test('ordinary project checks emit nothing and surface compiler startup failures', async () => {
+test('ordinary project checks build references but emit no app output and surface compiler failures', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'native-project-check-'));
   try {
-    fs.writeFileSync(path.join(root, 'index.ts'), 'export const value = 1;');
+    fs.mkdirSync(path.join(root, 'lib'));
+    fs.writeFileSync(
+      path.join(root, 'lib/index.ts'),
+      'export interface Value { name: string }',
+    );
+    fs.writeFileSync(
+      path.join(root, 'lib/tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          composite: true,
+          declaration: true,
+          emitDeclarationOnly: true,
+          types: [],
+        },
+        files: ['index.ts'],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(root, 'index.ts'),
+      "import type { Value } from './lib'; export const value: Value = { name: 'ok' };",
+    );
     fs.writeFileSync(
       path.join(root, 'tsconfig.json'),
-      JSON.stringify({ compilerOptions: { types: [] }, files: ['index.ts'] }),
+      JSON.stringify({
+        compilerOptions: { types: [] },
+        files: ['index.ts'],
+        references: [{ path: './lib' }],
+      }),
     );
     const options = {
       build: false,
@@ -82,6 +106,15 @@ test('ordinary project checks emit nothing and surface compiler startup failures
     };
     await new UltramodernNativeTypeChecker(options).check();
     expect(fs.existsSync(path.join(root, 'index.js'))).toBe(false);
+    expect(fs.existsSync(path.join(root, 'index.d.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(root, 'lib/index.d.ts'))).toBe(true);
+    fs.writeFileSync(
+      path.join(root, 'lib/index.ts'),
+      'export interface Value { name: number }',
+    );
+    await expect(
+      new UltramodernNativeTypeChecker(options).check(),
+    ).rejects.toThrow('TS2322');
     await expect(
       new UltramodernNativeTypeChecker({
         ...options,
