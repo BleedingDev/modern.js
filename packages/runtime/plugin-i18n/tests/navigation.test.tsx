@@ -281,6 +281,34 @@ describe('bare plugin-i18n navigation adapter', () => {
     ).toBe('true');
   });
 
+  test('reports no router for a framework the adapter cannot drive', async () => {
+    // A custom provider may publish an instance under a name `navigate` has
+    // no implementation for. Claiming a router then makes `changeLanguage()`
+    // await a navigate that goes nowhere instead of the full-page fallback.
+    const runtimeContext = createTanstackCsrRuntimeContextWithoutRouter();
+    const App = () => {
+      const adapter = useIntegratedRouterAdapter();
+      return <span data-testid="has-router">{String(adapter.hasRouter)}</span>;
+    };
+
+    rendered = await renderBareRuntime(
+      App,
+      runtimeContext,
+      createI18nInstance('en'),
+    );
+    await act(async () => {
+      applyRouterRuntimeState(runtimeContext, {
+        framework: 'custom-router',
+        instance: { navigate: () => undefined, state: { location: {} } },
+      } as any);
+    });
+
+    expect(
+      rendered.container.querySelector('[data-testid="has-router"]')
+        ?.textContent,
+    ).toBe('false');
+  });
+
   test('leaves links unrouted until the TanStack instance is installed', async () => {
     const runtimeContext = createTanstackCsrRuntimeContextWithoutRouter();
     const App = () => (
