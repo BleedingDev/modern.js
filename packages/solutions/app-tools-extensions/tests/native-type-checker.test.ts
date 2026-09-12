@@ -200,6 +200,71 @@ test('the rspack plugin regenerates a generated checker config from the project 
   }
 }, 30000);
 
+test('the rspack plugin keeps a missing project tsconfig registered so its return rebuilds', async () => {
+  // Mid-edit the project tsconfig can be absent for a compilation. The
+  // generated config still names it through `extends`; it must be registered
+  // as a file and as a missing dependency (not realpathed, which would throw on
+  // Windows), so restoring the file triggers the next compilation on its own.
+  const root = fs.realpathSync.native(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'native-plugin-missing-')),
+  );
+  const write = (relative: string, value: string) => {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, value);
+  };
+  write('app/index.ts', 'export const item = 1;');
+  write(
+    'app/.modern-js/tsgo/tsconfig.abc.json',
+    JSON.stringify({
+      extends: '../../tsconfig.json',
+      compilerOptions: { baseUrl: null },
+    }),
+  );
+  const projectConfigFile = path.join(root, 'app/tsconfig.json');
+  const build = rspack({
+    context: root,
+    mode: 'development',
+    devtool: false,
+    entry: './app/index.ts',
+    output: { path: path.join(root, 'dist') },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          loader: 'builtin:swc-loader',
+          options: { jsc: { parser: { syntax: 'typescript' } } },
+        },
+      ],
+    },
+    plugins: [
+      new UltramodernNativeTypeChecker({
+        build: false,
+        configFile: path.join(root, 'app/.modern-js/tsgo/tsconfig.abc.json'),
+        compiler: () => compiler,
+      }),
+    ],
+  });
+  try {
+    const stats = await new Promise<any>((resolve, reject) =>
+      build.run((error, result) => (error ? reject(error) : resolve(result))),
+    );
+    // The compiler reports the broken project config; the build is not silent.
+    expect(stats.hasErrors()).toBe(true);
+    expect(stats.compilation.fileDependencies.has(projectConfigFile)).toBe(
+      true,
+    );
+    expect(stats.compilation.missingDependencies.has(projectConfigFile)).toBe(
+      true,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      build.close(error => (error ? reject(error) : resolve())),
+    );
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}, 30000);
+
 test('the rspack plugin reports type errors as build errors and registers referenced type-only inputs', async () => {
   const root = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'native-plugin-check-')),
