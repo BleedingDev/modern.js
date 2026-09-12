@@ -122,14 +122,13 @@ function isIgnorableWindowsTaskkillError(error: unknown) {
 }
 
 function createFederatedEnv(ports: FederatedPorts) {
-  // Node does not create --report-directory itself.
-  mkdirSync('/tmp/mf-diag-reports', { recursive: true });
+  const diagnosticDirectory = path.join(fixtureRoot, '.mf-diagnostic');
+  mkdirSync(diagnosticDirectory, { recursive: true });
   return {
-    // TEMPORARY CI DIAGNOSTIC - remove before merge: every node process in
-    // the fixture tree writes a diagnostic report (with its JS stack) when it
-    // receives SIGUSR2, so the monitor below can show what a dev server that
-    // sits at 100% CPU is actually executing.
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --report-on-signal --report-signal=SIGUSR2 --report-directory=/tmp/mf-diag-reports`.trim(),
+    // TEMPORARY CI DIAGNOSTIC - remove before merge.
+    MF_DIAGNOSTIC_DIR: diagnosticDirectory,
+    NODE_OPTIONS:
+      `${process.env.NODE_OPTIONS ?? ''} --require=${path.join(__dirname, 'diagnostic.cjs')}`.trim(),
     MF_REMOTE_PORT: String(ports.remote),
     MF_REMOTE_TWO_PORT: String(ports.remoteTwo),
     MF_HOST_PORT: String(ports.host),
@@ -809,118 +808,25 @@ describe('routes-tanstack-mf', () => {
     await logFederationReachability(ports.remote, ports.remoteTwo);
 
     // TEMPORARY CI DIAGNOSTIC - remove before merge.
-    // While the host boots, re-probe both producers and snapshot every node
-    // process in the fixture tree every 15s, so the run says whether a
-    // producer's dts worker (fork-generate-dts / fork-dev-worker) is alive,
-    // stuck, or gone while the host waits for its types.
-    let ticks = 0;
+    // Sample actual JS CPU stacks, rather than infer the cause from CPU usage.
     const monitor = setInterval(() => {
-      void (async () => {
-        const stamp = new Date().toISOString();
-        ticks += 1;
-        await logFederationReachability(ports.remote, ports.remoteTwo);
-        try {
-          const { execFileSync } = await import('node:child_process');
-          // On the 3rd and 8th tick (~45s, ~120s into the host wait) ask every
-          // fixture dev server for a diagnostic report and print its JS stack.
-          if (ticks === 3 || ticks === 8) {
-            const nodeFs = await import('node:fs');
-            try {
-              const targets = execFileSync(
-                'pgrep',
-                ['-f', 'app-tools/bin/modern.js dev'],
-                { encoding: 'utf8' },
-              )
-                .split('\n')
-                .filter(Boolean);
-              console.log(
-                `[mf-diagnostic report ${stamp}] signalling pids ${targets.join(',')}`,
-              );
-              for (const pid of targets) {
-                process.kill(Number(pid), 'SIGUSR2');
-              }
-              // Per-thread view of each dev server: thread name, state, CPU
-              // ticks and kernel wait channel. Says which threads burn CPU and
-              // whether the JS thread is parked in a native call.
-              const nodeFs2 = await import('node:fs');
-              for (const pid of targets) {
-                const lines: string[] = [];
-                try {
-                  for (const tid of nodeFs2.readdirSync(`/proc/${pid}/task`)) {
-                    const base = `/proc/${pid}/task/${tid}`;
-                    const comm = nodeFs2
-                      .readFileSync(`${base}/comm`, 'utf8')
-                      .trim();
-                    const stat = nodeFs2
-                      .readFileSync(`${base}/stat`, 'utf8')
-                      .replace(/^.*\) /, '')
-                      .split(' ');
-                    let wchan = '?';
-                    try {
-                      wchan = nodeFs2.readFileSync(`${base}/wchan`, 'utf8');
-                    } catch {}
-                    // stat after the comm field: state=0 utime=11 stime=12
-                    lines.push(
-                      `${tid} ${comm} state=${stat[0]} utime=${stat[11]} stime=${stat[12]} wchan=${wchan}`,
-                    );
-                  }
-                  const cmd = nodeFs2
-                    .readFileSync(`/proc/${pid}/cmdline`, 'utf8')
-                    .split('\0')
-                    .slice(1, 3)
-                    .join(' ');
-                  const cwd = nodeFs2.readlinkSync(`/proc/${pid}/cwd`);
-                  console.log(
-                    `[mf-diagnostic threads ${stamp}] pid=${pid} cwd=${cwd} cmd=${cmd}\n  ${lines.join('\n  ')}`,
-                  );
-                } catch (error) {
-                  console.log(
-                    `[mf-diagnostic threads ${stamp}] pid=${pid} failed: ${String(error)}`,
-                  );
-                }
-              }
-            } catch (error) {
-              console.log(
-                `[mf-diagnostic report ${stamp}] signal failed: ${String(error)}`,
-              );
-            }
-            await new Promise(resolve => setTimeout(resolve, 4000));
-            try {
-              const reportDir = '/tmp/mf-diag-reports';
-              for (const file of nodeFs.readdirSync(reportDir)) {
-                const report = JSON.parse(
-                  nodeFs.readFileSync(`${reportDir}/${file}`, 'utf8'),
-                );
-                const stack = (report.javascriptStack?.stack ?? []).slice(
-                  0,
-                  30,
-                );
-                console.log(
-                  `[mf-diagnostic report ${stamp}] pid=${report.header?.processId} cwd=${report.header?.cwd} cpu=${report.resourceUsage?.cpuConsumptionPercent}\n  ${report.javascriptStack?.message}\n  ${stack.join('\n  ')}`,
-                );
-                nodeFs.rmSync(`${reportDir}/${file}`, { force: true });
-              }
-            } catch (error) {
-              console.log(
-                `[mf-diagnostic report ${stamp}] no reports: ${String(error)}`,
-              );
-            }
-          }
-          const ps = execFileSync(
-            'ps',
-            ['-eo', 'pid,ppid,stat,etime,pcpu,rss,args'],
-            { encoding: 'utf8' },
-          )
-            .split('\n')
-            .filter(line => /node|tsc|tsgo/.test(line))
-            .map(line => line.slice(0, 220))
-            .join('\n');
-          console.log(`[mf-diagnostic ${stamp}] processes:\n${ps}`);
-        } catch (error) {
-          console.log(`[mf-diagnostic ${stamp}] ps failed: ${String(error)}`);
-        }
-      })();
-    }, 15_000);
+      void import('node:child_process').then(({ execFile }) => {
+        execFile(
+          process.execPath,
+          [path.join(__dirname, 'diagnostic.cjs')],
+          {
+            env: { ...process.env, MF_DIAGNOSTIC_DIR: env.MF_DIAGNOSTIC_DIR },
+            timeout: 20_000,
+            maxBuffer: 2 * 1024 * 1024,
+          },
+          (error, stdout, stderr) => {
+            console.log(stdout);
+            if (error || stderr)
+              console.log(`[mf-diagnostic CPU] ${error} ${stderr}`);
+          },
+        );
+      });
+    }, 45_000);
 
     try {
       hostApp = await launchApp(hostDir, ports.host, { env });
