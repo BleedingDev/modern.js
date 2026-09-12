@@ -54,20 +54,33 @@ export class UltramodernNativeTypeChecker {
     }
   }
 
-  private async watchInputs(): Promise<Set<string>> {
+  private async watchInputs(): Promise<{
+    inputs: Set<string>;
+    missing: Set<string>;
+  }> {
     const inputs = new Set<string>();
+    const missing = new Set<string>();
     const projects = [this.options.configFile];
     const visited = new Set<string>();
     for (const configFile of projects) {
       if (visited.has(configFile)) continue;
       visited.add(configFile);
+      // Registered before it is parsed: a referenced config that is absent or
+      // unparsable right now must still be watched, or creating or repairing
+      // it never re-triggers the compilation. `check()` reports the error.
       inputs.add(configFile);
-      const config = JSON.parse(
-        await this.run(['--showConfig', '--project', configFile]),
-      ) as {
-        files?: string[];
-        references?: { path: string }[];
-      };
+      if (!existsSync(configFile)) {
+        missing.add(configFile);
+        continue;
+      }
+      let config: { files?: string[]; references?: { path: string }[] };
+      try {
+        config = JSON.parse(
+          await this.run(['--showConfig', '--project', configFile]),
+        );
+      } catch {
+        continue;
+      }
       const directory = path.dirname(configFile);
       for (const file of config.files ?? [])
         inputs.add(path.resolve(directory, file));
@@ -80,7 +93,7 @@ export class UltramodernNativeTypeChecker {
         );
       }
     }
-    return inputs;
+    return { inputs, missing };
   }
 
   apply(compiler: Rspack.Compiler): void {
@@ -107,8 +120,11 @@ export class UltramodernNativeTypeChecker {
               compilation.missingDependencies.add(watched);
             }
           }
-          for (const file of await this.watchInputs())
+          const { inputs, missing } = await this.watchInputs();
+          for (const file of inputs)
             compilation.fileDependencies.add(watchDependencyPath(file));
+          for (const file of missing)
+            compilation.missingDependencies.add(watchDependencyPath(file));
           await this.check();
         } catch (cause) {
           compilation.errors.push(
