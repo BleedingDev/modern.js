@@ -33,6 +33,15 @@ every PR.
 
 ---
 
+### 2026-09-12 dev watcher CPU starvation
+
+Linux V8 profiles in run 34708962442 show every federation fixture server spending its main-thread CPU rebuilding dependency trees and recompiling minimatch ignore patterns. Reuse compiled patterns and use the already-filtered tree to resolve edges; no watch targets, cache-invalidation rules or readiness timeouts change.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/server/server/src/dev-tools/watcher/dependencyTree.ts` | bleedingdev | Compile fixed ignore patterns once per tree and avoid matching parent/child filenames already filtered during node insertion, preventing synchronous dependency rebuilds from starving dev-server HTTP. | `inline-patch` |
+| `packages/server/server/tests/watcher.test.ts` | bleedingdev | Verify shared parents, cycles, ignored generated/dependency modules and stale-node removal under the optimized dependency rebuild. | `inline-patch` |
+
 ### 2026-09-11 adoption defects found in a consumer
 
 Four defects an adopting workspace hit on 3.9.0-ultramodern.8. Each is a fork
