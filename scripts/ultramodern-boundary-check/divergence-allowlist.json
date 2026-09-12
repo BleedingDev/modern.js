@@ -6,7 +6,7 @@
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
   "totalFiles": 810,
   "totalHunks": 3042,
-  "totalChangedLines": 49856,
+  "totalChangedLines": 49932,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -1306,7 +1306,7 @@
     {
       "file": "packages/runtime/plugin-i18n/src/runtime/utils.ts",
       "hunks": 16,
-      "changedLines": 105
+      "changedLines": 111
     },
     {
       "file": "packages/runtime/plugin-i18n/src/server/apiPrefix.ts",
@@ -1336,7 +1336,7 @@
     {
       "file": "packages/runtime/plugin-i18n/src/server/redirectPolicy.ts",
       "hunks": 1,
-      "changedLines": 133
+      "changedLines": 142
     },
     {
       "file": "packages/runtime/plugin-i18n/src/shared/detection.ts",
@@ -1346,7 +1346,7 @@
     {
       "file": "packages/runtime/plugin-i18n/src/shared/mappedUrlStrategy.ts",
       "hunks": 1,
-      "changedLines": 51
+      "changedLines": 59
     },
     {
       "file": "packages/runtime/plugin-i18n/src/shared/type.ts",
@@ -1411,7 +1411,7 @@
     {
       "file": "packages/runtime/plugin-i18n/tests/redirectPolicy.test.ts",
       "hunks": 1,
-      "changedLines": 54
+      "changedLines": 107
     },
     {
       "file": "packages/runtime/plugin-i18n/tests/routerAdapter.test.tsx",
