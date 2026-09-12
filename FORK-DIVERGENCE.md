@@ -1381,6 +1381,25 @@ no tsgo lane, so the fix has no upstream home.
 | `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | Restate the project's own `references` in the generated checker config, each path resolved against the config that declares it, so the checker keeps the project graph the project's tsconfig describes. Expose `refreshTsgoCheckerConfig` so the native checker can regenerate the file from the project tsconfig before every run, keeping restated values current during `modern dev`. | `extension-point` |
 | `packages/cli/builder/src/index.ts` | bleedingdev | Export `refreshTsgoCheckerConfig` for `@modern-js/app-tools-extensions`' native checker. | `extension-point` |
 | `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pin that declared references are restated with project-anchored absolute paths, that a project without references gets none, and that a refresh picks up a reference added to the project tsconfig after generation. | `extension-point` |
+
+### Federation artifacts are never locale-redirected (2026-09-12)
+
+The native locale redirect excluded `backend-mf-manifest.json`,
+`backendRemoteEntry.cjs`, `mf-manifest.json`, `mf-stats.json` and
+`remoteEntry.js` only through a configured URL strategy's `shouldSkipRedirect`.
+Once mapped locale URLs stopped needing the integration's server plugin, an app
+with `localeDetection.localisedUrls: {}` derived no strategy at all and the
+exclusions vanished: the 3.9.0-ultramodern.9 clean-room acceptance failed
+because `GET /backend-mf-manifest.json` answered `302 /en/backend-mf-manifest.json`.
+Upstream has no federation artifacts or backend federation lane, so the
+exclusion list and this policy have no upstream home.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-i18n/src/server/redirectPolicy.ts` | bleedingdev | Apply the fork's default federation-artifact exclusions natively before consulting a strategy, so they hold with or without one. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/runtime/utils.ts` | bleedingdev | Same native exclusions on the client redirect path. | `inline-patch` |
+| `packages/runtime/plugin-i18n/src/shared/mappedUrlStrategy.ts` | bleedingdev | Fork-owned seam that re-exports the default exclusions, so the upstream-owned runtime and server redirect paths do not import the extensions package themselves (import-boundary guard). | `extension-point` |
+| `packages/runtime/plugin-i18n/tests/redirectPolicy.test.ts` | bleedingdev | Pin that every federation artifact is skipped on server and runtime with no strategy configured, under entry and locale prefixes, while a page is still redirected. | `inline-patch` |
 ### Default-on mapped locale URLs (2026-09-12)
 
 Localised route generation and the client URL policy reached only consumers of
