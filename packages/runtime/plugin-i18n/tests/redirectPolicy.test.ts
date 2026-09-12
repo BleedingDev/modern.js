@@ -18,6 +18,8 @@ describe('native locale redirect safeguards', () => {
       '/mf-manifest.json',
       '/mf-stats.json',
       '/remoteEntry.js',
+      '/remoteEntry.catalog.js',
+      '/backendRemoteEntry.catalog.cjs',
       '/cs/backend-mf-manifest.json',
     ]) {
       expect(

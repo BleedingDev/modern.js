@@ -9,15 +9,26 @@ export type LocaleRedirectSkipRule =
   | {
       type: 'prefix';
       path: string;
+    }
+  | {
+      type: 'pattern';
+      path: RegExp;
     };
 
+/**
+ * Federation artifacts are never pages. The remote entries match the same
+ * shapes the federation layer itself recognises and serves (`mfCache.ts`):
+ * a manifest may name a root entry such as `remoteEntry.catalog.js`.
+ */
 export const DEFAULT_LOCALE_REDIRECT_SKIP_RULES: readonly LocaleRedirectSkipRule[] =
   [
     { type: 'exact', path: '/backend-mf-manifest.json' },
-    { type: 'exact', path: '/backendRemoteEntry.cjs' },
     { type: 'exact', path: '/mf-manifest.json' },
     { type: 'exact', path: '/mf-stats.json' },
-    { type: 'exact', path: '/remoteEntry.js' },
+    {
+      type: 'pattern',
+      path: /^\/(?:backendRemoteEntry(?:\.[a-zA-Z0-9_-]+)?\.cjs|remoteEntry(?:\.[a-zA-Z0-9_-]+)?\.js)$/,
+    },
     { type: 'prefix', path: '/static/' },
     { type: 'prefix', path: '/upload/' },
   ];
@@ -44,6 +55,9 @@ const matchesSkipRule = (
 ): boolean => {
   if (rule.type === 'exact') {
     return normalisePathname(pathname) === normalisePathname(rule.path);
+  }
+  if (rule.type === 'pattern') {
+    return rule.path.test(normalisePathname(pathname));
   }
 
   return matchesPathPrefix(pathname, rule.path);

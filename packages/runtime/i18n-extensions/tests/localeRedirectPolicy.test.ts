@@ -21,6 +21,9 @@ describe('locale redirect resource policy', () => {
       '/mf-manifest.json',
       '/mf-stats.json',
       '/remoteEntry.js',
+      // A manifest may name a root entry; the federation layer serves these.
+      '/remoteEntry.catalog.js',
+      '/backendRemoteEntry.catalog-v2.cjs',
       '/static/app.js',
       '/upload/avatar.png',
     ];
@@ -31,6 +34,14 @@ describe('locale redirect resource policy', () => {
         true,
       );
       expect(shouldIgnoreRedirect(`/store${pathname}`, '/store/*')).toBe(true);
+    }
+    // Only the entry itself, not a page or asset that merely starts like one.
+    for (const pathname of [
+      '/remoteEntry.catalog.js.map',
+      '/remoteEntry.catalog/js',
+      '/products/remoteEntry.js',
+    ]) {
+      expect(isStaticResourceRequest(pathname, [], languages)).toBe(false);
     }
   });
 
