@@ -28,11 +28,13 @@ export interface TreeNode {
 export class DependencyTree {
   private readonly tree: Map<string, TreeNode>;
 
-  private readonly ignore: string[];
+  private readonly ignore: minimatch.Minimatch[];
 
   constructor() {
     this.tree = new Map<string, TreeNode>();
-    this.ignore = [...defaultIgnores];
+    this.ignore = defaultIgnores.map(
+      rule => new minimatch.Minimatch(rule, { dot: true }),
+    );
   }
 
   public getNode(path: string) {
@@ -64,20 +66,18 @@ export class DependencyTree {
       const { parent } = treeNode.module;
       const { children } = treeNode.module;
 
-      if (parent && !this.shouldIgnore(parent.filename)) {
-        const parentTreeNode = this.tree.get(parent.filename)!;
+      if (parent) {
+        const parentTreeNode = this.tree.get(parent.filename);
         if (parentTreeNode) {
           treeNode.parent.add(parentTreeNode);
         }
       }
 
       children?.forEach(child => {
-        if (!this.shouldIgnore(child.filename)) {
-          const childTreeNode = this.tree.get(child.filename)!;
-          if (childTreeNode) {
-            treeNode.children.add(childTreeNode);
-            childTreeNode.parent.add(treeNode);
-          }
+        const childTreeNode = this.tree.get(child.filename);
+        if (childTreeNode) {
+          treeNode.children.add(childTreeNode);
+          childTreeNode.parent.add(treeNode);
         }
       });
     }
@@ -88,16 +88,6 @@ export class DependencyTree {
       path && nodePath.isAbsolute(path)
         ? nodePath.relative(process.cwd(), path)
         : path;
-    return (
-      !matchPath ||
-      Boolean(
-        this.ignore.find(
-          rule =>
-            minimatch.match([matchPath], rule, {
-              dot: true,
-            }).length > 0,
-        ),
-      )
-    );
+    return !matchPath || this.ignore.some(rule => rule.match(matchPath));
   }
 }
