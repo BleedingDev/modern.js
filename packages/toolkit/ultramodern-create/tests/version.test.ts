@@ -199,7 +199,12 @@ test('built CLI scaffolds a workspace whose asset prefix resolves by precedence'
       );
     }
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
   }
 });
 
@@ -217,7 +222,9 @@ test('local source initializes Git offline and leaves the first commit to the us
     path.join(hooksDir, 'pre-commit'),
     '#!/bin/sh\n: > "$ULTRAMODERN_TEST_HOOK_MARKER"\n',
   );
-  const gitConfig = `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n`;
+  // Background maintenance (auto gc, fsmonitor) would keep writing into .git
+  // after `git commit` returns and race the cleanup below (ENOTEMPTY on macOS).
+  const gitConfig = `[core]\n\thooksPath = ${JSON.stringify(hooksDir)}\n\tfsmonitor = false\n[user]\n\tname = Scaffold Test\n\temail = scaffold@example.test\n[commit]\n\tgpgsign = false\n[gc]\n\tauto = 0\n[maintenance]\n\tauto = false\n`;
   fs.writeFileSync(isolatedGitConfig, gitConfig);
   const env = {
     ...hermeticEnv,
@@ -268,7 +275,12 @@ test('local source initializes Git offline and leaves the first commit to the us
     assert.equal(fs.existsSync(hookMarker), true);
     assert.equal(git(['rev-parse', '--verify', 'HEAD']).status, 0);
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
   }
 });
 
@@ -340,7 +352,12 @@ test('creation inside a repository preserves its HEAD and staged changes', () =>
     );
     assert.equal(fs.existsSync(hookMarker), false);
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
   }
 });
 
@@ -379,6 +396,11 @@ test('missing git fails fast without attempting a system package install', () =>
       'create must never attempt to install git through a package manager',
     );
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
   }
 });
