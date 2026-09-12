@@ -111,7 +111,11 @@ describe('create-bff-runtime', () => {
         stdout: false,
         stderr: false,
       });
-      expect(buildResult.code).toBe(0);
+      expect(
+        buildResult.code,
+        `${buildResult.stdout}
+${buildResult.stderr}`,
+      ).toBe(0);
 
       const port = await getPort();
       const server = await modernServe(verticalDir, port, {
