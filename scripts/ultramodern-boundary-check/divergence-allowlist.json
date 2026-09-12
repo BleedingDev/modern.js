@@ -6,7 +6,7 @@
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
   "totalFiles": 810,
   "totalHunks": 3042,
-  "totalChangedLines": 49616,
+  "totalChangedLines": 49715,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -86,7 +86,7 @@
     {
       "file": "packages/cli/builder/src/shared/tsgo.ts",
       "hunks": 1,
-      "changedLines": 319
+      "changedLines": 359
     },
     {
       "file": "packages/cli/builder/src/types.ts",
@@ -146,7 +146,7 @@
     {
       "file": "packages/cli/builder/tests/tsgo.test.ts",
       "hunks": 1,
-      "changedLines": 193
+      "changedLines": 252
     },
     {
       "file": "packages/cli/plugin-bff/CHANGELOG.md",
