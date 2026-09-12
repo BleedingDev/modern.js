@@ -1665,6 +1665,9 @@ importers:
 
   packages/runtime/i18n-extensions:
     dependencies:
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../runtime-extensions
       '@modern-js/runtime-utils':
         specifier: workspace:*
         version: link:../../toolkit/runtime-utils
@@ -1778,9 +1781,6 @@ importers:
       '@modern-js/plugin':
         specifier: workspace:*
         version: link:../../toolkit/plugin
-      '@modern-js/runtime-extensions':
-        specifier: workspace:*
-        version: link:../runtime-extensions
       '@modern-js/runtime-utils':
         specifier: workspace:*
         version: link:../../toolkit/runtime-utils
@@ -1824,6 +1824,9 @@ importers:
       '@modern-js/runtime':
         specifier: workspace:*
         version: link:../plugin-runtime
+      '@modern-js/runtime-extensions':
+        specifier: workspace:*
+        version: link:../runtime-extensions
       '@rslib/core':
         specifier: 1.0.0
         version: 1.0.0(@module-federation/runtime-tools@2.9.0)(core-js@3.50.0)(typescript@7.0.2)

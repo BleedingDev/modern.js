@@ -948,16 +948,37 @@ function runModernCommandDev(argv, stdOut, options = {}) {
         const output = [stdoutOutput.trim(), stderrOutput.trim()]
           .filter(Boolean)
           .join('\n');
-        void releaseDistReadLock();
-        reject(
-          new Error(
-            `modern ${phase} in ${cwd} produced no readiness marker within ` +
-              `${bootupTimeoutMs}ms (pid ${instance.pid}).` +
-              (output
-                ? `\nOutput so far:\n${output}`
-                : '\nIt emitted nothing.'),
-          ),
+        const error = new Error(
+          `modern ${phase} in ${cwd} produced no readiness marker within ` +
+            `${bootupTimeoutMs}ms (pid ${instance.pid}).` +
+            (output ? `\nOutput so far:\n${output}` : '\nIt emitted nothing.'),
         );
+        error.stdout = stdoutOutput;
+        error.stderr = stderrOutput;
+        // `launchApp` never returns here, so no caller can hold this child for
+        // its `afterAll`. Leaving it alive would keep a dev server and its
+        // pipes running for the rest of the session, and - because the dist
+        // read lock is what stops a concurrent rebuild wiping the tree it is
+        // reading - releasing that lock while the child still runs is exactly
+        // the corruption the lock exists to prevent. Kill it and wait for the
+        // close before releasing and rejecting.
+        void (async () => {
+          try {
+            await killApp(instance);
+          } catch {
+            // Best effort: a child that cannot be killed must not mask the
+            // readiness failure being reported.
+          }
+          if (instance.exitCode === null && instance.signalCode === null) {
+            await new Promise(resolve => {
+              const done = () => resolve();
+              instance.once('close', done);
+              setTimeout(done, 10_000).unref?.();
+            });
+          }
+          await releaseDistReadLock();
+          reject(error);
+        })();
       }, bootupTimeoutMs);
       bootupTimer.unref?.();
       const clearBootupTimer = () => clearTimeout(bootupTimer);

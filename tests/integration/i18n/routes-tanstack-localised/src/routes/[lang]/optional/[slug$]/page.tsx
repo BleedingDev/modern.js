@@ -4,24 +4,13 @@ import type { OptionalData } from './page.data';
 // `canonicaliseLocalisedRoutes` collapses every localised spelling back onto
 // the canonical route identity before the tree reaches TanStack, and the
 // localised URL is rewritten to the canonical path at the router's rewrite
-// seam. The matched route id is therefore always the canonical one, whichever
-// spelling the browser shows, so ask for both rather than assuming a winner.
-const useOptionalLoaderData = () => {
-  const canonicalMatch = useMatch({
-    from: '/$lang/optional/{-$slug}',
-    shouldThrow: false,
-  });
-  const localisedMatch = useMatch({
-    from: '/$lang/volitelne/{-$slug}',
-    shouldThrow: false,
-  });
-
-  return (canonicalMatch?.loaderData ||
-    localisedMatch?.loaderData) as OptionalData;
-};
-
+// seam. The matched id is therefore always the canonical one, whichever
+// spelling the browser shows. Match only that, with throwing semantics: if the
+// localised identity ever survives into the router again, this page must fail
+// rather than quietly accept either id and hide the regression.
 export default function OptionalPage() {
-  const data = useOptionalLoaderData();
+  const match = useMatch({ from: '/$lang/optional/{-$slug}' });
+  const data = match.loaderData as OptionalData;
 
   return (
     <div id="optional">

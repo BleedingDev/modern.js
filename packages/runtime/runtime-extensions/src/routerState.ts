@@ -145,10 +145,84 @@ export function createRouterRuntimeState(
   };
 }
 
+/**
+ * Listeners per runtime context, so a consumer can react to the slot being
+ * filled in. A router provider publishes its instance during render - TanStack
+ * installs it when `RouterWrapper` renders - which is after anything that
+ * wraps the app has already evaluated. Without a notification those wrappers
+ * would hold a routerless view of the app for the rest of the session.
+ *
+ * Keyed weakly: the runtime context outlives neither the app nor this map.
+ */
+const routerRuntimeStateListeners = new WeakMap<object, Set<() => void>>();
+
+/**
+ * Observe the router runtime-state slot for the given runtime context.
+ * Returns an unsubscribe function; safe to call for a context that never
+ * receives a router.
+ */
+export function subscribeRouterRuntimeState(
+  runtimeContext: object,
+  listener: () => void,
+): () => void {
+  if (!runtimeContext || typeof runtimeContext !== 'object') {
+    return () => undefined;
+  }
+  let listeners = routerRuntimeStateListeners.get(runtimeContext);
+  if (!listeners) {
+    listeners = new Set();
+    routerRuntimeStateListeners.set(runtimeContext, listeners);
+  }
+  listeners.add(listener);
+  return () => {
+    listeners?.delete(listener);
+  };
+}
+
+/** Contexts with a notification already scheduled, so a burst coalesces. */
+const pendingRouterRuntimeStateNotifications = new WeakSet<object>();
+
+function notifyRouterRuntimeState(runtimeContext: object) {
+  const listeners = routerRuntimeStateListeners.get(runtimeContext);
+  if (!listeners?.size) {
+    return;
+  }
+  if (pendingRouterRuntimeStateNotifications.has(runtimeContext)) {
+    return;
+  }
+  pendingRouterRuntimeStateNotifications.add(runtimeContext);
+  // Deferred deliberately. A router provider publishes its instance from
+  // inside its own render - `RouterWrapper` does - so calling observers
+  // synchronously would schedule an update on a component that is rendering,
+  // which React reports as "Cannot update a component while rendering a
+  // different component". Delivering after the current render lands keeps the
+  // notification correct and silent.
+  const deliver = () => {
+    pendingRouterRuntimeStateNotifications.delete(runtimeContext);
+    const current = routerRuntimeStateListeners.get(runtimeContext);
+    if (!current?.size) {
+      return;
+    }
+    for (const listener of [...current]) {
+      try {
+        listener();
+      } catch {
+        // One bad observer must not stop the router from being published.
+      }
+    }
+  };
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(deliver);
+  } else {
+    setTimeout(deliver, 0);
+  }
+}
+
 export function applyRouterRuntimeState<Context extends object>(
   runtimeContext: Context,
   state: InternalRouterRuntimeState,
 ) {
+  const previous = routerRuntimeStateExtension.get(runtimeContext);
   const normalized = createRouterRuntimeState(state);
   routerRuntimeStateExtension.set(runtimeContext, normalized);
   if (normalized.serverSnapshot) {
@@ -156,6 +230,14 @@ export function applyRouterRuntimeState<Context extends object>(
       runtimeContext,
       normalized.serverSnapshot,
     );
+  }
+  // Only a change of identity is worth a re-render; `RouterWrapper` reapplies
+  // the same instance on every render of the app.
+  if (
+    previous?.instance !== normalized.instance ||
+    previous?.framework !== normalized.framework
+  ) {
+    notifyRouterRuntimeState(runtimeContext);
   }
 
   return runtimeContext;
