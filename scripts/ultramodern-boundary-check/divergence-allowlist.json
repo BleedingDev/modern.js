@@ -5,8 +5,8 @@
   "pathspec": ["packages"],
   "migrationGoal": "Shrink-only budget of fork edits inside upstream-owned files. Every entry is debt: move it upstream or behind an extension point, then re-run --write-divergence-allowlist.",
   "totalFiles": 812,
-  "totalHunks": 3048,
-  "totalChangedLines": 50418,
+  "totalHunks": 3050,
+  "totalChangedLines": 50473,
   "files": [
     {
       "file": "packages/cli/adapter-rstest/package.json",
@@ -2915,8 +2915,8 @@
     },
     {
       "file": "packages/server/server/src/dev-tools/watcher/index.ts",
-      "hunks": 5,
-      "changedLines": 14
+      "hunks": 6,
+      "changedLines": 18
     },
     {
       "file": "packages/server/server/src/dev.ts",
@@ -2985,8 +2985,8 @@
     },
     {
       "file": "packages/server/server/tests/watcher.test.ts",
-      "hunks": 8,
-      "changedLines": 82
+      "hunks": 9,
+      "changedLines": 133
     },
     {
       "file": "packages/server/server/tsconfig.json",
