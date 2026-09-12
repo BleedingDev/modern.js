@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { refreshTsgoCheckerConfig } from '@modern-js/builder';
@@ -9,8 +9,16 @@ const execute = promisify(execFile);
 const name = 'UltramodernNativeTypeChecker';
 
 // Windows file events expand 8.3 aliases; register the same native path spelling.
-const watchDependencyPath = (file: string): string =>
-  process.platform === 'win32' ? realpathSync.native(file) : file;
+// A path that does not exist yet (a project tsconfig mid-edit) cannot be
+// realpathed; it is registered as spelled so its return still triggers a build.
+const watchDependencyPath = (file: string): string => {
+  if (process.platform !== 'win32') return file;
+  try {
+    return realpathSync.native(file);
+  } catch {
+    return file;
+  }
+};
 
 export class UltramodernNativeTypeChecker {
   constructor(
@@ -91,9 +99,13 @@ export class UltramodernNativeTypeChecker {
             this.options.configFile,
           );
           if (projectConfigFile) {
-            compilation.fileDependencies.add(
-              watchDependencyPath(projectConfigFile),
-            );
+            const watched = watchDependencyPath(projectConfigFile);
+            compilation.fileDependencies.add(watched);
+            // Absent mid-edit: a missing dependency makes its (re)appearance
+            // a rebuild trigger, so the dev server recovers on its own.
+            if (!existsSync(projectConfigFile)) {
+              compilation.missingDependencies.add(watched);
+            }
           }
           for (const file of await this.watchInputs())
             compilation.fileDependencies.add(watchDependencyPath(file));
