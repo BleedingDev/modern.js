@@ -43,7 +43,11 @@ export default {
     withTestPreset({
       name: 'plugin-i18n-client',
       testEnvironment: 'happy-dom',
-      include: ['tests/routerAdapter.test.tsx', 'tests/link.test.tsx'],
+      include: [
+        'tests/routerAdapter.test.tsx',
+        'tests/link.test.tsx',
+        'tests/navigation.test.tsx',
+      ],
       extends: commonConfig,
     }),
   ],

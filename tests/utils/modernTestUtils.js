@@ -36,6 +36,8 @@ const kWorkspaceDistWriterLockDir = path.join(
   'writer.lock',
 );
 const kWorkspaceDistReadersDir = path.join(kWorkspaceRwLockRoot, 'readers');
+// Dist read locks this process currently holds; see acquireWorkspaceDistReadLock.
+let kWorkspaceDistReadersHeld = 0;
 const kTestPortAllocatorKey = `${kTestsRoot}#test-port-allocator`;
 const kTestPortStatePath = path.join(
   os.tmpdir(),
@@ -186,6 +188,19 @@ async function isWorkspaceDistWriterActive() {
   }
 }
 
+async function readWorkspaceDistWriterOwner() {
+  try {
+    return JSON.parse(
+      await fs.promises.readFile(
+        path.join(kWorkspaceDistWriterLockDir, 'owner.json'),
+        'utf8',
+      ),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 async function acquireWorkspaceDistReadLock() {
   await fs.promises.mkdir(kWorkspaceDistReadersDir, { recursive: true });
   const readerPath = path.join(
@@ -193,8 +208,35 @@ async function acquireWorkspaceDistReadLock() {
     `${process.pid}-${crypto.randomUUID()}.json`,
   );
 
-  while (true) {
+  // Reader acquisition is re-entrant per process. A worker that already holds
+  // a reader is keeping it for the lifetime of a spawned dev/serve child, and
+  // a pending writer drains exactly those readers before it proceeds. Making
+  // the second acquisition yield to that writer deadlocks the pair: the writer
+  // waits for readers this process can only release after it finishes setting
+  // up, and the setup waits for the writer to clear. Fixtures that bring up
+  // several servers (federation hosts with their remotes, cross-project BFF
+  // suites) hit this whenever another worker rebuilds a workspace package, and
+  // the only symptom is an opaque `beforeAll hook timed out`. Admitting the
+  // re-entrant reader costs the writer nothing it was not already waiting for.
+  const isReentrant = kWorkspaceDistReadersHeld > 0;
+  const waitStartedAt = Date.now();
+  let warnedAboutWriter = false;
+
+  while (!isReentrant) {
     if (await isWorkspaceDistWriterActive()) {
+      // A blocked reader used to be invisible: the suite simply reported
+      // `beforeAll hook timed out` with no indication that it never reached
+      // the spawn. Name the writer once so a stall is diagnosable from the
+      // CI log alone.
+      if (!warnedAboutWriter && Date.now() - waitStartedAt > 30_000) {
+        warnedAboutWriter = true;
+        const owner = await readWorkspaceDistWriterOwner();
+        console.warn(
+          `[modernTestUtils] waiting on the workspace dist write lock for ${Math.round(
+            (Date.now() - waitStartedAt) / 1000,
+          )}s; writer=${owner ? JSON.stringify(owner) : 'unknown'}`,
+        );
+      }
       await new Promise(resolve =>
         setTimeout(resolve, kWorkspacePackageLockPollInterval),
       );
@@ -220,12 +262,25 @@ async function acquireWorkspaceDistReadLock() {
     );
   }
 
+  if (isReentrant) {
+    await fs.promises.writeFile(
+      readerPath,
+      JSON.stringify({
+        pid: process.pid,
+        acquiredAt: new Date().toISOString(),
+        reentrant: true,
+      }),
+    );
+  }
+
+  kWorkspaceDistReadersHeld += 1;
   let released = false;
   return async () => {
     if (released) {
       return;
     }
     released = true;
+    kWorkspaceDistReadersHeld -= 1;
     await fs.promises.rm(readerPath, { force: true });
   };
 }
