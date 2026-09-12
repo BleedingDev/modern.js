@@ -15,6 +15,7 @@ export {
   type RspackChain,
 } from '@rsbuild/core';
 export { parseConfig as parseRspackConfig } from './createBuilder';
+export { refreshTsgoCheckerConfig } from './shared/tsgo';
 export {
   castArray,
   isHtmlDisabled,

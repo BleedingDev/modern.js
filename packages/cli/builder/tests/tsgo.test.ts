@@ -8,7 +8,11 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from '@rstest/core';
-import { type TsCheckerOptions, withTsgoDefaults } from '../src/shared/tsgo';
+import {
+  refreshTsgoCheckerConfig,
+  type TsCheckerOptions,
+  withTsgoDefaults,
+} from '../src/shared/tsgo';
 
 const temporaryRoots: string[] = [];
 
@@ -218,6 +222,55 @@ describe('withTsgoDefaults', () => {
           .replaceAll(path.sep, '/'),
       },
     ]);
+  });
+
+  test('refreshes restated references from the project config on demand', () => {
+    // The generated file is written at builder configuration. During
+    // `modern dev` the checker asks for a refresh before every run, so a
+    // reference added, removed or retargeted in the project's tsconfig reaches
+    // the next compilation instead of the next restart.
+    const appDirectory = createVerticalApp({ composite: true });
+    const config = applyChain(
+      withTsgoDefaults(
+        { typescript: { configFile: 'tsconfig.json' } },
+        appDirectory,
+      ),
+    );
+    const generatedFile = config.typescript?.configFile as string;
+    expect(
+      'references' in readGeneratedCheckerConfig(appDirectory, config),
+    ).toBe(false);
+
+    writeFileSync(
+      path.join(appDirectory, 'tsconfig.json'),
+      `${JSON.stringify(
+        {
+          compilerOptions: { composite: true },
+          include: ['src', 'api'],
+          references: [{ path: '../checkout' }],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    expect(refreshTsgoCheckerConfig(generatedFile)).toBe(
+      path.join(appDirectory, 'tsconfig.json'),
+    );
+    const refreshed = readGeneratedCheckerConfig(appDirectory, config) as {
+      references?: Array<{ path: string }>;
+    };
+    expect(refreshed.references).toEqual([
+      {
+        path: path
+          .resolve(appDirectory, '../checkout')
+          .replaceAll(path.sep, '/'),
+      },
+    ]);
+
+    // Not a generated checker config: nothing to refresh, nothing to watch.
+    expect(
+      refreshTsgoCheckerConfig(path.join(appDirectory, 'tsconfig.json')),
+    ).toBeUndefined();
   });
 
   test('omits references when the project declares none', () => {
