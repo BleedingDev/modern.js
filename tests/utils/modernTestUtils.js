@@ -883,6 +883,7 @@ function runModernCommandDev(argv, stdOut, options = {}) {
             .then(() => {
               if (!didResolve) {
                 didResolve = true;
+                clearBootupTimer();
                 resolve(stdOut ? message : instance);
               }
             })
@@ -930,7 +931,39 @@ function runModernCommandDev(argv, stdOut, options = {}) {
         }
       });
 
+      // A dev/serve child that never prints its readiness marker used to hang
+      // this promise forever: the suite then died on its own hook timeout with
+      // no indication of which server never came up or what it had emitted.
+      // Fail with that evidence instead. This does not make a failing fixture
+      // pass - it makes an opaque stall readable.
+      const bootupTimeoutMs = Number(
+        process.env.MODERN_TEST_BOOTUP_TIMEOUT_MS || 240_000,
+      );
+      const bootupTimer = setTimeout(() => {
+        if (didResolve) {
+          return;
+        }
+        didResolve = true;
+        const phase = options.modernServe ? 'serve' : 'dev';
+        const output = [stdoutOutput.trim(), stderrOutput.trim()]
+          .filter(Boolean)
+          .join('\n');
+        void releaseDistReadLock();
+        reject(
+          new Error(
+            `modern ${phase} in ${cwd} produced no readiness marker within ` +
+              `${bootupTimeoutMs}ms (pid ${instance.pid}).` +
+              (output
+                ? `\nOutput so far:\n${output}`
+                : '\nIt emitted nothing.'),
+          ),
+        );
+      }, bootupTimeoutMs);
+      bootupTimer.unref?.();
+      const clearBootupTimer = () => clearTimeout(bootupTimer);
+
       instance.on('error', error => {
+        clearBootupTimer();
         error.stdout = stdoutOutput;
         error.stderr = stderrOutput;
         void releaseDistReadLock();
@@ -938,6 +971,7 @@ function runModernCommandDev(argv, stdOut, options = {}) {
       });
 
       instance.on('close', code => {
+        clearBootupTimer();
         void releaseDistReadLock();
         instance.stdout.removeListener('data', handleStdout);
         if (!didResolve) {
