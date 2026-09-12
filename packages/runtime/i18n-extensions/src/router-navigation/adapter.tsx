@@ -323,7 +323,14 @@ export const createI18nRouterNavigation = <
     // `changeLanguage()` a `navigate` that can only throw, instead of letting it
     // fall back to a full-page load.
     const slotRouter = getRouterInstance(internalContext, contextRouter);
-    const hasRouter = Boolean(reactRouterNavigate) || Boolean(slotRouter);
+    // A slot instance counts only when `navigate` below can drive it: a named
+    // framework this adapter implements, with a navigate function. An unknown
+    // provider's instance would otherwise hand `changeLanguage()` a navigate
+    // that goes nowhere instead of the routerless full-page fallback.
+    const drivableSlotRouter =
+      (framework === 'tanstack' || framework === 'react-router') &&
+      typeof slotRouter?.navigate === 'function';
+    const hasRouter = Boolean(reactRouterNavigate) || drivableSlotRouter;
 
     const subscribeToRouter = useCallback(
       (update: () => void) => {
