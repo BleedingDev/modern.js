@@ -13,7 +13,9 @@ export type WatchEvent = 'add' | 'change' | 'unlink';
 export const defaultWatchOptions = {
   // 初始化的时候不触发 add、addDir 事件
   ignoreInitial: true,
-  ignored: /api\/typings\/.*/,
+  // Shared workspace symlinks must not pull installed dependency trees into
+  // the watcher and schedule runtime reloads for their file events.
+  ignored: /api\/typings\/.*|(?:^|[/\\])node_modules(?:[/\\]|$)/,
 };
 
 export const getWatchedFiles = (watcher: FSWatcher) => {
