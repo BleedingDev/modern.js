@@ -69,7 +69,9 @@ describe('release cohort projection parity', () => {
         writeWorkspace(workspaceRoot, projection());
       },
       roots => {
-        expect(checkReleaseCohortParity(roots)).toBeUndefined();
+        expect(
+          checkReleaseCohortParity({ ...roots, requireTemplate: true }),
+        ).toBeUndefined();
       },
     );
   });
@@ -88,7 +90,10 @@ describe('release cohort projection parity', () => {
         );
       },
       roots => {
-        const problem = checkReleaseCohortParity(roots);
+        const problem = checkReleaseCohortParity({
+          ...roots,
+          requireTemplate: true,
+        });
         expect(problem?.differences).toEqual(['source.commit']);
         expect(problem?.message).toContain('differs at source.commit');
         expect(problem?.message).toContain(
@@ -106,13 +111,75 @@ describe('release cohort projection parity', () => {
     );
   });
 
-  test('a source checkout without a template projection judges nothing', () => {
+  test('a local-source workspace without a template projection judges nothing', () => {
     withRoots(
       ({ workspaceRoot }) => {
         writeWorkspace(workspaceRoot, projection());
       },
       roots => {
-        expect(checkReleaseCohortParity(roots)).toBeUndefined();
+        expect(
+          checkReleaseCohortParity({ ...roots, requireTemplate: false }),
+        ).toBeUndefined();
+      },
+    );
+  });
+
+  test('an installed cohort whose projection is missing or unreadable fails closed', () => {
+    // The gate authenticates provenance; a template it cannot read must not
+    // silently disable it.
+    withRoots(
+      ({ workspaceRoot }) => {
+        writeWorkspace(workspaceRoot, projection());
+      },
+      roots => {
+        const problem = checkReleaseCohortParity({
+          ...roots,
+          requireTemplate: true,
+        });
+        expect(problem?.message).toContain(
+          'ships no release cohort projection',
+        );
+        expect(problem?.message).toContain('Reinstall the published cohort');
+      },
+    );
+    withRoots(
+      ({ workspaceRoot, createPackageRoot }) => {
+        fs.writeFileSync(
+          path.join(
+            createPackageRoot,
+            'template-workspace',
+            '.modernjs',
+            'release-cohort.json',
+          ),
+          '{ not json',
+        );
+        writeWorkspace(workspaceRoot, projection());
+      },
+      roots => {
+        expect(
+          checkReleaseCohortParity({ ...roots, requireTemplate: true })
+            ?.message,
+        ).toContain('ships an unreadable release cohort projection');
+      },
+    );
+  });
+
+  test('an unreadable workspace projection is reported as different', () => {
+    withRoots(
+      ({ workspaceRoot, createPackageRoot }) => {
+        writeTemplate(createPackageRoot, projection());
+        fs.writeFileSync(
+          path.join(workspaceRoot, '.modernjs', 'release-cohort.json'),
+          '{ not json',
+        );
+      },
+      roots => {
+        const problem = checkReleaseCohortParity({
+          ...roots,
+          requireTemplate: true,
+        });
+        expect(problem?.differences.length).toBeGreaterThan(0);
+        expect(problem?.message).toContain('Replace it with');
       },
     );
   });
