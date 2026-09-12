@@ -122,6 +122,11 @@ function isIgnorableWindowsTaskkillError(error: unknown) {
 
 function createFederatedEnv(ports: FederatedPorts) {
   return {
+    // TEMPORARY CI DIAGNOSTIC - remove before merge: every node process in
+    // the fixture tree writes a diagnostic report (with its JS stack) when it
+    // receives SIGUSR2, so the monitor below can show what a dev server that
+    // sits at 100% CPU is actually executing.
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --report-on-signal --report-signal=SIGUSR2 --report-directory=/tmp/mf-diag-reports`.trim(),
     MF_REMOTE_PORT: String(ports.remote),
     MF_REMOTE_TWO_PORT: String(ports.remoteTwo),
     MF_HOST_PORT: String(ports.host),
@@ -805,12 +810,45 @@ describe('routes-tanstack-mf', () => {
     // process in the fixture tree every 15s, so the run says whether a
     // producer's dts worker (fork-generate-dts / fork-dev-worker) is alive,
     // stuck, or gone while the host waits for its types.
+    let ticks = 0;
     const monitor = setInterval(() => {
       void (async () => {
         const stamp = new Date().toISOString();
+        ticks += 1;
         await logFederationReachability(ports.remote, ports.remoteTwo);
         try {
           const { execFileSync } = await import('node:child_process');
+          // On the 3rd and 8th tick (~45s, ~120s into the host wait) ask every
+          // fixture dev server for a diagnostic report and print its JS stack.
+          if (ticks === 3 || ticks === 8) {
+            const nodeFs = await import('node:fs');
+            try {
+              execFileSync('pkill', ['-USR2', '-f', 'app-tools.*dev'], {
+                encoding: 'utf8',
+              });
+            } catch {}
+            await new Promise(resolve => setTimeout(resolve, 4000));
+            try {
+              const reportDir = '/tmp/mf-diag-reports';
+              for (const file of nodeFs.readdirSync(reportDir)) {
+                const report = JSON.parse(
+                  nodeFs.readFileSync(`${reportDir}/${file}`, 'utf8'),
+                );
+                const stack = (report.javascriptStack?.stack ?? []).slice(
+                  0,
+                  30,
+                );
+                console.log(
+                  `[mf-diagnostic report ${stamp}] pid=${report.header?.processId} cwd=${report.header?.cwd} cpu=${report.resourceUsage?.cpuConsumptionPercent}\n  ${report.javascriptStack?.message}\n  ${stack.join('\n  ')}`,
+                );
+                nodeFs.rmSync(`${reportDir}/${file}`, { force: true });
+              }
+            } catch (error) {
+              console.log(
+                `[mf-diagnostic report ${stamp}] no reports: ${String(error)}`,
+              );
+            }
+          }
           const ps = execFileSync(
             'ps',
             ['-eo', 'pid,ppid,stat,etime,pcpu,rss,args'],
