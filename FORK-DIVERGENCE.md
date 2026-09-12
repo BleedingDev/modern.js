@@ -1365,6 +1365,21 @@ tsgo lane, so the shim and its fix have no upstream home.
 | --- | --- | --- | --- |
 | `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | Pin `rootDir` to the project directory when the resolved config is `composite` and declares none, and resolve path-valued options to absolute while merging the `extends` chain, so relocating the checker config cannot re-anchor them on the generated directory. | `extension-point` |
 | `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pin the composite-vertical layout (sources under `src/` and `api/`) against TS6059, that an explicit relative `rootDir` still resolves against the project, and that a non-composite project keeps TypeScript's own inference. | `extension-point` |
+
+### Native type-checker project references (2026-09-12)
+
+`references` is the one top-level tsconfig property TypeScript never inherits
+through `extends`, so the generated checker config dropped every project
+reference. A referenced sibling stopped being a project boundary: its sources
+were compiled inside this app's program and checked against this app's globals
+(the TanStack `Register` route tree), which failed the Tractor `decide` build on
+`checkout`'s typed links during the 3.9.0-ultramodern.9 rehearsal. Upstream has
+no tsgo lane, so the fix has no upstream home.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | Restate the project's own `references` in the generated checker config, each path resolved against the config that declares it, so the checker keeps the project graph the project's tsconfig describes. | `extension-point` |
+| `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pin that declared references are restated with project-anchored absolute paths and that a project without references gets none. | `extension-point` |
 ### Default-on mapped locale URLs (2026-09-12)
 
 Localised route generation and the client URL policy reached only consumers of

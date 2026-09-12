@@ -174,6 +174,65 @@ describe('withTsgoDefaults', () => {
     expect('rootDir' in generated.compilerOptions).toBe(false);
   });
 
+  test('restates project references so a referenced sibling stays a project boundary', () => {
+    // `references` is the one top-level property TypeScript does not inherit
+    // through `extends`. Dropping it pulls a referenced sibling's sources into
+    // this program and checks them against this program's globals, instead of
+    // redirecting to the sibling's own declarations.
+    const appDirectory = createVerticalApp({ composite: true });
+    writeFileSync(
+      path.join(appDirectory, 'tsconfig.json'),
+      `${JSON.stringify(
+        {
+          compilerOptions: { composite: true },
+          include: ['src', 'api'],
+          references: [
+            { path: '../checkout' },
+            { path: '../../packages/shared' },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const config = applyChain(
+      withTsgoDefaults(
+        { typescript: { configFile: 'tsconfig.json' } },
+        appDirectory,
+      ),
+    );
+    const generated = readGeneratedCheckerConfig(appDirectory, config) as {
+      references?: Array<{ path: string }>;
+    };
+
+    // Resolved against the project config, not the generated directory.
+    expect(generated.references).toEqual([
+      {
+        path: path
+          .resolve(appDirectory, '../checkout')
+          .replaceAll(path.sep, '/'),
+      },
+      {
+        path: path
+          .resolve(appDirectory, '../../packages/shared')
+          .replaceAll(path.sep, '/'),
+      },
+    ]);
+  });
+
+  test('omits references when the project declares none', () => {
+    const appDirectory = createVerticalApp({ composite: true });
+    const config = applyChain(
+      withTsgoDefaults(
+        { typescript: { configFile: 'tsconfig.json' } },
+        appDirectory,
+      ),
+    );
+    const generated = readGeneratedCheckerConfig(appDirectory, config);
+
+    expect('references' in generated).toBe(false);
+  });
+
   test('opting out of tsgo hands the classic checker the untouched config', () => {
     const config = applyChain(
       withTsgoDefaults({ typescript: { tsgo: false } }, process.cwd()),

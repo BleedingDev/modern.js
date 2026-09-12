@@ -8,9 +8,11 @@ import type { PluginTypeCheckerOptions } from '@rsbuild/plugin-type-check';
 type TsCheckerChain = NonNullable<PluginTypeCheckerOptions['tsCheckerOptions']>;
 type TsCheckerFn = Extract<TsCheckerChain, (config: never) => unknown>;
 export type TsCheckerOptions = Parameters<TsCheckerFn>[0];
+type TsConfigProjectReference = { path: string } & Record<string, unknown>;
 type TsConfigJson = {
   extends?: string | string[];
   compilerOptions?: Record<string, any>;
+  references?: TsConfigProjectReference[];
 };
 
 const builderRequire = createRequire(import.meta.url);
@@ -180,6 +182,42 @@ const readTsConfig = (
   };
 };
 
+/**
+ * Project references are the one top-level tsconfig property TypeScript never
+ * inherits through `extends`, so the generated checker config has to restate
+ * them. They come from the project's own config only (a base config's
+ * references would not apply to the project either), with each path resolved
+ * against the config that declares it.
+ *
+ * Without them a referenced sibling project stops being a project boundary:
+ * its sources are pulled into this program and type-checked against this
+ * program's globals (TanStack's `Register` route tree, for example) instead of
+ * being redirected to the sibling's own declarations.
+ */
+const readProjectReferences = (
+  configFile: string,
+): TsConfigProjectReference[] => {
+  if (!fs.existsSync(configFile)) {
+    return [];
+  }
+  const config = json5.parse(
+    fs.readFileSync(configFile, 'utf8'),
+  ) as TsConfigJson;
+  if (!Array.isArray(config.references)) {
+    return [];
+  }
+  const configDirectory = path.dirname(configFile);
+  return config.references
+    .filter(
+      (reference): reference is TsConfigProjectReference =>
+        typeof reference?.path === 'string',
+    )
+    .map(reference => ({
+      ...reference,
+      path: toPosixPath(path.resolve(configDirectory, reference.path)),
+    }));
+};
+
 const toRelativeConfigPath = (fromDirectory: string, target: string) => {
   const relative = toPosixPath(path.relative(fromDirectory, target));
   if (relative.startsWith('.')) {
@@ -228,9 +266,11 @@ const createTsgoCheckerConfig = (configFile: string): string => {
     compilerOptions.moduleResolution = null;
   }
 
+  const references = readProjectReferences(configFile);
   const checkerConfig = {
     extends: toRelativeConfigPath(checkerConfigDirectory, configFile),
     compilerOptions,
+    ...(references.length > 0 ? { references } : {}),
   };
 
   fs.mkdirSync(checkerConfigDirectory, { recursive: true });
