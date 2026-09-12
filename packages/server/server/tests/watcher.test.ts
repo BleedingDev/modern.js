@@ -119,6 +119,57 @@ describe('watcher', () => {
   //   setTimeout(() => writeFiles('end', filepath), 100);
   // });
 
+  test('watches symlinked shared source without traversing its installed dependencies', async () => {
+    const root = path.join(serverDir, 'linked-shared');
+    const shared = path.join(root, 'shared');
+    const source = path.join(root, 'workspace-package');
+    const dependencies = path.join(root, 'installed');
+    fs.ensureDirSync(shared);
+    fs.ensureDirSync(source);
+    fs.ensureDirSync(dependencies);
+    fs.writeFileSync(path.join(source, 'index.ts'), 'export const value = 1;');
+    fs.writeFileSync(
+      path.join(dependencies, 'dependency.js'),
+      'module.exports = 1;',
+    );
+    fs.symlinkSync(source, path.join(shared, 'effect'), 'junction');
+    fs.symlinkSync(dependencies, path.join(source, 'node_modules'), 'junction');
+    const watcher = new Watcher();
+    const events: string[] = [];
+    let sourceChanged!: () => void;
+    const changed = new Promise<void>(resolve => {
+      sourceChanged = resolve;
+    });
+    watcher.listen([`${shared}/**/*`], mergeWatchOptions({}), file => {
+      events.push(file);
+      if (file === path.join(shared, 'effect/index.ts')) sourceChanged();
+    });
+    try {
+      await new Promise<void>(resolve =>
+        (watcher as any).watcher.once('ready', resolve),
+      );
+      fs.writeFileSync(
+        path.join(dependencies, 'dependency.js'),
+        'module.exports = 2;',
+      );
+      fs.writeFileSync(
+        path.join(source, 'index.ts'),
+        'export const value = 2;',
+      );
+      await changed;
+      expect(
+        getWatchedFiles((watcher as any).watcher).filter(file =>
+          file.includes('node_modules'),
+        ),
+      ).toEqual([]);
+      expect(events).toContain(path.join(shared, 'effect/index.ts'));
+      expect(events.filter(file => file.includes('node_modules'))).toEqual([]);
+    } finally {
+      await watcher.close();
+      fs.removeSync(root);
+    }
+  });
+
   test('should not emit change when typings file changed', async () => {
     const watcher = new Watcher();
     const apiDir = path.normalize(path.join(pwd, './api'));

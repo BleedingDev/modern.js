@@ -35,12 +35,13 @@ every PR.
 
 ### 2026-09-12 dev watcher CPU starvation
 
-Linux V8 profiles in run 34708962442 show every federation fixture server spending its main-thread CPU rebuilding dependency trees and recompiling minimatch ignore patterns. Reuse compiled patterns and use the already-filtered tree to resolve edges; no watch targets, cache-invalidation rules or readiness timeouts change.
+Linux V8 profiles in run 34708962442 show every federation fixture server spending its main-thread CPU rebuilding dependency trees and recompiling minimatch ignore patterns. Reuse compiled patterns and use the already-filtered tree to resolve edges. Follow-up run 34710562468 identifies thousands of events under shared/effect/node_modules reached through workspace symlinks (up to 5528 events and 56.5 seconds in watcher callbacks). Exclude installed dependency subtrees at the watcher boundary while retaining symlinked shared source watching; cache-invalidation rules and readiness timeouts remain unchanged.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
 | `packages/server/server/src/dev-tools/watcher/dependencyTree.ts` | bleedingdev | Compile fixed ignore patterns once per tree and avoid matching parent/child filenames already filtered during node insertion, preventing synchronous dependency rebuilds from starving dev-server HTTP. | `inline-patch` |
-| `packages/server/server/tests/watcher.test.ts` | bleedingdev | Verify shared parents, cycles, ignored generated/dependency modules and stale-node removal under the optimized dependency rebuild. | `inline-patch` |
+| `packages/server/server/src/dev-tools/watcher/index.ts` | bleedingdev | Do not traverse nested node_modules under watched shared workspace symlinks or schedule runtime reloads for installed dependency events. | `inline-patch` |
+| `packages/server/server/tests/watcher.test.ts` | bleedingdev | Verify linked shared source edits still fire while installed dependencies are not watched, plus shared parents, cycles, ignored modules and stale-node removal under the optimized graph rebuild. | `inline-patch` |
 
 ### 2026-09-11 adoption defects found in a consumer
 
