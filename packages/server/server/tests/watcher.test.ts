@@ -5,6 +5,7 @@ import Watcher, {
   getWatchedFiles,
   mergeWatchOptions,
 } from '../src/dev-tools/watcher';
+import { DependencyTree } from '../src/dev-tools/watcher/dependencyTree';
 import { StatsCache } from '../src/dev-tools/watcher/statsCache';
 
 rstest.useRealTimers();
@@ -285,4 +286,60 @@ describe('test watcher', () => {
       useFsEvents: false,
     });
   });
+});
+
+test('dependency tree preserves shared parents and cycles while excluding generated and installed modules', () => {
+  const root = process.cwd();
+  const node = (file: string) =>
+    ({
+      filename: path.join(root, file),
+      children: [],
+    }) as unknown as NodeModule;
+  const first = node('server/first.js');
+  const second = node('server/second.js');
+  const shared = node('server/shared.js');
+  const ignored = [
+    node('node_modules/pkg/index.js'),
+    node('server/.generated/index.js'),
+    node('server/types.d.ts'),
+    node('coverage/index.js'),
+    node('server/output.log'),
+  ];
+  first.children = [shared, ...ignored];
+  second.children = [shared];
+  shared.children = [first];
+  shared.parent = first;
+  const cache = Object.fromEntries(
+    [first, second, shared, ...ignored].map(module => [
+      module.filename,
+      module,
+    ]),
+  );
+  const tree = new DependencyTree();
+  tree.update(cache);
+  expect(
+    [...tree.getNode(shared.filename)!.parent]
+      .map(node => node.module.filename)
+      .sort(),
+  ).toEqual([first.filename, second.filename].sort());
+  expect(
+    [...tree.getNode(first.filename)!.children].map(
+      node => node.module.filename,
+    ),
+  ).toEqual([shared.filename]);
+  expect(
+    [...tree.getNode(shared.filename)!.children].map(
+      node => node.module.filename,
+    ),
+  ).toEqual([first.filename]);
+  for (const module of ignored)
+    expect(tree.getNode(module.filename)).toBeUndefined();
+  delete cache[second.filename];
+  tree.update(cache);
+  expect(tree.getNode(second.filename)).toBeUndefined();
+  expect(
+    [...tree.getNode(shared.filename)!.parent].map(
+      node => node.module.filename,
+    ),
+  ).toEqual([first.filename]);
 });
