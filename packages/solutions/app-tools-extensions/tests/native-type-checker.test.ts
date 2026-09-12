@@ -93,6 +93,113 @@ test('ordinary project checks emit nothing and surface compiler startup failures
   }
 });
 
+test('the rspack plugin regenerates a generated checker config from the project tsconfig before each check', async () => {
+  // The builder writes the checker config to `<app>/.modern-js/tsgo/` once.
+  // `references` cannot be inherited through `extends`, so a reference added
+  // to the project tsconfig while `modern dev` runs must be restated on the
+  // next compilation, and the project tsconfig must be a watched input.
+  const root = fs.realpathSync.native(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'native-plugin-refresh-')),
+  );
+  const compilerOptions = {
+    composite: true,
+    declaration: true,
+    emitDeclarationOnly: true,
+    noEmit: false,
+    types: [],
+  };
+  const write = (relative: string, value: string) => {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, value);
+  };
+  write('lib/index.ts', 'export interface Value { name: string }');
+  write(
+    'lib/tsconfig.json',
+    JSON.stringify({ compilerOptions, files: ['index.ts'] }),
+  );
+  write(
+    'app/index.ts',
+    "import type { Value } from '../lib'; export const item: Value = { name: 'ok' };",
+  );
+  // The project tsconfig as it is when the builder configures the checker: no reference yet.
+  write(
+    'app/tsconfig.json',
+    JSON.stringify({ compilerOptions, files: ['index.ts'] }),
+  );
+  // The generated checker config, exactly as `withTsgoDefaults` writes it.
+  write(
+    'app/.modern-js/tsgo/tsconfig.abc.json',
+    JSON.stringify({
+      extends: '../../tsconfig.json',
+      compilerOptions: { baseUrl: null, rootDir: path.join(root, 'app') },
+    }),
+  );
+  // The developer then adds the reference while the dev server is running.
+  write(
+    'app/tsconfig.json',
+    JSON.stringify({
+      compilerOptions,
+      files: ['index.ts'],
+      references: [{ path: '../lib' }],
+    }),
+  );
+  const generated = path.join(root, 'app/.modern-js/tsgo/tsconfig.abc.json');
+  // The referenced project is built, as a workspace typecheck step does before
+  // `modern build`; with the reference restated, `app` resolves `lib` through
+  // its declarations instead of compiling `lib`'s source inside its own program.
+  await new UltramodernNativeTypeChecker({
+    build: true,
+    compiler: () => compiler,
+    configFile: path.join(root, 'lib/tsconfig.json'),
+  }).check();
+  const build = rspack({
+    context: root,
+    mode: 'development',
+    devtool: false,
+    entry: './app/index.ts',
+    output: { path: path.join(root, 'dist') },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          loader: 'builtin:swc-loader',
+          options: { jsc: { parser: { syntax: 'typescript' } } },
+        },
+      ],
+    },
+    plugins: [
+      new UltramodernNativeTypeChecker({
+        build: false,
+        configFile: generated,
+        compiler: () => compiler,
+      }),
+    ],
+  });
+  try {
+    const stats = await new Promise<any>((resolve, reject) =>
+      build.run((error, result) => (error ? reject(error) : resolve(result))),
+    );
+    expect(stats.toString({ all: false, errors: true })).not.toContain('error');
+    const refreshed = JSON.parse(fs.readFileSync(generated, 'utf8')) as {
+      references?: Array<{ path: string }>;
+    };
+    expect(refreshed.references).toEqual([
+      { path: path.join(root, 'lib').replaceAll(path.sep, '/') },
+    ]);
+    expect(
+      stats.compilation.fileDependencies.has(
+        path.join(root, 'app/tsconfig.json'),
+      ),
+    ).toBe(true);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      build.close(error => (error ? reject(error) : resolve())),
+    );
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}, 30000);
+
 test('the rspack plugin reports type errors as build errors and registers referenced type-only inputs', async () => {
   const root = fs.realpathSync.native(
     fs.mkdtempSync(path.join(os.tmpdir(), 'native-plugin-check-')),

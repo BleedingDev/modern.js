@@ -25,3 +25,8 @@ UltramodernNativeTypeChecker failed:
 The generated config now carries the project's own `references`, each path
 resolved against the config that declares it, so the checker sees the same
 project graph the project's tsconfig describes.
+
+The native checker also regenerates the config from the project's tsconfig
+before every run and watches that tsconfig, so a reference added, removed or
+retargeted during `modern dev` reaches the next compilation instead of the next
+restart.

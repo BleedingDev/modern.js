@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { refreshTsgoCheckerConfig } from '@modern-js/builder';
 import type { Rspack, RspackChain } from '@rsbuild/core';
 
 const execute = promisify(execFile);
@@ -81,6 +82,19 @@ export class UltramodernNativeTypeChecker {
           compilation.fileDependencies.add(
             watchDependencyPath(this.options.configFile),
           );
+          // A generated checker config restates values TypeScript does not
+          // inherit through `extends` (project references above all). Rebuild
+          // it from the project's own tsconfig before every check, and watch
+          // that tsconfig, so an edit during `modern dev` reaches the next
+          // compilation instead of the next restart.
+          const projectConfigFile = refreshTsgoCheckerConfig(
+            this.options.configFile,
+          );
+          if (projectConfigFile) {
+            compilation.fileDependencies.add(
+              watchDependencyPath(projectConfigFile),
+            );
+          }
           for (const file of await this.watchInputs())
             compilation.fileDependencies.add(watchDependencyPath(file));
           await this.check();

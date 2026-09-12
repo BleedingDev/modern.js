@@ -1378,8 +1378,9 @@ no tsgo lane, so the fix has no upstream home.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | Restate the project's own `references` in the generated checker config, each path resolved against the config that declares it, so the checker keeps the project graph the project's tsconfig describes. | `extension-point` |
-| `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pin that declared references are restated with project-anchored absolute paths and that a project without references gets none. | `extension-point` |
+| `packages/cli/builder/src/shared/tsgo.ts` | bleedingdev | Restate the project's own `references` in the generated checker config, each path resolved against the config that declares it, so the checker keeps the project graph the project's tsconfig describes. Expose `refreshTsgoCheckerConfig` so the native checker can regenerate the file from the project tsconfig before every run, keeping restated values current during `modern dev`. | `extension-point` |
+| `packages/cli/builder/src/index.ts` | bleedingdev | Export `refreshTsgoCheckerConfig` for `@modern-js/app-tools-extensions`' native checker. | `extension-point` |
+| `packages/cli/builder/tests/tsgo.test.ts` | bleedingdev | Pin that declared references are restated with project-anchored absolute paths, that a project without references gets none, and that a refresh picks up a reference added to the project tsconfig after generation. | `extension-point` |
 ### Default-on mapped locale URLs (2026-09-12)
 
 Localised route generation and the client URL policy reached only consumers of

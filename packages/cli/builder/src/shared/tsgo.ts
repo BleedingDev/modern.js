@@ -233,14 +233,21 @@ const writeFileIfChanged = (file: string, content: string) => {
   fs.writeFileSync(file, content);
 };
 
-const createTsgoCheckerConfig = (configFile: string): string => {
-  const configDirectory = path.dirname(configFile);
-  const checkerConfigDirectory = path.join(configDirectory, TSGO_CHECKER_DIR);
+const defaultTsgoCheckerConfigFile = (configFile: string): string => {
   const hash = createHash('sha1').update(configFile).digest('hex').slice(0, 10);
-  const checkerConfigFile = path.join(
-    checkerConfigDirectory,
+  return path.join(
+    path.dirname(configFile),
+    TSGO_CHECKER_DIR,
     `tsconfig.${hash}.json`,
   );
+};
+
+const createTsgoCheckerConfig = (
+  configFile: string,
+  checkerConfigFile: string = defaultTsgoCheckerConfigFile(configFile),
+): string => {
+  const configDirectory = path.dirname(configFile);
+  const checkerConfigDirectory = path.dirname(checkerConfigFile);
   const tsConfig = readTsConfig(configFile);
   const compilerOptions: Record<string, unknown> = {
     baseUrl: null,
@@ -280,6 +287,48 @@ const createTsgoCheckerConfig = (configFile: string): string => {
   );
 
   return checkerConfigFile;
+};
+
+/**
+ * Regenerate a checker config from the project config it `extends`.
+ *
+ * The generated file is written once, at builder configuration; everything it
+ * inherits through `extends` is read fresh by the compiler on every check, but
+ * the values it has to restate (`references`, the pinned `rootDir`, the
+ * `moduleResolution` override) would otherwise stay frozen for the life of a
+ * `modern dev` session. The checker calls this before each run so an edit to
+ * the project's tsconfig - adding, removing or retargeting a project reference -
+ * takes effect on the next compilation instead of the next restart.
+ *
+ * Returns the project config the checker config was derived from, so the caller
+ * can watch it; `undefined` when the file is not a generated checker config.
+ */
+export const refreshTsgoCheckerConfig = (
+  checkerConfigFile: string,
+): string | undefined => {
+  const checkerConfigDirectory = path.dirname(checkerConfigFile);
+  if (
+    path.basename(checkerConfigDirectory) !== 'tsgo' ||
+    path.basename(path.dirname(checkerConfigDirectory)) !== '.modern-js' ||
+    !fs.existsSync(checkerConfigFile)
+  ) {
+    return undefined;
+  }
+  const checkerConfig = json5.parse(
+    fs.readFileSync(checkerConfigFile, 'utf8'),
+  ) as TsConfigJson;
+  if (typeof checkerConfig.extends !== 'string') {
+    return undefined;
+  }
+  const projectConfigFile = path.resolve(
+    checkerConfigDirectory,
+    checkerConfig.extends,
+  );
+  if (!fs.existsSync(projectConfigFile)) {
+    return undefined;
+  }
+  createTsgoCheckerConfig(projectConfigFile, checkerConfigFile);
+  return projectConfigFile;
 };
 
 const normalizeTsgoConfig = (config: TsCheckerOptions, rootPath: string) => {
