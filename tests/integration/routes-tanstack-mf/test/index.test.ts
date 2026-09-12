@@ -20,20 +20,36 @@ import { ensurePluginDataLoaderRuntimeBuilt } from './pluginDataLoaderRuntime';
 setSuiteTimeout(1000 * 60 * 8);
 
 async function waitForAppReady(url: string, maxRetries = 60) {
+  let lastStatus: number | undefined;
   for (let i = 0; i < maxRetries; i++) {
     try {
       const res = await fetch(url, {
         method: 'HEAD',
         signal: AbortSignal.timeout(2000),
       });
-      if (res.ok || res.status < 500) {
+      lastStatus = res.status;
+      // A dev server starts answering long before it has emitted the artifact
+      // being asked for: the Module Federation manifest is written at the end
+      // of the first compile, and until then the same port returns 404. The
+      // old check accepted anything under 500, so a remote counted as ready
+      // while its manifest was still missing, and the host was started against
+      // remotes it could not resolve - which is how the host ends up compiling
+      // with no output at all and the hook dies on the suite timeout with
+      // nothing to read. Ready means this URL is actually serving.
+      if (res.ok || (res.status >= 300 && res.status < 400)) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         return;
       }
-    } catch {}
+    } catch {
+      lastStatus = undefined;
+    }
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
-  throw new Error(`App did not become ready: ${url}`);
+  throw new Error(
+    `App did not become ready: ${url} (last status: ${
+      lastStatus === undefined ? 'no response' : lastStatus
+    })`,
+  );
 }
 
 const remoteDir = path.resolve(__dirname, '../mf-remote');

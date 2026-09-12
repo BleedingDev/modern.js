@@ -407,11 +407,27 @@ const createTanstackLinkProps = (target: I18nRouterLinkTarget) => {
   };
 };
 
-/** Supplies the actual selected router; native links still render its Link. */
+/**
+ * Supplies the actual selected router; native links still render its Link.
+ *
+ * This provider sits above the app, so it sits above the router element too.
+ * That is fine for a router this adapter reaches through the fork-owned
+ * runtime-state slot - TanStack hands out its instance, not a React context -
+ * but react-router publishes its location and navigate through context that
+ * only exists *below* the router. Reading it from up here yields an inert
+ * adapter, and publishing that would shadow the native one a consumer resolves
+ * at its own position, which is where the context is live. So only take over
+ * for the router that needs it; leaving the value null makes
+ * `useI18nRouterAdapter` fall back to the native adapter, evaluated in the
+ * consumer, exactly as it did before this provider existed.
+ */
 export const I18nRouterNavigationProvider = ({
   children,
 }: React.PropsWithChildren) => {
   const value = useIntegratedRouterAdapter();
+  if (value.framework !== 'tanstack') {
+    return <>{children}</>;
+  }
   return (
     <I18nNavigationProvider value={value}>{children}</I18nNavigationProvider>
   );
