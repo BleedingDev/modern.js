@@ -74,11 +74,15 @@ export const createUltramodernReleaseEnvelopePlugin = <
     ],
     post: ['@modern-js/plugin-deploy'],
     setup(api) {
-      const emitBuildEnvelope = async (target: 'node' | 'cloudflare') => {
+      const emitBuildEnvelope = async (
+        target: 'node' | 'cloudflare',
+        requirePromotable = true,
+      ) => {
         const { apiOnly, distDirectory } = api.getAppContext();
         await emitFrameworkMicroVerticalReleaseEnvelope({
           apiOnly,
           distDirectory,
+          requirePromotable,
           target,
         });
       };
@@ -88,7 +92,11 @@ export const createUltramodernReleaseEnvelopePlugin = <
         if (configuredTarget !== 'node' && configuredTarget !== 'cloudflare') {
           return;
         }
-        await emitBuildEnvelope(configuredTarget);
+        // A plain `modern build` is the development path: a dirty or non-Git
+        // checkout resolves to the `workspace` source revision, which is not
+        // promotable but must still build. Deploy re-emits the envelope and
+        // verifies it, so the release gate keeps its teeth there.
+        await emitBuildEnvelope(configuredTarget, false);
       });
 
       api.onBeforeDeploy(async () => {

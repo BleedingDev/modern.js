@@ -7,6 +7,7 @@ import type {
 } from '../shared/type';
 import { asI18nUrlStrategy, type I18nUrlStrategy } from '../shared/urlStrategy';
 import type { I18nInitOptions, I18nInstance } from './i18n';
+import { I18nRouterNavigationProvider } from './navigation';
 import {
   type RuntimeContextWithI18n,
   setupI18nBeforeRender,
@@ -32,6 +33,10 @@ export type {
   Resources,
   TranslateFn,
 } from './i18n/instance';
+export {
+  I18nRouterNavigationProvider,
+  useIntegratedRouterAdapter,
+} from './navigation';
 export type {
   LoadReactI18nextIntegration,
   ReactI18nextIntegration,
@@ -137,7 +142,13 @@ export const createI18nPlugin =
           fallbackLanguage,
           ignoreRedirectRoutes,
           urlStrategy: resolvedUrlStrategy,
-          NavigationProvider,
+          // The selected router, not react-router, is what a localized `<Link>`
+          // has to navigate through, and the i18n language has to follow a
+          // client-side navigation to a mapped URL. Both need the actual router
+          // instance, so a bare `appTools()` consumer gets the integrated
+          // adapter by default; a composing runtime plugin can still replace it.
+          NavigationProvider:
+            NavigationProvider ?? I18nRouterNavigationProvider,
           LanguageSynchronization,
           getLatestI18nInstance: () => latestI18nInstance,
           getI18nextProvider: () => I18nextProvider,

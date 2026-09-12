@@ -1428,3 +1428,34 @@ upstream home.
 | `packages/runtime/plugin-i18n/tests/mappedUrlStrategyDerivation.test.ts` | bleedingdev | Pins the derived client policy: mapped, parameterised and unmapped pathnames, and that no policy is derived without a usable map. | `extension-point` |
 | `packages/runtime/plugin-i18n/tests/localisedUrls.test.ts` | bleedingdev | The route hook is registered unconditionally now, so the case that asserted it was never registered asserts the behaviour instead: a config with no map gets its routes back unchanged. | `inline-patch` |
 | `packages/runtime/plugin-i18n/rstest.config.mts` | bleedingdev | Register the two new test files. The project lists its test files explicitly, so a new file cannot be picked up any other way. | `inline-patch` |
+### Router-aware i18n navigation for bare consumers (2026-09-12)
+
+`useNativeI18nRouterAdapter` only knows react-router's own hooks, so a bare
+`appTools() + i18nPlugin()` app running the TanStack router fell back to plain
+`<a>` elements and a non-reactive `window.location`: localised `<Link>`s
+rendered unmapped hrefs, a click left the document through a full reload, and
+active state compared raw pathnames so the same page was active in one language
+and not in another. The selected-router adapter existed, but only inside
+`@modern-js/i18n-integration`, which is reachable only through
+`ultramodernAppTools()`.
+
+The adapter now lives in `@modern-js/plugin-i18n` and is the default
+`NavigationProvider`. It reads the active router out of the fork-owned router
+runtime-state slot, so it serves both routers without either plugin knowing
+about i18n. Registering it from `plugin-i18n` rather than `i18n-integration` is
+what keeps the Nx graph acyclic: `i18n-integration` peer-depends on
+`@modern-js/runtime`, so reaching it from the default app-tools path would close
+`app-tools -> app-tools-extensions -> i18n-integration -> runtime -> app-tools`,
+while `@modern-js/runtime-extensions` carries no such edge.
+`@modern-js/i18n-integration` re-exports the module, so its entry point is
+unchanged and a composing runtime plugin can still supply its own provider.
+Upstream has no localised-URL feature and no router-agnostic i18n navigation
+seam, so none of this has an upstream home.
+
+| Audited-base-owned path | Owner | Reason | Disposition |
+| --- | --- | --- | --- |
+| `packages/runtime/plugin-i18n/src/runtime/navigation.tsx` | bleedingdev | The selected-router navigation adapter. Resolves the active router from the fork-owned router runtime-state slot, subscribes to its location store so active state and language follow a client-side navigation, and maps a localised target onto the router's own `Link` props. Kept out of `i18n-integration` because reaching that package from the default runtime path closes the Nx cycle described above. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/runtime/core.tsx` | bleedingdev | Default `NavigationProvider` to the selected-router adapter so a bare `appTools()` consumer gets router-aware localised links, and re-export the adapter. A provider supplied by a composing runtime plugin still wins. | `inline-patch` |
+| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Depend on `@modern-js/runtime-extensions` for the router runtime-state slot the adapter reads. This is the edge that lets the adapter live here rather than in `i18n-integration`; it adds no cycle because `runtime-extensions` does not depend back on the runtime entry. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/navigation.test.tsx` | bleedingdev | Pins the bare-consumer contract with only `plugin-i18n` registered: the localised `<Link>` renders through the selected router's `Link` with the mapped href, active state is language-invariant across mapped spellings, and the language follows a client-side navigation to a mapped URL. | `extension-point` |
+| `packages/runtime/plugin-i18n/rstest.config.mts` | bleedingdev | Register the new test file. The project lists its test files explicitly, so a new file cannot be picked up any other way. | `inline-patch` |

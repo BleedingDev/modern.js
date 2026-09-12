@@ -76,6 +76,54 @@ afterEach(async () => {
   );
 });
 
+describe('workspace source revision', () => {
+  const framework = sourceFramework;
+
+  async function workspaceFixture() {
+    const f = await fixture(framework);
+    const workspaceUnit = { ...deliveryUnit, sourceRevision: 'workspace' };
+    await f.json(
+      'ultramodern-build.json',
+      createUltramodernBuildArtifact(workspaceUnit),
+    );
+    await f.json('backend-mf-manifest.json', {
+      backendFederation: {
+        deliveryUnit: workspaceUnit,
+        versionBoundary: { deliveryUnit: workspaceUnit },
+      },
+    });
+    return f;
+  }
+
+  test('a plain build emits no envelope instead of failing', async () => {
+    const f = await workspaceFixture();
+    await expect(
+      framework.emitFrameworkMicroVerticalReleaseEnvelope({
+        apiOnly: false,
+        distDirectory: f.root,
+        requirePromotable: false,
+        target: 'node',
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      fs.access(
+        path.join(f.root, framework.MICROVERTICAL_RELEASE_ENVELOPE_PATH),
+      ),
+    ).rejects.toThrow();
+  });
+
+  test('a promotion still refuses the non-promotable identity', async () => {
+    const f = await workspaceFixture();
+    await expect(
+      framework.emitFrameworkMicroVerticalReleaseEnvelope({
+        apiOnly: false,
+        distDirectory: f.root,
+        target: 'node',
+      }),
+    ).rejects.toThrow(/cannot produce a promotable full-stack envelope/);
+  });
+});
+
 describe('empty MF producer', () => {
   const framework = sourceFramework;
 

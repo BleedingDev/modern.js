@@ -129,6 +129,7 @@
   "dependencies": {
     "@modern-js/i18n-runtime-extensions": "workspace:*",
     "@modern-js/plugin": "workspace:*",
+    "@modern-js/runtime-extensions": "workspace:*",
     "@modern-js/runtime-utils": "workspace:*",
     "@modern-js/server-core": "workspace:*",
     "@modern-js/server-runtime": "workspace:*",

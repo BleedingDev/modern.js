@@ -322,7 +322,8 @@ const writeReleaseEnvelope = async (
 
 const readBuildArtifact = async (
   distDirectory: string,
-): Promise<UltramodernBuildArtifact> => {
+  requirePromotable = true,
+): Promise<UltramodernBuildArtifact | undefined> => {
   const artifactPath = path.join(
     distDirectory,
     ULTRAMODERN_BUILD_ARTIFACT_FILE,
@@ -334,6 +335,15 @@ const readBuildArtifact = async (
     );
   }
   if (artifact.deliveryUnit.sourceRevision === 'workspace') {
+    // `resolveUltramodernSourceRevision` deliberately labels a dirty or
+    // non-Git checkout `workspace` so development stays usable; only a
+    // promotion may not carry that identity. A plain `modern build` is the
+    // development path, so it skips the envelope instead of failing the
+    // build. The deploy path still asks for a promotable artifact, which is
+    // where the release gate belongs.
+    if (!requirePromotable) {
+      return undefined;
+    }
     throw new Error(
       '[ultramodern-release-envelope] sourceRevision "workspace" cannot produce a promotable full-stack envelope.',
     );
@@ -748,10 +758,12 @@ const pathExists = async (filePath: string) => {
 export const emitFrameworkMicroVerticalReleaseEnvelope = async ({
   apiOnly,
   distDirectory,
+  requirePromotable = true,
   target,
 }: {
   apiOnly: boolean;
   distDirectory: string;
+  requirePromotable?: boolean;
   target: MicroVerticalReleaseTarget;
 }): Promise<MicroVerticalReleaseEnvelope | undefined> => {
   if (apiOnly) {
@@ -778,7 +790,13 @@ export const emitFrameworkMicroVerticalReleaseEnvelope = async ({
     );
   }
 
-  const buildArtifact = await readBuildArtifact(distDirectory);
+  const buildArtifact = await readBuildArtifact(
+    distDirectory,
+    requirePromotable,
+  );
+  if (!buildArtifact) {
+    return undefined;
+  }
   const identity = {
     unitId: buildArtifact.deliveryUnit.unitId,
     buildMarker: buildArtifact.deliveryUnit.buildMarker,
