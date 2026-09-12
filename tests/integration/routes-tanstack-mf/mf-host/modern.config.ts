@@ -9,6 +9,21 @@ const hostOrigin = process.env.MF_HOST_ORIGIN ?? `http://localhost:${hostPort}`;
 
 export default defineConfig({
   tools: {
+    // TEMPORARY CI DIAGNOSTIC - remove before merge: name the files that
+    // trigger every rebuild, so the CI run says what keeps this app compiling.
+    rspack: (_config, { appendPlugins }) => {
+      appendPlugins({
+        apply(compiler: any) {
+          compiler.hooks.watchRun.tap('mf-diagnostic', (c: any) => {
+            const modified = [...(c.modifiedFiles ?? [])].slice(0, 12);
+            const removed = [...(c.removedFiles ?? [])].slice(0, 12);
+            console.log(
+              `[mf-diagnostic watchRun host ${new Date().toISOString()}] modified=${JSON.stringify(modified)} removed=${JSON.stringify(removed)}`,
+            );
+          });
+        },
+      });
+    },
     devServer: {
       headers: {
         'Access-Control-Allow-Headers':
