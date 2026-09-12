@@ -839,6 +839,46 @@ describe('routes-tanstack-mf', () => {
               for (const pid of targets) {
                 process.kill(Number(pid), 'SIGUSR2');
               }
+              // Per-thread view of each dev server: thread name, state, CPU
+              // ticks and kernel wait channel. Says which threads burn CPU and
+              // whether the JS thread is parked in a native call.
+              const nodeFs2 = await import('node:fs');
+              for (const pid of targets) {
+                const lines: string[] = [];
+                try {
+                  for (const tid of nodeFs2.readdirSync(`/proc/${pid}/task`)) {
+                    const base = `/proc/${pid}/task/${tid}`;
+                    const comm = nodeFs2
+                      .readFileSync(`${base}/comm`, 'utf8')
+                      .trim();
+                    const stat = nodeFs2
+                      .readFileSync(`${base}/stat`, 'utf8')
+                      .replace(/^.*\) /, '')
+                      .split(' ');
+                    let wchan = '?';
+                    try {
+                      wchan = nodeFs2.readFileSync(`${base}/wchan`, 'utf8');
+                    } catch {}
+                    // stat after the comm field: state=0 utime=11 stime=12
+                    lines.push(
+                      `${tid} ${comm} state=${stat[0]} utime=${stat[11]} stime=${stat[12]} wchan=${wchan}`,
+                    );
+                  }
+                  const cmd = nodeFs2
+                    .readFileSync(`/proc/${pid}/cmdline`, 'utf8')
+                    .split('\0')
+                    .slice(1, 3)
+                    .join(' ');
+                  const cwd = nodeFs2.readlinkSync(`/proc/${pid}/cwd`);
+                  console.log(
+                    `[mf-diagnostic threads ${stamp}] pid=${pid} cwd=${cwd} cmd=${cmd}\n  ${lines.join('\n  ')}`,
+                  );
+                } catch (error) {
+                  console.log(
+                    `[mf-diagnostic threads ${stamp}] pid=${pid} failed: ${String(error)}`,
+                  );
+                }
+              }
             } catch (error) {
               console.log(
                 `[mf-diagnostic report ${stamp}] signal failed: ${String(error)}`,
