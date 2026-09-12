@@ -800,8 +800,39 @@ describe('routes-tanstack-mf', () => {
     // about to talk to, over both name and literal address.
     await logFederationReachability(ports.remote, ports.remoteTwo);
 
-    hostApp = await launchApp(hostDir, ports.host, { env });
-    await waitForAppReady(`http://localhost:${ports.host}/`);
+    // TEMPORARY CI DIAGNOSTIC - remove before merge.
+    // While the host boots, re-probe both producers and snapshot every node
+    // process in the fixture tree every 15s, so the run says whether a
+    // producer's dts worker (fork-generate-dts / fork-dev-worker) is alive,
+    // stuck, or gone while the host waits for its types.
+    const monitor = setInterval(() => {
+      void (async () => {
+        const stamp = new Date().toISOString();
+        await logFederationReachability(ports.remote, ports.remoteTwo);
+        try {
+          const { execFileSync } = await import('node:child_process');
+          const ps = execFileSync(
+            'ps',
+            ['-eo', 'pid,ppid,stat,etime,pcpu,rss,args'],
+            { encoding: 'utf8' },
+          )
+            .split('\n')
+            .filter(line => /node|tsc|tsgo/.test(line))
+            .map(line => line.slice(0, 220))
+            .join('\n');
+          console.log(`[mf-diagnostic ${stamp}] processes:\n${ps}`);
+        } catch (error) {
+          console.log(`[mf-diagnostic ${stamp}] ps failed: ${String(error)}`);
+        }
+      })();
+    }, 15_000);
+
+    try {
+      hostApp = await launchApp(hostDir, ports.host, { env });
+      await waitForAppReady(`http://localhost:${ports.host}/`);
+    } finally {
+      clearInterval(monitor);
+    }
 
     browser = await puppeteer.launch(launchOptions as any);
     page = await browser.newPage();
