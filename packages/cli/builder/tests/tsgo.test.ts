@@ -273,6 +273,31 @@ describe('withTsgoDefaults', () => {
     ).toBeUndefined();
   });
 
+  test('keeps handing back the project config to watch while it is malformed or missing', () => {
+    // Mid-edit the project tsconfig may be unparsable or briefly absent. The
+    // refresh must not throw, must leave the last good generated config in
+    // place, and must still return the path so the checker keeps watching it
+    // and the next save re-triggers the compilation.
+    const appDirectory = createVerticalApp({ composite: true });
+    const projectConfigFile = path.join(appDirectory, 'tsconfig.json');
+    const config = applyChain(
+      withTsgoDefaults(
+        { typescript: { configFile: 'tsconfig.json' } },
+        appDirectory,
+      ),
+    );
+    const generatedFile = config.typescript?.configFile as string;
+    const lastGood = readFileSync(generatedFile, 'utf8');
+
+    writeFileSync(projectConfigFile, '{ "compilerOptions": { "composite": tru');
+    expect(refreshTsgoCheckerConfig(generatedFile)).toBe(projectConfigFile);
+    expect(readFileSync(generatedFile, 'utf8')).toBe(lastGood);
+
+    rmSync(projectConfigFile);
+    expect(refreshTsgoCheckerConfig(generatedFile)).toBe(projectConfigFile);
+    expect(readFileSync(generatedFile, 'utf8')).toBe(lastGood);
+  });
+
   test('omits references when the project declares none', () => {
     const appDirectory = createVerticalApp({ composite: true });
     const config = applyChain(

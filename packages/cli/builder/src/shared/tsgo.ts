@@ -314,9 +314,15 @@ export const refreshTsgoCheckerConfig = (
   ) {
     return undefined;
   }
-  const checkerConfig = json5.parse(
-    fs.readFileSync(checkerConfigFile, 'utf8'),
-  ) as TsConfigJson;
+  let checkerConfig: TsConfigJson;
+  try {
+    checkerConfig = json5.parse(
+      fs.readFileSync(checkerConfigFile, 'utf8'),
+    ) as TsConfigJson;
+  } catch {
+    // Not a generated checker config after all; nothing to derive it from.
+    return undefined;
+  }
   if (typeof checkerConfig.extends !== 'string') {
     return undefined;
   }
@@ -324,10 +330,17 @@ export const refreshTsgoCheckerConfig = (
     checkerConfigDirectory,
     checkerConfig.extends,
   );
-  if (!fs.existsSync(projectConfigFile)) {
-    return undefined;
+  // Register-before-parse: the project config path is returned even while the
+  // file is missing or malformed mid-edit, so the caller keeps watching it and
+  // the next save re-triggers the compilation. The generated file is left as
+  // it was, and the compiler reports the broken project config itself.
+  if (fs.existsSync(projectConfigFile)) {
+    try {
+      createTsgoCheckerConfig(projectConfigFile, checkerConfigFile);
+    } catch {
+      // A half-written tsconfig; keep the last good generated config.
+    }
   }
-  createTsgoCheckerConfig(projectConfigFile, checkerConfigFile);
   return projectConfigFile;
 };
 
