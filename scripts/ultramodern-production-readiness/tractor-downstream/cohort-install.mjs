@@ -1,11 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import {
+  inspectNpmTarball,
+  readVerifiedPackageArtifactBytes,
+} from '../../ultramodern-publish/lib/prepare-bleedingdev-packages/release-artifacts.mjs';
 import { expectedReleaseCohort } from '../published-create-proof/package-cohort.mjs';
 import { collectPackageJsonFiles } from './contract.mjs';
 
 // Installs one authenticated release into a workspace already using the current
-// contract. This changes dependency versions and their release identity only.
+// contract. Adopt template-owned patch bytes before pnpm computes its lock and
+// installs dependencies; authored application files remain untouched.
 export function prepareTractorCohortInstallation(
   workspace,
   release,
@@ -23,6 +28,15 @@ export function prepareTractorCohortInstallation(
       'Tractor cohort installation requires the authenticated release projection',
     );
   }
+  const create = release.createPackage;
+  const template = inspectNpmTarball(
+    readVerifiedPackageArtifactBytes(create, create.artifactPath),
+  );
+  const patches = [...template.fileContents].filter(([file]) =>
+    /^template-workspace\/patches\/[^/]+\.patch$/u.test(file),
+  );
+  if (patches.length === 0)
+    throw new Error('Release create template contains no workspace patches');
   const configPath = path.join(workspace, '.modernjs/ultramodern.json');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   if (
@@ -87,6 +101,12 @@ export function prepareTractorCohortInstallation(
     [configPath, config],
     [path.join(workspace, '.modernjs/release-cohort.json'), projection],
   );
+  fs.mkdirSync(path.join(workspace, 'patches'), { recursive: true });
+  for (const [file, bytes] of patches)
+    fs.writeFileSync(
+      path.join(workspace, file.slice('template-workspace/'.length)),
+      bytes,
+    );
   for (const [file, value] of writes)
     fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
   fs.writeFileSync(policyPath, nextPolicy);

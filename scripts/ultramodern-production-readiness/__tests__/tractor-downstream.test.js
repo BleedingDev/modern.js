@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
@@ -848,7 +849,7 @@ test('source-candidate rehearsal tears down its registry and refuses an escaped 
   assert.equal(driftedStarts, 0);
 });
 
-test('cohort installation updates exact dependencies while preserving authored Tractor source', async () => {
+test('cohort installation adopts authenticated template patches and dependencies without changing authored Tractor source', async () => {
   const { prepareTractorCohortInstallation } = await import(
     '../tractor-downstream/cohort-install.mjs'
   );
@@ -864,6 +865,61 @@ test('cohort installation updates exact dependencies while preserving authored T
     next.publishOrder = Object.values(next.aliases);
     next.cohortProjection.value.release.version = next.release.version;
     next.cohortProjection.value.packages[0].version = next.release.version;
+    const { inspectNpmTarball } = await import(
+      '../../ultramodern-publish/lib/prepare-bleedingdev-packages/release-artifacts.mjs'
+    );
+    const { createTemplateRequiredFiles } = await import(
+      '../../ultramodern-publish/lib/prepare-bleedingdev-packages/constants.mjs'
+    );
+    const packageDir = path.join(root, 'candidate/package');
+    for (const relativePath of createTemplateRequiredFiles) {
+      const file = path.join(packageDir, relativePath);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, 'candidate template content');
+    }
+    const patch = 'patches/@module-federation__dts-plugin@2.9.0.patch';
+    fs.mkdirSync(path.join(packageDir, 'template-workspace/patches'), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(packageDir, 'template-workspace', patch),
+      'candidate patch\n',
+    );
+    fs.writeFileSync(
+      path.join(packageDir, 'package.json'),
+      JSON.stringify({
+        name: '@bleedingdev/modern-js-ultramodern-create',
+        version: next.release.version,
+        publishConfig: { access: 'public' },
+      }),
+    );
+    const artifactPath = path.join(root, 'candidate.tgz');
+    runCommand('tar', [
+      '-czf',
+      artifactPath,
+      '-C',
+      path.dirname(packageDir),
+      'package',
+    ]);
+    const bytes = fs.readFileSync(artifactPath);
+    next.createPackage = {
+      ...inspectNpmTarball(bytes),
+      sourceName: '@modern-js/ultramodern-create',
+      targetName: '@bleedingdev/modern-js-ultramodern-create',
+      version: next.release.version,
+      artifactPath,
+      size: bytes.length,
+      sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+      shasum: crypto.createHash('sha1').update(bytes).digest('hex'),
+      integrity: `sha512-${crypto.createHash('sha512').update(bytes).digest('base64')}`,
+    };
+    fs.rmSync(path.dirname(packageDir), { recursive: true });
+    fs.mkdirSync(path.join(root, 'patches'));
+    fs.writeFileSync(path.join(root, patch), 'previous cohort patch\n');
+    fs.writeFileSync(
+      path.join(root, 'patches/tractor.patch'),
+      'authored patch\n',
+    );
     const uiFile = path.join(
       root,
       'apps/shell-super-app/locales/en/shell.json',
@@ -879,11 +935,25 @@ test('cohort installation updates exact dependencies while preserving authored T
     const result = prepareTractorCohortInstallation(root, next, exclusions);
     assert.equal(result.dependencyCount, 1);
     assert.equal(
+      fs.readFileSync(path.join(root, patch), 'utf8'),
+      'candidate patch\n',
+    );
+    assert.equal(
+      fs.readFileSync(path.join(root, 'patches/tractor.patch'), 'utf8'),
+      'authored patch\n',
+    );
+    assert.equal(
       assertAuthenticatedTractorCohort(root, next).version,
       next.release.version,
     );
     assert.equal(assertExactModernDependencySpecifiers(root, next).length, 1);
     assert.equal(fs.readFileSync(uiFile, 'utf8'), before);
+    fs.appendFileSync(artifactPath, 'tampered');
+    assert.throws(
+      () => prepareTractorCohortInstallation(root, next, exclusions),
+      /tarball size mismatch/,
+    );
+    fs.writeFileSync(artifactPath, bytes);
     const manifestFile = path.join(root, 'package.json');
     const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
     manifest.dependencies['@modern-js/unknown'] = 'workspace:*';
