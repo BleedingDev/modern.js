@@ -29,6 +29,15 @@
       },
       "default": "./dist/esm/index.mjs"
     },
+    "./router-navigation": {
+      "types": "./dist/types/router-navigation/index.d.ts",
+      "modern:source": "./src/router-navigation/index.ts",
+      "node": {
+        "import": "./dist/esm-node/router-navigation/index.mjs",
+        "require": "./dist/cjs/router-navigation/index.js"
+      },
+      "default": "./dist/esm/router-navigation/index.mjs"
+    },
     "./package.json": "./package.json",
     "./paths": {
       "types": "./dist/types/paths.d.ts",
@@ -48,6 +57,9 @@
       ],
       "paths": [
         "./dist/types/paths.d.ts"
+      ],
+      "router-navigation": [
+        "./dist/types/router-navigation/index.d.ts"
       ]
     }
   },
@@ -61,8 +73,9 @@
     "node": ">=26.7.0"
   },
   "dependencies": {
-    "i18next-browser-languagedetector": "^8.2.1",
-    "@modern-js/runtime-utils": "workspace:*"
+    "@modern-js/runtime-extensions": "workspace:*",
+    "@modern-js/runtime-utils": "workspace:*",
+    "i18next-browser-languagedetector": "^8.2.1"
   },
   "peerDependencies": {
     "@modern-js/runtime": "workspace:^3.9.0",

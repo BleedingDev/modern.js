@@ -11,6 +11,7 @@ import { useModernI18n } from '../src/runtime/context';
 import { createI18nPlugin } from '../src/runtime/core';
 import type { I18nInstance } from '../src/runtime/i18n';
 import { Link } from '../src/runtime/Link';
+import { useIntegratedRouterAdapter } from '../src/runtime/navigation';
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -132,6 +133,25 @@ function createTanstackRuntimeContext(
   return runtimeContext;
 }
 
+/**
+ * The CSR boot order: `plugin-tanstack`'s `onBeforeRender` publishes only the
+ * hook API, and no router instance exists until `RouterWrapper` renders -
+ * which is below anything that wraps the app, this provider included.
+ */
+function createTanstackCsrRuntimeContextWithoutRouter() {
+  const requestContext = { request: {}, response: {} };
+  return {
+    isBrowser: true,
+    requestContext,
+    context: requestContext,
+    router: {
+      Link: TanstackLink,
+      // `useRouter({ warn: false })` yields nothing before the instance exists.
+      useRouter: () => null,
+    },
+  } as Record<string, unknown>;
+}
+
 async function renderBareRuntime(
   App: ComponentType<any>,
   runtimeContext: Record<string, unknown>,
@@ -225,6 +245,67 @@ describe('bare plugin-i18n navigation adapter', () => {
         cleanup(attempt);
       }
     }
+  });
+
+  test('reports no router until the TanStack instance is installed', async () => {
+    const runtimeContext = createTanstackCsrRuntimeContextWithoutRouter();
+    const App = () => {
+      const adapter = useIntegratedRouterAdapter();
+      return <span data-testid="has-router">{String(adapter.hasRouter)}</span>;
+    };
+
+    rendered = await renderBareRuntime(
+      App,
+      runtimeContext,
+      createI18nInstance('en'),
+    );
+
+    // The hook API is published but the instance is not, so claiming a router
+    // here would hand `changeLanguage()` a `navigate` that only throws.
+    expect(
+      rendered.container.querySelector('[data-testid="has-router"]')
+        ?.textContent,
+    ).toBe('false');
+
+    await act(async () => {
+      applyRouterRuntimeState(runtimeContext, {
+        framework: 'tanstack',
+        instance: createMutableTanstackRouter('/en/terms-of-service'),
+      } as any);
+    });
+
+    // Installing the instance has to reach a provider that already rendered.
+    expect(
+      rendered.container.querySelector('[data-testid="has-router"]')
+        ?.textContent,
+    ).toBe('true');
+  });
+
+  test('leaves links unrouted until the TanStack instance is installed', async () => {
+    const runtimeContext = createTanstackCsrRuntimeContextWithoutRouter();
+    const App = () => (
+      <Link to="/terms-of-service" data-testid="nav-terms">
+        terms
+      </Link>
+    );
+
+    rendered = await renderBareRuntime(
+      App,
+      runtimeContext,
+      createI18nInstance('en'),
+    );
+    const anchor = () =>
+      rendered?.container.querySelector('[data-testid="nav-terms"]');
+    expect(anchor()?.getAttribute('data-router-link')).toBeNull();
+
+    await act(async () => {
+      applyRouterRuntimeState(runtimeContext, {
+        framework: 'tanstack',
+        instance: createMutableTanstackRouter('/cs/obchodni-podminky'),
+      } as any);
+    });
+
+    expect(anchor()?.getAttribute('data-router-link')).toBe('tanstack');
   });
 
   test('follows the router location so the language tracks a client navigation', async () => {

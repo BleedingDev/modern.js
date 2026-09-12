@@ -1439,23 +1439,21 @@ and not in another. The selected-router adapter existed, but only inside
 `@modern-js/i18n-integration`, which is reachable only through
 `ultramodernAppTools()`.
 
-The adapter now lives in `@modern-js/plugin-i18n` and is the default
-`NavigationProvider`. It reads the active router out of the fork-owned router
-runtime-state slot, so it serves both routers without either plugin knowing
-about i18n. Registering it from `plugin-i18n` rather than `i18n-integration` is
-what keeps the Nx graph acyclic: `i18n-integration` peer-depends on
-`@modern-js/runtime`, so reaching it from the default app-tools path would close
-`app-tools -> app-tools-extensions -> i18n-integration -> runtime -> app-tools`,
-while `@modern-js/runtime-extensions` carries no such edge.
-`@modern-js/i18n-integration` re-exports the module, so its entry point is
-unchanged and a composing runtime plugin can still supply its own provider.
-Upstream has no localised-URL feature and no router-agnostic i18n navigation
-seam, so none of this has an upstream home.
+The adapter subsystem itself is **fork-owned and lives outside this package**,
+in `@modern-js/i18n-runtime-extensions/router-navigation`. Upstream-owned
+`@modern-js/plugin-i18n` keeps only a seam: it calls the fork package's factory
+with its own navigation primitives and passes the result to the
+`NavigationProvider` extension point it already exposes. The factory takes
+those primitives as arguments, so the fork package never imports back into
+`plugin-i18n` and the dependency stays one-way; `plugin-i18n` already depended
+on `@modern-js/i18n-runtime-extensions`, so no edge is added to the Nx graph
+either. Upstream has no localised-URL feature and no router-agnostic i18n
+navigation seam, so the behaviour has no upstream home.
 
 | Audited-base-owned path | Owner | Reason | Disposition |
 | --- | --- | --- | --- |
-| `packages/runtime/plugin-i18n/src/runtime/navigation.tsx` | bleedingdev | The selected-router navigation adapter. Resolves the active router from the fork-owned router runtime-state slot, subscribes to its location store so active state and language follow a client-side navigation, and maps a localised target onto the router's own `Link` props. Kept out of `i18n-integration` because reaching that package from the default runtime path closes the Nx cycle described above. Installs a context value only for the router that is reached through the runtime-state slot: the provider wraps the app, so it also sits above the router element, and react-router's location and navigate live in a context that exists only below it - publishing an adapter read from above would shadow the live one a consumer resolves at its own position. | `extension-point` |
-| `packages/runtime/plugin-i18n/src/runtime/core.tsx` | bleedingdev | Default `NavigationProvider` to the selected-router adapter so a bare `appTools()` consumer gets router-aware localised links, and re-export the adapter. A provider supplied by a composing runtime plugin still wins. | `inline-patch` |
-| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Depend on `@modern-js/runtime-extensions` for the router runtime-state slot the adapter reads. This is the edge that lets the adapter live here rather than in `i18n-integration`; it adds no cycle because `runtime-extensions` does not depend back on the runtime entry. | `inline-patch` |
-| `packages/runtime/plugin-i18n/tests/navigation.test.tsx` | bleedingdev | Pins the bare-consumer contract with only `plugin-i18n` registered: the localised `<Link>` renders through the selected router's `Link` with the mapped href, active state is language-invariant across mapped spellings, and the language follows a client-side navigation to a mapped URL. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/runtime/navigation.tsx` | bleedingdev | The seam, and only the seam: it builds the fork-owned selected-router adapter from this package's own `I18nNavigationProvider` and `useNativeI18nRouterAdapter` and exposes it for the `NavigationProvider` extension point. Holding the fork import here is what keeps `core.tsx` to a default-value expression and keeps the adapter subsystem out of this upstream package. | `extension-point` |
+| `packages/runtime/plugin-i18n/src/runtime/core.tsx` | bleedingdev | Default `NavigationProvider` to the seam's provider so a bare `appTools()` consumer gets router-aware localised links, and re-export it. A provider supplied by a composing runtime plugin still wins. | `inline-patch` |
+| `packages/runtime/plugin-i18n/package.json` | bleedingdev | Declare `@modern-js/runtime-extensions` as a dev dependency only, for the test that drives the router runtime-state slot directly. The runtime edge the adapter needs is owned by `@modern-js/i18n-runtime-extensions`, which this package already depended on. | `inline-patch` |
+| `packages/runtime/plugin-i18n/tests/navigation.test.tsx` | bleedingdev | Pins the bare-consumer contract with only `plugin-i18n` registered: the localised `<Link>` renders through the selected router's `Link` with the mapped href, active state is language-invariant across mapped spellings, the language follows a client-side navigation, and - the CSR boot order - the adapter reports no router and leaves links unrouted until the router instance is actually installed, then picks it up when it is. | `extension-point` |
 | `packages/runtime/plugin-i18n/rstest.config.mts` | bleedingdev | Register the new test file. The project lists its test files explicitly, so a new file cannot be picked up any other way. | `inline-patch` |
