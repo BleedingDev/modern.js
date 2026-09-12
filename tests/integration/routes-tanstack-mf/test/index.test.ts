@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'path';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
@@ -121,6 +122,8 @@ function isIgnorableWindowsTaskkillError(error: unknown) {
 }
 
 function createFederatedEnv(ports: FederatedPorts) {
+  // Node does not create --report-directory itself.
+  mkdirSync('/tmp/mf-diag-reports', { recursive: true });
   return {
     // TEMPORARY CI DIAGNOSTIC - remove before merge: every node process in
     // the fixture tree writes a diagnostic report (with its JS stack) when it
@@ -823,10 +826,24 @@ describe('routes-tanstack-mf', () => {
           if (ticks === 3 || ticks === 8) {
             const nodeFs = await import('node:fs');
             try {
-              execFileSync('pkill', ['-USR2', '-f', 'app-tools.*dev'], {
-                encoding: 'utf8',
-              });
-            } catch {}
+              const targets = execFileSync(
+                'pgrep',
+                ['-f', 'app-tools/bin/modern.js dev'],
+                { encoding: 'utf8' },
+              )
+                .split('\n')
+                .filter(Boolean);
+              console.log(
+                `[mf-diagnostic report ${stamp}] signalling pids ${targets.join(',')}`,
+              );
+              for (const pid of targets) {
+                process.kill(Number(pid), 'SIGUSR2');
+              }
+            } catch (error) {
+              console.log(
+                `[mf-diagnostic report ${stamp}] signal failed: ${String(error)}`,
+              );
+            }
             await new Promise(resolve => setTimeout(resolve, 4000));
             try {
               const reportDir = '/tmp/mf-diag-reports';
