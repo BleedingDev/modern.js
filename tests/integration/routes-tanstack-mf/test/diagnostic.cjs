@@ -53,6 +53,13 @@ async function sample(target) {
     });
     socket.addEventListener('open', async () => {
       try {
+        const events = await request('Runtime.evaluate', {
+          expression: 'JSON.stringify(globalThis.__mfWatcherEvents)',
+          returnByValue: true,
+        });
+        console.log(
+          `[mf-diagnostic EVENTS] ${target.cwd} ${events.result.value}`,
+        );
         await request('Profiler.enable');
         await request('Profiler.start');
         await new Promise(done => setTimeout(done, 3000));

@@ -53,6 +53,18 @@ export function startWatcher({
     return path.normalize(finalPath);
   });
 
+  // TEMPORARY CI DIAGNOSTIC: read through the loopback inspector.
+  const diagnostic = process.env.MF_DIAGNOSTIC_DIR
+    ? {
+        paths: defaultWatchedPaths,
+        count: 0,
+        totalMs: 0,
+        cacheSize: 0,
+        latest: '',
+        samples: [] as string[],
+      }
+    : undefined;
+  if (diagnostic) (globalThis as any).__mfWatcherEvents = diagnostic;
   const watcher = new Watcher();
   watcher.createDepTree();
   watcher.listen(defaultWatchedPaths, mergedWatchOptions, (filepath, event) => {
@@ -66,9 +78,18 @@ export function startWatcher({
     // Bust the require cache for the changed module and its parents (incl.
     // modern.server.ts when it or one of its deps changes) so the next runtime
     // build re-imports fresh code, then trigger a unified runtime reload.
+    const started = performance.now();
+    if (diagnostic) {
+      diagnostic.count++;
+      diagnostic.latest = `${event} ${filepath}`;
+      if (diagnostic.samples.length < 20)
+        diagnostic.samples.push(diagnostic.latest);
+      diagnostic.cacheSize = Object.keys(require.cache).length;
+    }
     watcher.updateDepTree();
     watcher.cleanDepCache(filepath);
     onChange(filepath, event);
+    if (diagnostic) diagnostic.totalMs += performance.now() - started;
   });
 
   return watcher;
