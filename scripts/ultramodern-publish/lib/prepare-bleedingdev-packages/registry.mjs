@@ -893,9 +893,13 @@ async function verifyRegistryPackageDist(
   return dist;
 }
 
-// 36 attempts, front-loaded so a package that is already coherent is accepted
-// in seconds. The 35 delays the loop can spend must stay at or above the 350s
-// attestation-propagation window npm has needed; this shape spends 360s.
+// 60 attempts, front-loaded so a package that is already coherent is accepted
+// in seconds. The delays the loop can spend must outlast npm's propagation:
+// 350s was the attestation window it had needed, and on 2026-09-12 (run
+// 34689880072) the packument of one freshly published package stayed without
+// its version for more than the 360s the previous shape spent, failing an
+// otherwise complete cohort after the unrollbackable publish. This shape
+// spends 840s; the publish job's timeout leaves room for it.
 const registryVerificationRetryDelaysMs = Object.freeze([
   2000,
   3000,
@@ -903,6 +907,7 @@ const registryVerificationRetryDelaysMs = Object.freeze([
   5000,
   ...Array.from({ length: 24 }, () => 10000),
   ...Array.from({ length: 8 }, () => 15000),
+  ...Array.from({ length: 24 }, () => 20000),
 ]);
 
 async function verifyRegistryPackage(
