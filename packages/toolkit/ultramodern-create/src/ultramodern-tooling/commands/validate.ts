@@ -35,18 +35,6 @@ export function runValidate(context: CommandContext) {
     return 1;
   }
 
-  // Same class of drift for the authenticated cohort projection: a
-  // version-only adoption keeps the previous cohort's `source.commit`, and
-  // nothing downstream reads it, so the misreported provenance is silent.
-  const cohortProblem = checkReleaseCohortParity({
-    workspaceRoot: context.workspaceRoot,
-    createPackageRoot,
-  });
-  if (cohortProblem) {
-    process.stderr.write(`${formatReleaseCohortParityReport(cohortProblem)}\n`);
-    return 1;
-  }
-
   const workspace = readUltramodernWorkspaceInputs(context.workspaceRoot, {
     overlay: readJsonObject(
       path.join(
@@ -103,6 +91,20 @@ export function runValidate(context: CommandContext) {
         app.deploy.cloudflare[key] = declared[key];
       }
     }
+  }
+  // Same class of drift as a stale cohort patch, for the authenticated cohort
+  // projection: a version-only adoption keeps the previous cohort's
+  // `source.commit`, and nothing downstream reads it, so the misreported
+  // provenance is silent. An installed cohort must ship a readable projection;
+  // a local-source workspace has none to compare against.
+  const cohortProblem = checkReleaseCohortParity({
+    workspaceRoot: context.workspaceRoot,
+    createPackageRoot,
+    requireTemplate: config.packageSource?.strategy === 'install',
+  });
+  if (cohortProblem) {
+    process.stderr.write(`${formatReleaseCohortParityReport(cohortProblem)}\n`);
+    return 1;
   }
   const releaseCohort =
     config.packageSource?.strategy === 'install'

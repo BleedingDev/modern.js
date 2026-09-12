@@ -7,6 +7,14 @@ export interface ReleaseCohortParityInputs {
   workspaceRoot: string;
   /** Root of the installed `@modern-js/ultramodern-create` package. */
   createPackageRoot: string;
+  /**
+   * `true` when the workspace consumes a published cohort
+   * (`packageSource.strategy === 'install'`): the installed create package must
+   * then ship a readable projection, and its absence fails validation instead
+   * of silently disabling the gate. A local-source workspace has no
+   * authenticated projection to compare against and is not judged.
+   */
+  requireTemplate: boolean;
 }
 
 export interface ReleaseCohortParityProblem {
@@ -20,11 +28,21 @@ const TEMPLATE_PROJECTION = path.join(
   RELEASE_COHORT_PROJECTION_PATH,
 );
 
-const readJsonOrUndefined = (file: string): unknown => {
+type JsonRead =
+  | { ok: true; value: unknown }
+  | { ok: false; reason: 'missing' | 'malformed' };
+
+const readJson = (file: string): JsonRead => {
+  let text: string;
   try {
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
+    text = fs.readFileSync(file, 'utf8');
   } catch {
-    return undefined;
+    return { ok: false, reason: 'missing' };
+  }
+  try {
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch {
+    return { ok: false, reason: 'malformed' };
   }
 };
 
@@ -71,20 +89,41 @@ export const jsonDifferences = (
 export const checkReleaseCohortParity = ({
   workspaceRoot,
   createPackageRoot,
+  requireTemplate,
 }: ReleaseCohortParityInputs): ReleaseCohortParityProblem | undefined => {
   const templateFile = path.join(createPackageRoot, TEMPLATE_PROJECTION);
   const workspaceFile = path.join(
     workspaceRoot,
     RELEASE_COHORT_PROJECTION_PATH,
   );
-  const expected = readJsonOrUndefined(templateFile);
-  if (expected === undefined || !fs.existsSync(workspaceFile)) {
-    // A source checkout of the create package ships no projection, and a
-    // workspace without one is judged by the cohort reader, not here.
+  const expected = readJson(templateFile);
+  if (!expected.ok) {
+    if (!requireTemplate) {
+      // A local-source workspace: the create package is a source checkout and
+      // ships no authenticated projection. Nothing to compare against.
+      return undefined;
+    }
+    // An installed cohort without a readable projection cannot be trusted;
+    // failing closed is the point of this gate.
+    return {
+      differences: [],
+      message:
+        `the installed @modern-js/ultramodern-create ships ${
+          expected.reason === 'missing' ? 'no' : 'an unreadable'
+        } release cohort projection at ${templateFile}, so the workspace's ` +
+        `${RELEASE_COHORT_PROJECTION_PATH} cannot be authenticated. ` +
+        'Reinstall the published cohort.',
+    };
+  }
+  if (!fs.existsSync(workspaceFile)) {
+    // A workspace without a projection is judged by the cohort reader.
     return undefined;
   }
-  const actual = readJsonOrUndefined(workspaceFile);
-  const differences = jsonDifferences(expected, actual);
+  const actual = readJson(workspaceFile);
+  const differences = jsonDifferences(
+    expected.value,
+    actual.ok ? actual.value : undefined,
+  );
   if (differences.length === 0) {
     return undefined;
   }
