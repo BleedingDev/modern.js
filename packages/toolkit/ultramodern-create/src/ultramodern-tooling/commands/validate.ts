@@ -1,5 +1,9 @@
 import path from 'node:path';
 import { readWorkspaceReleaseCohort } from '../../ultramodern-release-cohort';
+import {
+  checkReleaseCohortParity,
+  formatReleaseCohortParityReport,
+} from '../../ultramodern-workspace/cohort-parity';
 import { createUltramodernConfig } from '../../ultramodern-workspace/contracts';
 import { createShellHost } from '../../ultramodern-workspace/descriptors';
 import {
@@ -28,6 +32,18 @@ export function runValidate(context: CommandContext) {
   });
   if (patchProblems.length > 0) {
     process.stderr.write(`${formatPatchParityReport(patchProblems)}\n`);
+    return 1;
+  }
+
+  // Same class of drift for the authenticated cohort projection: a
+  // version-only adoption keeps the previous cohort's `source.commit`, and
+  // nothing downstream reads it, so the misreported provenance is silent.
+  const cohortProblem = checkReleaseCohortParity({
+    workspaceRoot: context.workspaceRoot,
+    createPackageRoot,
+  });
+  if (cohortProblem) {
+    process.stderr.write(`${formatReleaseCohortParityReport(cohortProblem)}\n`);
     return 1;
   }
 
