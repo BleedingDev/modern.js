@@ -1,3 +1,4 @@
+import { isDefaultLocaleRedirectSkipPath } from '../shared/mappedUrlStrategy';
 import { asI18nUrlStrategy, type I18nUrlStrategy } from '../shared/urlStrategy';
 
 interface LocaleRedirectRequest {
@@ -23,6 +24,14 @@ export const shouldIgnoreRedirect = (
   languages: string[] = [],
 ): boolean => {
   const remainingPath = stripUrlPathPrefix(pathname, urlPath);
+  // Federation artifacts (`backend-mf-manifest.json`, `backendRemoteEntry.cjs`,
+  // `mf-manifest.json`, …) are never pages: redirecting them to a locale
+  // prefix hands a remote consumer an HTML document. This is native policy and
+  // does not depend on a URL strategy being configured; a strategy can only
+  // add exclusions.
+  if (isDefaultLocaleRedirectSkipPath(remainingPath, languages)) {
+    return true;
+  }
   if (
     asI18nUrlStrategy(urlStrategy)?.shouldSkipRedirect?.(
       remainingPath,

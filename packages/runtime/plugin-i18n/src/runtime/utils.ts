@@ -1,6 +1,7 @@
 import { isBrowser } from '@modern-js/runtime';
 import { getGlobalBasename } from '@modern-js/runtime/context';
 import { splitUrlTarget } from '@modern-js/runtime-utils/url';
+import { isDefaultLocaleRedirectSkipPath } from '../shared/mappedUrlStrategy';
 import { asI18nUrlStrategy, type I18nUrlStrategy } from '../shared/urlStrategy';
 
 export { splitUrlTarget } from '@modern-js/runtime-utils/url';
@@ -122,6 +123,11 @@ export const shouldIgnoreRedirect = (
   ignoreRedirectRoutes?: string[] | ((pathname: string) => boolean),
   urlStrategy?: I18nUrlStrategy,
 ): boolean => {
+  // Same native exclusions as the server: federation artifacts are never
+  // locale-redirected, with or without a configured strategy.
+  if (isDefaultLocaleRedirectSkipPath(pathname, languages)) {
+    return true;
+  }
   if (
     asI18nUrlStrategy(urlStrategy)?.shouldSkipRedirect?.(pathname, languages)
   ) {

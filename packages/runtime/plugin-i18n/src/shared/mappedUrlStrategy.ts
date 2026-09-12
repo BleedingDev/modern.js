@@ -7,6 +7,14 @@ import {
 import type { I18nUrlStrategy } from './urlStrategy';
 
 /**
+ * The fork's native locale-redirect exclusions (federation artifacts, static
+ * and upload prefixes). Re-exported from this fork-owned seam so the native
+ * runtime and server redirect paths apply them without importing the
+ * extensions package themselves.
+ */
+export { isDefaultLocaleRedirectSkipPath } from '@modern-js/i18n-runtime-extensions';
+
+/**
  * Build the URL policy from a mapped-locale-URL configuration.
  *
  * `localeDetection.localisedUrls` is plain data, so unlike a `urlStrategy`
