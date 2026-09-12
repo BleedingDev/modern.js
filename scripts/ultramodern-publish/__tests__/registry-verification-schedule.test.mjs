@@ -8,10 +8,11 @@ import { registryVerificationRetryDelaysMs } from '../lib/prepare-bleedingdev-pa
 // one package's packument lagged for more than the 360s the loop then spent).
 test('post-publish verification outlasts npm packument propagation', () => {
   const delays = [...registryVerificationRetryDelaysMs];
-  const totalMs = delays.reduce((sum, delay) => sum + delay, 0);
+  // The loop sleeps only between attempts: the final entry is never spent.
+  const spentMs = delays.slice(0, -1).reduce((sum, delay) => sum + delay, 0);
   assert.ok(
-    totalMs >= 840_000,
-    `verification spends ${totalMs}ms; npm has needed more than 420s`,
+    spentMs >= 840_000,
+    `verification waits ${spentMs}ms; npm has needed more than 420s`,
   );
   // Front-loaded: a package that is already coherent is accepted in seconds.
   assert.ok(delays[0] <= 2000);

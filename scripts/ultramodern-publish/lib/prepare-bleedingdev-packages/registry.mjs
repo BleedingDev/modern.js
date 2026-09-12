@@ -898,8 +898,9 @@ async function verifyRegistryPackageDist(
 // 350s was the attestation window it had needed, and on 2026-09-12 (run
 // 34689880072) the packument of one freshly published package stayed without
 // its version for more than the 360s the previous shape spent, failing an
-// otherwise complete cohort after the unrollbackable publish. This shape
-// spends 840s; the publish job's timeout leaves room for it.
+// otherwise complete cohort after the unrollbackable publish. The loop sleeps
+// only between attempts, so the last entry is never spent: this shape waits
+// 855s; the publish job's timeout leaves room for it.
 const registryVerificationRetryDelaysMs = Object.freeze([
   2000,
   3000,
@@ -907,7 +908,7 @@ const registryVerificationRetryDelaysMs = Object.freeze([
   5000,
   ...Array.from({ length: 24 }, () => 10000),
   ...Array.from({ length: 8 }, () => 15000),
-  ...Array.from({ length: 24 }, () => 20000),
+  ...Array.from({ length: 25 }, () => 20000),
 ]);
 
 async function verifyRegistryPackage(
